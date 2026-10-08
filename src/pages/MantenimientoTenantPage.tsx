@@ -1,8 +1,10 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ChevronDown, TriangleAlert, Wrench } from "lucide-react";
+import { ChevronDown, Eye, Trash2, TriangleAlert, Wrench } from "lucide-react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { AccionesFila } from "@/components/ui/AccionesFila";
+import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   SelectorOpcionesSheet,
@@ -19,7 +21,6 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
 import {
-  listadoTablaAccionClass,
   listadoTablaHeadRowClass,
   listadoTablaTdClass,
   listadoTablaThClass,
@@ -198,9 +199,23 @@ export function MantenimientoTenantPage() {
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
-        Mantenimiento
-      </h1>
+      {/* Título a la izquierda; acción de la pestaña activa a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
+          Mantenimiento
+        </h1>
+        {activeTab === "intervenciones" && !isReadOnly && (
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setModal({ mode: "create" })}
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            >
+              Nueva intervención
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="mt-6 border-b border-black/15">
         <div className="pb-3 lg:hidden">
@@ -269,20 +284,8 @@ export function MantenimientoTenantPage() {
       <div className="mt-6">
         {activeTab === "intervenciones" && (
           <>
-            <div className="flex flex-wrap items-center justify-end gap-3">
-              {!isReadOnly && (
-                <button
-                  type="button"
-                  onClick={() => setModal({ mode: "create" })}
-                  className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-                >
-                  Nueva intervención
-                </button>
-              )}
-            </div>
-
             {error && (
-              <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+              <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
                 {error}
               </p>
             )}
@@ -437,26 +440,26 @@ export function MantenimientoTenantPage() {
               }
               loadingMessage="Cargando…"
               actionsTdClassName={listadoTablaTdClass}
-              renderActions={(r) => (
-                <div className="inline-flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setModal({ mode: "view", intervencion: r })}
-                    className={listadoTablaAccionClass}
-                  >
-                    Ver
-                  </button>
-                  {!isReadOnly && (
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(r)}
-                      className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
-                    >
-                      Eliminar
-                    </button>
-                  )}
-                </div>
-              )}
+              renderActions={(r) => {
+                const options: AccionOpcion[] = [
+                  {
+                    id: "ver",
+                    label: "Ver",
+                    icon: Eye,
+                    onClick: () => setModal({ mode: "view", intervencion: r }),
+                  },
+                ];
+                if (!isReadOnly) {
+                  options.push({
+                    id: "eliminar",
+                    label: "Eliminar",
+                    icon: Trash2,
+                    danger: true,
+                    onClick: () => setDeleteTarget(r),
+                  });
+                }
+                return <AccionesFila options={options} destacadas={["ver"]} />;
+              }}
             />
           </>
         )}

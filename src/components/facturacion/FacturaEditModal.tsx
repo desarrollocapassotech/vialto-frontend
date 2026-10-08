@@ -25,6 +25,7 @@ import {
   textoImporteFacturaSeleccion,
   textoMontoFacturarListado,
 } from "@/lib/viajesFlota";
+import { normalizeViajeMoneda } from "@/lib/currencyMask";
 import {
   computeFacturaTotalesFromBases,
   importeNetoViajeParaFactura,
@@ -345,7 +346,8 @@ export function ViajesVinculadosEditor({
           viajes={pool}
           selectedIds={selected}
           onToggle={toggle}
-          renderMonto={(v) => textoMontoFacturarListado(v)}
+          renderMonto={(v, conMoneda) => textoMontoFacturarListado(v, conMoneda)}
+          monedaDe={(v) => normalizeViajeMoneda(v.monedaMonto)}
           loading={loading}
           fillHeight
           emptyMessage="No hay viajes disponibles para vincular."
@@ -364,7 +366,8 @@ export function ViajesVinculadosEditor({
       viajes={pool}
       selectedIds={selected}
       onToggle={toggle}
-      renderMonto={(v) => textoMontoFacturarListado(v)}
+      renderMonto={(v, conMoneda) => textoMontoFacturarListado(v, conMoneda)}
+      monedaDe={(v) => normalizeViajeMoneda(v.monedaMonto)}
       loading={loading}
       maxHeightClass="max-h-72"
       emptyMessage="No hay viajes disponibles para vincular."
@@ -426,6 +429,8 @@ export type FacturaEditModalProps = {
   idPropio2Habilitado?: boolean;
   /** Label configurable de la columna "ID Propio 2". */
   idPropio2Label?: string;
+  /** Tenant con ARCA: el número lo asigna AFIP al emitir, no se edita a mano. */
+  hasArca?: boolean;
 };
 
 export function FacturaEditModal({
@@ -441,6 +446,7 @@ export function FacturaEditModal({
   onSave,
   saving,
   error,
+  hasArca = false,
   showComprobanteAdjunto = false,
   idSistemaHabilitado = true,
   idPropio1Habilitado = true,
@@ -646,18 +652,20 @@ export function FacturaEditModal({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Número (opcional)
-              </label>
-              <input
-                type="text"
-                value={draft.numero}
-                onChange={(e) => patch({ numero: e.target.value })}
-                placeholder="0001-00000001"
-                className="h-9 border border-black/20 bg-white px-3 text-sm"
-              />
-            </div>
+            {!hasArca && (
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                  Número (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={draft.numero}
+                  onChange={(e) => patch({ numero: e.target.value })}
+                  placeholder="0001-00000001"
+                  className="h-9 border border-black/20 bg-white px-3 text-sm"
+                />
+              </div>
+            )}
 
             <FacturaContraparteField
               clienteId={draft.clienteId}

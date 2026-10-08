@@ -439,6 +439,10 @@ export interface Tenant {
   validacionCuitArcaHabilitada?: boolean;
   /** Con qué flota trabaja la empresa. Default 'mixta'; solo lo cambia superadmin (ver `useTipoFlotaVisible`). */
   tipoFlota?: TipoFlota;
+  /** false = sin dashboard; el inicio es el primer módulo contratado (`lib/tenantHome.ts`). Default true; solo lo cambia superadmin. */
+  dashboardHabilitado?: boolean;
+  /** Default true. false = origen/destino de Viajes en texto libre, sin buscador de ciudades ni validación en el import. */
+  recomendacionCiudadesHabilitada?: boolean;
   /**
    * Unidad de cantidad de flete del tenant — 'TN' (default, toneladas) | 'UD' (unidades).
    * Afecta los PDFs de Factura A/B, Liquidación (CVLP) y Contrato de liquidación, y los
@@ -668,6 +672,8 @@ export interface ImportPreviewFilaEntidad {
   fila: number;
   /** true = alta nueva, false = actualiza un registro ya existente. */
   esNuevo: boolean;
+  /** Solo si `esNuevo` es false: la fila no cambia nada del registro existente. */
+  sinCambios?: boolean;
   campos: ImportPreviewFilaCampo[];
 }
 
@@ -701,6 +707,25 @@ export interface ImportColumnaEsperada {
   recomendado?: boolean;
   allowedValues?: string[];
   lookupModel?: string;
+}
+
+/** Hoja del Excel asignada a un módulo por `POST /importaciones/detectar-hojas`. */
+export interface ImportDeteccionHoja {
+  modulo: string;
+  /** Nombre real de la hoja — se manda como `hoja` al preview. */
+  hoja: string;
+  /** Filas con datos. */
+  filas: number;
+  /** Encabezados obligatorios que faltan (solo si se detectó por nombre). */
+  faltantes: string[];
+  detectadaPor: "nombre" | "encabezados";
+}
+
+export interface ImportDeteccionHojas {
+  /** En orden de importación. */
+  hojas: ImportDeteccionHoja[];
+  /** Hojas con datos sin asignar; `candidatos` = módulos empatados (vacío = no se parece a ninguno). */
+  sinIdentificar: { hoja: string; filas: number; candidatos: string[] }[];
 }
 
 export interface ImportColumnasEsperadasModulo {

@@ -12,6 +12,8 @@ import { useAuth } from "@clerk/clerk-react";
 import { Receipt } from "lucide-react";
 import { useLockBodyScroll } from "@/hooks/useLockBodyScroll";
 import { SinConfigArcaAviso } from "@/components/facturacion/SinConfigArcaAviso";
+import { EmisorArcaResumen } from "@/components/facturacion/EmisorArcaResumen";
+import { ParteFacturaResumen } from "@/components/facturacion/ParteFacturaResumen";
 import {
   computeFacturaTotales,
   defaultFacturaLineas,
@@ -408,75 +410,41 @@ export function EmitirFacturaModal({
                     </span>
                   </div>
 
-                  <section className="space-y-1">
-                    <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
-                      Emisor
-                    </p>
-                    <p className="text-sm text-vialto-charcoal font-medium">
-                      {arcaConfig?.razonSocial ?? "—"}
-                    </p>
-                    <p className="text-xs text-vialto-steel">
-                      CUIT {arcaConfig?.cuitEmisor ?? "—"}
-                      {arcaConfig?.domicilioEmisor
-                        ? ` · ${arcaConfig.domicilioEmisor}`
-                        : ""}
-                    </p>
-                    {arcaConfig && (
-                      <p className="text-xs text-vialto-steel">
-                        Ing. Brutos: {arcaConfig.ingBrutos?.trim() || "—"}
-                        {" · "}
-                        Inic. act.: {arcaConfig.inicActEmisor?.trim() || "—"}
-                      </p>
-                    )}
-                  </section>
+                  <div className="grid grid-cols-2 gap-4">
+                    <EmisorArcaResumen arcaConfig={arcaConfig} />
+                    <ParteFacturaResumen
+                      titulo="Receptor"
+                      nombre={clienteDetalle?.nombre}
+                      detalle={
+                        clienteDetalle
+                          ? [
+                              condicionIvaLabel(condicionIva),
+                              clienteDetalle.idFiscal ? `CUIT ${clienteDetalle.idFiscal}` : null,
+                              clienteDetalle.direccion?.trim(),
+                              clienteDetalle.pais ? `País: ${clienteDetalle.pais}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join("\n")
+                          : undefined
+                      }
+                    />
+                  </div>
 
-                  <section className="space-y-1">
-                    <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
-                      Receptor (cliente)
-                    </p>
-                    <p className="text-sm text-vialto-charcoal font-medium">
-                      {clienteDetalle?.nombre ?? "—"}
-                    </p>
-                    <p className="text-xs text-vialto-steel">
-                      {condicionIvaLabel(condicionIva)}
-                      {clienteDetalle?.idFiscal
-                        ? ` · CUIT ${clienteDetalle.idFiscal}`
-                        : ""}
-                    </p>
-                    {clienteDetalle?.direccion && (
-                      <p className="text-xs text-vialto-steel">
-                        {clienteDetalle.direccion}
+                  {/* Campos ocultos: el aviso de abajo no aparece en este caso, así que se avisa acá. */}
+                  {missingHiddenFields.length > 0 && (
+                    <div className="rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900" role="alert">
+                      <p className="font-semibold">Faltan datos fiscales requeridos por ARCA</p>
+                      <p className="mt-1">
+                        Faltan los siguientes datos del cliente: <strong>{missingClienteFields.map(formatMissingFiscalField).join(", ")}</strong>.
+                        <br />Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.
                       </p>
-                    )}
-                    {clienteDetalle?.pais && (
-                      <p className="text-xs text-vialto-steel">
-                        País: {clienteDetalle.pais}
-                      </p>
-                    )}
-                    {missingHiddenFields.length > 0 ? (
-                      <div className="mt-2 rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900" role="alert">
-                        <p className="font-semibold">Faltan datos fiscales requeridos por ARCA</p>
-                        <p className="mt-1">
-                          Faltan los siguientes datos del cliente: <strong>{missingClienteFields.map(formatMissingFiscalField).join(", ")}</strong>.
-                          <br />Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.
-                        </p>
-                      </div>
-                    ) : missingClienteFields.length > 0 && (
-                      <div className="mt-2 rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
-                        <p className="font-medium">
-                          Faltan datos del cliente: {missingClienteFields.map((f) => f.replace("Cliente: ", "")).join(", ")}.
-                          <br />
-                          <strong className="font-bold">Desplazate hacia abajo para completarlos.</strong>
-                        </p>
-                      </div>
-                    )}
-                  </section>
+                    </div>
+                  )}
 
                   <section className="space-y-1">
                     <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
                       Comprobante
                     </p>
-                    <Row label="Número local" value={factura.numero ?? "—"} />
                     <Row
                       label="Fecha de emisión"
                       value={fmtDate(factura.fechaEmision)}

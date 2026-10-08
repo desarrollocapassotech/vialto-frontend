@@ -256,6 +256,8 @@ export function ViajeCreatePage() {
     }
     return paisesConSesion.find((p) => p.id === tenantConfig.paisOrigenDestinoFijoId) ?? null;
   }, [tenantConfig, paisesConSesion]);
+  /** `Tenant.recomendacionCiudadesHabilitada` (default true): false = ciudades en texto libre. */
+  const sugerenciasCiudad = tenantConfig?.recomendacionCiudadesHabilitada !== false;
 
   // El selector de país queda oculto en la UI cuando `paisFijo` está seteado (ver
   // `ViajeClientesFieldset`/`ViajeDestinosLista`) — acá se garantiza que lo que se valida
@@ -1059,6 +1061,7 @@ export function ViajeCreatePage() {
                 getToken={getToken}
                 onProductoCreado={(p) => setProductosCatalogo((prev) => [...prev, p])}
                 paisFijo={paisFijo}
+                sugerenciasCiudad={sugerenciasCiudad}
                 error={error}
                 onContinuar={() => void handleContinuar1()}
               />

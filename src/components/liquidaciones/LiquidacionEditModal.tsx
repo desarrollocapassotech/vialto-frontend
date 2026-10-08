@@ -56,9 +56,13 @@ function monedaDeViaje(
   return normalizeViajeMoneda(v.monedaPrecioTransportistaExterno);
 }
 
-function fmtMontoViaje(n: number | null, moneda?: string | null): string {
+function fmtMontoViaje(
+  n: number | null,
+  moneda?: string | null,
+  conMoneda = true,
+): string {
   if (n == null) return "—";
-  return formatViajeImporteForListado(n, moneda);
+  return formatViajeImporteForListado(n, moneda, conMoneda);
 }
 
 const INPUT =
@@ -584,12 +588,14 @@ export function LiquidacionEditModal({
                   idPropio1Label={idPropio1Label}
                   idPropio2Habilitado={idPropio2Habilitado}
                   idPropio2Label={idPropio2Label}
-                  renderMonto={(v) =>
+                  renderMonto={(v, conMoneda) =>
                     fmtMontoViaje(
                       v.precioTransportistaExterno,
                       v.monedaPrecioTransportistaExterno,
+                      conMoneda,
                     )
                   }
+                  monedaDe={monedaDeViaje}
                   disabledCheck={(v) => {
                     const moneda = monedaDeViaje(v);
                     const disabled =

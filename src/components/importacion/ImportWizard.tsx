@@ -1,16 +1,13 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useToast } from "@/lib/toast";
 import { Check, Download, Upload } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import {
   ViewModalShell,
   viewModalBtnGhost,
-  viewModalBtnPrimary,
 } from "@/components/ui/ViewModalShell";
-import { ListadoCard } from "@/components/listado/ListadoCard";
-import { ListadoDatos } from "@/components/listado/ListadoDatos";
-import { listadoTablaTdClass } from "@/lib/listadoTabla";
 import { labelModulo } from "@/lib/platformLabels";
 import { apiJson } from "@/lib/api";
 import { modalEditOverlayClass, modalEditPanelClass } from "@/lib/modalLayers";
@@ -22,6 +19,7 @@ import {
 import {
   MODULOS_SECUENCIA,
   useImportWizard,
+  type AsignacionHoja,
   type ModuloWizard,
 } from "@/hooks/useImportWizard";
 import { CiudadAdvertenciasPanel } from "@/components/importacion/CiudadAdvertenciasPanel";
@@ -31,10 +29,10 @@ import { condicionIvaLabel } from "@/lib/arcaCbteTipo";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import type { PaisCodigo } from "@/lib/ciudades";
 import type {
   ImportPreviewViaje,
-  ImportPreviewFactura,
-  ImportPreviewEntidad,
   ImportPreviewFilaEntidad,
   ImportColumnasEsperadasModulo,
   ImportCampoUnicoConflicto,
@@ -46,6 +44,12 @@ interface ImportWizardProps {
   /** Adónde vuelve el botón "Listo" al terminar el wizard. */
   backTo: string;
   /**
+   * Listado de Viajes de esta empresa (con `?tenantId=` para superadmin).
+   * Si la importación termina sin errores y se importaron viajes, el wizard
+   * redirige acá en vez de mostrar el resumen; sin viajes, a `backTo`.
+   */
+  viajesTo: string;
+  /**
    * Base de la URL de configuración de templates (ej.
    * `/superadmin/empresas/:orgId/importar/templates`). Solo el superadmin la
    * tiene — cuando está presente, un error de columnas faltantes ofrece un
@@ -54,6 +58,10 @@ interface ImportWizardProps {
    * le pida el ajuste a su administrador.
    */
   templatesTo?: string;
+  /** Título de la página: va a la izquierda, en la misma línea que los pasos. */
+  encabezado?: ReactNode;
+  /** Botones extra a la derecha de "Cambiar archivo" (ej. "Configurar templates" en superadmin). */
+  acciones?: ReactNode;
 }
 
 const th = "px-3 py-2 text-left font-semibold text-vialto-steel";
@@ -71,26 +79,33 @@ const TIPOS_VEHICULO = [
 ];
 
 /**
- * Wizard paso a paso del import: Clientes → Transportes → Choferes →
- * Vehículos → Viajes → (opcional) Liquidaciones borrador → (opcional)
- * Facturar a clientes. Cada etapa se previsualiza y confirma por separado —
- * no hay un botón único que confirme todo el archivo de una vez.
+ * Etapas post-viajes ("Liquidaciones a transportistas" / "Facturas a
+ * clientes": borradores generados con los viajes recién importados).
+ * Ocultas a pedido (oct 2026): nunca se eligen, y las fases
+ * `post-liquidaciones`/`post-facturas` del wizard se saltean solas
+ * (`AvanceSilencioso`). Toda la lógica sigue; para reactivarlas hay que volver
+ * a ofrecer los checks (ver CLAUDE.md, "Importación masiva desde Excel").
+ */
+const POST_VIAJES_ELEGIDO = { liquidaciones: false, facturas: false } as const;
+
+/**
+ * Wizard paso a paso del import. Arranca por el archivo: el backend detecta
+ * qué módulos trae (`useImportWizard.startFile`) y la secuencia se arma solo
+ * con esos, en orden Clientes → Transportes → Choferes → Vehículos → Viajes.
+ * Cada etapa se previsualiza y confirma (o se saltea) por separado — no hay
+ * un botón único que confirme todo el archivo de una vez.
  * Compartido entre tenant-admin y superadmin: la única diferencia entre
  * ambos es qué `tenantId`/`tenantModules` se le pasa desde la página que lo
  * hostea.
  */
-interface TenantTieneDatos {
-  clientes: boolean;
-  transportistas: boolean;
-  choferes: boolean;
-  vehiculos: boolean;
-}
-
 export function ImportWizard({
   tenantId,
   tenantModules,
   backTo,
+  viajesTo,
   templatesTo,
+  encabezado,
+  acciones,
 }: ImportWizardProps) {
   const { getToken } = useAuth();
   const maestro = useMaestroData();
@@ -101,144 +116,48 @@ export function ImportWizard({
   const hasLiquidoProductoArca = tenantModules.includes(
     "emision-liquido-producto-arca",
   );
-  const hasFacturacion = tenantModules.includes("facturacion");
-  const hasLiquidaciones = tenantModules.includes("liquidaciones");
-  const puedeLiquidaciones = hasLiquidaciones || hasLiquidoProductoArca;
-  const puedeFacturas = hasFacturasArca || hasFacturacion;
+  const postViajesElegido = POST_VIAJES_ELEGIDO;
   // Empresa solo de flota propia (Tenant.tipoFlota): no tiene transportistas,
   // el paso "Transportes" no se ofrece ni se recorre.
   const { transportistaExternoVisible } = useTipoFlotaVisible(tenantId);
+  // País fijo de la empresa: las ciudades a confirmar se buscan solo en ese país.
+  const { paisFijo, tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
   const moduloPermitido = (m: ModuloWizard) =>
     m !== "transportistas" || transportistaExternoVisible;
 
-  // Un tenant nuevo (sin nada cargado todavía, y sin liquidaciones/facturas
-  // que ofrecer) arranca directo con la secuencia completa — es el caso de
-  // uso principal. Si ya tiene datos, o si puede generar liquidaciones/
-  // facturas al final, se le pregunta primero qué quiere hacer en esta
-  // importación, para no forzarlo a pasar por hojas que no le interesan.
-  const [tieneDatos, setTieneDatos] = useState<TenantTieneDatos | null>(null);
-  const [modulosElegidos, setModulosElegidos] = useState<ModuloWizard[] | null>(
-    null,
-  );
-  // Checks de la pantalla de selección — viven acá (no en SelectorModulos)
-  // para que el stepper de arriba se pueda actualizar en vivo a medida que
-  // se tildan/destildan módulos, antes de confirmar con "Continuar →".
-  const [seleccionados, setSeleccionados] = useState<Set<ModuloWizard>>(
-    new Set(),
-  );
-  // Generar liquidaciones/facturas borrador después de Viajes es opcional y
-  // arranca siempre destildado — el usuario lo elige a propósito, no por
-  // default. Si no seleccionó nada (selector salteado), queda en false.
-  const [postViajesElegido, setPostViajesElegido] = useState<{
-    liquidaciones: boolean;
-    facturas: boolean;
-  }>({ liquidaciones: false, facturas: false });
-  // Checks de Liquidaciones/Facturas en la pantalla de selección — misma
-  // razón que `seleccionados`: viven acá para que el stepper reaccione en
-  // vivo. `postViajesElegido` (arriba) recién se fija cuando se confirma con
-  // "Continuar →".
-  const [liquidacionesSel, setLiquidacionesSel] = useState(false);
-  const [facturasSel, setFacturasSel] = useState(false);
-  // Se incrementa al "Volver a importar" para forzar un re-chequeo de
-  // tenant-tiene-datos — después de una corrida puede haber cambiado (ej. se
-  // acaban de crear los clientes que antes faltaban).
-  const [refetchTieneDatos, setRefetchTieneDatos] = useState(0);
-  // Puramente informativo (qué columnas espera cada módulo) — no bloquea el
-  // selector si todavía no llegó o si falla.
-  const [columnasEsperadas, setColumnasEsperadas] = useState<
-    ImportColumnasEsperadasModulo[] | null
-  >(null);
-  // Refrescar columnas esperadas al reiniciar la importación
-  const [refetchColumnas, setRefetchColumnas] = useState(0);
+  // La planilla modelo se pide al hacer clic (no al montar): así el botón no
+  // queda deshabilitado esperando una consulta, y siempre refleja la
+  // configuración de campos vigente de la empresa.
+  const [descargandoPlantilla, setDescargandoPlantilla] = useState(false);
+  const [errorPlantilla, setErrorPlantilla] = useState<string | null>(null);
   // Paso ya completado que el usuario quiere volver a mirar (no navega el
   // wizard hacia atrás, solo abre un resumen de lo que ya pasó en esa etapa
   // — los pasos futuros o el actual no son clickeables).
   const [pasoRevisando, setPasoRevisando] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelado = false;
-    setColumnasEsperadas(null);
-    (async () => {
-      try {
-        const data = await apiJson<ImportColumnasEsperadasModulo[]>(
-          `/api/importaciones/columnas-esperadas?tenantId=${encodeURIComponent(tenantId)}`,
-          getToken,
-        );
-        if (!cancelado) setColumnasEsperadas(data);
-      } catch {
-        // Si falla, el selector se muestra igual sin la info de columnas.
-      }
-    })();
-    return () => {
-      cancelado = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, refetchColumnas]);
-
-  // Por defecto solo quedan tildados Viajes (siempre) y los módulos que
-  // todavía no tienen datos cargados — los que ya tienen algo se destildan
-  // para no forzar un re-import de lo que ya está, aunque se puedan sumar a mano.
-  function seleccionPorDefecto(data: TenantTieneDatos): Set<ModuloWizard> {
-    return new Set(
-      MODULOS_SELECTOR.filter(
-        ({ key, tieneDatosKey }) =>
-          key === "viajes" || !tieneDatosKey || !data[tieneDatosKey],
-      ).map(({ key }) => key),
-    );
+  async function descargarPlanilla() {
+    setDescargandoPlantilla(true);
+    setErrorPlantilla(null);
+    try {
+      const data = await apiJson<ImportColumnasEsperadasModulo[]>(
+        `/api/importaciones/columnas-esperadas?tenantId=${encodeURIComponent(tenantId)}`,
+        getToken,
+      );
+      descargarPlantillaImportacion(
+        data.filter((m) => moduloPermitido(m.modulo as ModuloWizard)),
+      );
+    } catch {
+      setErrorPlantilla("No se pudo generar la planilla. Probá de nuevo.");
+    } finally {
+      setDescargandoPlantilla(false);
+    }
   }
-
-  useEffect(() => {
-    let cancelado = false;
-    setTieneDatos(null);
-    setModulosElegidos(null);
-    setPostViajesElegido({ liquidaciones: false, facturas: false });
-    setSeleccionados(new Set());
-    setLiquidacionesSel(false);
-    setFacturasSel(false);
-    (async () => {
-      try {
-        const data = await apiJson<TenantTieneDatos>(
-          `/api/importaciones/tenant-tiene-datos?tenantId=${encodeURIComponent(tenantId)}`,
-          getToken,
-        );
-        if (cancelado) return;
-        setTieneDatos(data);
-        setSeleccionados(seleccionPorDefecto(data));
-        if (
-          !data.clientes &&
-          !data.transportistas &&
-          !data.choferes &&
-          !data.vehiculos &&
-          !puedeLiquidaciones &&
-          !puedeFacturas
-        ) {
-          setModulosElegidos([...MODULOS_SECUENCIA]);
-        }
-      } catch {
-        // Si falla la consulta, no bloqueamos el import: se arranca con la secuencia completa.
-        if (!cancelado) {
-          const data: TenantTieneDatos = {
-            clientes: false,
-            transportistas: false,
-            choferes: false,
-            vehiculos: false,
-          };
-          setTieneDatos(data);
-          setSeleccionados(seleccionPorDefecto(data));
-          setModulosElegidos([...MODULOS_SECUENCIA]);
-        }
-      }
-    })();
-    return () => {
-      cancelado = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, refetchTieneDatos]);
 
   const wizard = useImportWizard(
     tenantId,
-    (modulosElegidos ?? [...MODULOS_SECUENCIA]).filter(moduloPermitido),
+    MODULOS_SECUENCIA.filter(moduloPermitido),
     () => getToken(),
+    tenantEfectivo?.recomendacionCiudadesHabilitada !== false,
   );
 
   // El wizard crea clientes/transportistas/choferes/vehículos por fuera del
@@ -266,6 +185,34 @@ export function ImportWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wizard.fase]);
 
+  // Importación terminada sin errores: no hay nada que revisar en el resumen,
+  // se va directo al listado (Viajes si se importaron viajes) con un toast.
+  // Con errores (o si no se importó nada) se queda en el resumen para que se
+  // vea el detalle.
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+  useEffect(() => {
+    if (wizard.fase !== "terminado") return;
+    const etapas = wizard.etapasCompletadas;
+    const huboSinCambios = wizard.sinCambiosModulos.size > 0;
+    if (etapas.length === 0 && !huboSinCambios) return;
+    if (etapas.some((e) => e.log.errores > 0)) return;
+    const contar = (pred: (d: (typeof etapas)[number]["log"]["detalles"][number]) => boolean) =>
+      etapas.reduce((n, e) => n + e.log.detalles.filter(pred).length, 0);
+    const creados = contar((d) => d.estado === "ok" && d.creado === true);
+    const actualizados = contar((d) => d.estado === "ok" && d.creado === false);
+    showToast(
+      creados + actualizados === 0
+        ? "Importación completada: todo ya estaba cargado, no hubo cambios"
+        : `Importación completada: ${creados} creados · ${actualizados} actualizados`,
+      "success",
+    );
+    const incluyoViajes =
+      etapas.some((e) => e.modulo === "viajes") || wizard.sinCambiosModulos.has("viajes");
+    navigate(incluyoViajes ? viajesTo : backTo, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wizard.fase]);
+
   const [numerosPorCliente, setNumerosPorCliente] = useState<
     Record<string, string>
   >({});
@@ -290,95 +237,33 @@ export function ImportWizard({
 
   function reiniciarImportacion() {
     wizard.reset();
-    setModulosElegidos(null);
-    setPostViajesElegido({ liquidaciones: false, facturas: false });
     setPasoRevisando(null);
-    setRefetchTieneDatos((n) => n + 1);
-    setRefetchColumnas((n) => n + 1);
-  }
-
-  function toggleModulo(modulo: ModuloWizard) {
-    setSeleccionados((prev) => {
-      const next = new Set(prev);
-      if (next.has(modulo)) next.delete(modulo);
-      else next.add(modulo);
-      return next;
-    });
-    // Liquidaciones/Facturas se generan a partir de los viajes recién
-    // creados en esta corrida — sin Viajes tildado no tienen de dónde salir,
-    // así que se destildan solas para no dejar una selección que no hace nada.
-    if (modulo === "viajes" && seleccionados.has("viajes")) {
-      setLiquidacionesSel(false);
-      setFacturasSel(false);
-    }
-  }
-
-  const seleccionadosPermitidos = new Set(
-    [...seleccionados].filter(moduloPermitido),
-  );
-  const ordenadosSeleccion = MODULOS_SECUENCIA.filter((m) =>
-    seleccionadosPermitidos.has(m),
-  );
-
-  if (!tieneDatos) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Spinner />
-      </div>
-    );
-  }
-
-  if (!modulosElegidos) {
-    return (
-      <div className="flex flex-col gap-6">
-        <WizardStepper
-          wizard={wizard}
-          secuencia={ordenadosSeleccion}
-          postViajesElegido={{
-            liquidaciones: liquidacionesSel,
-            facturas: facturasSel,
-          }}
-          seleccionCompleta={false}
-          onVerPaso={setPasoRevisando}
-        />
-        <SelectorModulos
-          tieneDatos={tieneDatos}
-          puedeLiquidaciones={puedeLiquidaciones}
-          puedeFacturas={puedeFacturas}
-          columnasEsperadas={columnasEsperadas}
-          seleccionados={seleccionadosPermitidos}
-          moduloPermitido={moduloPermitido}
-          onToggleModulo={toggleModulo}
-          liquidacionesSel={liquidacionesSel}
-          onToggleLiquidaciones={setLiquidacionesSel}
-          facturasSel={facturasSel}
-          onToggleFacturas={setFacturasSel}
-          onElegir={(modulos, postViajes) => {
-            setModulosElegidos(modulos);
-            setPostViajesElegido(postViajes);
-          }}
-        />
-      </div>
-    );
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <WizardStepper
-          wizard={wizard}
-          secuencia={wizard.secuencia}
-          postViajesElegido={postViajesElegido}
-          seleccionCompleta
-          onVerPaso={setPasoRevisando}
-        />
-        <button
-          type="button"
-          onClick={reiniciarImportacion}
-          className="shrink-0 border border-black/15 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal shadow-sm hover:bg-vialto-mist"
-        >
-          Volver a selección
-        </button>
+      {/* Una sola línea: título de la página, pasos y acciones. */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        {encabezado && <div className="shrink-0">{encabezado}</div>}
+        <div className="min-w-0 flex-1">
+          <WizardStepper
+            wizard={wizard}
+            postViajesElegido={postViajesElegido}
+            onVerPaso={setPasoRevisando}
+          />
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          {(wizard.fase !== "upload" || wizard.revision) && (
+            <button
+              type="button"
+              onClick={reiniciarImportacion}
+              className="shrink-0 border border-black/15 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal shadow-sm hover:bg-vialto-mist"
+            >
+              Cambiar archivo
+            </button>
+          )}
+          {acciones}
+        </div>
       </div>
 
       {wizard.error && columnasFaltantes && (
@@ -408,13 +293,25 @@ export function ImportWizard({
             </p>
           )}
           {!wizard.preview && (
-            <button
-              type="button"
-              onClick={reiniciarImportacion}
-              className="mt-3 border border-red-300 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-red-800 hover:bg-red-100"
-            >
-              Volver a importar
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={reiniciarImportacion}
+                className="border border-red-300 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-red-800 hover:bg-red-100"
+              >
+                Volver a importar
+              </button>
+              {wizard.fase === "modulo" && (
+                <button
+                  type="button"
+                  disabled={wizard.loading}
+                  onClick={wizard.saltearModuloActual}
+                  className="border border-red-300 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-red-800 hover:bg-red-100 disabled:opacity-50"
+                >
+                  No importar {moduloLabel} y seguir
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -423,13 +320,25 @@ export function ImportWizard({
         <div className="border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
           <p>{wizard.error}</p>
           {!wizard.preview && (
-            <button
-              type="button"
-              onClick={reiniciarImportacion}
-              className="mt-3 border border-red-300 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-red-800 hover:bg-red-100"
-            >
-              Volver a importar
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={reiniciarImportacion}
+                className="border border-red-300 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-red-800 hover:bg-red-100"
+              >
+                Volver a importar
+              </button>
+              {wizard.fase === "modulo" && (
+                <button
+                  type="button"
+                  disabled={wizard.loading}
+                  onClick={wizard.saltearModuloActual}
+                  className="border border-red-300 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-red-800 hover:bg-red-100 disabled:opacity-50"
+                >
+                  No importar {moduloLabel} y seguir
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -438,23 +347,18 @@ export function ImportWizard({
         <div className="border border-black/10 bg-white p-6">
           {wizard.fase === "upload" && (
             <div className="flex flex-col gap-4">
-              {wizard.preflightErrors && wizard.preflightErrors.length > 0 && (
-                <div className="border border-red-300 bg-red-50 p-4">
-                  <h3 className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-wider text-red-800">
-                    Error en la estructura del archivo
-                  </h3>
-                  <p className="mt-2 text-sm text-red-700">
-                    Faltan encabezados obligatorios. Corregí las siguientes columnas en tu Excel antes de seguir:
-                  </p>
-                  <ul className="mt-3 flex flex-col gap-2">
-                    {wizard.preflightErrors.map((e) => (
-                      <li key={e.modulo} className="text-sm text-red-800">
-                        <strong>{labelModulo(e.modulo)}:</strong> {e.faltantes.join(", ")}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {wizard.revision ? (
+                <RevisionArchivo
+                  revision={wizard.revision}
+                  nombreArchivo={wizard.file?.name ?? ""}
+                  loading={wizard.loading}
+                  onContinuar={(asignaciones) =>
+                    void wizard.iniciarImportacion(asignaciones)
+                  }
+                  onCambiarArchivo={reiniciarImportacion}
+                />
+              ) : (
+              <>
               <div
                 onClick={() => fileInputRef.current?.click()}
                 onDragOver={(e) => {
@@ -480,7 +384,7 @@ export function ImportWizard({
                   <>
                     <div className="h-6 w-6 animate-spin rounded-full border-2 border-vialto-charcoal border-t-transparent" />
                     <span className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-wider text-vialto-charcoal">
-                      Revisando estructura del archivo...
+                      Leyendo el archivo…
                     </span>
                   </>
                 ) : (
@@ -489,7 +393,10 @@ export function ImportWizard({
                     <span className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-wider text-vialto-charcoal">
                       Arrastrá el archivo o hacé clic para seleccionarlo
                     </span>
-                    <span className="text-xs">.xlsx o .xls</span>
+                    <span className="text-xs">
+                      .xlsx o .xls — detectamos solos qué hojas trae (clientes,
+                      transportes, choferes, vehículos, viajes)
+                    </span>
                   </>
                 )}
               </div>
@@ -503,30 +410,31 @@ export function ImportWizard({
                 }}
                 className="hidden"
               />
-              {wizard.secuencia.length > 0 && (
-                <div className="flex justify-end">
+              <div className="flex flex-col items-end gap-1">
                   <button
                     type="button"
-                    disabled={!columnasEsperadas}
-                    onClick={() =>
-                      descargarPlantillaImportacion(
-                        (columnasEsperadas ?? []).filter((m) =>
-                          wizard.secuencia.includes(m.modulo as ModuloWizard),
-                        ),
-                      )
-                    }
+                    disabled={descargandoPlantilla}
+                    onClick={() => void descargarPlanilla()}
                     className="inline-flex items-center gap-2 border border-black/15 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50"
                   >
-                    <Download className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    Descargar planilla
+                    {descargandoPlantilla ? (
+                      <Spinner className="h-3.5 w-3.5 shrink-0" />
+                    ) : (
+                      <Download className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    )}
+                    {descargandoPlantilla ? "Generando…" : "Descargar planilla"}
                   </button>
-                </div>
+                  {errorPlantilla && (
+                    <p className="text-xs font-medium text-red-600">{errorPlantilla}</p>
+                  )}
+              </div>
+              </>
               )}
             </div>
           )}
 
           {wizard.fase === "modulo" && wizard.moduloActual && (
-            <EtapaModulo wizard={wizard} />
+            <EtapaModulo wizard={wizard} paisFijo={paisFijo} />
           )}
 
           {wizard.fase === "post-liquidaciones" && postViajesElegido.liquidaciones && (
@@ -871,310 +779,179 @@ export function ImportWizard({
         <ResumenPasoModal
           paso={pasoRevisando}
           wizard={wizard}
-          modulosElegidos={modulosElegidos}
-          postViajesElegido={postViajesElegido}
           onClose={() => setPasoRevisando(null)}
-          onSeleccionarNuevos={reiniciarImportacion}
         />
       )}
     </div>
   );
 }
 
-/** Etiqueta + hint de "ya tenés N cargados" para cada módulo del selector inicial — Viajes no tiene chequeo propio. */
-const MODULOS_SELECTOR: { key: ModuloWizard; tieneDatosKey?: keyof TenantTieneDatos }[] =
-  [
-    { key: "clientes", tieneDatosKey: "clientes" },
-    { key: "transportistas", tieneDatosKey: "transportistas" },
-    { key: "choferes", tieneDatosKey: "choferes" },
-    { key: "vehiculos", tieneDatosKey: "vehiculos" },
-    { key: "viajes" },
-  ];
-
 /**
- * Pantalla previa al upload cuando el tenant ya tiene datos cargados: en vez
- * de forzar la secuencia completa (pensada para un tenant nuevo), deja
- * elegir qué hojas importar. Dejar todo tildado equivale al recorrido
- * completo de siempre.
+ * Revisión del archivo cuando la detección no pudo resolver todo sola: hojas
+ * con columnas obligatorias faltantes (no se importan), hojas que encajan en
+ * más de un módulo (elige el usuario) y hojas que no se parecen a ninguno.
  */
-function SelectorModulos({
-  tieneDatos,
-  puedeLiquidaciones,
-  puedeFacturas,
-  columnasEsperadas,
-  seleccionados,
-  moduloPermitido,
-  onToggleModulo,
-  liquidacionesSel,
-  onToggleLiquidaciones,
-  facturasSel,
-  onToggleFacturas,
-  onElegir,
+function RevisionArchivo({
+  revision,
+  nombreArchivo,
+  loading,
+  onContinuar,
+  onCambiarArchivo,
 }: {
-  tieneDatos: TenantTieneDatos;
-  puedeLiquidaciones: boolean;
-  puedeFacturas: boolean;
-  columnasEsperadas: ImportColumnasEsperadasModulo[] | null;
-  /** Estado de los checks vive en ImportWizard (no acá) para que el stepper de arriba se actualice en vivo a medida que se tildan/destildan módulos. */
-  seleccionados: Set<ModuloWizard>;
-  /** false = la empresa no usa ese módulo (ej. Transportes en una empresa solo de flota propia). */
-  moduloPermitido: (modulo: ModuloWizard) => boolean;
-  onToggleModulo: (modulo: ModuloWizard) => void;
-  liquidacionesSel: boolean;
-  onToggleLiquidaciones: (checked: boolean) => void;
-  facturasSel: boolean;
-  onToggleFacturas: (checked: boolean) => void;
-  onElegir: (
-    modulos: ModuloWizard[],
-    postViajes: { liquidaciones: boolean; facturas: boolean },
-  ) => void;
+  revision: NonNullable<ReturnType<typeof useImportWizard>["revision"]>;
+  nombreArchivo: string;
+  loading: boolean;
+  onContinuar: (asignaciones: AsignacionHoja[]) => void;
+  onCambiarArchivo: () => void;
 }) {
-  const ordenados = MODULOS_SECUENCIA.filter((m) => seleccionados.has(m));
-  const viajesSel = seleccionados.has("viajes");
+  // hoja → módulo elegido ("" = sin elegir, "no" = no importar)
+  const [eleccion, setEleccion] = useState<Record<string, string>>({});
+  const { listas, conFaltantes, ambiguas, noReconocidas } = revision;
+
+  const elegidas: AsignacionHoja[] = ambiguas
+    .filter((a) => eleccion[a.hoja] && eleccion[a.hoja] !== "no")
+    .map((a) => ({
+      modulo: eleccion[a.hoja] as ModuloWizard,
+      hoja: a.hoja,
+      filas: a.filas,
+    }));
+  const asignaciones = [...listas, ...elegidas];
+  const faltaElegir = ambiguas.some((a) => !eleccion[a.hoja]);
+  const nadaParaImportar = listas.length === 0 && ambiguas.length === 0;
 
   return (
-    <div className="flex flex-col ">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 text-sm">
+      <h3 className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-wider text-vialto-charcoal">
+        Revisá el archivo{nombreArchivo ? ` «${nombreArchivo}»` : ""}
+      </h3>
 
-      <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-6 text-left lg:grid-cols-2 lg:items-stretch">
-        <div className="flex h-full flex-col divide-y divide-black/10 border border-black/10 bg-white">
-          {MODULOS_SELECTOR.filter(({ key }) => moduloPermitido(key)).map(({ key, tieneDatosKey }) => (
-            <label
-              key={key}
-              className="flex cursor-pointer items-center justify-between gap-4 px-5 py-3.5 hover:bg-vialto-mist/60"
-            >
-              <span className="flex flex-col">
-                <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
-                  {labelModulo(key)}
-                </span>
-                {tieneDatosKey && tieneDatos[tieneDatosKey] && (
-                  <span className="text-xs text-vialto-steel">
-                    Ya tenés datos cargados
-                  </span>
-                )}
-              </span>
-              <input
-                type="checkbox"
-                checked={seleccionados.has(key)}
-                onChange={() => onToggleModulo(key)}
-                className="h-5 w-5 shrink-0 accent-vialto-charcoal"
-              />
-            </label>
-          ))}
-          {puedeLiquidaciones && (
-            <label
-              className={[
-                "flex items-center justify-between gap-4 px-5 py-3.5",
-                viajesSel
-                  ? "cursor-pointer hover:bg-vialto-mist/60"
-                  : "cursor-not-allowed opacity-50",
-              ].join(" ")}
-            >
-              <span className="flex flex-col">
-                <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
-                  Liquidaciones a transportistas
-                </span>
-                <span className="text-xs text-vialto-steel">
-                  {viajesSel
-                    ? "Genera un borrador por transportista al terminar viajes."
-                    : "Requiere también tildar Viajes — se generan a partir de los viajes recién importados."}
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                checked={liquidacionesSel}
-                disabled={!viajesSel}
-                onChange={(e) => onToggleLiquidaciones(e.target.checked)}
-                className="h-5 w-5 shrink-0 accent-vialto-charcoal disabled:cursor-not-allowed"
-              />
-            </label>
-          )}
-          {puedeFacturas && (
-            <label
-              className={[
-                "flex items-center justify-between gap-4 px-5 py-3.5",
-                viajesSel
-                  ? "cursor-pointer hover:bg-vialto-mist/60"
-                  : "cursor-not-allowed opacity-50",
-              ].join(" ")}
-            >
-              <span className="flex flex-col">
-                <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
-                  Facturas a clientes
-                </span>
-                <span className="text-xs text-vialto-steel">
-                  {viajesSel
-                    ? "Genera un borrador por cliente al terminar viajes."
-                    : "Requiere también tildar Viajes — se generan a partir de los viajes recién importados."}
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                checked={facturasSel}
-                disabled={!viajesSel}
-                onChange={(e) => onToggleFacturas(e.target.checked)}
-                className="h-5 w-5 shrink-0 accent-vialto-charcoal disabled:cursor-not-allowed"
-              />
-            </label>
-          )}
-        </div>
-
-        <div className="flex h-full min-h-[24rem] flex-col border border-black/10 bg-white lg:max-h-[32rem]">
-          <div className="shrink-0 border-b border-black/10 px-5 py-3">
-            <p className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-wider text-vialto-charcoal">
-              Columnas esperadas del Excel
-            </p>
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
-            {ordenados.length === 0 ? (
-              <p className="text-xs text-vialto-steel">
-                Elegí al menos un módulo para ver qué columnas espera.
-              </p>
-            ) : (
-              <ColumnasEsperadasLista
-                modulos={ordenados}
-                columnasEsperadas={columnasEsperadas}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="mx-auto flex w-full max-w-5xl items-center justify-end gap-3">
-        <button
-          type="button"
-          disabled={ordenados.length === 0}
-          onClick={() =>
-            onElegir(ordenados, {
-              liquidaciones: liquidacionesSel,
-              facturas: facturasSel,
-            })
-          }
-          className="border border-black/15 bg-vialto-charcoal px-8 py-3 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
-        >
-          Continuar →
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** Lista pura (sin wrapper ni botón) de las columnas esperadas — una pestaña por módulo tildado, reusada en el selector y en la pantalla de carga. */
-function ColumnasEsperadasLista({
-  modulos,
-  columnasEsperadas,
-}: {
-  modulos: ModuloWizard[];
-  columnasEsperadas: ImportColumnasEsperadasModulo[] | null;
-}) {
-  const [tabElegido, setTabElegido] = useState<ModuloWizard | null>(null);
-
-  if (modulos.length === 0) return null;
-  const tab = tabElegido && modulos.includes(tabElegido) ? tabElegido : modulos[0];
-  const info = columnasEsperadas?.find((m) => m.modulo === tab);
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap border-b border-black/10">
-        {modulos.map((modulo) => (
-          <button
-            key={modulo}
-            type="button"
-            onClick={() => setTabElegido(modulo)}
-            className={[
-              "px-4 py-2 text-[11px] uppercase tracking-wider border-b-2 -mb-px transition-colors",
-              modulo === tab
-                ? "border-vialto-fire text-vialto-fire"
-                : "border-transparent text-vialto-steel hover:text-vialto-charcoal",
-            ].join(" ")}
-          >
-            {labelModulo(modulo)}
-          </button>
-        ))}
-      </div>
-      {!columnasEsperadas ? (
-        <p className="text-xs text-vialto-steel">Cargando…</p>
-      ) : !info || info.columnas.length === 0 ? (
-        <p className="text-xs text-vialto-steel">
-          Este módulo no tiene columnas configuradas.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-1.5">
-          <p className="text-xs text-vialto-steel">Hoja "{info.sheet}"</p>
-          <div className="overflow-x-auto border border-black/10">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-vialto-mist/60">
-                  <th className={th}>Columna</th>
-                  <th className={th}>Tipo</th>
-                  <th className={th}>¿Obligatoria?</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/10">
-                {info.columnas.map((c) => (
-                  <tr key={c.excelHeader}>
-                    <td className={td}>{c.excelHeader}</td>
-                    <td className={td}>{tipoLabelColumna(c)}</td>
-                    <td className={td}>
-                      {c.requerido
-                        ? "Sí"
-                        : c.recomendado
-                          ? "Recomendada"
-                          : "No"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {nadaParaImportar && (
+        <div className="border border-red-300 bg-red-50 px-4 py-3 text-red-800">
+          No encontramos nada para importar en este archivo. Tiene que tener
+          hojas de Clientes, Transportes, Choferes, Vehículos o Viajes con sus
+          columnas obligatorias — podés bajar la planilla modelo con
+          &quot;Descargar planilla&quot;.
         </div>
       )}
+
+      {listas.length > 0 && (
+        <div>
+          <p className="text-xs uppercase tracking-wider text-vialto-steel">
+            Se va a importar
+          </p>
+          <ul className="mt-1.5 divide-y divide-black/10 border border-black/10 bg-white">
+            {listas.map((l) => (
+              <li key={l.modulo} className="flex justify-between gap-3 px-4 py-2">
+                <span className="font-semibold text-vialto-charcoal">
+                  {labelModulo(l.modulo)}
+                </span>
+                <span className="text-vialto-steel">
+                  hoja «{l.hoja}» · {l.filas} fila{l.filas !== 1 ? "s" : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {ambiguas.length > 0 && (
+        <div>
+          <p className="text-xs uppercase tracking-wider text-vialto-steel">
+            ¿Qué tiene cada una de estas hojas?
+          </p>
+          <ul className="mt-1.5 divide-y divide-black/10 border border-black/10 bg-white">
+            {ambiguas.map((a) => {
+              const tomados = new Set<string>([
+                ...listas.map((l) => l.modulo),
+                ...Object.entries(eleccion)
+                  .filter(([hoja]) => hoja !== a.hoja)
+                  .map(([, m]) => m),
+              ]);
+              return (
+                <li key={a.hoja} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2">
+                  <span className="text-vialto-charcoal">
+                    Hoja «{a.hoja}» · {a.filas} fila{a.filas !== 1 ? "s" : ""}
+                  </span>
+                  <select
+                    value={eleccion[a.hoja] ?? ""}
+                    onChange={(e) =>
+                      setEleccion((prev) => ({ ...prev, [a.hoja]: e.target.value }))
+                    }
+                    className="h-9 border border-black/15 bg-white px-2 text-sm"
+                    aria-label={`Qué contiene la hoja ${a.hoja}`}
+                  >
+                    <option value="">Elegí…</option>
+                    {a.candidatos.map((m) => (
+                      <option key={m} value={m} disabled={tomados.has(m)}>
+                        {labelModulo(m)}
+                      </option>
+                    ))}
+                    <option value="no">No importar</option>
+                  </select>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {conFaltantes.length > 0 && (
+        <div className="border border-red-300 bg-red-50 px-4 py-3 text-red-800">
+          <p>
+            Estas hojas no se pueden importar porque les faltan columnas
+            obligatorias. Corregí el Excel y volvé a subirlo, o seguí sin ellas:
+          </p>
+          <ul className="mt-2 flex flex-col gap-1">
+            {conFaltantes.map((h) => (
+              <li key={h.modulo}>
+                <strong>{labelModulo(h.modulo)}</strong> (hoja «{h.hoja}»):
+                faltan {h.faltantes.join(", ")}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {noReconocidas.length > 0 && (
+        <p className="text-xs text-vialto-steel">
+          No reconocimos {noReconocidas.length === 1 ? "la hoja" : "las hojas"}{" "}
+          {noReconocidas.map((h) => `«${h.hoja}»`).join(", ")} — no se{" "}
+          {noReconocidas.length === 1 ? "va" : "van"} a importar.
+        </p>
+      )}
+
+      <div className="flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={onCambiarArchivo}
+          className="border border-black/15 bg-white px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-charcoal hover:bg-vialto-mist"
+        >
+          Elegir otro archivo
+        </button>
+        {!nadaParaImportar && (
+          <button
+            type="button"
+            disabled={loading || faltaElegir || asignaciones.length === 0}
+            onClick={() => onContinuar(asignaciones)}
+            className="border border-black/15 bg-vialto-charcoal px-6 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
+          >
+            Continuar →
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-function tipoLabelColumna(c: {
-  tipo: string;
-  allowedValues?: string[];
-  lookupModel?: string;
-}): string {
-  switch (c.tipo) {
-    case "number":
-      return "Número";
-    case "date":
-      return "Fecha (DD/MM/AAAA)";
-    case "boolean":
-      return "Sí / No";
-    case "enum":
-      return c.allowedValues?.length
-        ? `Lista (${c.allowedValues.join(", ")})`
-        : "Lista";
-    case "lookup":
-      return c.lookupModel
-        ? `Búsqueda por ${labelModulo(c.lookupModel).toLowerCase()}`
-        : "Búsqueda";
-    default:
-      return "Texto";
-  }
-}
+type EstadoPaso = "done" | "current" | "pending" | "omitido";
 
 function WizardStepper({
   wizard,
-  secuencia,
   postViajesElegido,
-  seleccionCompleta,
   onVerPaso,
 }: {
   wizard: ReturnType<typeof useImportWizard>;
-  /**
-   * Módulos a mostrar en el stepper. Mientras `!seleccionCompleta` es la
-   * selección en vivo de la pantalla de checks (cambia con cada tilde);
-   * una vez confirmada, es siempre `wizard.secuencia` (fija para toda la
-   * corrida).
-   */
-  secuencia: ModuloWizard[];
   postViajesElegido: { liquidaciones: boolean; facturas: boolean };
-  /** false mientras se está en la pantalla de checks (paso "Selección" todavía no confirmado). */
-  seleccionCompleta: boolean;
   /** Se llama solo al clickear un paso ya completado ("done") — abre un resumen de solo lectura, no navega el wizard. */
   onVerPaso: (paso: string) => void;
 }) {
@@ -1182,68 +959,104 @@ function WizardStepper({
   // alcanzables si "viajes" está en la secuencia de este import — sin viajes,
   // useImportWizard salta directo a "terminado" (ver avanzarModulo). Mostrar
   // el paso igual, aunque nunca se vaya a visitar, confunde al usuario.
-  const tieneViajes = secuencia.includes("viajes");
+  const tieneViajes = wizard.secuencia.includes("viajes");
   const ofreceLiquidaciones = tieneViajes && postViajesElegido.liquidaciones;
-
   const ofreceFacturas = tieneViajes && postViajesElegido.facturas;
+  const enModulos = wizard.fase === "modulo";
+  const pasadosModulos = !enModulos && wizard.fase !== "upload";
+  const confirmados = new Set(wizard.etapasCompletadas.map((e) => e.modulo));
 
-  const pasos = [
-    // Paso 0: la pantalla de checks (qué módulos importar, liquidaciones/
-    // facturas sí o no). No es parte de la máquina de fases de
-    // useImportWizard — vive en el estado de ImportWizard (modulosElegidos)
-    // — así que su estado "done"/"current" se resuelve aparte, con
-    // `seleccionCompleta`, en vez de con `wizard.fase`.
-    { key: "seleccion", label: "Selección" },
-    ...secuencia.map((m) => ({ key: m as string, label: labelModulo(m) })),
+  const estadoModulo = (m: ModuloWizard): EstadoPaso => {
+    if (wizard.omitidos.has(m)) return "omitido";
+    const idx = wizard.secuencia.indexOf(m);
+    const yaPaso = pasadosModulos || (enModulos && idx < wizard.moduloIndex);
+    // Salteado en su paso = omitido; pasado con "Continuar" porque no había
+    // cambios = hecho.
+    if (yaPaso)
+      return confirmados.has(m) || wizard.sinCambiosModulos.has(m) ? "done" : "omitido";
+    return enModulos && idx === wizard.moduloIndex ? "current" : "pending";
+  };
+  const estadoPost = (fase: string, despuesDe: string[]): EstadoPaso =>
+    wizard.fase === fase
+      ? "current"
+      : despuesDe.includes(wizard.fase)
+        ? "done"
+        : "pending";
+
+  const pasos: { key: string; label: string; estado: EstadoPaso; modulo?: ModuloWizard }[] = [
+    // Paso 0: subir el archivo (y revisar lo que se detectó).
+    {
+      key: "archivo",
+      label: "Archivo",
+      estado: wizard.fase === "upload" ? "current" : "done",
+    },
+    ...wizard.detectados.map((d) => ({
+      key: d.modulo as string,
+      label: labelModulo(d.modulo),
+      estado: estadoModulo(d.modulo),
+      modulo: d.modulo,
+    })),
     ...(ofreceLiquidaciones
-      ? [{ key: "post-liquidaciones", label: "Liquidaciones" }]
+      ? [{
+          key: "post-liquidaciones",
+          label: "Liquidaciones",
+          estado: estadoPost("post-liquidaciones", ["post-facturas", "terminado"]),
+        }]
       : []),
-    // "Facturas" es un paso propio solo si el usuario lo tildó (igual que
-    // "Liquidaciones" arriba). "Resumen" es aparte: el paso final genérico,
-    // siempre presente si corrió Viajes — es la pantalla de "terminado" que
-    // se ve al final, se hayan generado o no facturas/liquidaciones.
-    ...(ofreceFacturas ? [{ key: "post-facturas", label: "Facturas" }] : []),
-    ...(tieneViajes ? [{ key: "terminado", label: "Resumen" }] : []),
+    ...(ofreceFacturas
+      ? [{
+          key: "post-facturas",
+          label: "Facturas",
+          estado: estadoPost("post-facturas", ["terminado"]),
+        }]
+      : []),
+    // Sin paso "Resumen": al terminar sin errores el wizard redirige solo; con
+    // errores muestra el resumen, pero no como un paso más del stepper.
   ];
-
-  const indiceActual = !seleccionCompleta
-    ? 0
-    : wizard.fase === "upload"
-      ? 1
-      : wizard.fase === "modulo"
-        ? 1 + wizard.moduloIndex
-        : wizard.fase === "post-liquidaciones"
-          ? 1 + secuencia.length
-          : wizard.fase === "post-facturas"
-            ? 1 + secuencia.length + (ofreceLiquidaciones ? 1 : 0)
-            : wizard.fase === "terminado" && tieneViajes
-              ? pasos.length - 1
-              : pasos.length;
 
   return (
     <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
       {pasos.map((p, i) => {
-        const estado =
-          i < indiceActual ? "done" : i === indiceActual ? "current" : "pending";
+        const esActual = p.estado === "current";
         const burbuja = (
-          <span
-            className={[
-              "flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-[family-name:var(--font-ui)] text-[11px] font-semibold",
-              estado === "done" ? "bg-vialto-charcoal text-white" : "",
-              estado === "current"
-                ? "bg-vialto-fire text-white"
-                : "",
-              estado === "pending"
-                ? "border border-black/15 text-vialto-steel"
-                : "",
-            ].join(" ")}
-          >
-            {estado === "done" ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : i + 1}
+          <span className="relative flex shrink-0 items-center justify-center">
+            {/* Paso actual: halo que late detrás de la burbuja. */}
+            {esActual && (
+              <span
+                aria-hidden
+                className="absolute inset-0 rounded-full bg-vialto-fire/40 motion-safe:animate-ping"
+              />
+            )}
+            <span
+              className={[
+                "relative flex shrink-0 items-center justify-center rounded-full font-[family-name:var(--font-ui)] font-semibold",
+                esActual ? "h-8 w-8 text-sm" : "h-6 w-6 text-[11px]",
+                p.estado === "done" ? "bg-vialto-charcoal text-white" : "",
+                esActual ? "bg-vialto-fire text-white" : "",
+                p.estado === "pending" ? "border border-black/15 text-vialto-steel" : "",
+                p.estado === "omitido" ? "border border-dashed border-black/20 text-vialto-steel/60" : "",
+              ].join(" ")}
+            >
+              {p.estado === "done" ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : i + 1}
+            </span>
           </span>
         );
+        const etiqueta = (clase: string) => (
+          <span
+            className={`font-[family-name:var(--font-ui)] uppercase tracking-wider ${esActual ? "text-[15px]" : "text-[11px]"} ${clase}`}
+          >
+            {p.label}
+          </span>
+        );
+        // Un módulo que todavía no empezó se puede marcar "no importar" (y
+        // volver a incluir) sin esperar a su vista previa.
+        const alternable =
+          p.modulo != null &&
+          (p.estado === "pending" ||
+            (p.estado === "omitido" && wizard.omitidos.has(p.modulo)));
         return (
           <li key={p.key} className="flex items-center gap-1.5">
-            {estado === "done" ? (
+            {p.estado === "done" ? (
               <button
                 type="button"
                 onClick={() => onVerPaso(p.key)}
@@ -1251,21 +1064,37 @@ function WizardStepper({
                 title={`Ver resumen de ${p.label}`}
               >
                 {burbuja}
-                <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider text-vialto-steel underline decoration-dotted underline-offset-2">
-                  {p.label}
-                </span>
+                {etiqueta("text-vialto-steel underline decoration-dotted underline-offset-2")}
+              </button>
+            ) : alternable ? (
+              <button
+                type="button"
+                disabled={wizard.loading}
+                onClick={() => wizard.omitirModulo(p.modulo!, p.estado !== "omitido")}
+                className="group flex items-center gap-1.5 rounded hover:opacity-75 disabled:cursor-not-allowed"
+                title={
+                  p.estado === "omitido"
+                    ? `${p.label}: no se va a importar. Click para volver a incluirla.`
+                    : `Click para no importar ${p.label}`
+                }
+              >
+                {burbuja}
+                {etiqueta(
+                  p.estado === "omitido"
+                    ? "text-vialto-steel/60 line-through"
+                    : "text-vialto-steel group-hover:line-through",
+                )}
               </button>
             ) : (
               <>
                 {burbuja}
-                <span
-                  className={[
-                    "font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider",
-                    estado === "current" ? "text-vialto-charcoal font-semibold" : "text-vialto-steel",
-                  ].join(" ")}
-                >
-                  {p.label}
-                </span>
+                {etiqueta(
+                  p.estado === "current"
+                    ? "text-vialto-charcoal font-semibold"
+                    : p.estado === "omitido"
+                      ? "text-vialto-steel/60 line-through"
+                      : "text-vialto-steel",
+                )}
               </>
             )}
             {i < pasos.length - 1 && (
@@ -1290,22 +1119,15 @@ function WizardStepper({
 function ResumenPasoModal({
   paso,
   wizard,
-  modulosElegidos,
-  postViajesElegido,
   onClose,
-  onSeleccionarNuevos,
 }: {
   paso: string;
   wizard: ReturnType<typeof useImportWizard>;
-  modulosElegidos: ModuloWizard[] | null;
-  postViajesElegido: { liquidaciones: boolean; facturas: boolean };
   onClose: () => void;
-  /** Solo se usa en el resumen de "Selección" — vuelve a la pantalla de checks para elegir otros módulos. */
-  onSeleccionarNuevos: () => void;
 }) {
   const titulo =
-    paso === "seleccion"
-      ? "Selección"
+    paso === "archivo"
+      ? "Archivo"
       : paso === "post-liquidaciones"
         ? "Liquidaciones"
         : paso === "post-facturas"
@@ -1314,32 +1136,28 @@ function ResumenPasoModal({
 
   let contenido: React.ReactNode;
 
-  if (paso === "seleccion") {
+  if (paso === "archivo") {
     contenido = (
       <div className="flex flex-col gap-3 text-sm">
         <div>
           <p className="text-xs uppercase tracking-wider text-vialto-steel">
-            Módulos elegidos
+            Archivo
           </p>
-          <p className="mt-1">
-            {modulosElegidos?.map((m) => labelModulo(m)).join(", ") || "—"}
-          </p>
+          <p className="mt-1">{wizard.file?.name ?? "—"}</p>
         </div>
         <div>
           <p className="text-xs uppercase tracking-wider text-vialto-steel">
-            Liquidaciones a transportistas
+            Hojas detectadas
           </p>
-          <p className="mt-1">
-            {postViajesElegido.liquidaciones ? "Sí, al terminar Viajes" : "No"}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wider text-vialto-steel">
-            Facturas a clientes
-          </p>
-          <p className="mt-1">
-            {postViajesElegido.facturas ? "Sí, al terminar Viajes" : "No"}
-          </p>
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {wizard.detectados.map((d) => (
+              <li key={d.modulo}>
+                {labelModulo(d.modulo)}: hoja «{d.hoja}» · {d.filas} fila
+                {d.filas !== 1 ? "s" : ""}
+                {wizard.omitidos.has(d.modulo) ? " — no se importa" : ""}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     );
@@ -1364,7 +1182,9 @@ function ResumenPasoModal({
     if (!etapa) {
       contenido = (
         <p className="text-sm text-vialto-steel">
-          Este módulo se salteó, no se importó nada.
+          {wizard.sinCambiosModulos.has(paso as ModuloWizard)
+            ? "Todas las filas ya estaban cargadas igual — no hubo nada que guardar."
+            : "Este módulo se salteó, no se importó nada."}
         </p>
       );
     } else {
@@ -1409,20 +1229,9 @@ function ResumenPasoModal({
       title={`Resumen — ${titulo}`}
       onClose={onClose}
       footer={
-        <>
-          {paso === "seleccion" && (
-            <button
-              type="button"
-              onClick={onSeleccionarNuevos}
-              className={viewModalBtnPrimary}
-            >
-              Seleccionar nuevos
-            </button>
-          )}
-          <button type="button" onClick={onClose} className={viewModalBtnGhost}>
-            Cerrar
-          </button>
-        </>
+        <button type="button" onClick={onClose} className={viewModalBtnGhost}>
+          Cerrar
+        </button>
       }
     >
       {contenido}
@@ -1479,12 +1288,14 @@ function StatBox({
   );
 }
 
-type PreviewTab = "viajes" | "facturas" | "clientes" | "transportistas";
 
 function EtapaModulo({
   wizard,
+  paisFijo,
 }: {
   wizard: ReturnType<typeof useImportWizard>;
+  /** País fijo de la empresa — oculta el selector de país en "Ciudades a confirmar". */
+  paisFijo: PaisCodigo | null;
 }) {
   const p = wizard.preview;
   const [tiposVehiculo, setTiposVehiculo] = useState<Record<string, string>>(
@@ -1519,21 +1330,21 @@ function EtapaModulo({
         return true;
     }
   }
-  const [tab, setTab] = useState<PreviewTab>("viajes");
+  // Página de la tabla "Viajes en este archivo".
   const [tablaPage, setTablaPage] = useState(1);
-  const TABLA_PAGE_SIZE = tab === "viajes" ? 5 : 10;
+  const VIAJES_PAGE_SIZE = 10;
   const [confirmarCamposFaltantes, setConfirmarCamposFaltantes] =
     useState(false);
   const [decisionesCampoUnico, setDecisionesCampoUnico] = useState<
     Record<number, "ignorar" | "actualizar">
   >({});
   const [ciudadesModalOpen, setCiudadesModalOpen] = useState(false);
-  const [detalleModalOpen, setDetalleModalOpen] = useState(false);
   // Cada preview nuevo (nuevo módulo, o "reintentar" tras crear entidades
   // faltantes) trae su propia sesión — no arrastrar una confirmación vieja.
   useEffect(() => {
     setConfirmarCamposFaltantes(false);
     setDecisionesCampoUnico({});
+    setTablaPage(1);
   }, [p?.sessionId]);
 
   // Un lookup de Viajes (cliente/transportista/chofer/vehículo) puede fallar
@@ -1593,21 +1404,7 @@ function EtapaModulo({
 
   const hasViajes = (p?.viajes?.length ?? 0) > 0;
   const hasFacturas = (p?.facturas?.length ?? 0) > 0;
-  // El preview de Viajes siempre trae los clientes/transportistas que
-  // referencia (para marcar cuáles son nuevos), pero si el usuario no eligió
-  // importar esos módulos en esta corrida no tiene sentido mostrarlos como
-  // si fueran parte de lo que se está por guardar.
-  const hasClientes =
-    wizard.secuencia.includes("clientes") && (p?.clientes?.length ?? 0) > 0;
-  const hasTransportistas =
-    wizard.secuencia.includes("transportistas") &&
-    (p?.transportistas?.length ?? 0) > 0;
   const advertenciasCiudad = p?.advertenciasCiudad ?? [];
-  const totalAdvertenciasCiudad =
-    p?.totalAdvertenciasCiudad ?? advertenciasCiudad.length;
-  const nuevosClientes = p?.clientes?.filter((c) => c.esNuevo).length ?? 0;
-  const nuevosTransp =
-    p?.transportistas?.filter((t) => t.esNuevo).length ?? 0;
   const advertenciasCamposFaltantes = p?.advertenciasCamposFaltantes ?? [];
   const camposFaltantesUnicos = Array.from(
     new Set(advertenciasCamposFaltantes.flatMap((a) => a.campos)),
@@ -1621,6 +1418,18 @@ function EtapaModulo({
 
   const advertenciasCampoUnicoDuplicado =
     p?.advertenciasCampoUnicoDuplicado ?? [];
+  // Ninguna fila trae algo nuevo o distinto a lo ya cargado: no hay nada que
+  // guardar, así que el paso se reduce a un "Continuar" (sin avisos que pidan
+  // confirmar nada).
+  const todoSinCambios =
+    !!p &&
+    filasConError === 0 &&
+    advertenciasCampoUnicoDuplicado.length === 0 &&
+    (hasViajes
+      ? advertenciasCiudad.length === 0 &&
+        p.viajes!.every((v) => !v.nuevo && (!v.cambios || v.cambios.length === 0))
+      : (p.filasDetalle?.length ?? 0) > 0 &&
+        p.filasDetalle!.every((f) => !f.esNuevo && f.sinCambios));
   const requiereResolverCampoUnicoDuplicado = advertenciasCampoUnicoDuplicado.some(
     (c) => !decisionesCampoUnico[c.fila],
   );
@@ -1635,11 +1444,19 @@ function EtapaModulo({
       )
     )
   ).join(" o ");
-  const tieneDesgloseActualizacion =
-    p != null &&
-    p.entidadesNuevas != null &&
-    p.entidadesActualizadas != null &&
-    (p.entidadesActualizadas > 0 || (p.filasFusionadas ?? 0) > 0);
+  // Tarjetas "Filas nuevas" / "Filas a actualizar": a actualizar cuenta solo
+  // las filas que cambian algo (las "Sin cambios" no se escriben).
+  const filasNuevasCount = hasViajes
+    ? p!.viajes!.filter((v) => v.nuevo).length
+    : p?.filasDetalle
+      ? p.filasDetalle.filter((f) => f.esNuevo).length
+      : (p?.entidadesNuevas ?? p?.exitosas ?? 0);
+  const filasActualizarCount = hasViajes
+    ? p!.viajes!.filter((v) => !v.nuevo && (v.cambios?.length ?? 0) > 0).length
+    : p?.filasDetalle
+      ? p.filasDetalle.filter((f) => !f.esNuevo && !f.sinCambios).length
+      : (p?.entidadesActualizadas ?? 0);
+  const cantStatBoxes = 3 + (hasFacturas ? 1 : 0);
 
   // Si el usuario resolvió (o excluyó) la última ciudad pendiente estando
   // dentro del modal, se cierra solo.
@@ -1660,15 +1477,10 @@ function EtapaModulo({
         >
           <div
             className={`grid gap-2 ${
-              // Cantidad real de StatBox renderizados (3 fijos + Facturas +
-              // Adv. ciudades, cada uno independiente) — si el grid asume
-              // siempre 5 columnas cuando solo hay 4 boxes, queda un hueco
-              // en blanco a la derecha.
-              3 + (hasFacturas ? 1 : 0) + (hasViajes ? 1 : 0) === 5
-                ? "grid-cols-2 sm:grid-cols-5"
-                : 3 + (hasFacturas ? 1 : 0) + (hasViajes ? 1 : 0) === 4
-                  ? "grid-cols-2 sm:grid-cols-4"
-                  : "grid-cols-3"
+              // Cantidad real de StatBox renderizados (3 fijos + Facturas) —
+              // si el grid asume más columnas que boxes, queda un hueco en
+              // blanco a la derecha.
+              cantStatBoxes === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"
               }`}
           >
             <StatBox label="Filas en el Excel" value={p.totalFilas} />
@@ -1676,36 +1488,19 @@ function EtapaModulo({
               <StatBox label="Facturas" value={p.facturas?.length ?? 0} />
             )}
             <StatBox
-              label="Filas con error"
-              value={filasConError}
-              highlight={filasConError > 0 ? "error" : undefined}
-            />
-            {hasViajes && (
-              <StatBox
-                label="Adv. ciudades"
-                value={totalAdvertenciasCiudad}
-                highlight={totalAdvertenciasCiudad > 0 ? "warn" : undefined}
-              />
-            )}
-            <StatBox
-              label={
-                tieneDesgloseActualizacion
-                  ? `Filas a importar`
-                  : p.entidadesNuevas != null
-                    ? `${labelModulo(wizard.moduloActual ?? "")} a crear`
-                    : `${labelModulo(wizard.moduloActual ?? "")} a crear`
-              }
-              value={p.entidadesNuevas ?? p.exitosas}
+              label="Filas nuevas"
+              value={filasNuevasCount}
               highlight="ok"
               caption={
-                tieneDesgloseActualizacion
-                  ? [
-                    `${p.entidadesNuevas} nuevas`,
-                    p.entidadesActualizadas! > 0 ? `${p.entidadesActualizadas} a actualizar` : null,
-                    (p.filasFusionadas ?? 0) > 0 ? `${p.filasFusionadas} fila${p.filasFusionadas! !== 1 ? 's' : ''} ignorada${p.filasFusionadas! !== 1 ? 's' : ''}` : null
-                  ].filter(Boolean).join(" · ")
+                (p.filasFusionadas ?? 0) > 0
+                  ? `${p.filasFusionadas} fila${p.filasFusionadas! !== 1 ? "s" : ""} duplicada${p.filasFusionadas! !== 1 ? "s" : ""} unificada${p.filasFusionadas! !== 1 ? "s" : ""}`
                   : undefined
               }
+            />
+            <StatBox
+              label="Filas a actualizar"
+              value={filasActualizarCount}
+              highlight="warn"
             />
           </div>
 
@@ -1714,36 +1509,101 @@ function EtapaModulo({
               <p className="mb-1.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal">
                 {labelModulo(wizard.moduloActual ?? "")} en este archivo
               </p>
-              <div className="flex flex-col gap-2">
-                {p.filasDetalle.map((f) => {
-                  const conflicto = advertenciasCampoUnicoDuplicado.find(
-                    (c) => c.fila === f.fila,
-                  );
-                  return (
-                    <FilaDetalleCard
-                      key={f.fila}
-                      fila={{
-                        ...f,
-                        campos: f.campos.filter((c) =>
-                          campoVisible(wizard.moduloActual, c.campo),
-                        ),
-                      }}
-                      conflicto={conflicto}
-                      decision={
-                        conflicto ? decisionesCampoUnico[conflicto.fila] : undefined
-                      }
-                      onElegirDecision={(accion) =>
-                        setDecisionesCampoUnico((prev) => ({
-                          ...prev,
-                          [f.fila]: accion,
-                        }))
-                      }
-                    />
-                  );
-                })}
-              </div>
+              <FilasDetalleTabla
+                filas={p.filasDetalle.map((f) => ({
+                  ...f,
+                  campos: f.campos.filter((c) =>
+                    campoVisible(wizard.moduloActual, c.campo),
+                  ),
+                }))}
+                conflictoDe={(fila) =>
+                  advertenciasCampoUnicoDuplicado.find((c) => c.fila === fila)
+                }
+                decisionDe={(fila) => decisionesCampoUnico[fila]}
+                onElegirDecision={(fila, accion) =>
+                  setDecisionesCampoUnico((prev) => ({ ...prev, [fila]: accion }))
+                }
+              />
             </div>
           )}
+
+          {/* Viajes: misma tabla que Clientes/Transportes, directo en el paso. */}
+          {hasViajes && (() => {
+            const meta = metaPaginacionCliente(
+              p.viajes!.length,
+              tablaPage,
+              VIAJES_PAGE_SIZE,
+            );
+            return (
+              <div>
+                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal">
+                    Viajes en este archivo
+                  </p>
+                  {filasActualizarCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        for (const v of p.viajes ?? []) {
+                          if (!v.nuevo) wizard.ignorarFila(v.fila);
+                        }
+                      }}
+                      className="border border-black/15 bg-white px-3 py-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+                    >
+                      Ignorar todas las actualizaciones
+                    </button>
+                  )}
+                </div>
+                <ViajesCambiosList
+                  viajes={slicePaginaCliente(p.viajes!, tablaPage, VIAJES_PAGE_SIZE)}
+                  onIgnorarFila={wizard.ignorarFila}
+                />
+                {meta.totalPages > 1 && (
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <span className="text-vialto-steel">
+                      Página {meta.page} de {meta.totalPages} · {meta.total} filas
+                    </span>
+                    <div className="inline-flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={!meta.hasPrev}
+                        onClick={() => setTablaPage((n) => Math.max(1, n - 1))}
+                        className="h-8 min-w-8 border border-black/20 px-2 text-xs uppercase tracking-wider hover:bg-vialto-mist/80 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Anterior
+                      </button>
+                      {paginasVisibles(meta.page, meta.totalPages).map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setTablaPage(n)}
+                          aria-current={n === meta.page ? "page" : undefined}
+                          className={[
+                            "h-8 min-w-8 px-2 border text-xs tabular-nums",
+                            n === meta.page
+                              ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+                              : "border-black/20 text-vialto-charcoal hover:bg-vialto-mist/80",
+                          ].join(" ")}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        disabled={!meta.hasNext}
+                        onClick={() =>
+                          setTablaPage((n) => Math.min(meta.totalPages, n + 1))
+                        }
+                        className="h-8 min-w-8 border border-black/20 px-2 text-xs uppercase tracking-wider hover:bg-vialto-mist/80 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Siguiente
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {p.headersNoMapeados.length > 0 && (
             <ImportAlert
@@ -1752,15 +1612,6 @@ function EtapaModulo({
               subtitle="— no bloquean la importación"
             >
               <p>{p.headersNoMapeados.join(", ")}</p>
-            </ImportAlert>
-          )}
-
-          {p.columnasOpcionalesFaltantes.length > 0 && (
-            <ImportAlert
-              color="amber"
-              title={`${p.columnasOpcionalesFaltantes.length} columna${p.columnasOpcionalesFaltantes.length !== 1 ? "s" : ""} del template no encontrada${p.columnasOpcionalesFaltantes.length !== 1 ? "s" : ""} en el Excel`}
-            >
-              <p>{p.columnasOpcionalesFaltantes.join(", ")}</p>
             </ImportAlert>
           )}
 
@@ -1796,30 +1647,6 @@ function EtapaModulo({
                 className="shrink-0 border border-amber-300 bg-white px-3 py-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold uppercase tracking-wider text-amber-900 hover:bg-amber-100"
               >
                 Revisar ciudades
-              </button>
-            </div>
-          )}
-
-          {hasViajes && tieneDesgloseActualizacion && p.entidadesActualizadas! > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
-              <span>
-                <strong>{p.entidadesActualizadas}</strong> viaje
-                {p.entidadesActualizadas !== 1 ? "s" : ""} de este archivo ya{" "}
-                {p.entidadesActualizadas !== 1 ? "existen" : "existe"} en
-                el sistema y se{" "}
-                {p.entidadesActualizadas !== 1 ? "van" : "va"} a actualizar —
-                el resto ({p.entidadesNuevas}) son altas nuevas.
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setTab("viajes");
-                  setTablaPage(1);
-                  setDetalleModalOpen(true);
-                }}
-                className="shrink-0 border border-amber-300 bg-white px-3 py-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold uppercase tracking-wider text-amber-900 hover:bg-amber-100"
-              >
-                Revisar actualizaciones
               </button>
             </div>
           )}
@@ -1964,7 +1791,7 @@ function EtapaModulo({
             );
           })}
 
-          {advertenciasCamposFaltantes.length > 0 && (
+          {advertenciasCamposFaltantes.length > 0 && !todoSinCambios && (
             <ImportAlert
               color="amber"
               collapsible={false}
@@ -2063,20 +1890,21 @@ function EtapaModulo({
               </div>
             </ImportAlert>
           )}
-
-          {p.exitosas > 0 &&
-            (hasViajes || hasFacturas || hasClientes || hasTransportistas) && (
-              <button
-                type="button"
-                onClick={() => setDetalleModalOpen(true)}
-                className="self-end border border-vialto-charcoal bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm hover:bg-black"
-              >
-                Ver cambios →
-              </button>
-            )}
         </fieldset>
       )}
-      {p && (
+      {p && todoSinCambios && (
+        <div className="flex items-center justify-end gap-4">
+          <button
+            type="button"
+            disabled={wizard.loading}
+            onClick={wizard.continuarSinCambios}
+            className="inline-flex items-center gap-2 border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
+          >
+            Continuar →
+          </button>
+        </div>
+      )}
+      {p && !todoSinCambios && (
         <div className="flex justify-end gap-3">
           <button
             type="button"
@@ -2084,7 +1912,7 @@ function EtapaModulo({
             onClick={wizard.saltearModuloActual}
             className="border border-black/15 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel hover:bg-black/[0.04] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Saltear esta hoja
+            No importar esta hoja
           </button>
           <button
             type="button"
@@ -2149,6 +1977,7 @@ function EtapaModulo({
                 advertencias={advertenciasCiudad}
                 onElegir={wizard.elegirCiudad}
                 onIgnorarFila={wizard.ignorarFila}
+                paisFijo={paisFijo}
               />
             </div>
             <div className="flex justify-end border-t border-black/10 px-6 py-4">
@@ -2164,199 +1993,6 @@ function EtapaModulo({
         </div>
       )}
 
-      {p && detalleModalOpen && (
-        <div
-          className={modalEditOverlayClass}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setDetalleModalOpen(false);
-          }}
-        >
-          <div className={modalEditPanelClass}>
-            <div className="flex items-center justify-between border-b border-black/10 px-6 py-3">
-              <h2 className="font-[family-name:var(--font-display)] text-lg tracking-wide text-vialto-charcoal">
-                Detalle de filas
-              </h2>
-              <button
-                type="button"
-                onClick={() => setDetalleModalOpen(false)}
-                className="text-vialto-steel hover:text-vialto-charcoal text-xl leading-none px-2"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-5 py-3">
-              <div className="flex border-b border-black/10">
-                {(
-                  [
-                    {
-                      key: "viajes",
-                      label: `Viajes (${p.viajes?.length ?? 0})`,
-                      show: hasViajes,
-                    },
-                    {
-                      key: "facturas",
-                      label: `Facturas (${p.facturas?.length ?? 0})`,
-                      show: hasFacturas,
-                    },
-                    {
-                      key: "clientes",
-                      label: `Clientes (${p.clientes?.length ?? 0})${nuevosClientes > 0 ? ` · ${nuevosClientes} nuevos` : ""}`,
-                      show: hasClientes,
-                    },
-                    {
-                      key: "transportistas",
-                      label: `Transportistas (${p.transportistas?.length ?? 0})${nuevosTransp > 0 ? ` · ${nuevosTransp} nuevos` : ""}`,
-                      show: hasTransportistas,
-                    },
-                  ] as { key: PreviewTab; label: string; show: boolean }[]
-                )
-                  .filter((t) => t.show)
-                  .map(({ key, label }) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => {
-                        setTab(key);
-                        setTablaPage(1);
-                      }}
-                      className={[
-                        "px-4 py-2 text-[11px] uppercase tracking-wider border-b-2 -mb-px transition-colors",
-                        tab === key
-                          ? "border-vialto-fire text-vialto-fire"
-                          : "border-transparent text-vialto-steel hover:text-vialto-charcoal",
-                      ].join(" ")}
-                    >
-                      {label}
-                    </button>
-                  ))}
-              </div>
-
-              {tab === "viajes" && (p.viajes ?? []).some((v) => !v.nuevo) && (
-                <div className="mt-2 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      for (const v of p.viajes ?? []) {
-                        if (!v.nuevo) wizard.ignorarFila(v.fila);
-                      }
-                    }}
-                    className="border border-black/15 bg-white px-3 py-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-                  >
-                    Ignorar todas las actualizaciones
-                  </button>
-                </div>
-              )}
-
-              {(() => {
-                const items: unknown[] =
-                  (tab === "viajes" && hasViajes && p.viajes) ||
-                  (tab === "facturas" && hasFacturas && p.facturas) ||
-                  (tab === "clientes" && hasClientes && p.clientes) ||
-                  (tab === "transportistas" &&
-                    hasTransportistas &&
-                    p.transportistas) ||
-                  [];
-                const meta = metaPaginacionCliente(
-                  items.length,
-                  tablaPage,
-                  TABLA_PAGE_SIZE,
-                );
-                return (
-                  <>
-                    <div className="mt-2 overflow-x-auto">
-                      {tab === "viajes" && hasViajes && (
-                        <ViajesCambiosList
-                          viajes={slicePaginaCliente(
-                            p.viajes!,
-                            tablaPage,
-                            TABLA_PAGE_SIZE,
-                          )}
-                          onIgnorarFila={wizard.ignorarFila}
-                        />
-                      )}
-                      {tab === "facturas" && hasFacturas && (
-                        <FacturasTable
-                          facturas={slicePaginaCliente(
-                            p.facturas!,
-                            tablaPage,
-                            TABLA_PAGE_SIZE,
-                          )}
-                        />
-                      )}
-                      {tab === "clientes" && hasClientes && (
-                        <EntidadTable
-                          entidades={slicePaginaCliente(
-                            p.clientes!,
-                            tablaPage,
-                            TABLA_PAGE_SIZE,
-                          )}
-                        />
-                      )}
-                      {tab === "transportistas" && hasTransportistas && (
-                        <EntidadTable
-                          entidades={slicePaginaCliente(
-                            p.transportistas!,
-                            tablaPage,
-                            TABLA_PAGE_SIZE,
-                          )}
-                        />
-                      )}
-                    </div>
-                    {meta.totalPages > 1 && (
-                      <div className="mt-2 flex items-center justify-between gap-3 text-xs">
-                        <span className="text-vialto-steel">
-                          Página {meta.page} de {meta.totalPages} ·{" "}
-                          {meta.total} filas
-                        </span>
-                        <div className="inline-flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            disabled={!meta.hasPrev}
-                            onClick={() =>
-                              setTablaPage((p) => Math.max(1, p - 1))
-                            }
-                            className="h-8 min-w-8 border border-black/20 px-2 text-xs uppercase tracking-wider hover:bg-vialto-mist/80 disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
-                            Anterior
-                          </button>
-                          {paginasVisibles(meta.page, meta.totalPages).map(
-                            (n) => (
-                              <button
-                                key={n}
-                                type="button"
-                                onClick={() => setTablaPage(n)}
-                                aria-current={n === meta.page ? "page" : undefined}
-                                className={[
-                                  "h-8 min-w-8 px-2 border text-xs tabular-nums",
-                                  n === meta.page
-                                    ? "border-vialto-charcoal bg-vialto-charcoal text-white"
-                                    : "border-black/20 text-vialto-charcoal hover:bg-vialto-mist/80",
-                                ].join(" ")}
-                              >
-                                {n}
-                              </button>
-                            ),
-                          )}
-                          <button
-                            type="button"
-                            disabled={!meta.hasNext}
-                            onClick={() =>
-                              setTablaPage((p) => Math.min(meta.totalPages, p + 1))
-                            }
-                            className="h-8 min-w-8 border border-black/20 px-2 text-xs uppercase tracking-wider hover:bg-vialto-mist/80 disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
-                            Siguiente
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -2396,184 +2032,129 @@ function ViajesCambiosList({
     );
   }
 
-  return (
-    <div className="divide-y divide-black/10 border border-black/10">
-      {viajes.map((v) => (
-        <div key={v.fila} className="px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium text-vialto-charcoal">
-              {v.filasAgrupadas && v.filasAgrupadas.length > 1 ? (
-                <>
-                  Filas {v.filasAgrupadas.join(", ")} <span className="font-normal opacity-70">(Duplicadas)</span>
-                </>
-              ) : (
-                <>Fila {v.fila}</>
-              )} · {fmt(v.cliente)}
-            </p>
-            <div className="flex shrink-0 items-center gap-2">
-              {v.filasAgrupadas && v.filasAgrupadas.length > 1 && (
-                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-purple-700">
-                  Unificado
-                </span>
-              )}
-              {v.nuevo ? (
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-green-700">
-                  Nuevo
-                </span>
-              ) : (
-                <>
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
-                    Actualiza
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onIgnorarFila(v.fila)}
-                    className="border border-black/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist hover:text-vialto-charcoal"
-                  >
-                    Ignorar (no actualizar)
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {v.advertenciaSobrescritura && (
-            <div className="mt-3 border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-sm">
-              <strong className="block font-semibold uppercase tracking-wider text-[10px] mb-1">Atención: Datos distintos</strong>
-              <p className="mb-2">
-                Estas filas fueron unificadas pero tenían datos diferentes. Se conservarán los datos de la <strong>primera fila</strong> ({v.fila}). A continuación se detallan los datos o IDs que se van a perder:
-              </p>
-              {v.cambiosSobrescritura && v.cambiosSobrescritura.length > 0 && (
-                <div className="space-y-1 bg-white p-2 border border-amber-200">
-                  {v.cambiosSobrescritura.map((c, i) => (
-                    <div key={i} className="text-xs">
-                      <span className="font-medium text-vialto-charcoal">
-                        {c.campo}:
-                      </span>{" "}
-                      <span className="text-vialto-steel line-through decoration-red-400">
-                        {fmt(c.antes)}
-                      </span>
-                      <span className="mx-1 text-vialto-steel">→</span>
-                      <span className="font-medium text-vialto-charcoal">
-                        {fmt(c.despues)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {v.advertenciasCiudad && v.advertenciasCiudad.length > 0 && (
-            <p className="mt-1 text-[11px] text-amber-700">
-              ⚠ Tiene ciudad sin confirmar — revisala en "Revisar ciudades".
-            </p>
-          )}
-
-          {v.nuevo ? (
-            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-3">
-              {CAMPOS_VIAJE_MOSTRAR.filter(
-                (c) => v[c.key] != null && v[c.key] !== "",
-              ).map((c) => (
-                <div key={c.key}>
-                  <dt className="text-[10px] uppercase tracking-wider text-vialto-steel">
-                    {c.label}
-                  </dt>
-                  <dd className="text-vialto-charcoal">{fmt(v[c.key])}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : v.cambios && v.cambios.length > 0 ? (
-            <div className="mt-2 space-y-1">
-              {v.cambios.map((c, i) => (
-                <div key={i} className="text-xs">
-                  <span className="font-medium text-vialto-charcoal">
-                    {c.campo}:
-                  </span>{" "}
-                  <span className="text-vialto-steel line-through decoration-red-400">
-                    {fmt(c.antes)}
-                  </span>
-                  <span className="mx-1 text-vialto-steel">→</span>
-                  <span className="font-medium text-vialto-charcoal">
-                    {fmt(c.despues)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-2 text-xs text-vialto-steel">Sin cambios.</p>
-          )}
-        </div>
+  // Solo las columnas que tienen dato en alguna fila de la página.
+  const columnas = CAMPOS_VIAJE_MOSTRAR.filter((c) =>
+    viajes.some((v) => v[c.key] != null && v[c.key] !== ""),
+  );
+  const th =
+    "px-3 py-2 text-left font-[family-name:var(--font-ui)] text-[10px] font-semibold uppercase tracking-[0.1em] text-vialto-steel whitespace-nowrap";
+  const td = "px-3 py-2 text-sm text-vialto-charcoal whitespace-nowrap";
+  const colSpan = columnas.length + 2;
+  const listaCambios = (cambios: { campo: string; antes: unknown; despues: unknown }[]) => (
+    <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+      {cambios.map((c, i) => (
+        <span key={i} className="text-xs">
+          <span className="font-medium text-vialto-charcoal">{c.campo}:</span>{" "}
+          <span className="text-vialto-steel line-through decoration-red-400">
+            {fmt(c.antes)}
+          </span>
+          <span className="mx-1 text-vialto-steel">→</span>
+          <span className="font-medium text-vialto-charcoal">{fmt(c.despues)}</span>
+        </span>
       ))}
     </div>
   );
-}
 
-function FacturasTable({ facturas }: { facturas: ImportPreviewFactura[] }) {
   return (
-    <ListadoDatos
-      columns={[
-        {
-          id: "numero",
-          header: "Número",
-          primary: true,
-          cell: (f) => f.numero,
-        },
-        { id: "nombre", header: "Cliente", cell: (f) => f.nombre },
-        {
-          id: "importe",
-          header: "Importe",
-          cell: (f) => `$${f.importe.toLocaleString("es-AR")}`,
-          tdClassName: `${listadoTablaTdClass} font-medium`,
-        },
-        { id: "emision", header: "Emisión", cell: (f) => f.fechaEmision },
-        {
-          id: "vencimiento",
-          header: "Vencimiento",
-          cell: (f) => f.fechaVencimiento,
-        },
-      ]}
-      rows={facturas}
-      rowKey={(f) => `${f.tipo}-${f.numero}`}
-      emptyMessage="No hay facturas en la vista previa."
-      renderMobileCard={(f) => (
-        <ListadoCard
-          primary={f.numero}
-          fields={[
-            { label: "Cliente", value: f.nombre },
-            {
-              label: "Importe",
-              value: `$${f.importe.toLocaleString("es-AR")}`,
-            },
-            { label: "Emisión", value: f.fechaEmision },
-            { label: "Vencimiento", value: f.fechaVencimiento },
-          ]}
-        />
-      )}
-    />
-  );
-}
+    <div className="overflow-x-auto border border-black/10">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="border-b border-black/10 bg-vialto-mist/50">
+            <th className={`${th} w-14`}>Fila</th>
+            {columnas.map((c) => (
+              <th key={c.key} className={th}>
+                {c.label}
+              </th>
+            ))}
+            <th className={`${th} text-right`}>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {viajes.map((v) => {
+            const unificado = !!v.filasAgrupadas && v.filasAgrupadas.length > 1;
+            const sinCambios = !v.nuevo && (!v.cambios || v.cambios.length === 0);
+            return (
+              <Fragment key={v.fila}>
+                <tr className="border-t border-black/5 first:border-t-0">
+                  <td className={`${td} text-vialto-steel tabular-nums`}>
+                    {unificado ? v.filasAgrupadas!.join(", ") : v.fila}
+                  </td>
+                  {columnas.map((c) => (
+                    <td key={c.key} className={td}>
+                      {v[c.key] != null && v[c.key] !== "" ? (
+                        String(v[c.key])
+                      ) : (
+                        <span className="text-vialto-steel/50">—</span>
+                      )}
+                    </td>
+                  ))}
+                  <td className={`${td} text-right`}>
+                    <div className="flex items-center justify-end gap-1.5">
+                      {unificado && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 uppercase tracking-wider">
+                          Unificado
+                        </span>
+                      )}
+                      {v.nuevo ? (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 uppercase tracking-wider">
+                          Nuevo
+                        </span>
+                      ) : sinCambios ? (
+                        <span className="text-[10px] px-1.5 py-0.5 border border-black/10 text-vialto-steel/70 uppercase tracking-wider">
+                          Sin cambios
+                        </span>
+                      ) : (
+                        <>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
+                            Actualiza
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onIgnorarFila(v.fila)}
+                            className="border border-black/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist hover:text-vialto-charcoal"
+                          >
+                            Ignorar
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
 
-function EntidadTable({ entidades }: { entidades: ImportPreviewEntidad[] }) {
-  return (
-    <div className="rounded border border-black/10 divide-y divide-black/5 max-h-80 overflow-y-auto">
-      {entidades.map((e, i) => (
-        <div
-          key={i}
-          className="flex items-center justify-between px-4 py-2.5 text-sm"
-        >
-          <span className="text-vialto-charcoal">{e.nombre}</span>
-          {e.esNuevo ? (
-            <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
-              Nuevo
-            </span>
-          ) : (
-            <span className="text-[10px] px-1.5 py-0.5 bg-vialto-mist text-vialto-steel uppercase tracking-wider">
-              Existente
-            </span>
-          )}
-        </div>
-      ))}
+                {/* Fila que actualiza un viaje existente: qué cambia. */}
+                {!v.nuevo && !sinCambios && (
+                  <tr>
+                    <td colSpan={colSpan} className="px-3 pb-2">
+                      {listaCambios(v.cambios!)}
+                    </td>
+                  </tr>
+                )}
+
+                {v.advertenciaSobrescritura && (
+                  <tr className="bg-amber-50/60">
+                    <td colSpan={colSpan} className="px-3 py-2 text-xs text-amber-900">
+                      <p className="mb-1">
+                        <strong>Datos distintos entre las filas unificadas</strong> — se
+                        conservan los de la fila {v.fila}; se pierden:
+                      </p>
+                      {v.cambiosSobrescritura && v.cambiosSobrescritura.length > 0 &&
+                        listaCambios(v.cambiosSobrescritura)}
+                    </td>
+                  </tr>
+                )}
+
+                {v.advertenciasCiudad && v.advertenciasCiudad.length > 0 && (
+                  <tr>
+                    <td colSpan={colSpan} className="px-3 pb-2 text-[11px] text-amber-700">
+                      ⚠ Tiene ciudad sin confirmar — revisala en "Revisar ciudades".
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -2587,83 +2168,136 @@ function valorFilaDetalle(campo: string, valor: string): string {
   return valor;
 }
 
-function FilaDetalleCard({
-  fila,
-  conflicto,
-  decision,
+/**
+ * Filas del archivo para los módulos "simples" (Clientes, Transportes,
+ * Choferes, Vehículos): tabla compacta, una columna por campo + Estado. Las
+ * filas con ID Fiscal/DNI duplicado llevan debajo una franja con la decisión
+ * (Ignorar / Actualizar) — ver "Conflicto de campo único" en CLAUDE.md.
+ */
+function FilasDetalleTabla({
+  filas,
+  conflictoDe,
+  decisionDe,
   onElegirDecision,
 }: {
-  fila: ImportPreviewFilaEntidad;
-  conflicto?: ImportCampoUnicoConflicto;
-  decision?: "ignorar" | "actualizar";
-  onElegirDecision?: (accion: "ignorar" | "actualizar") => void;
+  filas: ImportPreviewFilaEntidad[];
+  conflictoDe: (fila: number) => ImportCampoUnicoConflicto | undefined;
+  decisionDe: (fila: number) => "ignorar" | "actualizar" | undefined;
+  onElegirDecision: (fila: number, accion: "ignorar" | "actualizar") => void;
 }) {
+  // Columnas = unión de campos en el orden en que aparecen (una fila puede
+  // no traer todos los campos si la celda venía vacía).
+  const columnas: { campo: string; label: string }[] = [];
+  for (const f of filas) {
+    for (const c of f.campos) {
+      if (!columnas.some((col) => col.campo === c.campo)) {
+        columnas.push({ campo: c.campo, label: c.label });
+      }
+    }
+  }
+  const th =
+    "px-3 py-2 text-left font-[family-name:var(--font-ui)] text-[10px] font-semibold uppercase tracking-[0.1em] text-vialto-steel whitespace-nowrap";
+  const td = "px-3 py-2 text-sm text-vialto-charcoal";
+  const botonDecision = (activo: boolean) =>
+    `px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${
+      activo
+        ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+        : "border-amber-300 text-amber-900 hover:bg-amber-100"
+    }`;
+
   return (
-    <div
-      className={`rounded border p-3 ${conflicto ? "border-amber-300 bg-amber-50/50" : "border-black/10"
-        }`}
-    >
-      <div className="mb-2 flex items-center justify-between">
-        <span className="font-[family-name:var(--font-ui)] text-[11px] font-semibold uppercase tracking-wider text-vialto-steel">
-          Fila {fila.fila}
-        </span>
-        {conflicto ? (
-          <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-900 uppercase tracking-wider">
-            {conflicto.campoLabel} duplicado
-          </span>
-        ) : fila.esNuevo ? (
-          <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
-            Nuevo
-          </span>
-        ) : (
-          <span className="text-[10px] px-1.5 py-0.5 bg-vialto-mist text-vialto-steel uppercase tracking-wider">
-            Actualiza
-          </span>
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
-        {fila.campos.map((c) => (
-          <div key={c.campo}>
-            <p className="text-[10px] uppercase tracking-[0.08em] text-vialto-steel">
-              {c.label}
-            </p>
-            <p className="text-sm text-vialto-charcoal">
-              {valorFilaDetalle(c.campo, c.valor)}
-            </p>
-          </div>
-        ))}
-      </div>
-      {conflicto && (
-        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-amber-200 pt-2.5 text-xs text-amber-900">
-          <span>
-            {conflicto.campoLabel} <strong>{conflicto.valor}</strong> ya es
-            de <strong>{conflicto.entidadExistenteNombre}</strong> — elegí
-            qué hacer:
-          </span>
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              onClick={() => onElegirDecision?.("ignorar")}
-              className={`px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${decision === "ignorar"
-                ? "border-vialto-charcoal bg-vialto-charcoal text-white"
-                : "border-amber-300 text-amber-900 hover:bg-amber-100"
-                }`}
-            >
-              Ignorar fila
-            </button>
-            <button
-              type="button"
-              onClick={() => onElegirDecision?.("actualizar")}
-              className={`px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${decision === "actualizar"
-                ? "border-vialto-charcoal bg-vialto-charcoal text-white"
-                : "border-amber-300 text-amber-900 hover:bg-amber-100"
-                }`}
-            >
-              Actualizar {conflicto.entidadExistenteNombre}
-            </button>
-          </div>
-        </div>
-      )}
+    <div className="overflow-x-auto border border-black/10">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="border-b border-black/10 bg-vialto-mist/50">
+            <th className={`${th} w-14`}>Fila</th>
+            {columnas.map((col) => (
+              <th key={col.campo} className={th}>
+                {col.label}
+              </th>
+            ))}
+            <th className={`${th} text-right`}>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((f) => {
+            const conflicto = conflictoDe(f.fila);
+            const decision = decisionDe(f.fila);
+            const valores = new Map(f.campos.map((c) => [c.campo, c.valor]));
+            return (
+              <Fragment key={f.fila}>
+                <tr
+                  className={`border-t border-black/5 first:border-t-0 ${
+                    conflicto ? "bg-amber-50/60" : ""
+                  }`}
+                >
+                  <td className={`${td} text-vialto-steel tabular-nums`}>{f.fila}</td>
+                  {columnas.map((col) => {
+                    const valor = valores.get(col.campo);
+                    return (
+                      <td key={col.campo} className={td}>
+                        {valor ? (
+                          valorFilaDetalle(col.campo, valor)
+                        ) : (
+                          <span className="text-vialto-steel/50">—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className={`${td} text-right whitespace-nowrap`}>
+                    {conflicto ? (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-900 uppercase tracking-wider">
+                        {conflicto.campoLabel} duplicado
+                      </span>
+                    ) : f.esNuevo ? (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
+                        Nuevo
+                      </span>
+                    ) : f.sinCambios ? (
+                      <span className="text-[10px] px-1.5 py-0.5 border border-black/10 text-vialto-steel/70 uppercase tracking-wider">
+                        Sin cambios
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-vialto-mist text-vialto-steel uppercase tracking-wider">
+                        Actualiza
+                      </span>
+                    )}
+                  </td>
+                </tr>
+                {conflicto && (
+                  <tr className="bg-amber-50/60">
+                    <td colSpan={columnas.length + 2} className="px-3 pb-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900">
+                        <span>
+                          {conflicto.campoLabel} <strong>{conflicto.valor}</strong> ya es
+                          de <strong>{conflicto.entidadExistenteNombre}</strong> — elegí
+                          qué hacer:
+                        </span>
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onElegirDecision(f.fila, "ignorar")}
+                            className={botonDecision(decision === "ignorar")}
+                          >
+                            Ignorar fila
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onElegirDecision(f.fila, "actualizar")}
+                            className={botonDecision(decision === "actualizar")}
+                          >
+                            Actualizar {conflicto.entidadExistenteNombre}
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

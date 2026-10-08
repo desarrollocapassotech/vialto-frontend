@@ -391,6 +391,16 @@ function tramoFacturableParaCliente(
 }
 
 /**
+ * El tramo del viaje correspondiente a `clienteId` se puede incluir en una factura nueva.
+ * Mismo criterio que `viajesFiltradosParaFactura` (los viajes que muestra "Nueva factura"):
+ * mira solo la facturación al cliente, no la liquidación al transportista.
+ */
+export function viajeFacturableParaCliente(v: Viaje, clienteId: string): boolean {
+  const cid = clienteId.trim();
+  return Boolean(cid) && tramoFacturableParaCliente(v, cid).facturable;
+}
+
+/**
  * Viajes que se pueden vincular a una factura de cliente: viajes del
  * `clienteId` elegido. Excluye viajes que ya tienen factura asignada,
  * cobrados y cancelados. Con `opciones` de edición, mantiene visibles los
@@ -457,25 +467,31 @@ export function clientesConViajesPendientesFactura(todos: Viaje[]): Set<string> 
   return ids;
 }
 
-/** Formato de importe de viaje alineado con listados (ARS / USD). */
+/**
+ * Formato de importe de viaje alineado con listados (ARS / USD).
+ * `conMoneda: false` = solo "$" (cuando la moneda ya figura en el encabezado de la columna).
+ */
 export function formatViajeImporteForListado(
   m: number,
   moneda?: string | null,
+  conMoneda = true,
 ): string {
   const mon = normalizeViajeMoneda(moneda);
   const locale = mon === "USD" ? "en-US" : "es-AR";
   const formatted = m.toLocaleString(locale);
+  if (!conMoneda) return `$ ${formatted}`;
   return mon === "USD" ? `US$ ${formatted}` : `ARS $ ${formatted}`;
 }
 
 /** Celda de tabla: monto a facturar. */
-export function textoMontoFacturarListado(v: Viaje): string {
+export function textoMontoFacturarListado(v: Viaje, conMoneda = true): string {
   const hasDesglose =
     v.cantidadFactura != null && v.precioUnitarioFactura != null;
   if (!hasDesglose && v.monto == null) return "—";
   return formatViajeImporteForListado(
     importeNetoViajeParaFactura(v),
     v.monedaMonto,
+    conMoneda,
   );
 }
 

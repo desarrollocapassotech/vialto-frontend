@@ -38,6 +38,10 @@ interface Props {
   onSaved: (updated: Cliente | Transportista) => void;
   /** Si se pasa, muestra un botón "Cancelar" (formulario mostrado en un toggle). */
   onCancel?: () => void;
+  /** Texto del botón de `onCancel` (default "Cancelar"). */
+  cancelLabel?: string;
+  /** Texto del botón de guardar (default "Guardar y continuar"). */
+  saveLabel?: string;
   /** Si es true, ignora la configuración del tenant y hace obligatorios los campos de facturación/AFIP. */
   forceArcaFields?: boolean;
 }
@@ -53,6 +57,8 @@ export function CompletarDatosFiscalesInline({
   getToken,
   onSaved,
   onCancel,
+  cancelLabel = 'Cancelar',
+  saveLabel = 'Guardar y continuar',
   forceArcaFields,
 }: Props) {
   const [nombre, setNombre] = useState(initial.nombre);
@@ -174,22 +180,25 @@ export function CompletarDatosFiscalesInline({
         <CrudFieldError message={fieldErrors.nombre} />
       </label>
 
-      {(paisVisible || idFiscalVisible) && (
+      {/* Orden: País (si aplica) · CUIT + condición IVA en una fila · domicilio a todo el ancho. */}
+      {paisVisible && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {paisVisible && (
-            <label className="grid gap-1">
-              <CrudFieldLabel required>País</CrudFieldLabel>
-              <PaisUbicacionSelect
-                value={pais}
-                onChange={handlePaisChange}
-                placeholder="Seleccioná un país"
-                disabled={saving}
-                className={isPaisMissing ? redInputClass : undefined}
-              />
-              <CrudFieldError message={fieldErrors.pais} />
-            </label>
-          )}
+          <label className="grid gap-1">
+            <CrudFieldLabel required>País</CrudFieldLabel>
+            <PaisUbicacionSelect
+              value={pais}
+              onChange={handlePaisChange}
+              placeholder="Seleccioná un país"
+              disabled={saving}
+              className={isPaisMissing ? redInputClass : undefined}
+            />
+            <CrudFieldError message={fieldErrors.pais} />
+          </label>
+        </div>
+      )}
 
+      {(idFiscalVisible || condicionVisible) && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {idFiscalVisible && (
             <label className="grid gap-1">
               <CrudFieldLabel required>{idFiscalPorPais(pais).label}</CrudFieldLabel>
@@ -204,11 +213,7 @@ export function CompletarDatosFiscalesInline({
               <CrudFieldError message={idFiscalError} />
             </label>
           )}
-        </div>
-      )}
 
-      {(condicionVisible || direccionVisible) && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {condicionVisible && (
             <label className="grid gap-1">
               <CrudFieldLabel required>{condInfo.label}</CrudFieldLabel>
@@ -239,19 +244,19 @@ export function CompletarDatosFiscalesInline({
               )}
             </label>
           )}
-
-          {direccionVisible && (
-            <label className="grid gap-1">
-              <CrudFieldLabel required>{direccionLabel}</CrudFieldLabel>
-              <CrudInput
-                value={direccion}
-                disabled={saving}
-                className={isDireccionMissing ? redInputClass : undefined}
-                onChange={(e) => setDireccion(e.target.value)}
-              />
-            </label>
-          )}
         </div>
+      )}
+
+      {direccionVisible && (
+        <label className="grid gap-1">
+          <CrudFieldLabel required>{direccionLabel}</CrudFieldLabel>
+          <CrudInput
+            value={direccion}
+            disabled={saving}
+            className={isDireccionMissing ? redInputClass : undefined}
+            onChange={(e) => setDireccion(e.target.value)}
+          />
+        </label>
       )}
 
       {error && (
@@ -268,7 +273,7 @@ export function CompletarDatosFiscalesInline({
             onClick={onCancel}
             className="h-8 px-3 border border-black/20 text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist disabled:opacity-50"
           >
-            Cancelar
+            {cancelLabel}
           </button>
         )}
         <button
@@ -277,7 +282,7 @@ export function CompletarDatosFiscalesInline({
           onClick={() => void onSave()}
           className="h-8 px-4 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50"
         >
-          {saving ? 'Guardando…' : 'Guardar y continuar'}
+          {saving ? 'Guardando…' : saveLabel}
         </button>
       </div>
     </div>

@@ -1,11 +1,12 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileSpreadsheet, FileText } from 'lucide-react';
+import { Banknote, FileSpreadsheet, FileText } from 'lucide-react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
+import { AccionesFila } from '@/components/ui/AccionesFila';
 import { AccionesOpcionesSheet } from '@/components/ui/AccionesOpcionesSheet';
-import { listadoTablaAccionClass, listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
+import { listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
 
 /**
  * Más compacto que `listadoTablaTdClass` (py-3) a propósito: el historial de una
@@ -478,13 +479,18 @@ export function CuentaContraparteView({
         renderActions={(m: MovimientoConSaldo) =>
           m.tipo === 'cargo' &&
           (m.estadoDisponibilidad === 'pendiente' || m.estadoDisponibilidad === 'parcial') ? (
-            <button
-              type="button"
-              onClick={() => setModal({ kind: 'imputar', cargo: m })}
-              className={listadoTablaAccionClass}
-            >
-              {m.clienteId ? 'Imputar cobro' : 'Imputar pago'}
-            </button>
+            <AccionesFila
+              options={[
+                {
+                  id: 'imputar',
+                  label: m.clienteId ? 'Imputar cobro' : 'Imputar pago',
+                  icon: Banknote,
+                  onClick: () => setModal({ kind: 'imputar', cargo: m }),
+                },
+              ]}
+              destacadas={['imputar']}
+              subtitle={m.concepto}
+            />
           ) : null
         }
       />

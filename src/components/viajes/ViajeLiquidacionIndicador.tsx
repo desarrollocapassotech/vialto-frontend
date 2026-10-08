@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { HandCoins } from "lucide-react";
+import { EstadoIcono } from "@/components/viajes/EstadoIcono";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import {
+  glifoEstadoComprobante,
   liquidacionEstadoBadgeClass,
   liquidacionEstadoLabel,
   tooltipLiquidacionEstado,
@@ -29,6 +32,8 @@ type Props = {
   hasArca?: boolean;
   /** Si se pasa, el modal de detalle (sin liquidación vinculada) habilita "+ Registrar pago". */
   onRegistrarPago?: () => void;
+  /** `icono`: ícono compacto de una sola línea (columna "Liquidación" de la grilla). */
+  variante?: "badge" | "icono";
 };
 
 const badgeClass =
@@ -53,6 +58,7 @@ export function ViajeLiquidacionIndicador({
   tenantId,
   hasArca = false,
   onRegistrarPago,
+  variante = "badge",
 }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -107,15 +113,27 @@ export function ViajeLiquidacionIndicador({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => void handleClick()}
-        disabled={cargando}
-        title={`Liquidación: ${tooltipLiquidacionEstado(viaje)}`}
-        className={`${badgeClass} ${liquidacionEstadoBadgeClass[estado]}`}
-      >
-        {liquidacionEstadoLabel[estado] ?? estado}
-      </button>
+      {variante === "icono" ? (
+        <EstadoIcono
+          icon={HandCoins}
+          glifo={glifoEstadoComprobante(estado)}
+          colorClass={liquidacionEstadoBadgeClass[estado] ?? ""}
+          title={`Liquidación: ${tooltipLiquidacionEstado(viaje)}`}
+          tachado={estado === "anulado"}
+          onClick={() => void handleClick()}
+          disabled={cargando}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => void handleClick()}
+          disabled={cargando}
+          title={`Liquidación: ${tooltipLiquidacionEstado(viaje)}`}
+          className={`${badgeClass} ${liquidacionEstadoBadgeClass[estado]}`}
+        >
+          {liquidacionEstadoLabel[estado] ?? estado}
+        </button>
+      )}
       {open && (
         <ViajeLiquidacionDetalleModal
           viaje={viaje}

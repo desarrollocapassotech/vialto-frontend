@@ -8,6 +8,8 @@ type Props = {
   destino?: string | null | undefined;
   destinosViaje?: Viaje['destinosViaje'];
   className?: string;
+  /** Una sola línea (grilla desktop): primera y última parada, recortadas; las intermedias como "+N". */
+  compacto?: boolean;
 };
 
 function partesRutaVisibles(
@@ -30,6 +32,7 @@ export function ViajeOrigenDestinoLinea({
   destino,
   destinosViaje,
   className,
+  compacto,
 }: Props) {
   const destinos = etiquetasDestinosDesdeViaje({ destino: destino ?? null, destinosViaje });
   const partes = partesRutaVisibles(origen, destinos);
@@ -39,6 +42,31 @@ export function ViajeOrigenDestinoLinea({
     rawO || rawDestinos.length > 0
       ? [rawO, ...rawDestinos].filter(Boolean).join(' → ')
       : undefined;
+
+  if (compacto) {
+    const primera = partes[0];
+    const ultima = partes.length > 1 ? partes[partes.length - 1] : null;
+    const intermedias = Math.max(partes.length - 2, 0);
+    return (
+      <div
+        className={`flex min-w-0 items-baseline gap-1 text-vialto-charcoal ${className ?? ''}`}
+        title={title}
+      >
+        <span className="truncate">{primera}</span>
+        {ultima && (
+          <>
+            <span className="shrink-0 text-vialto-steel/75 select-none" aria-hidden>
+              →
+            </span>
+            <span className="truncate">{ultima}</span>
+            {intermedias > 0 && (
+              <span className="shrink-0 text-[11px] text-vialto-fire">+{intermedias}</span>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div

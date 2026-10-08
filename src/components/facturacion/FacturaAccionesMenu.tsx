@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Ban, Banknote, Eye, FileText, Receipt, Trash2 } from 'lucide-react';
-import { AccionesMenuTrigger } from '@/components/ui/AccionesMenuTrigger';
-import { AccionesOpcionesSheet, type AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
+import { Ban, Banknote, Eye, FileMinus, FileText, Receipt, RotateCw, Trash2 } from 'lucide-react';
+import { AccionesFila } from '@/components/ui/AccionesFila';
+import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Factura } from '@/types/api';
 
 interface Props {
@@ -58,10 +58,11 @@ export function FacturaAccionesMenu({
       !anulada &&
       !tieneCaeOriginal;
     if (puedeEmitirArca && onEmitirArca) {
+      const conError = factura.arcaEstado === 'error';
       opts.push({
-        id: 'emitir-arca',
-        label: 'Emitir a ARCA',
-        icon: Receipt,
+        id: conError ? 'reintentar' : 'emitir-arca',
+        label: conError ? 'Reintentar emisión' : 'Emitir a ARCA',
+        icon: conError ? RotateCw : Receipt,
         onClick: onEmitirArca,
       });
     }
@@ -86,6 +87,8 @@ export function FacturaAccionesMenu({
       onMarcarCobrada &&
       factura.tipo === 'cliente' &&
       !anulada &&
+      // Con error de AFIP no se cobra: primero hay que reintentar la emisión.
+      factura.arcaEstado !== 'error' &&
       !factura.cobrado
     ) {
       opts.push({
@@ -111,7 +114,7 @@ export function FacturaAccionesMenu({
       opts.push({
         id: 'nota-credito',
         label: 'Ver Nota de Crédito',
-        icon: FileText,
+        icon: FileMinus,
         onClick: onVerNotaCredito,
       });
     }
@@ -141,15 +144,23 @@ export function FacturaAccionesMenu({
   ]);
 
   return (
-    <>
-      <AccionesMenuTrigger open={open} onClick={() => setOpen(true)} />
-
-      <AccionesOpcionesSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        subtitle={factura.numero}
-        options={options}
-      />
-    </>
+    <AccionesFila
+      options={options}
+      destacadas={FACTURA_ACCIONES_DESTACADAS}
+      subtitle={factura.numero}
+      open={open}
+      onOpenChange={setOpen}
+    />
   );
 }
+
+/** Orden de prioridad de las acciones que se muestran como ícono en la grilla. */
+/** "Ver" no se lista: `AccionesFila` lo agrega como ícono solo si sobra lugar (igual que Viajes). */
+const FACTURA_ACCIONES_DESTACADAS = [
+  'reintentar',
+  'emitir-arca',
+  'marcar-cobrada',
+  'anular',
+  'comprobante',
+  'nota-credito',
+];

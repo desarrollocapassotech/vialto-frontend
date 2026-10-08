@@ -5,9 +5,14 @@ export function resolveNotificacionRoute(item: NotificacionFeedItem): string | n
   if (!item.entidadId) return null;
   switch (item.tipo) {
     case "facturacion.facturaPorVencer":
+    case "facturacion.facturaVencida":
       return `/facturacion?factura=${encodeURIComponent(item.entidadId)}`;
     case "combustible.cargaSospechosa":
       return `/combustible?carga=${encodeURIComponent(item.entidadId)}`;
+    case "combustible.errorChofer":
+      // entidadId es el localId de la carga en el celular, no un id navegable: va a la lista
+      // de Alertas, donde está el detalle con la explicación.
+      return "/?combustibleTab=alertas";
     default:
       return null;
   }

@@ -71,9 +71,8 @@ export function FinancieroDashboardSection({
   const [loading, setLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const cantAlertas = data?.margen?.alertas.length ?? 0;
-
-  const tabs: { id: FinancieroTab; label: string; badge?: number }[] = [
+  // Sin contador en "Alertas": la campana del menú superior es el único lugar con número.
+  const tabs: { id: FinancieroTab; label: string }[] = [
     ...(showViajes ? [{ id: "margen" as const, label: "Resumen" }] : []),
     ...(showViajes ? [{ id: "viajes" as const, label: "Viajes" }] : []),
     ...(showViajes && showIntegracionArca
@@ -81,7 +80,7 @@ export function FinancieroDashboardSection({
       : []),
     ...(showFacturacion ? [{ id: "facturacion" as const, label: "Facturación" }] : []),
     ...(showViajes
-      ? [{ id: "alertas" as const, label: "Alertas", badge: cantAlertas > 0 ? cantAlertas : undefined }]
+      ? [{ id: "alertas" as const, label: "Alertas" }]
       : []),
   ];
   const [tab, setTab] = useState<FinancieroTab | null>(null);
@@ -149,14 +148,6 @@ export function FinancieroDashboardSection({
             }`}
           >
             {t.label}
-            {t.badge !== undefined && (
-              <span
-                className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-vialto-fire px-1 text-[10px] font-semibold leading-none text-white"
-                aria-hidden
-              >
-                {t.badge}
-              </span>
-            )}
           </button>
         ))}
       </div>

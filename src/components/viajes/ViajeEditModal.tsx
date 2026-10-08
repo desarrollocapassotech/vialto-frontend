@@ -56,7 +56,11 @@ import {
   VIAJE_ETAPAS_TODAS,
   tooltipEtapaViaje,
 } from "@/lib/viajesIndicadores";
-import { viajePermiteBotonFacturar } from "@/lib/viajesComprobantes";
+import {
+  viajePendienteComprobanteCliente,
+  viajePendienteComprobanteTransportista,
+  viajeRequiereComprobanteDual,
+} from "@/lib/viajesComprobantes";
 import {
   numeroFacturaVisibleViaje,
   numeroVisibleViaje,
@@ -182,10 +186,18 @@ export type ViajeEditModalProps = {
   ) => void;
   onClose: () => void;
   onSave: () => void;
-  /** Misma acción que «Facturar» en el menú de acciones del listado (navegación / modal de facturas). */
+  /** Misma acción que «Facturar» en el menú de acciones del listado (factura al cliente). */
   onFacturar?: () => void;
   /** Motivo para deshabilitar Facturar (ej. ARCA + USD). */
   facturarBloqueoMotivo?: string | null;
+  /** Misma acción que «Liquidar» en el menú de acciones del listado (liquidación al transportista). */
+  onLiquidar?: () => void;
+  /** Motivo para deshabilitar Liquidar (ej. ARCA + USD). */
+  liquidarBloqueoMotivo?: string | null;
+  /** Solo si el viaje tiene una factura en borrador: lleva a emitirla en vez de crear otra. */
+  onContinuarFactura?: () => void;
+  /** Solo si el viaje tiene una liquidación en borrador. */
+  onContinuarLiquidacion?: () => void;
   onEliminar?: () => void;
   saving: boolean;
   error: string | null;
@@ -203,6 +215,7 @@ export type ViajeEditModalProps = {
     | "idPropio1Habilitado"
     | "idPropio2Habilitado"
     | "idPropio2Label"
+    | "recomendacionCiudadesHabilitada"
   > | null;
   /** Tenant con emision-liquido-producto-arca: habilita los campos ARCA en el detalle de la liquidación vinculada. */
   hasLiquidoProductoArca?: boolean;
@@ -253,6 +266,10 @@ export function ViajeEditModal({
   onSave,
   onFacturar,
   facturarBloqueoMotivo = null,
+  onLiquidar,
+  liquidarBloqueoMotivo = null,
+  onContinuarFactura,
+  onContinuarLiquidacion,
   onEliminar,
   saving,
   error,
@@ -343,6 +360,8 @@ export function ViajeEditModal({
     if (!tenant?.paisOrigenDestinoOculto || !tenant.paisOrigenDestinoFijoId) return null;
     return todosPaises.find((p) => p.id === tenant.paisOrigenDestinoFijoId) ?? null;
   }, [tenant, todosPaises]);
+  /** `Tenant.recomendacionCiudadesHabilitada` (default true): false = ciudades en texto libre. */
+  const sugerenciasCiudad = tenant?.recomendacionCiudadesHabilitada !== false;
 
   // El selector de país queda oculto en la UI cuando `paisFijo` está seteado (ver
   // `PaisUbicacionSelect`/`ViajeDestinosLista`/`ViajeClientesFieldset` más abajo) — acá se
@@ -509,18 +528,27 @@ export function ViajeEditModal({
 
   if (!open) return null;
 
+  const viajeComprobantes = {
+    ...snapshotViaje,
+    etapa: draft.estado,
+    transportistaId:
+      draft.operacionModo === "externo"
+        ? draft.transportistaId
+        : snapshotViaje.transportistaId,
+  };
+  const comprobantesHabilitados = draft.estado !== "cancelado";
   const muestraBotonFacturar =
     typeof onFacturar === "function" &&
-    viajePermiteBotonFacturar({
-      ...snapshotViaje,
-      etapa: draft.estado,
-      transportistaId:
-        draft.operacionModo === "externo"
-          ? draft.transportistaId
-          : snapshotViaje.transportistaId,
-    });
+    comprobantesHabilitados &&
+    viajePendienteComprobanteCliente(viajeComprobantes);
   const facturarDeshabilitado =
     saving || !draft.clienteId.trim() || Boolean(facturarBloqueoMotivo);
+  const muestraBotonLiquidar =
+    typeof onLiquidar === "function" &&
+    comprobantesHabilitados &&
+    viajeRequiereComprobanteDual(viajeComprobantes) &&
+    viajePendienteComprobanteTransportista(viajeComprobantes);
+  const liquidarDeshabilitado = saving || Boolean(liquidarBloqueoMotivo);
 
   const muestraPagosTransportista = viajeRequierePagosTransportista({
     transportistaId:
@@ -754,6 +782,7 @@ export function ViajeEditModal({
                             )
                           }
                           inputClassName={`${inputClass} w-full`}
+                          sugerencias={sugerenciasCiudad}
                         />
                       </div>
                     </div>
@@ -776,6 +805,7 @@ export function ViajeEditModal({
                           setQuickCreate("pais");
                         }}
                         paisFijo={paisFijo}
+                        sugerenciasCiudad={sugerenciasCiudad}
                       />
                       <CrudFieldError message={destinosError} />
                     </div>
@@ -972,6 +1002,7 @@ export function ViajeEditModal({
                   getToken={getToken}
                   onProductoCreado={onProductoCreado}
                   paisFijo={paisFijo}
+                  sugerenciasCiudad={sugerenciasCiudad}
                 />
                 <button
                   type="button"
@@ -1694,6 +1725,39 @@ export function ViajeEditModal({
                   className="inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Facturar
+                </button>
+              ) : null}
+              {muestraBotonLiquidar ? (
+                <button
+                  type="button"
+                  onClick={onLiquidar}
+                  disabled={liquidarDeshabilitado}
+                  title={liquidarBloqueoMotivo ?? undefined}
+                  className="inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Liquidar
+                </button>
+              ) : null}
+              {onContinuarFactura ? (
+                <button
+                  type="button"
+                  onClick={onContinuarFactura}
+                  disabled={saving}
+                  title="El viaje tiene una factura en borrador sin emitir"
+                  className="inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Continuar factura
+                </button>
+              ) : null}
+              {onContinuarLiquidacion ? (
+                <button
+                  type="button"
+                  onClick={onContinuarLiquidacion}
+                  disabled={saving}
+                  title="El viaje tiene una liquidación en borrador sin emitir"
+                  className="inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Continuar liquidación
                 </button>
               ) : null}
               {onEliminar ? (

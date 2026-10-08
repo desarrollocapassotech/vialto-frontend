@@ -1,3 +1,5 @@
+import { HandCoins } from 'lucide-react';
+import { EstadoIcono } from '@/components/viajes/EstadoIcono';
 import { formatViajeImporteForListado } from '@/lib/viajesFlota';
 import {
   calcularSaldoTransportista,
@@ -14,10 +16,12 @@ type Props = {
   viaje: Viaje;
   /** Si se pasa, el badge se vuelve clickeable y abre "Registrar pago". */
   onClick?: () => void;
+  /** `icono`: ícono compacto de una sola línea (columna "Liquidación" de la grilla). */
+  variante?: 'badge' | 'icono';
 };
 
 /** Badge bajo ganancia bruta: deuda pendiente o transportista liquidado. */
-export function ViajePagoTransportistaIndicador({ viaje, onClick }: Props) {
+export function ViajePagoTransportistaIndicador({ viaje, onClick, variante = 'badge' }: Props) {
   const { isVisible } = useFieldConfig('viajes');
   if (!isVisible('detalle_viaje', 'pagosTransportista')) return null;
 
@@ -26,6 +30,27 @@ export function ViajePagoTransportistaIndicador({ viaje, onClick }: Props) {
 
   const saldo = calcularSaldoTransportista(viaje);
   if (!saldo) return null;
+
+  if (variante === 'icono') {
+    const pagado = estado === 'pagado';
+    return (
+      <EstadoIcono
+        icon={HandCoins}
+        glifo={pagado ? 'ok' : 'error'}
+        colorClass={
+          pagado
+            ? 'border-emerald-500/80 bg-emerald-100 text-emerald-950'
+            : 'border-red-400/90 bg-red-50 text-red-900'
+        }
+        title={
+          pagado
+            ? 'Transportista pagado en su totalidad'
+            : `Saldo pendiente con el transportista: ${formatViajeImporteForListado(saldo.saldo, saldo.moneda)}`
+        }
+        onClick={onClick}
+      />
+    );
+  }
 
   const Tag = onClick ? 'button' : 'span';
   const commonProps = onClick ? { type: 'button' as const, onClick } : {};

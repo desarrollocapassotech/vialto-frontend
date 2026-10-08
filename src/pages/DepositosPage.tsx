@@ -300,12 +300,37 @@ export function DepositosPage({
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
-        Depósitos
-      </h1>
-      <p className="mt-2 text-vialto-steel">
-        Almacená y administrá los puntos de depósito para tu stock.
-      </p>
+      {/* Título a la izquierda; acciones a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
+            Depósitos
+          </h1>
+          <p className="mt-2 text-vialto-steel">
+            Almacená y administrá los puntos de depósito para tu stock.
+          </p>
+        </div>
+        {(!isPlatform || activeTenantId) && (
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            {anyFiltroActivo && (
+              <button
+                type="button"
+                onClick={limpiarFiltros}
+                className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+              >
+                Limpiar filtros
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={openCreateForm}
+              className="inline-flex h-10 w-fit max-w-full shrink-0 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            >
+              Nuevo depósito
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Buscador de empresas para plataforma */}
       {isPlatform && (
@@ -328,25 +353,6 @@ export function DepositosPage({
       {/* Contenido operativo (se oculta si falta empresa en modo plataforma) */}
       {(!isPlatform || activeTenantId) && (
         <>
-          <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
-            {anyFiltroActivo && (
-              <button
-                type="button"
-                onClick={limpiarFiltros}
-                className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-              >
-                Limpiar filtros
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={openCreateForm}
-              className="inline-flex h-10 w-fit max-w-full shrink-0 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-            >
-              Nuevo depósito
-            </button>
-          </div>
-
           {error && (
             <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
               {error}

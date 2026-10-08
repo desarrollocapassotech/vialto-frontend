@@ -20,16 +20,21 @@ export function SuperadminEmpresasPage() {
   return (
     <SuperadminOnly>
       <div className="w-full">
-        <h1 className="font-[family-name:var(--font-display)] text-4xl md:text-5xl tracking-wide text-vialto-charcoal">
-          Empresas
-        </h1>
-        <div className="mt-4 flex justify-end">
-          <Link
-            to="/superadmin/empresas/nueva"
-            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-          >
-            Crear empresa
-          </Link>
+        {/* Título a la izquierda; acciones a la derecha, en la misma línea. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <div className="min-w-0">
+            <h1 className="font-[family-name:var(--font-display)] text-4xl md:text-5xl tracking-wide text-vialto-charcoal">
+              Empresas
+            </h1>
+          </div>
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <Link
+              to="/superadmin/empresas/nueva"
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            >
+              Crear empresa
+            </Link>
+          </div>
         </div>
 
         {error && (

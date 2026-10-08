@@ -46,7 +46,43 @@ const MODULOS_CAMPOS_COMPARTIDOS = new Set([
   "transportistas",
   "vehiculos",
   "choferes",
+  "liquidaciones",
 ]);
+
+/**
+ * Campos de Viajes que se prenden/apagan desde General (y no desde la lista de
+ * campos de Viajes): además de los viajes, ocultan la pestaña de Base de datos
+ * y las columnas/hojas de la planilla de importación.
+ */
+const SWITCHES_ENTIDAD_VIAJES: readonly {
+  campos: readonly string[];
+  label: string;
+  ayuda: string;
+}[] = [
+  {
+    // Los dos campos de chofer de Viajes (flota propia / externo) van juntos.
+    campos: ["choferId", "choferExternoId"],
+    label: "Choferes",
+    ayuda:
+      "Apagado: no se cargan choferes en los viajes, no se muestra la pestaña Choferes de Base de datos (salvo que la empresa tenga Combustible o Stock) ni la hoja Choferes de la planilla de importación.",
+  },
+  {
+    campos: ["vehiculosRows"],
+    label: "Vehículos",
+    ayuda:
+      "Apagado: no se cargan vehículos en los viajes, no se muestra la pestaña Vehículos de Base de datos ni la hoja Vehículos de la planilla de importación.",
+  },
+  {
+    campos: ["productoItems"],
+    label: "Productos",
+    ayuda:
+      "Apagado: no se cargan productos en los viajes, no se muestra la pestaña Productos de Base de datos (salvo que la empresa tenga Stock) ni las columnas de producto en la planilla de importación.",
+  },
+];
+const CAMPOS_SWITCH_ENTIDAD: ReadonlySet<string> = new Set(
+  SWITCHES_ENTIDAD_VIAJES.flatMap((s) => s.campos),
+);
+const FORMULARIO_SWITCH_ENTIDAD = "alta_viaje";
 
 function calcularModulosDisponibles(
   catalogo: Catalogo | null,
@@ -195,6 +231,16 @@ export function CamposEmpresaPage() {
   const [savingValidacionCuitArca, setSavingValidacionCuitArca] = useState(false);
   const [empresaTipoFlota, setEmpresaTipoFlota] = useState<TipoFlota>("mixta");
   const [savingTipoFlota, setSavingTipoFlota] = useState(false);
+  const [empresaDashboardHabilitado, setEmpresaDashboardHabilitado] = useState(true);
+  const [savingDashboardHabilitado, setSavingDashboardHabilitado] = useState(false);
+  const [empresaRecomendacionCiudades, setEmpresaRecomendacionCiudades] = useState(true);
+  const [savingRecomendacionCiudades, setSavingRecomendacionCiudades] = useState(false);
+  // Choferes/Vehículos/Productos no son flags del Tenant: son campos de Viajes
+  // (tenant-field-config), ver SWITCHES_ENTIDAD_VIAJES. campo → visible.
+  const [empresaSwitchEntidad, setEmpresaSwitchEntidad] = useState<
+    Record<string, boolean>
+  >({});
+  const [savingSwitchEntidad, setSavingSwitchEntidad] = useState<string | null>(null);
   const [empresaPaisFijoId, setEmpresaPaisFijoId] = useState("");
   const [savingPaisFijo, setSavingPaisFijo] = useState(false);
   const [paisesEmpresa, setPaisesEmpresa] = useState<Pais[]>([]);
@@ -214,11 +260,25 @@ export function CamposEmpresaPage() {
     setEmpresaConfigError(null);
     (async () => {
       try {
-        const tenant = await apiJson<Tenant>(
-          `/api/tenants/${encodeURIComponent(filtroEmpresa)}`,
-          () => getToken(),
-        );
+        const [tenant, camposViaje] = await Promise.all([
+          apiJson<Tenant>(
+            `/api/tenants/${encodeURIComponent(filtroEmpresa)}`,
+            () => getToken(),
+          ),
+          apiJson<CampoConfig[]>(
+            `/api/platform/field-config/${encodeURIComponent(filtroEmpresa)}?modulo=viajes&formulario=${FORMULARIO_SWITCH_ENTIDAD}`,
+            () => getToken(),
+          ),
+        ]);
         if (!cancelled) {
+          setEmpresaSwitchEntidad(
+            Object.fromEntries(
+              [...CAMPOS_SWITCH_ENTIDAD].map((campo) => [
+                campo,
+                camposViaje.find((c) => c.campo === campo)?.visible ?? true,
+              ]),
+            ),
+          );
           const label = tenant.labelIdentificacionPersonalizadaViajes ?? "";
           setEmpresaLabel(label);
           setEmpresaLabelGuardado(label);
@@ -242,6 +302,8 @@ export function CamposEmpresaPage() {
           setEmpresaPaisFijoId(tenant.paisOrigenDestinoFijoId ?? "");
           setEmpresaValidacionCuitArca(tenant.validacionCuitArcaHabilitada ?? false);
           setEmpresaTipoFlota(tenant.tipoFlota ?? "mixta");
+          setEmpresaDashboardHabilitado(tenant.dashboardHabilitado ?? true);
+          setEmpresaRecomendacionCiudades(tenant.recomendacionCiudadesHabilitada ?? true);
           setEmpresaTenant(tenant);
         }
       } catch (e) {
@@ -407,6 +469,86 @@ export function CamposEmpresaPage() {
       showToast(msg, "error");
     } finally {
       setSavingValidacionCuitArca(false);
+    }
+  }
+
+  async function toggleRecomendacionCiudades() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaRecomendacionCiudades;
+    setSavingRecomendacionCiudades(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ recomendacionCiudadesHabilitada: nuevoValor }),
+      });
+      setEmpresaRecomendacionCiudades(nuevoValor);
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingRecomendacionCiudades(false);
+    }
+  }
+
+  async function toggleDashboardHabilitado() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaDashboardHabilitado;
+    setSavingDashboardHabilitado(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ dashboardHabilitado: nuevoValor }),
+      });
+      setEmpresaDashboardHabilitado(nuevoValor);
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingDashboardHabilitado(false);
+    }
+  }
+
+  /** Prendido si al menos uno de sus campos está visible. */
+  function switchEntidadHabilitado(campos: readonly string[]): boolean {
+    return campos.some((c) => empresaSwitchEntidad[c] ?? true);
+  }
+
+  async function toggleSwitchEntidad(label: string, campos: readonly string[]) {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !switchEntidadHabilitado(campos);
+    setSavingSwitchEntidad(label);
+    setEmpresaConfigError(null);
+    try {
+      for (const campo of campos) {
+        await apiJson(
+          `/api/platform/field-config/${encodeURIComponent(filtroEmpresa)}/toggle`,
+          () => getToken(),
+          {
+            method: "POST",
+            body: JSON.stringify({
+              modulo: "viajes",
+              formulario: FORMULARIO_SWITCH_ENTIDAD,
+              campo,
+              visible: nuevoValor,
+              aplicarATodosLosFormularios: true,
+            }),
+          },
+        );
+        setEmpresaSwitchEntidad((prev) => ({ ...prev, [campo]: nuevoValor }));
+      }
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingSwitchEntidad(null);
     }
   }
 
@@ -767,23 +909,23 @@ export function CamposEmpresaPage() {
     if (!filtroEmpresa) return;
     setLoading(true);
     try {
-      for (const f of ["alta_liquidacion", "edicion_liquidacion"]) {
-        for (const c of ["fechaDesde", "fechaHasta"]) {
-          await apiJson(
-            `/api/platform/field-config/${encodeURIComponent(filtroEmpresa)}/toggle`,
-            () => getToken(),
-            {
-              method: "POST",
-              body: JSON.stringify({
-                modulo: "liquidaciones",
-                formulario: f,
-                campo: c,
-                visible,
-                aplicarATodosLosFormularios: true,
-              }),
-            },
-          );
-        }
+      // La visibilidad de Liquidaciones es compartida entre alta y edición
+      // (MODULOS_CAMPOS_COMPARTIDOS): un toggle por campo alcanza para ambas.
+      for (const c of ["fechaDesde", "fechaHasta"]) {
+        await apiJson(
+          `/api/platform/field-config/${encodeURIComponent(filtroEmpresa)}/toggle`,
+          () => getToken(),
+          {
+            method: "POST",
+            body: JSON.stringify({
+              modulo: "liquidaciones",
+              formulario: "alta_liquidacion",
+              campo: c,
+              visible,
+              aplicarATodosLosFormularios: true,
+            }),
+          },
+        );
       }
       if (modulo && formulario) {
         const resp = await apiJson<CampoConfig[]>(
@@ -809,7 +951,13 @@ export function CamposEmpresaPage() {
     catalogo && modulo ? Object.keys(catalogo[modulo].formularios) : [];
   // Los campos obligatorios del sistema no se pueden ocultar — no tiene
   // sentido mostrarlos en esta pantalla, solo agregan ruido.
-  const camposConfigurables = campos?.filter((c) => !c.obligatorioSistema) ?? null;
+  // Choferes/Vehículos/Productos de Viajes se configuran desde General (SWITCHES_ENTIDAD_VIAJES).
+  const camposConfigurables =
+    campos?.filter(
+      (c) =>
+        !c.obligatorioSistema &&
+        !(modulo === "viajes" && CAMPOS_SWITCH_ENTIDAD.has(c.campo)),
+    ) ?? null;
 
   return (
     <div className="w-full">
@@ -938,6 +1086,44 @@ export function CamposEmpresaPage() {
                       </tr>
                     ) : (
                       <>
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            Mostrar dashboard (pantalla de inicio)
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <ToggleSwitch
+                              checked={empresaDashboardHabilitado}
+                              disabled={savingDashboardHabilitado}
+                              onChange={() => void toggleDashboardHabilitado()}
+                              label={
+                                empresaDashboardHabilitado
+                                  ? "Ocultar dashboard"
+                                  : "Mostrar dashboard"
+                              }
+                            />
+                          </td>
+                        </tr>
+                        {SWITCHES_ENTIDAD_VIAJES.map((s) => {
+                          const habilitado = switchEntidadHabilitado(s.campos);
+                          return (
+                            <tr key={s.label} className="border-t border-black/10">
+                              <td className="px-4 py-2.5">
+                                {s.label}
+                                <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                                  {s.ayuda}
+                                </p>
+                              </td>
+                              <td className="px-4 py-2.5 text-right">
+                                <ToggleSwitch
+                                  checked={habilitado}
+                                  disabled={savingSwitchEntidad === s.label}
+                                  onChange={() => void toggleSwitchEntidad(s.label, s.campos)}
+                                  label={`${habilitado ? "Deshabilitar" : "Habilitar"} ${s.label.toLowerCase()}`}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
                             ID Sistema (módulo Viajes)
@@ -1138,6 +1324,28 @@ export function CamposEmpresaPage() {
                             </td>
                           </tr>
                         )}
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            Recomendación de ciudades (Viajes)
+                            <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                              Prendido: origen y destino se eligen de un buscador
+                              de ciudades, y la importación valida las ciudades
+                              del Excel. Apagado: se escriben como texto libre.
+                            </p>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <ToggleSwitch
+                              checked={empresaRecomendacionCiudades}
+                              disabled={savingRecomendacionCiudades}
+                              onChange={() => void toggleRecomendacionCiudades()}
+                              label={
+                                empresaRecomendacionCiudades
+                                  ? "Deshabilitar recomendación de ciudades"
+                                  : "Habilitar recomendación de ciudades"
+                              }
+                            />
+                          </td>
+                        </tr>
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
                             Validar CUIT con ARCA (Clientes y Transportistas)

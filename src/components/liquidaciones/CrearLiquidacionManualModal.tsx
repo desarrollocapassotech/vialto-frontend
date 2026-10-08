@@ -13,8 +13,15 @@ import {
 } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
+import { EmisorArcaResumen } from "@/components/facturacion/EmisorArcaResumen";
+import { ParteFacturaResumen } from "@/components/facturacion/ParteFacturaResumen";
 import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
-import { DatosFiscalesFaltantesAlerta } from "@/components/shared/DatosFiscalesFaltantesAlerta";
+import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
+import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
+import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
+import { useValidacionPadronRegistro } from "@/hooks/useValidacionPadronRegistro";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import { PadronValidacionEstado } from "@/components/shared/PadronValidacionEstado";
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson, apiFetch } from "@/lib/api";
@@ -70,6 +77,7 @@ type ViajeItem = Pick<
   | "numeroIdentificacionPersonalizado"
   | "idPropio2"
   | "fechaCarga"
+  | "fechaDescarga"
   | "origen"
   | "destino"
   | "precioTransportistaExterno"
@@ -81,6 +89,7 @@ type ViajeItem = Pick<
   | "choferId"
   | "chofer"
   | "productosViaje"
+  | "cliente"
 >;
 
 function fmtDate(iso: string | null) {
@@ -94,9 +103,19 @@ function dateInputValueFromIso(iso: string | null | undefined): string {
   return iso?.trim() ? iso.slice(0, 10) : "";
 }
 
-function fmtMoney(n: number | null, moneda?: string | null) {
+/** Fila label/importe del resumen — mismo estilo que `Row` de FacturaArcaPreviewPanel. */
+function ResumenRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-3 text-xs">
+      <span className="min-w-0 break-words text-vialto-steel">{label}</span>
+      <span className="shrink-0 tabular-nums text-vialto-charcoal">{value}</span>
+    </div>
+  );
+}
+
+function fmtMoney(n: number | null, moneda?: string | null, conMoneda = true) {
   if (n == null) return "—";
-  return formatViajeImporteForListado(n, moneda);
+  return formatViajeImporteForListado(n, moneda, conMoneda);
 }
 
 function monedaViaje(
@@ -132,6 +151,9 @@ const labelClass =
 interface Props {
   /** Viaje puntual: el viaje queda fijo; el transportista solo se elige si hay contratante + ejecutor distintos. */
   viajeInicial?: Viaje;
+  /** Liquidación de varios viajes desde la grilla: transportista fijo y viajes preseleccionados (sin `viajeInicial`). */
+  transportistaIdInicial?: string;
+  viajeIdsIniciales?: string[];
   transportistas: Transportista[];
   /** true = el host todavía está armando la lista de transportistas: bloquea el modal con un loader. */
   transportistasLoading?: boolean;
@@ -157,6 +179,8 @@ interface Props {
 
 export function CrearLiquidacionManualModal({
   viajeInicial,
+  transportistaIdInicial,
+  viajeIdsIniciales,
   transportistas,
   transportistasLoading = false,
   config: configProp,
@@ -204,8 +228,15 @@ export function CrearLiquidacionManualModal({
   // — Campos del formulario —
   const [transportistaId, setTransportistaId] = useState(
     () =>
-      (viajeInicial ? transportistaOpcionesViaje[0]?.id : "") ??
-      "",
+      (viajeInicial
+        ? transportistaOpcionesViaje[0]?.id
+        : transportistaIdInicial) ?? "",
+  );
+  /** Viajes a marcar apenas cargue la lista del transportista inicial (una sola vez). */
+  const preseleccionPendiente = useRef<string[] | null>(
+    !viajeInicial && transportistaIdInicial && viajeIdsIniciales?.length
+      ? viajeIdsIniciales
+      : null,
   );
 
   const [transportistaActualizado, setTransportistaActualizado] =
@@ -374,7 +405,31 @@ export function CrearLiquidacionManualModal({
           () => getToken(),
         );
         if (!cancelled) {
-          setViajes(res.items ?? []);
+          const items = res.items ?? [];
+          setViajes(items);
+          const preseleccion = preseleccionPendiente.current;
+          preseleccionPendiente.current = null;
+          if (preseleccion && transportistaId === transportistaIdInicial) {
+            const elegidos = items.filter((v) => preseleccion.includes(v.id));
+            setSelectedViajeIds(new Set(elegidos.map((v) => v.id)));
+            if (elegidos.length < preseleccion.length) {
+              showToast(
+                `${preseleccion.length - elegidos.length} de los viajes elegidos ya no están disponibles para liquidar a este transportista.`,
+                "error",
+              );
+            }
+            const desde = elegidos
+              .map((v) => dateInputValueFromIso(v.fechaCarga))
+              .filter(Boolean)
+              .sort();
+            const hasta = elegidos
+              .map((v) => dateInputValueFromIso(v.fechaDescarga ?? v.fechaCarga))
+              .filter(Boolean)
+              .sort();
+            if (desde.length > 0) setPeriodoDesde((p) => p || desde[0]);
+            if (hasta.length > 0)
+              setPeriodoHasta((p) => p || hasta[hasta.length - 1]);
+          }
         }
       } catch {
         if (!cancelled) setViajes([]);
@@ -385,7 +440,7 @@ export function CrearLiquidacionManualModal({
     return () => {
       cancelled = true;
     };
-  }, [transportistaId, viajeInicial, getToken]);
+  }, [transportistaId, transportistaIdInicial, viajeInicial, getToken, showToast]);
 
   const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
 
@@ -482,6 +537,124 @@ export function CrearLiquidacionManualModal({
       ? [...missingTransportistaFields, ...missingClienteFields]
       : [],
   );
+
+  // — Datos faltantes para emitir: mismo manejo que "Nueva factura" —
+  // Aviso fijo en el pie (con zumbido al tocar "Emitir") + modal para completarlos que se
+  // abre solo una vez por transportista/cliente (primero el transportista, después el cliente).
+  const faltantesEmision = [
+    ...missingEmitFields.filter((f) => !f.startsWith("Cliente:")),
+    ...missingClienteFields,
+  ];
+  const datosEmitIncompletos =
+    hasLiquidoProductoArca && faltantesEmision.length > 0;
+  const mensajeFaltantes = faltantesEmision.every((f) => f.startsWith("Cliente:"))
+    ? "Faltan datos del cliente para poder liquidar."
+    : faltantesEmision.every((f) => f.startsWith("Transportista:"))
+      ? "Faltan datos del transportista para poder liquidar."
+      : "Faltan datos para poder liquidar.";
+  const zumbidoAviso = useZumbidoAviso();
+  const [modalDatos, setModalDatos] = useState<
+    "transportista" | "cliente" | null
+  >(null);
+  const datosAvisadosRef = useRef(new Set<string>());
+  const transportistaSeleccionadoId = transportistaSeleccionado?.id;
+
+  // Al elegir el transportista se valida su CUIT contra el padrón de ARCA (opt-in por
+  // empresa). Si ARCA informa otra condición IVA / domicilio, o el CUIT no está activo,
+  // se abre el mismo modal con lo de ARCA precargado.
+  const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
+  const validacionPadronHabilitada =
+    hasLiquidoProductoArca &&
+    tenantEfectivo?.validacionCuitArcaHabilitada === true;
+  const padronTransportista = useValidacionPadronRegistro({
+    entidad: "transportistas",
+    id: transportistaSeleccionadoId,
+    habilitado: validacionPadronHabilitada,
+    tenantId,
+    getToken,
+  });
+  const padronTransportistaAviso =
+    padronTransportista.resultado?.resultado === "diferencias" ||
+    padronTransportista.resultado?.resultado === "rechazado"
+      ? padronTransportista.resultado
+      : null;
+
+  // Mismo circuito para el cliente de los viajes elegidos: se valida apenas se conoce,
+  // se precarga lo de ARCA en su modal y, al guardar, queda la huella de validado.
+  const padronCliente = useValidacionPadronRegistro({
+    entidad: "clientes",
+    id: clienteDetalle?.id,
+    habilitado: validacionPadronHabilitada,
+    tenantId,
+    getToken,
+  });
+  const padronClienteAviso =
+    padronCliente.resultado?.resultado === "diferencias" ||
+    padronCliente.resultado?.resultado === "rechazado"
+      ? padronCliente.resultado
+      : null;
+
+  // Hay algo para mostrar en cada modal (si no, el modal ni se renderiza).
+  const modalTransportistaDisponible = Boolean(
+    transportistaSeleccionadoId &&
+      (missingTransportistaFields.length > 0 || padronTransportistaAviso),
+  );
+  const modalClienteDisponible = Boolean(
+    clienteDetalle && (missingClienteFields.length > 0 || padronClienteAviso),
+  );
+  // Si el estado apunta a un modal que ya no corresponde mostrar, cuenta como cerrado:
+  // si no, bloquearía la apertura del otro (ej. abriendo desde la grilla de Viajes).
+  const modalDatosVisible =
+    (modalDatos === "transportista" && modalTransportistaDisponible) ||
+    (modalDatos === "cliente" && modalClienteDisponible)
+      ? modalDatos
+      : null;
+
+  useEffect(() => {
+    if (!hasLiquidoProductoArca || modalDatosVisible) return;
+    // Se espera la respuesta de ARCA para abrir el modal del transportista ya precargado.
+    if (padronTransportista.pendiente) return;
+    // La marca de "ya avisado" distingue el motivo: un aviso de datos faltantes no
+    // consume el de "ARCA informa otros datos" que puede llegar después.
+    if (modalTransportistaDisponible) {
+      const key = `t:${transportistaSeleccionadoId}:${padronTransportistaAviso ? "arca" : "faltan"}`;
+      if (!datosAvisadosRef.current.has(key)) {
+        datosAvisadosRef.current.add(key);
+        setModalDatos("transportista");
+        return;
+      }
+    }
+    // Ídem para el cliente: se espera la respuesta de ARCA antes de abrir su modal.
+    if (padronCliente.pendiente) return;
+    if (modalClienteDisponible && clienteDetalle) {
+      const key = `c:${clienteDetalle.id}:${padronClienteAviso ? "arca" : "faltan"}`;
+      if (!datosAvisadosRef.current.has(key)) {
+        datosAvisadosRef.current.add(key);
+        setModalDatos("cliente");
+      }
+    }
+  }, [
+    hasLiquidoProductoArca,
+    modalDatosVisible,
+    modalTransportistaDisponible,
+    modalClienteDisponible,
+    transportistaSeleccionadoId,
+    clienteDetalle?.id,
+    missingTransportistaFields.length,
+    missingClienteFields.length,
+    padronTransportistaAviso,
+    padronTransportista.pendiente,
+    padronClienteAviso,
+    padronCliente.pendiente,
+  ]);
+  const abrirModalDatos =
+    transportistaSeleccionadoId &&
+    (missingTransportistaFields.length > 0 || padronTransportistaAviso)
+      ? () => setModalDatos("transportista")
+      : clienteDetalle &&
+          (missingClienteFields.length > 0 || padronClienteAviso)
+        ? () => setModalDatos("cliente")
+        : undefined;
 
   const bloqueadoUsd = selectedViajes.some((v) =>
     arcaBloqueaLiquidarUsd(
@@ -812,14 +985,16 @@ export function CrearLiquidacionManualModal({
   const periodoInvalido = Boolean(
     showFechaDesde && showFechaHasta && periodoDesde && periodoHasta && periodoHasta < periodoDesde,
   );
-  const canSubmit =
+  // Sin el chequeo de campos ocultos: "Emitir" no se deshabilita por datos faltantes
+  // (hace zumbar el aviso del pie); "Guardar borrador" sí sigue bloqueado por ocultos.
+  const canSubmitBase =
     Boolean(transportistaId) &&
     (showFechaDesde ? Boolean(periodoDesde) : true) &&
     (showFechaHasta ? Boolean(periodoHasta) : true) &&
     !periodoInvalido &&
     !bloqueadoUsd &&
-    missingHiddenFields.length === 0 &&
     (viajeInicial ? true : selectedViajeIds.size > 0);
+  const canSubmit = canSubmitBase && missingHiddenFields.length === 0;
   const ptoVentaNumPreview = Number(ptoVenta);
   const ptoVentaInvalidoPreview =
     !ptoVenta.trim() ||
@@ -868,7 +1043,7 @@ export function CrearLiquidacionManualModal({
         className={`relative flex w-full flex-col border border-black/10 bg-white shadow-xl overflow-hidden ${
           step === "autorizada"
             ? "h-auto max-w-lg rounded-lg"
-            : "h-[min(92dvh,920px)] max-w-6xl"
+            : "h-[min(92dvh,920px)] max-w-[min(90rem,calc(100vw-1rem))]"
         }`}
       >
         {step !== "autorizada" && transportistasLoading ? (
@@ -1011,17 +1186,8 @@ export function CrearLiquidacionManualModal({
                   <Spinner className="h-6 w-6 text-vialto-fire" />
                 </div>
               ) : (
-                <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
+                <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]">
                 <div className="min-h-0 space-y-4 overflow-y-auto px-6 py-4 lg:border-r lg:border-black/10">
-                  {hasLiquidoProductoArca && (
-                    <div className="flex items-center justify-between rounded border border-black/10 bg-white px-4 py-2.5">
-                      <span className={labelClass}>Comprobante</span>
-                      <span className="text-sm text-vialto-charcoal">
-                        {cvlpCbteLabel(60)}
-                      </span>
-                    </div>
-                  )}
-
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className={labelClass}>
@@ -1058,64 +1224,27 @@ export function CrearLiquidacionManualModal({
                         </select>
                       )}
                     </div>
-                    <div>
-                      <p className={labelClass}>Condición frente al IVA</p>
-                      <div className="rounded border border-black/10 bg-vialto-mist px-3 py-2 text-sm text-vialto-charcoal">
-                        {transportistaId
-                          ? condicionIvaLabel(condicionIva)
-                          : "—"}
+                    {/* La condición frente al IVA del transportista se ve en el tooltip del Receptor (panel derecho). */}
+                    {hasLiquidoProductoArca && (
+                      <div>
+                        <label
+                          htmlFor="ptoVentaLiquidacion"
+                          className={labelClass}
+                        >
+                          Punto de venta
+                        </label>
+                        <input
+                          id="ptoVentaLiquidacion"
+                          type="number"
+                          min={1}
+                          value={ptoVenta}
+                          onChange={(e) => setPtoVenta(e.target.value)}
+                          title="Solo se usa si emitís el comprobante ahora. Se precarga con el de Configuración ARCA."
+                          className={inputClass}
+                        />
                       </div>
-                    </div>
+                    )}
                   </div>
-
-                  {missingHiddenFields.length > 0 &&
-                    transportistaId &&
-                    hasLiquidoProductoArca && (
-                      <div
-                        className="rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900"
-                        role="alert"
-                      >
-                        <p className="font-semibold">
-                          Faltan datos fiscales requeridos por ARCA
-                        </p>
-                        <p className="mt-1">
-                          No se puede emitir la liquidación. Faltan los
-                          siguientes datos:{" "}
-                          <strong>
-                            {[
-                              ...missingTransportistaFields,
-                              ...missingClienteFields,
-                            ]
-                              .map(formatMissingFiscalField)
-                              .join(", ")}
-                          </strong>
-                          .
-                          <br />
-                          Hay campos ocultos que no se pueden editar. Por favor
-                          contactá al administrador para habilitarlos.
-                        </p>
-                      </div>
-                    )}
-
-                  {missingHiddenFields.length === 0 &&
-                    missingTransportistaFields.length > 0 && (
-                      <div
-                        className="rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900"
-                        role="alert"
-                      >
-                        <p className="font-medium">
-                          Faltan datos del transportista:{" "}
-                          {missingTransportistaFields
-                            .map((f) => f.replace("Transportista: ", ""))
-                            .join(", ")}
-                          .
-                          <br />
-                          <strong className="font-bold">
-                            Desplazate hacia abajo para completarlos.
-                          </strong>
-                        </p>
-                      </div>
-                    )}
 
                   {/* Período */}
                   {(showFechaDesde || showFechaHasta) && (
@@ -1172,6 +1301,79 @@ export function CrearLiquidacionManualModal({
                       )}
                     </div>
                   )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="comisionPct" className={labelClass}>
+                        Comisión por flete (%)
+                      </label>
+                      <input
+                        id="comisionPct"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={comisionPct}
+                        onChange={(e) => {
+                          comisionEditadaManualmente.current = true;
+                          setComisionPct(e.target.value);
+                        }}
+                        className={inputClass}
+                      />
+                      <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
+                        Si lo dejás vacío se usa el default del tenant
+                        {resolvedConfig?.comisionPctDefault != null
+                          ? ` (${resolvedConfig.comisionPctDefault}%).`
+                          : "."}
+                      </p>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="ivaPct"
+                        className="mb-1 flex items-center gap-1.5 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.18em] text-vialto-steel"
+                      >
+                        <span>IVA sobre comisión (%)</span>
+                        <div className="group relative flex items-center">
+                          <HelpCircle className="h-3.5 w-3.5 cursor-help text-vialto-steel transition-colors hover:text-vialto-charcoal" />
+                          <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[220px] -translate-x-1/2 whitespace-normal rounded bg-vialto-charcoal px-2.5 py-1.5 text-[11px] normal-case leading-tight tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100">
+                            Alícuotas válidas de AFIP: 0%, 2.5%, 5%, 10.5%, 21%
+                            y 27%
+                            <span className="absolute left-1/2 top-full -mt-[1px] -translate-x-1/2 border-[5px] border-transparent border-t-vialto-charcoal"></span>
+                          </div>
+                        </div>
+                      </label>
+                      <input
+                        id="ivaPct"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={ivaPct}
+                        onChange={(e) => {
+                          ivaEditadaManualmente.current = true;
+                          setIvaPct(e.target.value);
+                        }}
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <ConceptosLiquidacionLineasEditor
+                    getToken={getToken}
+                    lineas={conceptosLineas}
+                    autoFillBlockedConcepts={true}
+                    viajesDisponibles={selectedViajes.map((v) => ({
+                      id: v.id,
+                      numero: numeroVisibleViaje(v),
+                    }))}
+                    onChange={(next) => {
+                      setConceptosLineas(next);
+                      setConceptosIncomplete([]);
+                    }}
+                    disabled={submitting}
+                    incompleteIndices={conceptosIncomplete}
+                    mostrarEfectoNeto={false}
+                  />
 
                   {viajeInicial && (
                     <div>
@@ -1279,10 +1481,14 @@ export function CrearLiquidacionManualModal({
                         idPropio1Label={idPropio1Label}
                         idPropio2Habilitado={idPropio2Habilitado}
                         idPropio2Label={idPropio2Label}
-                        renderMonto={(v) =>
+                        mostrarCliente
+                        mostrarTransporte={false}
+                        monedaDe={monedaViaje}
+                        renderMonto={(v, conMoneda) =>
                           fmtMoney(
                             v.precioTransportistaExterno,
                             v.monedaPrecioTransportistaExterno,
+                            conMoneda,
                           ) +
                           (ivaTransportistaVisible &&
                           v.precioTransportistaIvaIncluidoPct
@@ -1302,28 +1508,9 @@ export function CrearLiquidacionManualModal({
                           };
                         }}
                         loading={viajesLoading}
-                        maxHeightClass="max-h-44"
+                        maxHeightClass="" /* sin alto máximo: la tabla muestra todos sus viajes, el scroll es el del formulario */
                         emptyMessage="No hay viajes registrados para este transportista."
                       />
-                    </div>
-                  )}
-
-                  {missingClienteFields.length > 0 && (
-                    <div
-                      className="rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900"
-                      role="alert"
-                    >
-                      <p className="font-medium">
-                        Faltan datos del cliente:{" "}
-                        {missingClienteFields
-                          .map((f) => f.replace("Cliente: ", ""))
-                          .join(", ")}
-                        .
-                        <br />
-                        <strong className="font-bold">
-                          Desplazate hacia abajo para completarlos.
-                        </strong>
-                      </p>
                     </div>
                   )}
 
@@ -1335,101 +1522,6 @@ export function CrearLiquidacionManualModal({
                       {MSG_ARCA_NO_LIQUIDA_USD}
                     </p>
                   )}
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label htmlFor="comisionPct" className={labelClass}>
-                        Comisión por flete (%)
-                      </label>
-                      <input
-                        id="comisionPct"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={comisionPct}
-                        onChange={(e) => {
-                          comisionEditadaManualmente.current = true;
-                          setComisionPct(e.target.value);
-                        }}
-                        className={inputClass}
-                      />
-                      <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
-                        Si lo dejás vacío se usa el default del tenant
-                        {resolvedConfig?.comisionPctDefault != null
-                          ? ` (${resolvedConfig.comisionPctDefault}%).`
-                          : "."}
-                      </p>
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="ivaPct"
-                        className="mb-1 flex items-center gap-1.5 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.18em] text-vialto-steel"
-                      >
-                        <span>IVA sobre comisión (%)</span>
-                        <div className="group relative flex items-center">
-                          <HelpCircle className="h-3.5 w-3.5 cursor-help text-vialto-steel transition-colors hover:text-vialto-charcoal" />
-                          <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[220px] -translate-x-1/2 whitespace-normal rounded bg-vialto-charcoal px-2.5 py-1.5 text-[11px] normal-case leading-tight tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100">
-                            Alícuotas válidas de AFIP: 0%, 2.5%, 5%, 10.5%, 21%
-                            y 27%
-                            <span className="absolute left-1/2 top-full -mt-[1px] -translate-x-1/2 border-[5px] border-transparent border-t-vialto-charcoal"></span>
-                          </div>
-                        </div>
-                      </label>
-                      <input
-                        id="ivaPct"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={ivaPct}
-                        onChange={(e) => {
-                          ivaEditadaManualmente.current = true;
-                          setIvaPct(e.target.value);
-                        }}
-                        className={inputClass}
-                      />
-                    </div>
-                  </div>
-
-                  {hasLiquidoProductoArca && (
-                    <div>
-                      <label
-                        htmlFor="ptoVentaLiquidacion"
-                        className={labelClass}
-                      >
-                        Punto de venta
-                      </label>
-                      <input
-                        id="ptoVentaLiquidacion"
-                        type="number"
-                        min={1}
-                        value={ptoVenta}
-                        onChange={(e) => setPtoVenta(e.target.value)}
-                        className={`${inputClass} w-52`}
-                      />
-                      <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
-                        Solo se usa si emitís el comprobante ahora. Se precarga
-                        con el de Configuración ARCA.
-                      </p>
-                    </div>
-                  )}
-
-                  <ConceptosLiquidacionLineasEditor
-                    getToken={getToken}
-                    lineas={conceptosLineas}
-                    autoFillBlockedConcepts={true}
-                    viajesDisponibles={selectedViajes.map((v) => ({
-                      id: v.id,
-                      numero: numeroVisibleViaje(v),
-                    }))}
-                    onChange={(next) => {
-                      setConceptosLineas(next);
-                      setConceptosIncomplete([]);
-                    }}
-                    disabled={submitting}
-                    incompleteIndices={conceptosIncomplete}
-                  />
 
                   {showComprobante && (
                     <ComprobanteAdjuntoField
@@ -1443,30 +1535,6 @@ export function CrearLiquidacionManualModal({
                     <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
                       {error}
                     </div>
-                  )}
-
-                  {hasLiquidoProductoArca && missingEmitFields.length > 0 && (
-                    <DatosFiscalesFaltantesAlerta
-                      missingEmitFields={
-                        selectedViajes.length > 0 && !isLoadingCliente
-                          ? missingEmitFields
-                          : missingEmitFields.filter(
-                              (f) => !f.startsWith("Cliente:"),
-                            )
-                      }
-                      clienteDetalle={clienteSeleccionado}
-                      onClienteUpdated={(c) => {
-                        setClienteDetalle(c);
-                        onDataSaved?.();
-                      }}
-                      transportistaSeleccionado={transportistaSeleccionado}
-                      onTransportistaUpdated={(t) => {
-                        setTransportistaActualizado(t);
-                        onDataSaved?.();
-                      }}
-                      tenantId={tenantId}
-                      getToken={getToken}
-                    />
                   )}
 
                   {cvlpClaseBAlerta && (
@@ -1489,35 +1557,139 @@ export function CrearLiquidacionManualModal({
                   )}
                 </div>
 
-                <aside className="flex min-h-0 flex-col border-t border-black/10 bg-vialto-mist/40 lg:border-t-0">
-                  <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-                    <p className="mb-3 font-[family-name:var(--font-ui)] text-[10px] font-semibold uppercase tracking-[0.18em] text-vialto-steel">
-                      Resumen
-                    </p>
-                    {showSummary ? (
-                      <div className="space-y-2">
-                        <div className="flex items-baseline justify-between gap-3">
-                          <span className={labelClass}>Moneda</span>
-                          <span className="text-sm font-medium text-vialto-charcoal">
-                            {monedaResumen}
-                          </span>
+                {/* Panel derecho con el mismo formato que "Nueva factura" (FacturaArcaPreviewPanel). */}
+                <aside className="flex min-h-0 flex-col border-t border-black/10 bg-white lg:border-t-0">
+                  <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+                    {hasLiquidoProductoArca && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs uppercase tracking-wider text-vialto-steel">
+                          Tipo:
+                        </span>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-vialto-charcoal">
+                          {cvlpCbteLabel(60)}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {hasLiquidoProductoArca && (
+                        <EmisorArcaResumen arcaConfig={resolvedConfig} />
+                      )}
+                      <ParteFacturaResumen
+                        titulo="Receptor"
+                        nombre={transportistaId ? transportistaNombre : null}
+                        detalle={
+                          transportistaSeleccionado
+                            ? [
+                                condicionIvaLabel(condicionIva),
+                                transportistaSeleccionado.idFiscal
+                                  ? `CUIT ${transportistaSeleccionado.idFiscal}`
+                                  : null,
+                                transportistaSeleccionado.domicilio?.trim(),
+                              ]
+                                .filter(Boolean)
+                                .join("\n")
+                            : undefined
+                        }
+                        estado={
+                          transportistaId ? (
+                            <PadronValidacionEstado
+                              habilitado={validacionPadronHabilitada}
+                              pendiente={padronTransportista.pendiente}
+                              resultado={padronTransportista.resultado}
+                              consultado={padronTransportista.consultado}
+                              onRevisar={() => setModalDatos("transportista")}
+                              onReintentar={() => void padronTransportista.revalidar()}
+                            />
+                          ) : undefined
+                        }
+                      />
+                      {/* Cliente de los viajes elegidos: también se valida contra ARCA. */}
+                      {clienteDetalle && (
+                        <ParteFacturaResumen
+                          titulo="Cliente"
+                          nombre={clienteDetalle.nombre}
+                          detalle={[
+                            condicionIvaLabel(clienteDetalle.condicionIva ?? null),
+                            clienteDetalle.idFiscal
+                              ? `CUIT ${clienteDetalle.idFiscal}`
+                              : null,
+                            clienteDetalle.direccion?.trim(),
+                          ]
+                            .filter(Boolean)
+                            .join("\n")}
+                          estado={
+                            <PadronValidacionEstado
+                              habilitado={validacionPadronHabilitada}
+                              pendiente={padronCliente.pendiente}
+                              resultado={padronCliente.resultado}
+                              consultado={padronCliente.consultado}
+                              onRevisar={() => setModalDatos("cliente")}
+                              onReintentar={() => void padronCliente.revalidar()}
+                            />
+                          }
+                        />
+                      )}
+                    </div>
+
+                    {(showFechaDesde || showFechaHasta) && (
+                      <section className="space-y-1">
+                        <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
+                          Comprobante
+                        </p>
+                        {showFechaDesde && (
+                          <ResumenRow label="Período desde" value={periodoDesde ? fmtDate(periodoDesde) : "—"} />
+                        )}
+                        {showFechaHasta && (
+                          <ResumenRow label="Período hasta" value={periodoHasta ? fmtDate(periodoHasta) : "—"} />
+                        )}
+                      </section>
+                    )}
+
+                    <section className="space-y-1.5">
+                      <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
+                        Detalles del viaje
+                      </p>
+                      {selectedViajes.length === 0 ? (
+                        <p className="pt-1 text-xs leading-relaxed text-vialto-steel">
+                          Seleccioná transportista y al menos un viaje para ver el
+                          desglose de montos.
+                        </p>
+                      ) : (
+                        <div className="space-y-3 pt-1">
+                          {selectedViajes.map((v) => (
+                            <div
+                              key={v.id}
+                              className="flex items-start justify-between text-sm"
+                            >
+                              <div className="pr-4 text-vialto-charcoal">
+                                Viaje #{numeroVisibleViaje(v)} {v.origen ?? "—"} — {v.destino ?? "—"}
+                              </div>
+                              <div className="shrink-0 text-right">
+                                <div className="font-medium tabular-nums text-vialto-charcoal">
+                                  {fmtMoney(v.precioTransportistaExterno ?? null, monedaViaje(v))}
+                                </div>
+                                <div className="mt-0.5 text-xs tabular-nums text-vialto-steel">
+                                  IVA: {v.precioTransportistaIvaIncluidoPct || ivaPctNum}%
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div className="flex items-baseline justify-between gap-3">
-                          <span className={labelClass}>Bruto</span>
-                          <span className="text-sm font-medium tabular-nums text-vialto-charcoal">
-                            {fmtSignedLiquidacionMoney(bruto, "plus")}
-                          </span>
-                        </div>
-                        {anyHasPrice && comisionMonto > 0 && (
-                          <div className="flex items-baseline justify-between gap-3 text-xs text-vialto-steel">
-                            <span>Comisión {comisionNum}%</span>
-                            <span className="tabular-nums">
-                              {fmtSignedLiquidacionMoney(
-                                comisionMonto,
-                                "minus",
-                              )}
-                            </span>
-                          </div>
+                      )}
+                    </section>
+
+                    {showSummary && (
+                      <div className="space-y-1 border-t border-black/10 pt-2">
+                        <ResumenRow
+                          label="Bruto"
+                          value={`${fmtLiquidacionMoney(bruto)} ${monedaResumen}`}
+                        />
+                        {comisionMonto > 0 && (
+                          <ResumenRow
+                            label={`Comisión ${comisionNum}%`}
+                            value={`${fmtSignedLiquidacionMoney(comisionMonto, "minus")} ${monedaResumen}`}
+                          />
                         )}
                         {conceptosCompletos.map((l, idx) => {
                           const mult = getMultiplicador(l.modoAplicacion);
@@ -1528,59 +1700,34 @@ export function CrearLiquidacionManualModal({
                               l.ivaPct,
                             ) * mult;
                           return (
-                            <div
+                            <ResumenRow
                               key={`${l.conceptoLiquidacionId}-${idx}`}
-                              className="flex items-baseline justify-between gap-3 text-xs text-vialto-steel"
-                            >
-                              <span className="min-w-0 break-words">
-                                {l.nombre || "Concepto"}
-                                {mult > 1 ? ` (×${mult} viajes)` : ""}
-                                {l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ""}
-                              </span>
-                              <span className="shrink-0 tabular-nums">
-                                {fmtSignedLiquidacionMoney(
-                                  Math.abs(conIva),
-                                  conIva >= 0 ? "plus" : "minus",
-                                )}
-                              </span>
-                            </div>
+                              label={`${l.nombre || "Concepto"}${mult > 1 ? ` (×${mult} viajes)` : ""}${l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ""}`}
+                              value={`${fmtSignedLiquidacionMoney(Math.abs(conIva), conIva >= 0 ? "plus" : "minus")} ${monedaResumen}`}
+                            />
                           );
                         })}
-
                         {netoGravado !== null && (
-                          <div className="flex items-baseline justify-between gap-3 border-t border-black/10 pt-2">
-                            <span className={labelClass}>Subtotal</span>
-                            <span className="text-sm font-medium tabular-nums text-vialto-charcoal">
-                              {fmtLiquidacionMoney(
-                                netoGravado + conceptosEfecto,
-                              )}
-                            </span>
-                          </div>
+                          <ResumenRow
+                            label="Subtotal"
+                            value={`${fmtLiquidacionMoney(netoGravado + conceptosEfecto)} ${monedaResumen}`}
+                          />
                         )}
                         {ivaMonto !== null && (
-                          <div className="flex items-baseline justify-between gap-3 text-xs text-vialto-steel">
-                            <span>IVA {ivaPctNum}% (flete/comisión)</span>
-                            <span className="tabular-nums">
-                              {fmtSignedLiquidacionMoney(ivaMonto, "plus")}
-                            </span>
-                          </div>
+                          <ResumenRow
+                            label={`IVA ${ivaPctNum}% (flete/comisión)`}
+                            value={`${fmtSignedLiquidacionMoney(ivaMonto, "plus")} ${monedaResumen}`}
+                          />
                         )}
                         {totalALiquidar !== null && (
-                          <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-black/15 pt-2.5">
-                            <span className="font-[family-name:var(--font-ui)] text-[10px] font-semibold uppercase tracking-[0.14em] text-vialto-charcoal">
-                              Total a liquidar
-                            </span>
-                            <span className="text-base font-semibold tabular-nums text-vialto-charcoal">
-                              {fmtLiquidacionMoney(totalALiquidar)}
+                          <div className="flex justify-between pt-1 text-xs font-semibold text-vialto-charcoal">
+                            <span>Total a liquidar</span>
+                            <span className="tabular-nums">
+                              {fmtLiquidacionMoney(totalALiquidar)} {monedaResumen}
                             </span>
                           </div>
                         )}
                       </div>
-                    ) : (
-                      <p className="text-xs leading-relaxed text-vialto-steel">
-                        Seleccioná transportista y al menos un viaje para ver el
-                        desglose de montos.
-                      </p>
                     )}
                   </div>
                 </aside>
@@ -1588,7 +1735,16 @@ export function CrearLiquidacionManualModal({
               )}
             </form>
 
-            <div className="flex flex-wrap justify-end gap-3 border-t border-black/10 px-6 py-4 shrink-0">
+            <div className="flex flex-wrap items-center justify-end gap-3 border-t border-black/10 px-6 py-4 shrink-0">
+              {datosEmitIncompletos && (
+                <AvisoFaltantesEmision
+                  mensaje={mensajeFaltantes}
+                  hayOcultos={missingHiddenFields.length > 0}
+                  onCompletar={abrirModalDatos}
+                  zumbando={zumbidoAviso.zumbando}
+                  onZumbidoEnd={zumbidoAviso.terminar}
+                />
+              )}
               <button
                 type="button"
                 disabled={submitting}
@@ -1615,21 +1771,32 @@ export function CrearLiquidacionManualModal({
                       ? "Guardando…"
                       : "Guardar borrador"}
                   </button>
+                  {/* Con datos faltantes no se usa `disabled` (no dispararía el click): se ve
+                      deshabilitado y el click hace zumbar el aviso del pie. */}
                   <button
                     type="button"
                     disabled={
                       submitting ||
-                      !canSubmit ||
+                      !canSubmitBase ||
                       ptoVentaInvalidoPreview ||
                       cvlpClaseBAlerta
                     }
-                    onClick={(e) =>
+                    aria-disabled={datosEmitIncompletos || undefined}
+                    onClick={(e) => {
+                      if (datosEmitIncompletos) {
+                        zumbidoAviso.disparar();
+                        return;
+                      }
                       void handleSubmit(
                         e as unknown as React.FormEvent,
                         "emitir",
-                      )
-                    }
-                    className="inline-flex items-center gap-2 h-9 px-5 rounded bg-vialto-charcoal font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-white hover:bg-vialto-charcoal/90 disabled:opacity-50"
+                      );
+                    }}
+                    className={`inline-flex items-center gap-2 h-9 px-5 rounded bg-vialto-charcoal font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-white disabled:opacity-50 ${
+                      datosEmitIncompletos
+                        ? "cursor-not-allowed opacity-50"
+                        : "hover:bg-vialto-charcoal/90"
+                    }`}
                   >
                     {submitAction === "emitir" ? (
                       <Spinner />
@@ -1665,6 +1832,101 @@ export function CrearLiquidacionManualModal({
           </>
         )}
       </div>
+
+      {transportistaSeleccionadoId &&
+        (missingTransportistaFields.length > 0 || padronTransportistaAviso) && (
+          <DatosFiscalesFaltantesModal
+            // Remonta al llegar la respuesta de ARCA para que el formulario tome lo precargado.
+            key={`${transportistaSeleccionadoId}-${padronTransportistaAviso?.resultado ?? "sin-arca"}`}
+            open={modalDatos === "transportista" && step === "form"}
+            entidad="transportista"
+            id={transportistaSeleccionadoId}
+            nombre={transportistaNombre}
+            initial={{
+              nombre: transportistaSeleccionado?.nombre ?? "",
+              pais: transportistaSeleccionado?.pais ?? null,
+              idFiscal: transportistaSeleccionado?.idFiscal ?? null,
+              condicionIva:
+                padronTransportistaAviso?.resultado === "diferencias" &&
+                padronTransportistaAviso.diferencias.includes("condicionIva")
+                  ? padronTransportistaAviso.padron.condicionIva
+                  : (transportistaSeleccionado?.condicionIva ?? null),
+              condicionTributaria:
+                transportistaSeleccionado?.condicionTributaria ?? null,
+              direccion:
+                padronTransportistaAviso?.resultado === "diferencias" &&
+                padronTransportistaAviso.diferencias.includes("domicilio")
+                  ? padronTransportistaAviso.padron.domicilio
+                  : (transportistaSeleccionado?.domicilio ?? null),
+            }}
+            missingFields={missingTransportistaFields}
+            padron={padronTransportistaAviso}
+            accion="emitir una liquidación"
+            tenantId={tenantId}
+            getToken={getToken}
+            onSaved={(t) => {
+              setTransportistaActualizado(t as Transportista);
+              onDataSaved?.();
+              if (padronTransportistaAviso) {
+                // Revisó y guardó contra lo de ARCA: queda marcado como validado.
+                void padronTransportista.confirmar();
+              } else {
+                // Completó datos que faltaban (ej. el CUIT): se valida ahora. Si ARCA
+                // informa algo distinto, el modal se vuelve a abrir con eso precargado.
+                datosAvisadosRef.current.delete(`t:${transportistaSeleccionadoId}:arca`);
+                void padronTransportista.revalidar();
+              }
+            }}
+            onClose={() => setModalDatos(null)}
+          />
+        )}
+
+      {clienteDetalle &&
+        (missingClienteFields.length > 0 || padronClienteAviso) && (
+          <DatosFiscalesFaltantesModal
+            // Remonta al llegar la respuesta de ARCA para que el formulario tome lo precargado.
+            key={`${clienteDetalle.id}-${padronClienteAviso?.resultado ?? "sin-arca"}`}
+            open={modalDatos === "cliente" && step === "form"}
+            entidad="cliente"
+            id={clienteDetalle.id}
+            nombre={clienteDetalle.nombre}
+            initial={{
+              nombre: clienteDetalle.nombre ?? "",
+              pais: clienteDetalle.pais ?? null,
+              idFiscal: clienteDetalle.idFiscal ?? null,
+              condicionIva:
+                padronClienteAviso?.resultado === "diferencias" &&
+                padronClienteAviso.diferencias.includes("condicionIva")
+                  ? padronClienteAviso.padron.condicionIva
+                  : (clienteDetalle.condicionIva ?? null),
+              condicionTributaria: clienteDetalle.condicionTributaria ?? null,
+              direccion:
+                padronClienteAviso?.resultado === "diferencias" &&
+                padronClienteAviso.diferencias.includes("domicilio")
+                  ? padronClienteAviso.padron.domicilio
+                  : (clienteDetalle.direccion ?? null),
+            }}
+            missingFields={missingClienteFields}
+            padron={padronClienteAviso}
+            accion="emitir una liquidación"
+            tenantId={tenantId}
+            getToken={getToken}
+            onSaved={(c) => {
+              setClienteDetalle(c as Cliente);
+              onDataSaved?.();
+              if (padronClienteAviso) {
+                // Revisó y guardó contra lo de ARCA: se guarda la huella de validado.
+                void padronCliente.confirmar();
+              } else {
+                // Completó datos que faltaban (ej. el CUIT): se valida ahora; si ARCA
+                // coincide se guarda la huella, si no, el modal se reabre precargado.
+                datosAvisadosRef.current.delete(`c:${clienteDetalle.id}:arca`);
+                void padronCliente.revalidar();
+              }
+            }}
+            onClose={() => setModalDatos(null)}
+          />
+        )}
     </div>
   );
 }

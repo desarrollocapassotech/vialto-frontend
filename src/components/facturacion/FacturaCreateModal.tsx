@@ -10,8 +10,16 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Receipt } from "lucide-react";
+import { useHiddenFiscalFields } from "@/hooks/useHiddenFiscalFields";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
 import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPreviewPanel";
+import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
+import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
+import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
+import { useValidacionPadronRegistro } from "@/hooks/useValidacionPadronRegistro";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import { PadronValidacionEstado } from "@/components/shared/PadronValidacionEstado";
+import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import {
   FacturaTotalesPreview,
   facturaPayloadFromDraft,
@@ -264,21 +272,6 @@ export function FacturaCreateModal({
     return Array.from(map.values());
   }, [clientes, viajes, viajesLoading]);
 
-  const allowedClienteIds = useMemo(() => {
-    if (draft.viajeIds.length === 0) return null;
-
-    const activeTrips = viajes.filter((v) => draft.viajeIds.includes(v.id));
-    const ids = new Set<string>();
-
-    activeTrips.forEach((v) => {
-      if (v.clienteId) ids.add(v.clienteId);
-      v.clientesViaje?.forEach((cv) => {
-        if (cv.clienteId) ids.add(cv.clienteId);
-      });
-    });
-    return ids;
-  }, [draft.viajeIds, viajes]);
-
   const derivedViajes = useMemo(() => {
     return viajes.map((v) => {
       if (draft.clienteId && v.clientesViaje) {
@@ -341,10 +334,12 @@ export function FacturaCreateModal({
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
 
+  // No se restringe a los clientes de los viajes ya tildados: cambiar de cliente limpia
+  // la selección de viajes (`onClienteChange`), así que siempre se ofrece el catálogo completo.
+  // (Antes se filtraba por los clientes de los viajes tildados y el select quedaba solo
+  // con el cliente actual.)
   const filteredClientes = useMemo(() => {
-    const base = !allowedClienteIds
-      ? allAvailableClientes
-      : allAvailableClientes.filter((c) => allowedClienteIds.has(c.id));
+    const base = allAvailableClientes;
 
     if (draft.clienteId && !base.some((c) => c.id === draft.clienteId)) {
       const fallback =
@@ -355,7 +350,7 @@ export function FacturaCreateModal({
     }
 
     return base;
-  }, [allAvailableClientes, allowedClienteIds, draft.clienteId, clienteDetalle]);
+  }, [allAvailableClientes, draft.clienteId, clienteDetalle]);
 
   // Si el cliente elegido queda sin ningún viaje disponible una vez que `viajes` ya
   // terminó de cargar (p. ej. se lo seleccionó durante la ventana de carga inicial, o el
@@ -412,6 +407,66 @@ export function FacturaCreateModal({
   const missingEmitMessage = formatFacturaEmitMissingMessage(missingEmitFields);
   const datosEmitIncompletos = datosReady && missingEmitFields.length > 0;
   const sinConfigArca = datosReady && !arcaConfig;
+
+  // Al elegir un cliente sin los datos fiscales que ARCA exige, se abre un modal para
+  // completarlos — una sola vez por cliente; después se reabre desde el aviso del panel.
+  const missingClienteFields = useMemo(
+    () => missingEmitFields.filter((f) => f.startsWith("Cliente:")),
+    [missingEmitFields],
+  );
+  const missingHiddenClienteFields = useHiddenFiscalFields(missingClienteFields);
+  const [datosClienteModalOpen, setDatosClienteModalOpen] = useState(false);
+  const datosClienteAvisadoRef = useRef<string | null>(null);
+
+  // Al elegir el cliente se valida su CUIT contra el padrón de ARCA (opt-in por empresa,
+  // mismo circuito que el transportista en "Nueva liquidación"): si ARCA informa otra
+  // condición IVA / domicilio, el modal se abre con eso precargado y al guardar queda la
+  // huella de validado (no se vuelve a consultar mientras esos datos no cambien).
+  const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
+  const validacionPadronHabilitada =
+    unifiedArca && tenantEfectivo?.validacionCuitArcaHabilitada === true;
+  const clienteElegidoId =
+    clienteDetalle && clienteDetalle.id === draft.clienteId ? clienteDetalle.id : null;
+  const padronCliente = useValidacionPadronRegistro({
+    entidad: "clientes",
+    id: open ? clienteElegidoId : null,
+    habilitado: validacionPadronHabilitada,
+    tenantId,
+    getToken,
+  });
+  const padronClienteAviso =
+    padronCliente.resultado?.resultado === "diferencias" ||
+    padronCliente.resultado?.resultado === "rechazado"
+      ? padronCliente.resultado
+      : null;
+
+  // Zumbido del aviso del pie al tocar "Emitir a ARCA" con datos faltantes.
+  const zumbidoAviso = useZumbidoAviso();
+  useEffect(() => {
+    if (!open) {
+      datosClienteAvisadoRef.current = null;
+      setDatosClienteModalOpen(false);
+      return;
+    }
+    if (!unifiedArca || !datosReady || !clienteElegidoId) return;
+    // Se espera la respuesta de ARCA para abrir el modal ya precargado.
+    if (padronCliente.pendiente) return;
+    if (missingClienteFields.length === 0 && !padronClienteAviso) return;
+    // La marca distingue el motivo: avisar de datos faltantes no consume el aviso de
+    // "ARCA informa otros datos" que puede llegar después (ej. abriendo desde Viajes).
+    const key = `${clienteElegidoId}:${padronClienteAviso ? "arca" : "faltan"}`;
+    if (datosClienteAvisadoRef.current === key) return;
+    datosClienteAvisadoRef.current = key;
+    setDatosClienteModalOpen(true);
+  }, [
+    open,
+    unifiedArca,
+    datosReady,
+    clienteElegidoId,
+    missingClienteFields.length,
+    padronCliente.pendiente,
+    padronClienteAviso,
+  ]);
 
   const [frozenLineas, setFrozenLineas] = useState<FacturaLineaDraft[] | null>(null);
 
@@ -610,8 +665,12 @@ export function FacturaCreateModal({
     setLocalError(null);
     setSubmitAction(action);
 
+    // Para saber en el catch si la factura se llegó a crear
+    let facturaCreada: Factura | null = null;
+
     try {
       const factura = await persistFactura();
+      facturaCreada = factura;
 
       if (action === "borrador") {
         showToast("Factura guardada como borrador.", "success");
@@ -635,6 +694,17 @@ export function FacturaCreateModal({
       onFacturaEmitida?.(updated);
       showToast("Factura emitida a ARCA.", "success");
     } catch (err) {
+      // Se creó pero falló ARCA: refrescar y cerrar
+      if (facturaCreada) {
+        onFacturaGuardada?.(facturaCreada);
+        showToast(
+          "La factura quedó en borrador pero no se pudo emitir a ARCA. Podés reintentar desde el listado.",
+          "error",
+        );
+        onClose();
+        return;
+      }
+
       const msg =
         action === "emitir" &&
         err instanceof ApiError &&
@@ -722,8 +792,26 @@ export function FacturaCreateModal({
     draft.viajeIds.length > 0 &&
     monedaUnicaDeViajes(draft.viajeIds, derivedViajes) === null;
 
+  const compactIvaField = (
+    <div className="flex flex-col gap-1">
+      <label className={compactLabelClass}>
+        {draft.facturarPorTramo ? "IVA (%) viajes sin tramo" : "IVA (%)"}
+      </label>
+      <input
+        type="number"
+        min="0"
+        max="100"
+        step="0.01"
+        value={draft.ivaPct}
+        onChange={(e) => patch({ ivaPct: e.target.value })}
+        placeholder="21"
+        className={`${compactInputClass} sm:max-w-[8rem]`}
+      />
+    </div>
+  );
+
   const compactFields = (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div className="flex flex-1 flex-col gap-3">
       <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
         {!hasArca && (
           <div className="flex flex-col gap-1">
@@ -751,6 +839,8 @@ export function FacturaCreateModal({
           }
           compact
         />
+        {/* Con ARCA no hay campo Número: el IVA ocupa el lugar libre al lado del cliente. */}
+        {hasArca && compactIvaField}
         <div className="grid grid-cols-2 gap-3 sm:col-span-2">
           <div className="flex flex-col gap-1">
             <label className={compactLabelClass}>
@@ -773,34 +863,9 @@ export function FacturaCreateModal({
             />
           </div>
         </div>
-        <div className="flex flex-col gap-1 sm:col-span-2">
-          <label className={compactLabelClass}>
-            {draft.facturarPorTramo ? "IVA (%) viajes sin tramo" : "IVA (%)"}
-          </label>
-          <input
-            type="number"
-            min="0"
-            max="100"
-            step="0.01"
-            value={draft.ivaPct}
-            onChange={(e) => patch({ ivaPct: e.target.value })}
-            placeholder="21"
-            className={`${compactInputClass} sm:max-w-[8rem]`}
-          />
-        </div>
+        {!hasArca && <div className="sm:col-span-2">{compactIvaField}</div>}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
-        <div className="flex shrink-0 items-baseline justify-between gap-2">
-          <label className={compactLabelClass}>
-            Viajes vinculados{" "}
-            {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
-          </label>
-          {draft.viajeIds.length > 0 && (
-            <span className="text-xs font-medium tabular-nums text-vialto-charcoal">
-              {textoImporteFacturaSeleccion(draft.viajeIds, derivedViajes)}
-            </span>
-          )}
-        </div>
+      <div className="flex min-h-[14rem] flex-1 flex-col gap-1 overflow-hidden">
         <div className="min-h-0 flex-1 overflow-hidden">
           <ViajesVinculadosEditor
             viajes={derivedViajes}
@@ -859,18 +924,21 @@ export function FacturaCreateModal({
   const standardFields = (
     <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-            Número (opcional)
-          </label>
-          <input
-            type="text"
-            value={draft.numero}
-            onChange={(e) => patch({ numero: e.target.value })}
-            placeholder="0001-00000001"
-            className="h-9 border border-black/20 bg-white px-3 text-sm"
-          />
-        </div>
+        {/* Con ARCA el número lo asigna AFIP al emitir: no se carga a mano. */}
+        {!hasArca && (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+              Número (opcional)
+            </label>
+            <input
+              type="text"
+              value={draft.numero}
+              onChange={(e) => patch({ numero: e.target.value })}
+              placeholder="0001-00000001"
+              className="h-9 border border-black/20 bg-white px-3 text-sm"
+            />
+          </div>
+        )}
         <FacturaContraparteField
           clienteId={draft.clienteId}
           clientes={filteredClientes}
@@ -1063,31 +1131,36 @@ export function FacturaCreateModal({
           ) : null}
           <header className="flex shrink-0 items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-6">
             <div className="min-w-0">
-              <h2
-                id="factura-create-modal-title"
-                className="text-base font-semibold text-vialto-charcoal"
-              >
-                {step === "autorizada" ? (
-                  "Factura emitida"
-                ) : (
-                  <>
-                    Nueva factura
-                    {draft.letraComprobante === "a"
-                      ? " A"
-                      : draft.letraComprobante === "b"
-                        ? " B"
-                        : ""}
-                  </>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2
+                  id="factura-create-modal-title"
+                  className="text-base font-semibold text-vialto-charcoal"
+                >
+                  {step === "autorizada" ? (
+                    "Factura emitida"
+                  ) : (
+                    <>
+                      Nueva factura
+                      {draft.letraComprobante === "a"
+                        ? " A"
+                        : draft.letraComprobante === "b"
+                          ? " B"
+                          : ""}
+                    </>
+                  )}
+                </h2>
+                {/* Mismo distintivo que "Nueva liquidación": ambiente de ARCA del tenant (o el de la factura ya emitida). */}
+                {unifiedArca && (
+                  <AmbienteTestBadge
+                    ambiente={facturaEmitida?.ambiente ?? arcaConfig?.ambiente}
+                  />
                 )}
-              </h2>
+              </div>
               <p className="mt-1 text-xs text-vialto-steel">
                 {step === "autorizada" ? (
                   "El comprobante fue autorizado por ARCA."
                 ) : (
                   <>
-                    {unifiedArca
-                      ? "Completá los datos a la izquierda y revisá el comprobante en tiempo real a la derecha."
-                      : "Completá los datos y opcionalmente vinculá viajes a esta factura."}
                     {draft.letraComprobante
                       ? ` Tipo elegido: Factura ${draft.letraComprobante.toUpperCase()}.`
                       : ""}
@@ -1117,14 +1190,13 @@ export function FacturaCreateModal({
             {step === "form" ? (
               unifiedArca ? (
                 <>
-                  <div className="flex min-h-0 flex-col overflow-y-auto border-b border-black/10 px-4 py-4 sm:px-5 lg:w-[65%] lg:max-w-[65%] lg:shrink-0 lg:overflow-hidden lg:border-b-0 lg:border-r">
+                  <div className="flex min-h-0 flex-col overflow-y-auto border-b border-black/10 px-4 py-4 sm:px-5 lg:w-[65%] lg:max-w-[65%] lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
                     {compactFields}
                   </div>
                   <div className="min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:w-[35%] lg:max-w-[35%] lg:shrink-0 lg:min-w-0">
                     <FacturaArcaPreviewPanel
                       arcaConfig={arcaConfig}
                       clienteDetalle={clienteDetalle}
-                      numero={draft.numero}
                       fechaEmision={draft.fechaEmision}
                       lineas={lineas}
                       onLineasChange={() => {}} /* Bloqueado, las líneas son fijas */
@@ -1144,6 +1216,19 @@ export function FacturaCreateModal({
                         setClienteDetalle(c);
                         onDataSaved?.();
                       }}
+                      avisoFaltantesExterno
+                      estadoReceptor={
+                        clienteElegidoId ? (
+                          <PadronValidacionEstado
+                            habilitado={validacionPadronHabilitada}
+                            pendiente={padronCliente.pendiente}
+                            resultado={padronCliente.resultado}
+                            consultado={padronCliente.consultado}
+                            onRevisar={() => setDatosClienteModalOpen(true)}
+                            onReintentar={() => void padronCliente.revalidar()}
+                          />
+                        ) : undefined
+                      }
                       feedbackSlot={
                         <div ref={feedbackRef} className="space-y-2">
                           {displayError &&
@@ -1278,7 +1363,25 @@ export function FacturaCreateModal({
           </div>
 
           {step === "form" && (
-            <footer className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
+            <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
+              {/* Faltantes para emitir: fijo en el pie, al lado de "Emitir a ARCA", para que se vea siempre. */}
+              {unifiedArca && datosEmitIncompletos && (
+                <AvisoFaltantesEmision
+                  mensaje={
+                    missingClienteFields.length === missingEmitFields.length
+                      ? "Faltan datos del cliente para poder facturar."
+                      : "Faltan datos para poder facturar."
+                  }
+                  hayOcultos={missingHiddenClienteFields.length > 0}
+                  onCompletar={
+                    clienteDetalle && missingClienteFields.length > 0
+                      ? () => setDatosClienteModalOpen(true)
+                      : undefined
+                  }
+                  zumbando={zumbidoAviso.zumbando}
+                  onZumbidoEnd={zumbidoAviso.terminar}
+                />
+              )}
               <button
                 type="button"
                 onClick={onClose}
@@ -1302,16 +1405,24 @@ export function FacturaCreateModal({
                       ? "Guardando…"
                       : "Guardar borrador"}
                   </button>
+                  {/* Con datos faltantes no se usa `disabled` (no dispararía el click): se ve
+                      deshabilitado y el click hace zumbar el aviso del pie. */}
                   <button
                     type="button"
-                    disabled={
-                      busy ||
-                      monedaInvalida ||
-                      bloqueadoUsd ||
+                    disabled={busy || monedaInvalida || bloqueadoUsd}
+                    aria-disabled={datosEmitIncompletos || undefined}
+                    onClick={() => {
+                      if (datosEmitIncompletos) {
+                        zumbidoAviso.disparar();
+                        return;
+                      }
+                      void handleUnifiedSubmit("emitir");
+                    }}
+                    className={`inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white disabled:opacity-60 ${
                       datosEmitIncompletos
-                    }
-                    onClick={() => void handleUnifiedSubmit("emitir")}
-                    className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
+                        ? "cursor-not-allowed opacity-60"
+                        : "hover:bg-vialto-graphite"
+                    }`}
                   >
                     {submitAction === "emitir" ? (
                       <Spinner className="h-3.5 w-3.5" />
@@ -1352,6 +1463,53 @@ export function FacturaCreateModal({
           onClose={() => setPreviewComprobanteUrl(null)}
         />
       )}
+
+      {clienteDetalle &&
+        (missingClienteFields.length > 0 || padronClienteAviso) && (
+          <DatosFiscalesFaltantesModal
+            // Remonta al llegar la respuesta de ARCA para que el formulario tome lo precargado.
+            key={`${clienteDetalle.id}-${padronClienteAviso?.resultado ?? "sin-arca"}`}
+            open={datosClienteModalOpen && step === "form"}
+            entidad="cliente"
+            id={clienteDetalle.id}
+            nombre={clienteDetalle.nombre}
+            initial={{
+              nombre: clienteDetalle.nombre ?? "",
+              pais: clienteDetalle.pais ?? null,
+              idFiscal: clienteDetalle.idFiscal ?? null,
+              condicionIva:
+                padronClienteAviso?.resultado === "diferencias" &&
+                padronClienteAviso.diferencias.includes("condicionIva")
+                  ? padronClienteAviso.padron.condicionIva
+                  : (clienteDetalle.condicionIva ?? null),
+              condicionTributaria: clienteDetalle.condicionTributaria ?? null,
+              direccion:
+                padronClienteAviso?.resultado === "diferencias" &&
+                padronClienteAviso.diferencias.includes("domicilio")
+                  ? padronClienteAviso.padron.domicilio
+                  : (clienteDetalle.direccion ?? null),
+            }}
+            missingFields={missingClienteFields}
+            padron={padronClienteAviso}
+            accion="emitir una factura"
+            tenantId={tenantId}
+            getToken={getToken}
+            onSaved={(c) => {
+              setClienteDetalle(c as Cliente);
+              onDataSaved?.();
+              if (padronClienteAviso) {
+                // Revisó y guardó contra lo de ARCA: se guarda la huella de validado.
+                void padronCliente.confirmar();
+              } else {
+                // Completó datos que faltaban (ej. el CUIT): se valida ahora; si ARCA
+                // coincide se guarda la huella, si no, el modal se reabre precargado.
+                datosClienteAvisadoRef.current = null;
+                void padronCliente.revalidar();
+              }
+            }}
+            onClose={() => setDatosClienteModalOpen(false)}
+          />
+        )}
     </>
   );
 }

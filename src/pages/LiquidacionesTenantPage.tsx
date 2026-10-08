@@ -5,9 +5,12 @@ import {
   Ban,
   Download,
   Eye,
+  FileMinus,
   FileText,
+  FlaskConical,
   Landmark,
   Receipt,
+  RotateCw,
   Trash2,
 } from "lucide-react";
 import { ListadoCard } from "@/components/listado/ListadoCard";
@@ -22,11 +25,20 @@ import {
 } from "@/components/liquidaciones/LiquidacionViewModal";
 import { LiquidacionEditModal } from "@/components/liquidaciones/LiquidacionEditModal";
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
-import { AccionesMenuTrigger } from "@/components/ui/AccionesMenuTrigger";
-import {
-  AccionesOpcionesSheet,
-  type AccionOpcion,
-} from "@/components/ui/AccionesOpcionesSheet";
+import { AccionesFila } from "@/components/ui/AccionesFila";
+import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
+
+/** Orden de prioridad de las acciones que se muestran como ícono en la grilla. */
+const LIQUIDACION_ACCIONES_DESTACADAS = [
+  "reintentar",
+  "emitir",
+  "pdf",
+  "anular",
+  "marcar-pendiente-anulacion",
+  "confirmar-anulacion-manual",
+  "comprobante",
+  "pdf-nc",
+];
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AnularLiquidacionModal } from "@/components/liquidaciones/AnularLiquidacionModal";
 import { ConfirmarAnulacionManualModal } from "@/components/liquidaciones/ConfirmarAnulacionManualModal";
@@ -43,6 +55,7 @@ import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
 import { friendlyError } from "@/lib/friendlyError";
 import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
+import { modalOverlayClass } from "@/lib/modalLayers";
 import { listadoTablaHeadRowClass, listadoTablaTdClass, listadoTablaThClass } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
@@ -95,6 +108,13 @@ function fmtDate(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
+/** "dd/mm" sin año, como las fechas de carga/descarga de la grilla de Viajes. Fecha sin hora: se lee del string, sin zona horaria. */
+function fmtDateCorta(iso: string) {
+  if (!iso) return "—";
+  const [, m, d] = iso.slice(0, 10).split("-");
+  return `${d}/${m}`;
+}
+
 function transportistaNombre(liq: LiquidacionConTransportista) {
   return liq.transportista?.nombre ?? liq.transportistaId;
 }
@@ -105,8 +125,6 @@ function LiquidacionAccionesMenu({
   metodoAnulacion,
   isBusy,
   isDownloading,
-  actionErrorMsg,
-  actionErrorDetalle,
   onVer,
   onEmitir,
   onPdf,
@@ -124,8 +142,6 @@ function LiquidacionAccionesMenu({
   metodoAnulacion: "nota_credito_debito" | "manual";
   isBusy: boolean;
   isDownloading: boolean;
-  actionErrorMsg?: string;
-  actionErrorDetalle?: string;
   onVer: () => void;
   onEmitir: () => void;
   onPdf: () => void;
@@ -170,10 +186,11 @@ function LiquidacionAccionesMenu({
     { id: "ver", label: "Ver", icon: Eye, onClick: onVer },
   ];
   if (puedeEmitir) {
+    const conError = liq.estado === "error";
     options.push({
-      id: "emitir",
-      label: isBusy ? "Emitiendo…" : "Emitir",
-      icon: Receipt,
+      id: conError ? "reintentar" : "emitir",
+      label: isBusy ? "Emitiendo…" : conError ? "Reintentar emisión" : "Emitir",
+      icon: conError ? RotateCw : Receipt,
       onClick: onEmitir,
       disabled: isBusy,
     });
@@ -193,7 +210,7 @@ function LiquidacionAccionesMenu({
       id: "pdf-nc",
       label: isDownloading ? "Descargando…" : "PDF anulación",
       description: comprobanteLabel,
-      icon: Download,
+      icon: FileMinus,
       onClick: onPdfNc,
       disabled: isDownloading,
     });
@@ -247,24 +264,16 @@ function LiquidacionAccionesMenu({
     });
   }
 
+  // El error de una acción (emitir, anular, PDF) ya no se muestra debajo de los íconos
+  // — agrandaba la fila —: lo muestra un modal a nivel de página (`actionError`).
   return (
-    <div className="flex flex-col items-end gap-1">
-      <AccionesMenuTrigger open={open} onClick={() => setOpen(true)} />
-      <AccionesOpcionesSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        subtitle={transportistaNombre(liq)}
-        options={options}
-      />
-      {actionErrorMsg && (
-        <ArcaErrorMessage
-          message={actionErrorMsg}
-          detalle={actionErrorDetalle}
-          align="right"
-          className="text-xs"
-        />
-      )}
-    </div>
+    <AccionesFila
+      options={options}
+      destacadas={LIQUIDACION_ACCIONES_DESTACADAS}
+      subtitle={transportistaNombre(liq)}
+      open={open}
+      onOpenChange={setOpen}
+    />
   );
 }
 
@@ -298,7 +307,12 @@ export function LiquidacionesTenantPage() {
       ? "manual"
       : "nota_credito_debito";
 
-  useFieldConfig("liquidaciones");
+  const { isVisible: isLiqFieldVisible } = useFieldConfig("liquidaciones");
+  // Columna "Período": se oculta si el superadmin desactivó las dos fechas
+  // (desde/hasta) en el alta de liquidación de esta empresa.
+  const mostrarPeriodo =
+    isLiqFieldVisible("alta_liquidacion", "fechaDesde") ||
+    isLiqFieldVisible("alta_liquidacion", "fechaHasta");
 
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
   const [page, setPage] = useState(1);
@@ -466,12 +480,18 @@ export function LiquidacionesTenantPage() {
     };
   }, [getToken, isLoaded, isSignedIn, activeTenantId, hasArca]);
 
-  /** Deep-link `?liquidacion=<id>` (ej. desde el detalle de facturación/liquidación de un viaje). */
+  /**
+   * Deep-link `?liquidacion=<id>` (ej. desde el detalle de facturación/liquidación de un viaje).
+   * Con `&emitir=1` (botones "Reintentar"/"Continuar liquidación" de Viajes) abre directo
+   * la emisión si la liquidación sigue con error de ARCA o en borrador; si no, cae en la
+   * vista normal.
+   */
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     if (!isLoaded || !isSignedIn || !activeTenantId) return;
     const id = searchParams.get("liquidacion")?.trim();
     if (!id) return;
+    const emitir = searchParams.get("emitir") === "1";
     let cancelled = false;
     void (async () => {
       try {
@@ -480,10 +500,14 @@ export function LiquidacionesTenantPage() {
           () => getToken(),
         );
         if (cancelled) return;
-        setDetail({
-          mode: "view",
-          liq: { ...full, conceptosLineas: full.conceptosLineas ?? [] },
-        });
+        const liq = { ...full, conceptosLineas: full.conceptosLineas ?? [] };
+        // `error` (reintentar) o `borrador` (continuar). Viajes solo manda `emitir=1`
+        // para tenants con ARCA, así que no depende de que los módulos ya hayan cargado.
+        if (emitir && (liq.estado === "error" || liq.estado === "borrador")) {
+          setPendingEmitir(liq);
+        } else {
+          setDetail({ mode: "view", liq });
+        }
       } catch {
         // Si no se pudo resolver (id inválido, sin permisos), no bloqueamos la pantalla.
       } finally {
@@ -492,6 +516,7 @@ export function LiquidacionesTenantPage() {
             (p) => {
               const next = new URLSearchParams(p);
               next.delete("liquidacion");
+              next.delete("emitir");
               return next;
             },
             { replace: true },
@@ -770,9 +795,6 @@ export function LiquidacionesTenantPage() {
       metodoAnulacion,
       isBusy: busyId === liq.id,
       isDownloading: downloading === liq.id,
-      actionErrorMsg: actionError?.id === liq.id ? actionError.msg : undefined,
-      actionErrorDetalle:
-        actionError?.id === liq.id ? actionError.detalle : undefined,
       open: accionesAbiertoLiqId === liq.id,
       onOpenChange: (o: boolean) => setAccionesAbiertoLiqId(o ? liq.id : null),
       onVer: () => {
@@ -896,9 +918,48 @@ export function LiquidacionesTenantPage() {
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
-        Liquidaciones
-      </h1>
+      {/* Título + badges ARCA a la izquierda; acciones a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide text-vialto-charcoal">
+          Liquidaciones
+        </h1>
+
+        {hasArca && activeTenantId && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
+              <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
+              Emisión electrónica vía ARCA
+            </div>
+            <AmbienteTestBadge ambiente={config?.ambiente} />
+          </div>
+        )}
+
+        {activeTenantId && (!error || !isSuperAdmin) && (
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            {exportButton}
+            {anyFiltroActivo && (
+              <button
+                type="button"
+                onClick={limpiarFiltros}
+                className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+              >
+                Limpiar filtros
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowCrear(true);
+                void ensureViajesTodosLoaded();
+              }}
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            >
+              Nueva liquidación
+            </button>
+          </div>
+        )}
+      </div>
 
       {isSuperAdmin && (
         <div className="mt-6">
@@ -916,56 +977,15 @@ export function LiquidacionesTenantPage() {
         </div>
       )}
 
-      {hasArca && activeTenantId && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
-            <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
-            Emisión electrónica vía ARCA
-          </div>
-          <AmbienteTestBadge ambiente={config?.ambiente} />
+      {isSuperAdmin && error && (
+        <div className="mt-4 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {error}
         </div>
       )}
 
-      <div className="mt-4">
-        {isSuperAdmin && error && (
-          <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4">
-            {error}
-          </div>
-        )}
-
-        {activeTenantId && (!error || !isSuperAdmin) && (
-          <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
-            <div className="flex shrink-0 items-center gap-2">{exportButton}</div>
-
-            <div className="flex gap-2 ml-auto">
-              {anyFiltroActivo && (
-                <button
-                  type="button"
-                  onClick={limpiarFiltros}
-                  className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-                >
-                  Limpiar filtros
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCrear(true);
-                  void ensureViajesTodosLoaded();
-                }}
-                className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-              >
-                Nueva liquidación
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
       <ListadoDatos
         className="mt-6"
-        tableColSpan={hasArca ? 7 : 6}
+        tableColSpan={(hasArca ? 8 : 7) - (mostrarPeriodo ? 0 : 1)}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -990,6 +1010,7 @@ export function LiquidacionesTenantPage() {
                 />
               </ViajesListadoHeaderFiltro>
             </th>
+            {mostrarPeriodo && (
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Período"
@@ -1024,11 +1045,15 @@ export function LiquidacionesTenantPage() {
                 </div>
               </ViajesListadoHeaderFiltro>
             </th>
+            )}
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Bruto
             </th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Comisión
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              IVA
             </th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               A liquidar
@@ -1075,28 +1100,40 @@ export function LiquidacionesTenantPage() {
             header: "Transportista",
             primary: true,
             cell: (liq) => (
-              <>
-                <p className="font-medium">{transportistaNombre(liq)}</p>
-                {liq.transportista?.idFiscal && (
-                  <p className="text-xs text-vialto-steel">
-                    {liq.transportista.idFiscal}
-                  </p>
-                )}
-              </>
+              <p
+                className="font-medium"
+                title={
+                  liq.transportista?.idFiscal
+                    ? `CUIT: ${liq.transportista.idFiscal}`
+                    : undefined
+                }
+              >
+                {transportistaNombre(liq)}
+              </p>
             ),
             tdClassName: listadoTablaTdClass,
           },
-          {
-            id: "periodo",
-            header: "Período",
-            cell: (liq) => (
-              <div className="flex flex-col leading-tight">
-                <span>{fmtDate(liq.periodoDesde)}</span>
-                <span>{fmtDate(liq.periodoHasta)}</span>
-              </div>
-            ),
-            tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
-          },
+          ...(mostrarPeriodo
+            ? [
+                {
+                  id: "periodo",
+                  header: "Período",
+                  cell: (liq: LiquidacionConTransportista) => (
+                    <div
+                      className="tabular-nums"
+                      title={`Desde: ${fmtDate(liq.periodoDesde)}\nHasta: ${fmtDate(liq.periodoHasta)}`}
+                    >
+                      <span>{fmtDateCorta(liq.periodoDesde)}</span>
+                      <span className="mx-1 text-vialto-steel/75" aria-hidden>
+                        →
+                      </span>
+                      <span>{fmtDateCorta(liq.periodoHasta)}</span>
+                    </div>
+                  ),
+                  tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
+                },
+              ]
+            : []),
           {
             id: "bruto",
             header: "Bruto",
@@ -1107,14 +1144,36 @@ export function LiquidacionesTenantPage() {
           {
             id: "comision",
             header: "Comisión",
+            // La comisión siempre se resta del bruto: en rojo.
             cell: (liq) => (
-              <>
-                {fmtMoney(liq.comision)}
-                <span className="ml-1 text-xs">({liq.comisionPct}%)</span>
-              </>
+              <span
+                className="text-red-700"
+                title={`−${fmtMoney(liq.comision)}`}
+              >
+                {liq.comisionPct}%
+              </span>
             ),
             thClassName: `${listadoTablaThClass} text-right`,
-            tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-vialto-steel`,
+            tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
+          },
+          {
+            id: "iva",
+            header: "IVA",
+            // Mismo monto que la línea de IVA del detalle (LiquidacionMontosBreakdown).
+            // Verde si se suma al líquido, rojo si se resta (IVA negativo).
+            cell: (liq) => {
+              const iva = Number(liq.gastosAdminIva) || 0;
+              return (
+                <span
+                  className={iva < 0 ? "text-red-700" : "text-emerald-700"}
+                  title={`${iva < 0 ? "−" : "+"}${fmtMoney(Math.abs(iva))}`}
+                >
+                  {liq.ivaPct != null ? `${liq.ivaPct}%` : "—"}
+                </span>
+              );
+            },
+            thClassName: `${listadoTablaThClass} text-right`,
+            tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
             id: "liquido",
@@ -1128,14 +1187,24 @@ export function LiquidacionesTenantPage() {
                 {
                   id: "estado",
                   header: "Estado",
+                  // Una sola línea, igual que Facturas: el ambiente de pruebas va
+                  // como ícono con tooltip.
                   cell: (liq: LiquidacionConTransportista) => (
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex flex-nowrap items-center gap-1">
                       <span
-                        className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
+                        className={`inline-block whitespace-nowrap px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
                       >
                         {ESTADO_LABEL[liq.estado]}
                       </span>
-                      <AmbienteTestBadge ambiente={liq.ambiente} />
+                      {liq.ambiente === "homologacion" && (
+                        <span
+                          title="Emitida en ambiente de pruebas (homologación)"
+                          aria-label="Emitida en ambiente de pruebas"
+                          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-amber-300 bg-amber-50 text-amber-800"
+                        >
+                          <FlaskConical className="h-3 w-3" strokeWidth={2} aria-hidden />
+                        </span>
+                      )}
                     </div>
                   ),
                   tdClassName: listadoTablaTdClass,
@@ -1165,10 +1234,14 @@ export function LiquidacionesTenantPage() {
             onClick={() => setAccionesAbiertoLiqId(liq.id)}
             primary={transportistaNombre(liq)}
             fields={[
-              {
-                label: "Período",
-                value: `${fmtDate(liq.periodoDesde)} — ${fmtDate(liq.periodoHasta)}`,
-              },
+              ...(mostrarPeriodo
+                ? [
+                    {
+                      label: "Período",
+                      value: `${fmtDate(liq.periodoDesde)} — ${fmtDate(liq.periodoHasta)}`,
+                    },
+                  ]
+                : []),
               { label: "Bruto", value: fmtMoney(liq.bruto) },
               {
                 label: "Comisión",
@@ -1217,6 +1290,45 @@ export function LiquidacionesTenantPage() {
             }}
           />
         )}
+
+      {/* Error de una acción de la grilla (emitir, anular, PDF): modal con el detalle
+          en vez de texto bajo los íconos, para que la fila no crezca. */}
+      {actionError && (
+        <div
+          className={modalOverlayClass}
+          role="presentation"
+          onClick={() => setActionError(null)}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="liq-accion-error-titulo"
+            className="w-full max-w-md border border-black/10 bg-white p-5 shadow-lg sm:rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="liq-accion-error-titulo"
+              className="font-[family-name:var(--font-display)] text-lg tracking-wide text-vialto-charcoal"
+            >
+              No se pudo completar la acción
+            </h2>
+            <ArcaErrorMessage
+              message={actionError.msg}
+              detalle={actionError.detalle}
+              className="mt-3 text-sm"
+            />
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setActionError(null)}
+                className="inline-flex h-10 items-center px-4 border border-black/15 bg-white text-sm uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pendingEmitir && hasArca && activeTenantId && (
         <EmitirLiquidacionModal

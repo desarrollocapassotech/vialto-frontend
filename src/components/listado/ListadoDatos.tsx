@@ -1,5 +1,7 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { ListadoFiltrosSheet } from '@/components/listado/ListadoFiltrosSheet';
+import { TablaScrollHorizontal } from '@/components/listado/TablaScrollHorizontal';
+import { TooltipsDelegados } from '@/components/ui/TooltipsDelegados';
 import {
   listadoCardActionsClass,
   listadoCardClass,
@@ -102,6 +104,7 @@ export function ListadoDatos<T>({
   actionsTdClassName = `${listadoTablaTdClass} text-right`,
   tableColSpan,
 }: ListadoDatosProps<T>) {
+  const contenedorRef = useRef<HTMLDivElement>(null);
   const loading = rows == null;
   const isEmpty = !loading && rows.length === 0;
   const colSpan = tableColSpan ?? columns.length + (renderActions ? 1 : 0);
@@ -159,7 +162,8 @@ export function ListadoDatos<T>({
   ) : null;
 
   return (
-    <div className={className}>
+    <div className={className} ref={contenedorRef}>
+      <TooltipsDelegados contenedorRef={contenedorRef} />
       {filterBar}
 
       <div className={[listadoDatosWrapperClass].filter(Boolean).join(' ')}>
@@ -181,7 +185,10 @@ export function ListadoDatos<T>({
           )}
       </div>
 
-      <div className={`${listadoTablaWrapperClass} hidden lg:block border-0 shadow-none rounded-none`}>
+      <TablaScrollHorizontal
+        className="hidden lg:block"
+        scrollClassName={`${listadoTablaWrapperClass} border-0 shadow-none rounded-none`}
+      >
         <table className={listadoTablaClass}>
           <thead className={listadoTablaTheadClass}>
             {tableHead ?? (
@@ -240,7 +247,7 @@ export function ListadoDatos<T>({
               )}
           </tbody>
         </table>
-      </div>
+      </TablaScrollHorizontal>
       </div>
     </div>
   );

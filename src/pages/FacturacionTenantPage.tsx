@@ -33,7 +33,7 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
-import { Download, Landmark } from "lucide-react";
+import { Clock, Download, FlaskConical, Landmark } from "lucide-react";
 import {
   clientesConViajesPendientesFactura,
   monedaUnicaDeViajes,
@@ -120,6 +120,11 @@ type FacturaNuevaNavState = {
   };
   expandFacturaId?: string;
   viewFacturaId?: string;
+  /**
+   * "Reintentar"/"Continuar factura" desde Viajes: abre directo la emisión si la factura
+   * sigue con error de ARCA o en borrador sin emitir.
+   */
+  emitirFacturaId?: string;
 };
 
 export function FacturacionTenantPage({
@@ -639,16 +644,19 @@ export function FacturacionTenantPage({
   }, [location.state, getToken, facturaUrl]);
 
   useEffect(() => {
-    const viewId = (
-      location.state as FacturaNuevaNavState | null
-    )?.viewFacturaId?.trim();
+    const state = location.state as FacturaNuevaNavState | null;
+    const emitirId = state?.emitirFacturaId?.trim();
+    const viewId = emitirId || state?.viewFacturaId?.trim();
     if (!viewId || viewFacturaHandledRef.current) return;
     viewFacturaHandledRef.current = true;
     window.history.replaceState({}, "");
     void (async () => {
       try {
         const f = await apiJson<Factura>(facturaUrl(viewId), () => getToken());
-        setViewingFactura(f);
+        // Error de ARCA (reintentar) o borrador nunca emitido (continuar).
+        const emitible = (f.arcaEstado === "error" || f.arcaEstado == null) && !f.cae;
+        if (emitirId && emitible) abrirEmitirArca(f);
+        else setViewingFactura(f);
       } catch {
         // si falla, simplemente no se abre el modal de vista automático
       }
@@ -829,7 +837,13 @@ export function FacturacionTenantPage({
   }
 
   function puedeMarcarCobrada(f: Factura) {
-    return f.tipo === "cliente" && f.arcaEstado !== "anulado" && !f.cobrado;
+    // Con error de AFIP no se cobra: primero hay que reintentar la emisión.
+    return (
+      f.tipo === "cliente" &&
+      f.arcaEstado !== "anulado" &&
+      f.arcaEstado !== "error" &&
+      !f.cobrado
+    );
   }
 
   function abrirMarcarCobrada(f: Factura) {
@@ -844,35 +858,34 @@ export function FacturacionTenantPage({
   function renderEstadoBadges(f: Factura) {
     const badgeBase =
       "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap";
+    // Una sola línea: ciclo de vida + (COBRADO | VENCIDA) como badges aditivos.
+    // Excepción: ANULADO es estado final — no se muestra COBRADO/VENCIDA al lado
+    // (una factura anulada ya no tiene validez). "Marcar como cobrada" vive en la
+    // columna de acciones; el ambiente de pruebas va como ícono con tooltip.
+    const anulada = f.estado === "anulado";
     return (
-      <span className="inline-flex flex-wrap items-center gap-1">
+      <span className="inline-flex flex-nowrap items-center gap-1">
         <span className={[badgeBase, ESTADO_BADGE[f.estado] ?? ""].join(" ")}>
           {ESTADO_LABEL[f.estado] ?? f.estado}
         </span>
-        {f.cobrado ? (
+        {anulada ? null : f.cobrado ? (
           <span className={[badgeBase, COBRADO_BADGE_CLASS].join(" ")}>
             COBRADO
           </span>
-        ) : puedeMarcarCobrada(f) ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              abrirMarcarCobrada(f);
-            }}
-            title="Marcar como cobrada"
-            className={[
-              badgeBase,
-              "cursor-pointer hover:brightness-95",
-              f.vencida
-                ? VENCIDA_BADGE_CLASS
-                : "border-black/15 text-vialto-steel",
-            ].join(" ")}
-          >
-            {f.vencida ? "VENCIDA" : "MARCAR COBRADA"}
-          </button>
+        ) : f.vencida && puedeMarcarCobrada(f) ? (
+          <span className={[badgeBase, VENCIDA_BADGE_CLASS].join(" ")}>
+            VENCIDA
+          </span>
         ) : null}
-        <AmbienteTestBadge ambiente={f.ambiente} />
+        {f.ambiente === "homologacion" && (
+          <span
+            title="Emitida en ambiente de pruebas (homologación)"
+            aria-label="Emitida en ambiente de pruebas"
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-amber-300 bg-amber-50 text-amber-800"
+          >
+            <FlaskConical className="h-3 w-3" strokeWidth={2} aria-hidden />
+          </span>
+        )}
       </span>
     );
   }
@@ -1232,45 +1245,33 @@ export function FacturacionTenantPage({
 
   return (
     <div className="w-full">
-      {!embeddedInSuperadmin && (
-        <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
-          Facturas
-        </h1>
-      )}
+      {/* Título + badges ARCA a la izquierda; acciones a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        {!embeddedInSuperadmin && (
+          <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
+            Facturas
+          </h1>
+        )}
 
-      {!embeddedInSuperadmin && (
-        <>
-          {hasArca && (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
-                <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
-                Emisión electrónica vía ARCA
-              </div>
-              <AmbienteTestBadge
-                ambiente={ambienteArca}
-                to="/configuracion/arca?tab=ambiente"
-              />
+        {hasArca && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
+              <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
+              Emisión electrónica vía ARCA
             </div>
-          )}
-        </>
-      )}
-
-      {embeddedInSuperadmin && hasArca && (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
-            <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
-            Emisión electrónica vía ARCA
+            <AmbienteTestBadge
+              ambiente={ambienteArca}
+              to={
+                embeddedInSuperadmin
+                  ? undefined
+                  : "/configuracion/arca?tab=ambiente"
+              }
+            />
           </div>
-          <AmbienteTestBadge ambiente={ambienteArca} />
-        </div>
-      )}
+        )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 justify-between">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {exportButton}
-          {error && <CrudFormErrorAlert message={error} />}
-        </div>
-        <div className="flex gap-2 ml-auto">
           {anyFiltroActivo && (
             <button
               type="button"
@@ -1295,6 +1296,12 @@ export function FacturacionTenantPage({
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="mt-4">
+          <CrudFormErrorAlert message={error} />
+        </div>
+      )}
 
       <ListadoDatos
         className="mt-6"
@@ -1489,35 +1496,56 @@ export function FacturacionTenantPage({
             className={`${listadoTablaBodyRowClass} cursor-pointer`}
             onClick={() => setAccionesAbiertoFacturaId(f.id)}
           >
-            <td className="px-4 py-3 font-medium break-all">{f.numero || "—"}</td>
-            <td className="px-4 py-3 truncate" title={nombreContraparte(f)}>
-              {nombreContraparte(f)}
+            <td className="px-3 py-2 font-medium tabular-nums">
+              <span
+                className="block max-w-[8rem] truncate"
+                title={f.numero || undefined}
+              >
+                {f.numero || "—"}
+              </span>
             </td>
-            <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
+            <td className="px-3 py-2">
+              <span
+                className="block max-w-[12rem] truncate"
+                title={nombreContraparte(f)}
+              >
+                {nombreContraparte(f)}
+              </span>
+            </td>
+            <td className="px-3 py-2 text-vialto-steel tabular-nums whitespace-nowrap">
               {fmtFecha(f.fechaEmision)}
             </td>
-            <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
+            <td
+              className={`px-3 py-2 tabular-nums whitespace-nowrap ${
+                f.vencida && !f.cobrado ? "text-red-700" : "text-vialto-steel"
+              }`}
+            >
               {fmtFecha(f.fechaVencimiento)}
             </td>
-            <td className="px-4 py-3">{renderEstadoBadges(f)}</td>
-            <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">
-              <div className="flex flex-col items-end gap-0.5">
-                <span>
-                  {textoImporteFacturaListado(f, viajes, { hasArca })}
-                </span>
+            <td className="px-3 py-2">{renderEstadoBadges(f)}</td>
+            <td className="px-3 py-2 text-right tabular-nums font-medium whitespace-nowrap">
+              <div className="flex items-center justify-end gap-1.5">
+                {/* Saldo pendiente (por tramo, sin ARCA, cobro parcial): ícono con
+                    tooltip para que la fila no crezca a dos líneas. */}
                 {!hasArca &&
                   f.facturarPorTramo &&
                   !f.cobrado &&
                   (f.saldoPendiente ?? 0) > 0.005 && (
-                    <span className="text-xs font-normal text-amber-800/90">
-                      Saldo{" "}
-                      {textoImporteMonedaFactura(f.moneda, f.saldoPendiente!)}
+                    <span
+                      title={`Saldo pendiente: ${textoImporteMonedaFactura(f.moneda, f.saldoPendiente!)}`}
+                      aria-label={`Saldo pendiente: ${textoImporteMonedaFactura(f.moneda, f.saldoPendiente!)}`}
+                      className="inline-flex text-amber-700"
+                    >
+                      <Clock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                     </span>
                   )}
+                <span>
+                  {textoImporteFacturaListado(f, viajes, { hasArca })}
+                </span>
               </div>
             </td>
             <td
-              className="px-4 py-3 text-right"
+              className="px-3 py-2 text-right"
               onClick={(e) => e.stopPropagation()}
             >
               <FacturaAccionesMenu
@@ -1735,6 +1763,7 @@ export function FacturacionTenantPage({
           viajes={viajes}
           viajesEdicion={viajesEdicionFactura}
           viajesLoading={viajesLoading}
+          hasArca={hasArca}
           onClose={cancelEdit}
           onSave={() => void saveEdit()}
           saving={savingEditId === editingId}

@@ -6,14 +6,14 @@ import {
   useOrganization,
   useUser,
 } from "@clerk/clerk-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { tooltipFlotanteClass } from "@/components/ui/TooltipsDelegados";
 import {
   ArrowLeftRight,
   Bell,
   Building2,
   Split,
   Calculator,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Database,
@@ -49,7 +49,9 @@ import {
   canAccessMantenimiento,
   canAccessStock,
   canAccessViajes,
+  tieneModulosConNotificaciones,
 } from "@/lib/tenantModules";
+import { dashboardHabilitado } from "@/lib/tenantHome";
 import {
   isPlatformSuperadmin,
   isOrgMember,
@@ -75,20 +77,13 @@ type NavGroup = {
   icon?: LucideIcon;
   /** Texto del tooltip al pasar el mouse sobre el ícono colapsado. Por defecto usa `title`. */
   tooltip?: string;
+  /** Grupo secundario: va pegado al fondo del menú, sin fondo, con borde tenue y texto algo más apagado. */
+  subtle?: boolean;
+  /** true = en el riel colapsado muestra cada ítem por separado, aunque haya varios. */
+  itemsSueltosEnRiel?: boolean;
 };
 
 const HEADER_HEIGHT_CLASS = "h-16";
-
-const SIDEBAR_GROUPS_STORAGE_KEY = "vialto:sidebarOpenGroups";
-
-function readStoredOpenGroups(): Record<string, boolean> {
-  try {
-    const raw = localStorage.getItem(SIDEBAR_GROUPS_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
-  } catch {
-    return {};
-  }
-}
 
 const sidebarBaseClass =
   "sidebar-scrollbar shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 gap-6 overflow-y-auto transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
@@ -104,8 +99,6 @@ export function AppShell() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-  const [openGroups, setOpenGroups] =
-    useState<Record<string, boolean>>(readStoredOpenGroups);
   const [navTooltip, setNavTooltip] = useState<{
     label: string;
     top: number;
@@ -114,10 +107,9 @@ export function AppShell() {
   useEnsureTenantOrganization();
 
   const superadmin = userLoaded && isPlatformSuperadmin(user?.publicMetadata);
-  // El menú por grupos colapsables solo tiene sentido si hay bastante para ordenar:
-  // superadmin siempre lo ve (siempre tiene muchos módulos); un tenant lo ve recién
-  // a partir de 2 módulos contratados — con 0 o 1, el menú vuelve al listado plano
-  // de siempre (sin headers de grupo ni accordion).
+  // En el riel colapsado, agrupar en un solo ícono por módulo solo tiene sentido si
+  // hay bastante para ordenar: superadmin siempre (muchos módulos); un tenant recién
+  // a partir de 2 módulos contratados — con 0 o 1, el riel muestra cada ítem suelto.
   const sidebarUsesAccordion =
     superadmin || (tenant?.modules?.length ?? 0) >= 2;
 
@@ -128,6 +120,19 @@ export function AppShell() {
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
+
+  // Desktop: con el menú expandido, un click fuera de él lo colapsa.
+  const sidebarDesktopRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (sidebarCollapsed) return;
+    function onMouseDown(e: MouseEvent) {
+      if (sidebarDesktopRef.current?.contains(e.target as Node)) return;
+      setSidebarCollapsed(true);
+      setNavTooltip(null);
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     if (!sidebarOpen) return;
@@ -147,17 +152,23 @@ export function AppShell() {
   const stockOperator = isStockOperator(roleCtx);
   const canSeeNotificaciones =
     Boolean(organization) &&
-    puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
+    puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata) &&
+    tieneModulosConNotificaciones(tenant?.modules ?? []);
 
   const navGroups = useMemo((): NavGroup[] => {
+    // Sin dashboard, "/" solo redirige al primer módulo: no tiene sentido el ítem "Inicio".
+    const inicioGroups: NavGroup[] =
+      superadmin || dashboardHabilitado(tenant)
+        ? [
+            {
+              title: null,
+              items: [{ to: "/", label: "Inicio", icon: House, end: true }],
+            },
+          ]
+        : [];
+
     if (isOrgMember(roleCtx)) {
-      // 1. Inicializamos el grupo de navegación del Miembro incluyendo "Inicio"
-      const memberGroups: NavGroup[] = [
-        {
-          title: null,
-          items: [{ to: "/", label: "Inicio", icon: House, end: true }],
-        },
-      ];
+      const memberGroups: NavGroup[] = [...inicioGroups];
 
       if (canAccessStock(tenant?.modules ?? [])) {
         memberGroups.push({
@@ -227,12 +238,7 @@ export function AppShell() {
       return [];
     }
 
-    const groups: NavGroup[] = [
-      {
-        title: null,
-        items: [{ to: "/", label: "Inicio", icon: House, end: true }],
-      },
-    ];
+    const groups: NavGroup[] = [...inicioGroups];
 
     if (superadmin) {
       groups.push({
@@ -296,6 +302,7 @@ export function AppShell() {
       groups.push({
         title: "Facturación",
         tooltip: "Facturación y liquidaciones",
+        itemsSueltosEnRiel: true,
         items: facturacionItems,
       });
     }
@@ -341,29 +348,11 @@ export function AppShell() {
       });
     }
 
-    groups.push({
-      title: "Base de datos",
-      items: [
-        {
-          to: "/base-de-datos",
-          label: "Base de datos",
-          icon: Database,
-          extraActivePaths: [
-            "/clientes",
-            "/transportistas",
-            "/choferes",
-            "/vehiculos",
-            "/stock/productos",
-            "/usuarios",
-          ],
-        },
-      ],
-    });
-
     if (superadmin) {
       groups.push({
         title: "Ajustes",
         icon: Settings,
+        subtle: true,
         items: [
           { to: "/superadmin/arca", label: "ARCA / AFIP", icon: Landmark },
           {
@@ -388,59 +377,45 @@ export function AppShell() {
           icon: SlidersHorizontal,
         });
       }
-      ajustesItems.push({
-        to: "/configuracion/notificaciones",
-        label: "Notificaciones",
-        icon: Bell,
-      });
-      groups.push({ title: "Ajustes", icon: Settings, items: ajustesItems });
+      if (tieneModulosConNotificaciones(tenant?.modules ?? [])) {
+        ajustesItems.push({
+          to: "/configuracion/notificaciones",
+          label: "Notificaciones",
+          icon: Bell,
+        });
+      }
+      if (ajustesItems.length > 0) {
+        groups.push({
+          title: "Ajustes",
+          icon: Settings,
+          subtle: true,
+          items: ajustesItems,
+        });
+      }
     }
+
+    groups.push({
+      title: "Base de datos",
+      subtle: true,
+      items: [
+        {
+          to: "/base-de-datos",
+          label: "Base de datos",
+          icon: Database,
+          extraActivePaths: [
+            "/clientes",
+            "/transportistas",
+            "/choferes",
+            "/vehiculos",
+            "/stock/productos",
+            "/usuarios",
+          ],
+        },
+      ],
+    });
 
     return groups;
-  }, [superadmin, tenant?.modules, roleCtx]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        SIDEBAR_GROUPS_STORAGE_KEY,
-        JSON.stringify(openGroups),
-      );
-    } catch {
-      // localStorage no disponible (modo privado, etc.) — la preferencia simplemente no persiste.
-    }
-  }, [openGroups]);
-
-  // Al colapsar el menú a solo-iconos, plegamos todos los grupos: si después se
-  // vuelve a expandir (botón de flecha), arranca todo cerrado. El único caso que
-  // queda abierto es el que el usuario haya clickeado en el riel de iconos, que
-  // setea ese grupo en `true` en el mismo gesto que expande el menú (por eso este
-  // efecto solo corre mientras `sidebarCollapsed` sigue en `true`).
-  useEffect(() => {
-    if (!sidebarCollapsed || !sidebarUsesAccordion) return;
-    setOpenGroups((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const group of navGroups) {
-        if (group.title !== null && next[group.title] !== false) {
-          next[group.title] = false;
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [sidebarCollapsed, sidebarUsesAccordion, navGroups]);
-
-  // Un grupo queda abierto salvo que el usuario lo haya colapsado explícitamente
-  // (la preferencia manual siempre gana, incluso si el grupo es el de la ruta activa).
-  function isGroupOpen(group: NavGroup) {
-    if (group.title === null) return true;
-    if (!sidebarUsesAccordion) return true;
-    return openGroups[group.title] ?? true;
-  }
-
-  function toggleGroup(title: string) {
-    setOpenGroups((prev) => ({ ...prev, [title]: !(prev[title] ?? true) }));
-  }
+  }, [superadmin, tenant, roleCtx]);
 
   const platformRole =
     typeof user?.publicMetadata?.vialtoRole === "string"
@@ -509,7 +484,7 @@ export function AppShell() {
         )}
 
         <nav
-          className={`flex flex-col gap-3 ${collapsed ? "items-center" : ""}`}
+          className={`flex flex-1 flex-col gap-3 ${collapsed ? "items-center" : ""}`}
         >
           {navLoading ? (
             <div
@@ -526,48 +501,27 @@ export function AppShell() {
             </div>
           ) : (
             navGroups.map((group, gi) => {
-              const open = isGroupOpen(group);
-              // Un grupo con un solo ítem no necesita accordion (ni colapsado ni expandido):
-              // se muestra directo ese ítem, sin header intermedio para togglear/expandir.
-              const singleItemGroup =
-                sidebarUsesAccordion &&
-                group.title !== null &&
-                group.items.length === 1;
               const isCollapsibleGroup =
                 collapsed &&
                 sidebarUsesAccordion &&
                 group.title !== null &&
+                !group.itemsSueltosEnRiel &&
                 group.items.length > 1;
               return (
                 <div
                   key={group.title ?? `g-${gi}`}
-                  className={`flex flex-col gap-0.5 ${collapsed ? "items-center" : ""}`}
+                  // Solo el primer grupo secundario lleva `mt-auto`: empuja a todos los
+                  // secundarios juntos al fondo del menú.
+                  className={`flex flex-col gap-0.5 ${collapsed ? "items-center" : ""} ${group.subtle && !navGroups[gi - 1]?.subtle ? "mt-auto pt-4" : ""}`}
                 >
-                  {(collapsed || !sidebarUsesAccordion) && gi > 0 && (
+                  {gi > 0 && !group.subtle && (
                     <div
                       className={`mb-2 border-t border-white/[0.12] ${collapsed ? "w-8" : ""}`}
                     />
                   )}
-                  {sidebarUsesAccordion &&
-                    !collapsed &&
-                    group.title !== null &&
-                    !singleItemGroup && (
-                      <button
-                        type="button"
-                        onClick={() => toggleGroup(group.title as string)}
-                        aria-expanded={open}
-                        className="mt-3 mb-1.5 flex items-center justify-between gap-2 rounded px-1 py-2 font-[family-name:var(--font-ui)] text-2xl font-semibold uppercase tracking-normal text-white/55 transition-colors hover:text-white/85"
-                      >
-                        <span>{group.title}</span>
-                        <ChevronDown
-                          className={`h-5 w-5 shrink-0 transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
-                          strokeWidth={2}
-                        />
-                      </button>
-                    )}
                   {isCollapsibleGroup
                     ? // Riel de iconos: un solo botón representativo por grupo colapsable.
-                      // Al hacer click, expande el menú con labels y abre ese grupo puntual.
+                      // Al hacer click, expande el menú con labels.
                       (() => {
                         const GroupIcon =
                           group.icon ?? group.items[0]?.icon ?? House;
@@ -578,10 +532,6 @@ export function AppShell() {
                             type="button"
                             aria-label={groupTooltip}
                             onClick={() => {
-                              setOpenGroups((prev) => ({
-                                ...prev,
-                                [group.title as string]: true,
-                              }));
                               setSidebarCollapsed(false);
                               setNavTooltip(null);
                             }}
@@ -595,7 +545,11 @@ export function AppShell() {
                               });
                             }}
                             onMouseLeave={() => setNavTooltip(null)}
-                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-white/65 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md border transition-colors hover:text-white ${
+                              group.subtle
+                                ? "border-white/[0.06] text-white/60 hover:border-white/15 hover:bg-white/[0.06]"
+                                : "border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08]"
+                            }`}
                           >
                             <GroupIcon
                               className="h-4 w-4 shrink-0"
@@ -604,8 +558,7 @@ export function AppShell() {
                           </button>
                         );
                       })()
-                    : (singleItemGroup || open) &&
-                      group.items.map((item) => (
+                    : group.items.map((item) => (
                         <NavLink
                           key={item.to}
                           to={item.to}
@@ -639,15 +592,21 @@ export function AppShell() {
                               group.title === null && !collapsed
                                 ? "text-2xl font-semibold tracking-normal"
                                 : "text-sm font-medium tracking-wider";
+                            const stateClasses = group.subtle
+                              ? active
+                                ? "border-white/20 bg-white/[0.1] text-white"
+                                : "border-white/[0.06] text-white/60 hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
+                              : active
+                                ? "border-vialto-fire bg-vialto-fire text-white shadow-sm"
+                                : "border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white";
                             return [
-                              "flex min-h-11 items-center rounded-md font-[family-name:var(--font-ui)] uppercase transition-colors border",
+                              "flex items-center rounded-md font-[family-name:var(--font-ui)] uppercase transition-colors border",
+                              "min-h-11",
                               textClasses,
                               collapsed
                                 ? "w-11 justify-center px-0"
                                 : "gap-2.5 px-3 py-2.5",
-                              active
-                                ? "border-vialto-fire bg-vialto-fire text-white shadow-sm"
-                                : "border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white",
+                              stateClasses,
                             ].join(" ");
                           }}
                         >
@@ -779,7 +738,10 @@ export function AppShell() {
           />
         )}
 
-        <div className="sidebar-control-zone hidden lg:block fixed left-0 top-16 z-30 h-[calc(100dvh-4rem)]">
+        <div
+          ref={sidebarDesktopRef}
+          className="sidebar-control-zone hidden lg:block fixed left-0 top-16 z-30 h-[calc(100dvh-4rem)]"
+        >
           <aside
             className={[
               "flex h-full",
@@ -864,7 +826,7 @@ export function AppShell() {
       {navTooltip &&
         createPortal(
           <div
-            className="pointer-events-none fixed z-[200] -translate-y-1/2 whitespace-nowrap rounded-md bg-vialto-charcoal px-3.5 py-2 font-[family-name:var(--font-ui)] text-sm font-medium tracking-wide text-white shadow-lg"
+            className={`${tooltipFlotanteClass} -translate-y-1/2 whitespace-nowrap`}
             style={{ top: navTooltip.top, left: navTooltip.left }}
           >
             {navTooltip.label}

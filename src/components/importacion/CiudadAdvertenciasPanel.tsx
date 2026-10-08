@@ -42,12 +42,6 @@ function agruparAdvertencias(
   return [...grupos.values()];
 }
 
-/** El mensaje ya trae el valor citado al inicio (`"X" no coincide con...`) — se saca para no repetirlo dos veces si el valor ya se muestra como título del grupo. */
-function explicacionSinValor(mensaje: string, valor: string): string {
-  const prefijo = `"${valor}" `;
-  return mensaje.startsWith(prefijo) ? mensaje.slice(prefijo.length) : mensaje;
-}
-
 const excludeButtonClass =
   "inline-flex h-7 items-center gap-1 rounded border border-black/15 bg-white px-2 text-[11px] text-vialto-steel hover:bg-black/[0.04]";
 
@@ -66,10 +60,13 @@ export function CiudadAdvertenciasPanel({
   advertencias,
   onElegir,
   onIgnorarFila,
+  paisFijo = null,
 }: {
   advertencias: ImportCiudadAdvertencia[];
   onElegir: (fila: number, campo: "origen" | "destino", valor: string) => void;
   onIgnorarFila: (fila: number) => void;
+  /** País fijo de la empresa (ver useTenantPaisFijo): oculta el selector de país. */
+  paisFijo?: PaisCodigo | null;
 }) {
   const [paisPorGrupo, setPaisPorGrupo] = useState<Record<string, PaisCodigo>>(
     {},
@@ -100,9 +97,9 @@ export function CiudadAdvertenciasPanel({
       </p>
       <div className="space-y-3">
         {grupos.map((g) => {
-          const pais = paisPorGrupo[g.mensaje] ?? inferirPaisDesdeUbicacion(g.valor);
+          const pais =
+            paisFijo ?? paisPorGrupo[g.mensaje] ?? inferirPaisDesdeUbicacion(g.valor);
           const filasUnicas = [...new Set(g.ocurrencias.map((o) => o.fila))];
-          const explicacion = explicacionSinValor(g.mensaje, g.valor);
 
           return (
             <div
@@ -129,7 +126,6 @@ export function CiudadAdvertenciasPanel({
                       Copiar
                     </button>
                   </div>
-                  <p className="mt-0.5 text-xs text-amber-800">{explicacion}</p>
                 </div>
                 <span className="shrink-0 rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
                   {filasUnicas.length} fila{filasUnicas.length > 1 ? "s" : ""}
@@ -137,18 +133,9 @@ export function CiudadAdvertenciasPanel({
               </div>
 
               <div className="space-y-3 bg-amber-50/60 px-4 py-3">
-                <div className="flex flex-wrap gap-1.5">
-                  {g.ocurrencias.map((o) => (
-                    <span
-                      key={`${o.fila}-${o.campo}`}
-                      className="rounded border border-amber-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
-                    >
-                      Fila {o.fila} · {o.campo === "origen" ? "Origen" : "Destino"}
-                    </span>
-                  ))}
-                </div>
-
                 <div className="flex flex-col gap-2 sm:flex-row">
+                  {/* Empresa con país fijo: la ciudad se busca siempre en ese país. */}
+                  {!paisFijo && (
                   <select
                     value={pais}
                     onChange={(e) =>
@@ -166,6 +153,7 @@ export function CiudadAdvertenciasPanel({
                       </option>
                     ))}
                   </select>
+                  )}
                   <CiudadCombobox
                     pais={pais}
                     value=""

@@ -68,3 +68,14 @@ export function canAccessCombustible(modules: string[]): boolean {
 export function canAccessMantenimiento(modules: string[]): boolean {
   return modules.some((m) => m.toLowerCase() === 'mantenimiento');
 }
+
+/**
+ * Módulos que tienen al menos un tipo de notificación. Espejo de los `requiereModulo` de
+ * `NOTIFICACIONES_CATALOG` en el backend (`notificaciones-catalog.ts`): si se suma un tipo
+ * de notificación para un módulo nuevo, agregarlo también acá.
+ */
+const MODULOS_CON_NOTIFICACIONES = ['facturacion', 'cuenta-corriente', 'combustible', 'mantenimiento'];
+
+export function tieneModulosConNotificaciones(modules: string[]): boolean {
+  return modules.some((m) => MODULOS_CON_NOTIFICACIONES.includes(m.toLowerCase()));
+}

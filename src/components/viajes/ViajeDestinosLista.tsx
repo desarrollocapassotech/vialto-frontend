@@ -27,6 +27,8 @@ type Props = {
   paisFijo?: Pais | null;
   /** Sugerencia "para la vuelta" (origen del primer cliente) para el botón de autocompletar del Destino 1. */
   sugerenciaPrimerDestino?: { pais: PaisCodigo; etiqueta: string } | null;
+  /** `Tenant.recomendacionCiudadesHabilitada`: false = ciudad en texto libre. */
+  sugerenciasCiudad?: boolean;
 };
 
 export function ViajeDestinosLista({
@@ -40,6 +42,7 @@ export function ViajeDestinosLista({
   onNuevoPais,
   paisFijo = null,
   sugerenciaPrimerDestino = null,
+  sugerenciasCiudad = true,
 }: Props) {
   function setRow(i: number, patch: Partial<ViajeDestinoRowDraft>) {
     onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -106,6 +109,7 @@ export function ViajeDestinosLista({
                         onChange={(next) => setRow(i, { etiqueta: next })}
                         inputClassName={`${inputClassName} w-full`}
                         disableBrowserAutocomplete={disableBrowserAutocomplete}
+                        sugerencias={sugerenciasCiudad}
                       />
                     </div>
                   );

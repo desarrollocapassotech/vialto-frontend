@@ -629,7 +629,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     const clientesBloqueados = draft.clientesRows.some(
       (r) =>
         !!r.facturacionEstado &&
-        !["sin_facturar", "anulado"].includes(r.facturacionEstado),
+        !facturacionPermiteVincular(r.facturacionEstado),
     );
     setError(null);
     try {

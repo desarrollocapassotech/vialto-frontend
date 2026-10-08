@@ -1,4 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+
+/** Ancho del panel flotante de filtro (px). */
+const PANEL_WIDTH_PX = 288;
 
 type Props = {
   /** Título visible de la columna (mayúsculas, estilo listado). */
@@ -15,9 +19,8 @@ type Props = {
   filterSignature?: string;
   /** Alinea título + icono al borde derecho de la celda (columnas numéricas). */
   alignRight?: boolean;
-  /** Ancho mínimo del encabezado (clase Tailwind). Default: `min-w-[9rem]`, pensado para
-   * los controles de filtro (selects/search). Columnas angostas por contenido (ej. Etapa,
-   * con badges cortos) pueden pasar un valor menor o `min-w-0` para no imponer un piso. */
+  /** Ancho mínimo del encabezado (clase Tailwind). Default: `min-w-0` — los controles de
+   * filtro abren en un panel flotante, así que el encabezado no necesita reservarles lugar. */
   minWidthClass?: string;
   /**
    * true = el título nunca se parte en dos líneas (la columna se angosta como mucho hasta
@@ -55,7 +58,7 @@ export function ViajesListadoHeaderFiltro({
   filterActive,
   filterSignature,
   alignRight = false,
-  minWidthClass = "min-w-[9rem]",
+  minWidthClass = "min-w-0",
   titleNoWrap = false,
 }: Props) {
   const [abierto, setAbierto] = useState(false);
@@ -86,15 +89,64 @@ export function ViajesListadoHeaderFiltro({
     }
   }, [filterSignature, filterActive]);
 
+  // Panel flotante (portal + fixed): no ensancha la columna ni queda recortado por el
+  // overflow del wrapper de la tabla.
+  const botonRef = useRef<HTMLButtonElement>(null);
+  const clickDentroRef = useRef(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!abierto) return;
+    function ubicar() {
+      const r = botonRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const anchoPanel = PANEL_WIDTH_PX;
+      const izquierdaDeseada = alignRight ? r.right - anchoPanel : r.left;
+      const left = Math.max(8, Math.min(izquierdaDeseada, window.innerWidth - anchoPanel - 8));
+      setPos({ top: r.bottom + 6, left });
+    }
+    ubicar();
+    window.addEventListener('resize', ubicar);
+    window.addEventListener('scroll', ubicar, true);
+    return () => {
+      window.removeEventListener('resize', ubicar);
+      window.removeEventListener('scroll', ubicar, true);
+    };
+  }, [abierto, alignRight]);
+
+  useEffect(() => {
+    if (!abierto) return;
+    // Los selects del panel abren sus listas en otro portal: el "adentro" se detecta por el
+    // árbol de React (onMouseDownCapture del panel), no por el DOM.
+    function onMouseDown(e: MouseEvent) {
+      if (clickDentroRef.current) {
+        clickDentroRef.current = false;
+        return;
+      }
+      if (botonRef.current?.contains(e.target as Node)) return;
+      setAbierto(false);
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setAbierto(false);
+    }
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [abierto]);
+
   const mostrarContador = filterActive && !abierto;
 
   return (
     <div
-      className={`flex flex-col gap-1.5 ${alignRight ? 'w-full items-end' : minWidthClass}`}
+      className={`flex ${alignRight ? 'w-full justify-end' : minWidthClass}`}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-center gap-1.5">
         <div className="relative inline-flex shrink-0">
           <button
+            ref={botonRef}
             type="button"
             onClick={() => setAbierto((v) => !v)}
             className={`relative rounded border p-1 transition-colors ${
@@ -117,21 +169,30 @@ export function ViajesListadoHeaderFiltro({
           ) : null}
         </div>
         <span
-          className={`text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase ${
+          className={`leading-tight uppercase ${
             titleNoWrap ? 'whitespace-nowrap' : ''
           } ${alignRight ? 'shrink-0' : 'min-w-0 flex-1'}`}
         >
           {title}
         </span>
       </div>
-      {abierto ? (
-        <div
-          className={`normal-case text-sm tracking-normal ${alignRight ? 'min-w-[9rem]' : ''}`}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          {children}
-        </div>
-      ) : null}
+      {abierto && pos
+        ? createPortal(
+            <div
+              role="dialog"
+              aria-label={`Filtro: ${title}`}
+              className="fixed z-40 rounded border border-black/10 bg-white p-3 text-left font-[family-name:var(--font-body)] text-sm normal-case tracking-normal text-vialto-charcoal shadow-lg"
+              style={{ top: pos.top, left: pos.left, width: PANEL_WIDTH_PX }}
+              onMouseDownCapture={() => {
+                clickDentroRef.current = true;
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {children}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

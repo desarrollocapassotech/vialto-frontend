@@ -1,4 +1,4 @@
-import { facturacionPermiteVincular, liquidacionPermiteVincular } from '@/lib/viajesIndicadores';
+import { liquidacionPermiteVincular } from '@/lib/viajesIndicadores';
 import { transportistaEfectivoIdDesdeViaje } from '@/lib/viajesFlota';
 import type { Transportista, Viaje } from '@/types/api';
 
@@ -110,14 +110,42 @@ export function viajeTieneLiquidacionActivaParaTransportista(
   return false;
 }
 
+/**
+ * Estados en los que hace falta crear una factura NUEVA. A diferencia de
+ * `facturacionPermiteVincular`, no incluye `borrador`: ese viaje ya tiene una factura
+ * sin emitir, y lo que corresponde es continuarla (ver `facturaBorradorIdDeViaje`), no
+ * crear otra.
+ */
+const FACTURACION_SIN_COMPROBANTE = new Set(['sin_facturar', 'anulado']);
+
 export function viajePendienteComprobanteCliente(v: Pick<Viaje, 'facturacionEstado' | 'clientesViaje'>): boolean {
-  if (facturacionPermiteVincular(v.facturacionEstado)) return true;
+  if (FACTURACION_SIN_COMPROBANTE.has(v.facturacionEstado)) return true;
   if (v.clientesViaje) {
     for (const c of v.clientesViaje) {
-      if (facturacionPermiteVincular(c.facturacionEstado)) return true;
+      if (FACTURACION_SIN_COMPROBANTE.has(c.facturacionEstado)) return true;
     }
   }
   return false;
+}
+
+/** Factura en borrador (sin emitir) del viaje o de alguno de sus clientes. */
+export function facturaBorradorIdDeViaje(
+  v: Pick<Viaje, 'facturacionEstado' | 'facturaId' | 'clientesViaje'>,
+): string | undefined {
+  if (v.facturacionEstado === 'borrador' && v.facturaId) return v.facturaId;
+  return (
+    v.clientesViaje?.find((c) => c.facturacionEstado === 'borrador' && c.facturaId)
+      ?.facturaId ?? undefined
+  );
+}
+
+/** Liquidación en borrador (sin emitir) del viaje. */
+export function liquidacionBorradorIdDeViaje(
+  v: Pick<Viaje, 'liquidacionEstado' | 'liquidacionesViaje'>,
+): string | undefined {
+  if (v.liquidacionEstado !== 'borrador') return undefined;
+  return v.liquidacionesViaje?.find((lv) => lv.liquidacion.estado === 'borrador')
+    ?.liquidacion.id;
 }
 
 export function viajePendienteComprobanteTransportista(

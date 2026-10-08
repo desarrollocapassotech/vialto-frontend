@@ -154,29 +154,33 @@ export function VehiculosTenantPage() {
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
-        Vehículos
-      </h1>
-      <p className="mt-2 text-vialto-steel">
-        Toda tu flota.
-      </p>
-
-      <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-        {activeFilterCount > 0 && (
-          <button
-            type="button"
-            onClick={limpiarFiltros}
-            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+      {/* Título a la izquierda; acciones a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
+            Vehículos
+          </h1>
+          <p className="mt-2 text-vialto-steel">
+            Toda tu flota.
+          </p>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={limpiarFiltros}
+              className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+            >
+              Limpiar filtros
+            </button>
+          )}
+          <Link
+            to="/vehiculos/nuevo"
+            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
           >
-            Limpiar filtros
-          </button>
-        )}
-        <Link
-          to="/vehiculos/nuevo"
-          className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-        >
-          Crear vehículo
-        </Link>
+            Crear vehículo
+          </Link>
+        </div>
       </div>
 
       {error && (
