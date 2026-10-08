@@ -189,6 +189,10 @@ export function ChoferesTenantPage() {
                 title="Nombre"
                 filterActive={!!filtroNombre}
                 filterSignature={filtroNombre}
+                onClear={() => {
+                  setFiltroNombre("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroNombre}
@@ -215,6 +219,10 @@ export function ChoferesTenantPage() {
                 title="DNI"
                 filterActive={!!filtroDni}
                 filterSignature={filtroDni}
+                onClear={() => {
+                  setFiltroDni("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroDni}
@@ -241,6 +249,10 @@ export function ChoferesTenantPage() {
                 title="Estado"
                 filterActive={filtroActivo !== "todos"}
                 filterSignature={filtroActivo}
+                onClear={() => {
+                  setFiltroActivo("todos");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroActivo}

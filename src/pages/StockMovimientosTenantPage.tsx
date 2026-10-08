@@ -332,6 +332,14 @@ export function StockMovimientosTenantPage({
                 title="Fecha"
                 filterActive={!!fechaDesde || !!fechaHasta}
                 filterSignature={`${fechaDesde}|${fechaHasta}`}
+                onClear={() =>
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.delete("fechaDesde");
+                    next.delete("fechaHasta");
+                    return next;
+                  })
+                }
               >
                 <div className="flex flex-col gap-2">
                   <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
@@ -389,6 +397,13 @@ export function StockMovimientosTenantPage({
                 title="Tipo"
                 filterActive={!!tipo}
                 filterSignature={tipo}
+                onClear={() =>
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.delete("tipo");
+                    return next;
+                  })
+                }
               >
                 <select
                   value={tipo}
@@ -494,6 +509,13 @@ export function StockMovimientosTenantPage({
                 title="Productos"
                 filterActive={!!productoId}
                 filterSignature={productoId}
+                onClear={() =>
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.delete("productoId");
+                    return next;
+                  })
+                }
               >
                 <SearchableEntitySelect<Producto>
                   items={productos}
@@ -535,6 +557,13 @@ export function StockMovimientosTenantPage({
                 title="Cliente"
                 filterActive={!!clienteId}
                 filterSignature={clienteId}
+                onClear={() =>
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.delete("clienteId");
+                    return next;
+                  })
+                }
               >
                 <SearchableEntitySelect<Cliente>
                   items={clientes}
@@ -576,6 +605,13 @@ export function StockMovimientosTenantPage({
                 title="Depósito"
                 filterActive={!!depositoId}
                 filterSignature={depositoId}
+                onClear={() =>
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.delete("depositoId");
+                    return next;
+                  })
+                }
               >
                 <SearchableEntitySelect<Deposito>
                   items={depositos}
@@ -624,6 +660,13 @@ export function StockMovimientosTenantPage({
                 title="Usuario"
                 filterActive={!!createdBy}
                 filterSignature={createdBy}
+                onClear={() =>
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.delete("createdBy");
+                    return next;
+                  })
+                }
               >
                 <SearchableEntitySelect<Usuario>
                   items={usuarios}

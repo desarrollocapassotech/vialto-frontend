@@ -828,6 +828,11 @@ export function CombustibleTenantPage({
                     title="Fecha"
                     filterActive={!rangoFechaPorDefecto}
                     filterSignature={`${desde}|${hasta}`}
+                    onClear={() => {
+                      setDesde("");
+                      setHasta("");
+                      resetPage();
+                    }}
                   >
                     <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
                       <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
@@ -866,6 +871,10 @@ export function CombustibleTenantPage({
                     title="Conductor"
                     filterActive={!!choferId}
                     filterSignature={choferId}
+                    onClear={() => {
+                      setChoferId("");
+                      resetPage();
+                    }}
                   >
                     <SearchableSelect
                       value={choferId}
@@ -886,6 +895,10 @@ export function CombustibleTenantPage({
                     title="Vehículo"
                     filterActive={!!vehiculoId}
                     filterSignature={vehiculoId}
+                    onClear={() => {
+                      setVehiculoId("");
+                      resetPage();
+                    }}
                   >
                     <SearchableSelect
                       value={vehiculoId}
@@ -906,6 +919,10 @@ export function CombustibleTenantPage({
                     title="Estación"
                     filterActive={!!estacion}
                     filterSignature={estacion}
+                    onClear={() => {
+                      setEstacion("");
+                      resetPage();
+                    }}
                   >
                     <SearchableSelect
                       value={estacion}
@@ -926,6 +943,10 @@ export function CombustibleTenantPage({
                     title="Pago"
                     filterActive={!!formaPago}
                     filterSignature={formaPago}
+                    onClear={() => {
+                      setFormaPago("");
+                      resetPage();
+                    }}
                   >
                     <select
                       value={formaPago}

@@ -117,6 +117,7 @@ export function TenantsTable({
                 title="Empresa"
                 filterActive={!!filtroNombre}
                 filterSignature={filtroNombre}
+                onClear={() => setFiltroNombre("")}
               >
                 <select
                   value={filtroNombre}
@@ -140,6 +141,7 @@ export function TenantsTable({
                 title="Suscripción"
                 filterActive={!!filtroSuscripcion}
                 filterSignature={filtroSuscripcion}
+                onClear={() => setFiltroSuscripcion("")}
               >
                 <select
                   value={filtroSuscripcion}

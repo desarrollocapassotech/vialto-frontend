@@ -225,6 +225,10 @@ export function TransportistasSuperadminPage() {
                 title="Nombre"
                 filterActive={!!filtroNombre}
                 filterSignature={filtroNombre}
+                onClear={() => {
+                  setFiltroNombre("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroNombre}
@@ -252,6 +256,10 @@ export function TransportistasSuperadminPage() {
                   title={idFiscalLabel}
                   filterActive={!!filtroIdFiscal}
                   filterSignature={filtroIdFiscal}
+                  onClear={() => {
+                    setFiltroIdFiscal("");
+                    setPage(1);
+                  }}
                 >
                   <select
                     value={filtroIdFiscal}
@@ -280,6 +288,10 @@ export function TransportistasSuperadminPage() {
                 title="País"
                 filterActive={!!filtroPais}
                 filterSignature={filtroPais}
+                onClear={() => {
+                  setFiltroPais("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroPais}
@@ -313,6 +325,10 @@ export function TransportistasSuperadminPage() {
                 title="N° PAUT"
                 filterActive={!!filtroPaut}
                 filterSignature={filtroPaut}
+                onClear={() => {
+                  setFiltroPaut("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroPaut}

@@ -229,6 +229,10 @@ export function DestinatariosSuperadminPage() {
                 title="Nombre"
                 filterActive={!!filtroNombre}
                 filterSignature={filtroNombre}
+                onClear={() => {
+                  setFiltroNombre("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroNombre}
@@ -255,6 +259,10 @@ export function DestinatariosSuperadminPage() {
                 title="Empresa"
                 filterActive={!!filtroEmpresaCol}
                 filterSignature={filtroEmpresaCol}
+                onClear={() => {
+                  setFiltroEmpresaCol("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroEmpresaCol}

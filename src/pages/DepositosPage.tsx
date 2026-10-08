@@ -369,6 +369,10 @@ export function DepositosPage({
                     title="Nombre"
                     filterActive={!!filtroNombre}
                     filterSignature={filtroNombre}
+                    onClear={() => {
+                      setFiltroNombre("");
+                      setPage(1);
+                    }}
                   >
                     <select
                       value={filtroNombre}
@@ -400,6 +404,10 @@ export function DepositosPage({
                     title="Activo"
                     filterActive={!!filtroEstado}
                     filterSignature={filtroEstado}
+                    onClear={() => {
+                      setFiltroEstado("");
+                      setPage(1);
+                    }}
                   >
                     <select
                       value={filtroEstado}

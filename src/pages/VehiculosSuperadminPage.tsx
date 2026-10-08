@@ -225,6 +225,10 @@ export function VehiculosSuperadminPage() {
                 title="Patente"
                 filterActive={!!filtroPatente}
                 filterSignature={filtroPatente}
+                onClear={() => {
+                  setFiltroPatente("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroPatente}
@@ -254,6 +258,10 @@ export function VehiculosSuperadminPage() {
                 title="Pertenencia"
                 filterActive={!!filtroPertenencia}
                 filterSignature={filtroPertenencia}
+                onClear={() => {
+                  setFiltroPertenencia("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroPertenencia}

@@ -187,6 +187,14 @@ export function DivisionesStockHistorialTenantPage({
                     title="Fecha"
                     filterActive={!!fechaDesde || !!fechaHasta}
                     filterSignature={`${fechaDesde}|${fechaHasta}`}
+                    onClear={() =>
+                      setSearchParams((prev) => {
+                        const next = new URLSearchParams(prev);
+                        next.delete("fechaDesde");
+                        next.delete("fechaHasta");
+                        return next;
+                      })
+                    }
                   >
                     <div className="flex flex-col gap-2">
                       <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
@@ -237,6 +245,13 @@ export function DivisionesStockHistorialTenantPage({
                     title="Cliente"
                     filterActive={!!clienteId}
                     filterSignature={clienteId}
+                    onClear={() =>
+                      setSearchParams((prev) => {
+                        const next = new URLSearchParams(prev);
+                        next.delete("clienteId");
+                        return next;
+                      })
+                    }
                   >
                     <SearchableEntitySelect<Cliente>
                       items={clientes}
@@ -276,6 +291,13 @@ export function DivisionesStockHistorialTenantPage({
                     title="Depósito"
                     filterActive={!!depositoId}
                     filterSignature={depositoId}
+                    onClear={() =>
+                      setSearchParams((prev) => {
+                        const next = new URLSearchParams(prev);
+                        next.delete("depositoId");
+                        return next;
+                      })
+                    }
                   >
                     <SearchableEntitySelect<Deposito>
                       items={depositos}
@@ -315,6 +337,13 @@ export function DivisionesStockHistorialTenantPage({
                     title="Producto"
                     filterActive={!!productoId}
                     filterSignature={productoId}
+                    onClear={() =>
+                      setSearchParams((prev) => {
+                        const next = new URLSearchParams(prev);
+                        next.delete("productoId");
+                        return next;
+                      })
+                    }
                   >
                     <SearchableEntitySelect<Producto>
                       items={productos}

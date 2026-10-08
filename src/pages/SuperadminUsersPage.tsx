@@ -280,6 +280,10 @@ export function SuperadminUsersPage() {
                   title="Nombre"
                   filterActive={!!filtroNombre}
                   filterSignature={filtroNombre}
+                  onClear={() => {
+                    setFiltroNombre("");
+                    setPage(1);
+                  }}
                 >
                   <select
                     value={filtroNombre}
@@ -306,6 +310,10 @@ export function SuperadminUsersPage() {
                   title="Email"
                   filterActive={!!filtroEmail}
                   filterSignature={filtroEmail}
+                  onClear={() => {
+                    setFiltroEmail("");
+                    setPage(1);
+                  }}
                 >
                   <select
                     value={filtroEmail}
@@ -332,6 +340,10 @@ export function SuperadminUsersPage() {
                   title="Rol"
                   filterActive={!!filtroRol}
                   filterSignature={filtroRol}
+                  onClear={() => {
+                    setFiltroRol("");
+                    setPage(1);
+                  }}
                 >
                   <select
                     value={filtroRol}

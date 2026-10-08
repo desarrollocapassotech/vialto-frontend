@@ -205,6 +205,10 @@ export function VehiculosTenantPage() {
                 title="Patente"
                 filterActive={!!filtroPatente}
                 filterSignature={filtroPatente}
+                onClear={() => {
+                  setFiltroPatente("");
+                  setPage(1);
+                }}
               >
                 <div className="flex gap-1">
                   <input
@@ -243,6 +247,10 @@ export function VehiculosTenantPage() {
                   title="Tipo"
                   filterActive={!!filtroTipo}
                   filterSignature={filtroTipo}
+                  onClear={() => {
+                    setFiltroTipo("");
+                    setPage(1);
+                  }}
                 >
                   <select
                     value={filtroTipo}
@@ -268,6 +276,10 @@ export function VehiculosTenantPage() {
                 title="Marca"
                 filterActive={!!filtroMarca}
                 filterSignature={filtroMarca}
+                onClear={() => {
+                  setFiltroMarca("");
+                  setPage(1);
+                }}
               >
                 <div className="flex gap-1">
                   <input
@@ -307,6 +319,10 @@ export function VehiculosTenantPage() {
                 title="Modelo"
                 filterActive={!!filtroModelo}
                 filterSignature={filtroModelo}
+                onClear={() => {
+                  setFiltroModelo("");
+                  setPage(1);
+                }}
               >
                 <div className="flex gap-1">
                   <input
@@ -346,6 +362,10 @@ export function VehiculosTenantPage() {
                 title="Estado"
                 filterActive={filtroActivo !== "todos"}
                 filterSignature={filtroActivo}
+                onClear={() => {
+                  setFiltroActivo("todos");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroActivo}

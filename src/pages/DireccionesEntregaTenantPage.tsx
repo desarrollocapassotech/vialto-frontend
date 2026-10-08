@@ -181,6 +181,10 @@ export function DireccionesEntregaTenantPage() {
                 title="Dirección / Ruta"
                 filterActive={!!filtroDireccion}
                 filterSignature={filtroDireccion}
+                onClear={() => {
+                  setFiltroDireccion("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroDireccion}

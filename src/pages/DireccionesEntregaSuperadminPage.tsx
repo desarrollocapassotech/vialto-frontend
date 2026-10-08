@@ -230,6 +230,10 @@ export function DireccionesEntregaSuperadminPage() {
                 title="Dirección / Ruta"
                 filterActive={!!filtroDireccion}
                 filterSignature={filtroDireccion}
+                onClear={() => {
+                  setFiltroDireccion("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroDireccion}
@@ -258,6 +262,10 @@ export function DireccionesEntregaSuperadminPage() {
                 title="Empresa"
                 filterActive={!!filtroEmpresaCol}
                 filterSignature={filtroEmpresaCol}
+                onClear={() => {
+                  setFiltroEmpresaCol("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroEmpresaCol}

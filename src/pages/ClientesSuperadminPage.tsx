@@ -225,6 +225,10 @@ export function ClientesSuperadminPage() {
                 title="Nombre"
                 filterActive={!!filtroNombre}
                 filterSignature={filtroNombre}
+                onClear={() => {
+                  setFiltroNombre("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroNombre}
@@ -252,6 +256,10 @@ export function ClientesSuperadminPage() {
                   title={idFiscalLabel}
                   filterActive={!!filtroIdFiscal}
                   filterSignature={filtroIdFiscal}
+                  onClear={() => {
+                    setFiltroIdFiscal("");
+                    setPage(1);
+                  }}
                 >
                   <select
                     value={filtroIdFiscal}
@@ -280,6 +288,10 @@ export function ClientesSuperadminPage() {
                   title="País"
                   filterActive={!!filtroPais}
                   filterSignature={filtroPais}
+                  onClear={() => {
+                    setFiltroPais("");
+                    setPage(1);
+                  }}
                 >
                   <select
                     value={filtroPais}
