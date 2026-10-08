@@ -3105,6 +3105,11 @@ export function ViajesTenantPage({
                                 ? () => openVerFacturaFlow(v)
                                 : undefined
                             }
+                            onFacturar={
+                              puedeFacturarDesdeGrilla
+                                ? () => facturarViaje(v, undefined)
+                                : undefined
+                            }
                           />
                         )}
                         {mostrarColumnaLiquidacion &&
@@ -3114,6 +3119,9 @@ export function ViajesTenantPage({
                               tenantId={platform ? tid : undefined}
                               hasArca={hasLiquidoProductoArcaResuelto}
                               onRegistrarPago={() => setRegistrarPagoViaje(v)}
+                              onLiquidar={
+                                hasLiquidaciones ? () => liquidarViaje(v) : undefined
+                              }
                               variante="icono"
                             />
                           ) : (
@@ -3292,6 +3300,11 @@ export function ViajesTenantPage({
                           ? () => openVerFacturaFlow(v)
                           : undefined
                       }
+                      onFacturar={
+                        puedeFacturarDesdeGrilla
+                          ? () => facturarViaje(v, undefined)
+                          : undefined
+                      }
                     />
                   )}
                   {isViajeFieldVisible("detalle_viaje", "liquidacionEstado") && (
@@ -3301,6 +3314,9 @@ export function ViajesTenantPage({
                         tenantId={platform ? tid : undefined}
                         hasArca={hasLiquidoProductoArcaResuelto}
                         onRegistrarPago={() => setRegistrarPagoViaje(v)}
+                        onLiquidar={
+                          hasLiquidaciones ? () => liquidarViaje(v) : undefined
+                        }
                       />
                     ) : (
                       <ViajePagoTransportistaIndicador
