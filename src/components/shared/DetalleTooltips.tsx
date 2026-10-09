@@ -22,7 +22,7 @@ export function DetalleConTooltip({
           {filas.map(([k, val]) => (
             <div key={k} className="contents">
               <dt className="text-white/60">{k}</dt>
-              <dd className="tabular-nums">{val}</dd>
+              <dd className="whitespace-pre-line tabular-nums">{val}</dd>
             </div>
           ))}
         </dl>

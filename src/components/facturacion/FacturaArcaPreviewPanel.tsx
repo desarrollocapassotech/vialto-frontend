@@ -1,4 +1,5 @@
 import { FacturaLineaDetalle } from "@/components/facturacion/FacturaLineaDetalle";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import type { ReactNode } from "react";
 import {
   FacturaLineasEditor,
@@ -81,6 +82,8 @@ export function FacturaArcaPreviewPanel({
   estadoReceptor,
   feedbackSlot,
 }: FacturaArcaPreviewPanelProps) {
+  // Empresa efectiva (propia u override de superadmin) para armar el detalle como en el PDF.
+  const { tenant: tenantPdf } = useTenantPaisFijo(tenantId);
   const condicionIva = clienteDetalle?.condicionIva ?? null;
   const letra = facturaLetraFromCondicionIva(condicionIva);
   const totales = computeFacturaTotales(lineas, ivaPctDefault);
@@ -174,6 +177,7 @@ export function FacturaArcaPreviewPanel({
                 linea={linea}
                 ivaPctDefault={ivaPctDefault}
                 formatMonto={fmtMoney}
+                tenant={tenantPdf}
               />
             ))}
           </div>
