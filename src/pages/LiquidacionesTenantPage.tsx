@@ -40,7 +40,6 @@ const LIQUIDACION_ACCIONES_DESTACADAS = [
   "anular",
   "marcar-pendiente-anulacion",
   "confirmar-anulacion-manual",
-  "comprobante",
   "pdf-nc",
 ];
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
