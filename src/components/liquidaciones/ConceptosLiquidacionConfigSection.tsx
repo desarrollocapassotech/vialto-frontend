@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudFieldLabel } from '@/components/crud/CrudFields';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Spinner } from '@/components/ui/Spinner';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { ALICUOTAS_IVA_AFIP_LABEL, esAlicuotaIvaAfip } from '@/lib/liquidacionConceptosIva';
 import { useToast } from '@/lib/toast';
 import { tooltipPanelClass } from '@/lib/tooltip';
 import type { ConceptoLiquidacion, ConceptoLiquidacionSigno } from '@/types/api';
@@ -12,12 +14,16 @@ const inputClass =
   'h-10 rounded border border-black/10 bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35';
 
 const SIGNO_OPTIONS: { value: ConceptoLiquidacionSigno; label: string }[] = [
-  { value: 'favor', label: 'A favor' },
-  { value: 'contra', label: 'En contra' },
+  { value: 'favor', label: 'Sumar' },
+  { value: 'contra', label: 'Restar' },
 ];
 
 function signoLabel(s: ConceptoLiquidacionSigno) {
-  return s === 'favor' ? 'A favor' : 'En contra';
+  return s === 'favor' ? 'Sumar' : 'Restar';
+}
+
+function fmtMoney(n: number) {
+  return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 type FormState = {
@@ -25,6 +31,8 @@ type FormState = {
   signo: ConceptoLiquidacionSigno;
   ivaPct: string;
   monto: string;
+  cantidad: string;
+  cantidadIgualViajes: boolean;
   bloqueado: boolean;
 };
 
@@ -33,6 +41,8 @@ const EMPTY_FORM: FormState = {
   signo: 'favor',
   ivaPct: '21',
   monto: '',
+  cantidad: '1',
+  cantidadIgualViajes: false,
   bloqueado: false,
 };
 
@@ -65,6 +75,7 @@ export function ConceptosLiquidacionConfigSection({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [showForm, setShowForm] = useState(false);
+  const [eliminando, setEliminando] = useState<ConceptoLiquidacion | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -101,6 +112,8 @@ export function ConceptosLiquidacionConfigSection({
       signo: c.signo,
       ivaPct: String(c.ivaPct),
       monto: c.monto != null ? String(c.monto) : '',
+      cantidad: String(c.cantidad ?? 1),
+      cantidadIgualViajes: c.cantidadIgualViajes ?? false,
       bloqueado: c.bloqueado ?? false,
     });
     setFieldErrors({});
@@ -117,15 +130,21 @@ export function ConceptosLiquidacionConfigSection({
   function validate(): Record<string, string> {
     const errs: Record<string, string> = {};
     if (!form.nombre.trim()) errs.nombre = 'Ingresá el nombre.';
-    if (!form.signo) errs.signo = 'Seleccioná el signo.';
+    if (!form.signo) errs.signo = 'Seleccioná sumar o restar.';
     const iva = Number(form.ivaPct);
-    if (form.ivaPct.trim() === '' || Number.isNaN(iva) || iva < 0 || iva > 100) {
-      errs.ivaPct = 'Ingresá un IVA entre 0 y 100.';
+    if (form.ivaPct.trim() === '' || !esAlicuotaIvaAfip(iva)) {
+      errs.ivaPct = `Usá ${ALICUOTAS_IVA_AFIP_LABEL}.`;
     }
     if (form.monto.trim() !== '') {
       const m = Number(form.monto);
       if (Number.isNaN(m) || m < 0) {
         errs.monto = 'Ingresá un monto válido (0 o mayor).';
+      }
+    }
+    if (!form.cantidadIgualViajes && form.cantidad.trim() !== '') {
+      const q = Number(form.cantidad);
+      if (Number.isNaN(q) || q <= 0) {
+        errs.cantidad = 'Ingresá una cantidad mayor a 0.';
       }
     }
     return errs;
@@ -147,6 +166,11 @@ export function ConceptosLiquidacionConfigSection({
         signo: form.signo,
         ivaPct: Number(form.ivaPct),
         monto: form.monto.trim() !== '' ? Number(form.monto) : null,
+        cantidad:
+          !form.cantidadIgualViajes && form.cantidad.trim() !== ''
+            ? Number(form.cantidad)
+            : 1,
+        cantidadIgualViajes: form.cantidadIgualViajes,
         bloqueado: form.bloqueado,
       };
       if (editingId) {
@@ -173,16 +197,17 @@ export function ConceptosLiquidacionConfigSection({
     }
   }
 
-  async function toggleActivo(c: ConceptoLiquidacion) {
+  /** Solo para conceptos desactivados antes de que existiera "Eliminar". */
+  async function activar(c: ConceptoLiquidacion) {
     setSaving(true);
     setError(null);
     try {
       await apiJson<ConceptoLiquidacion>(
         itemUrl(c.id),
         () => getToken(),
-        { method: 'PATCH', body: JSON.stringify({ activo: !c.activo }) },
+        { method: 'PATCH', body: JSON.stringify({ activo: true }) },
       );
-      showToast(c.activo ? 'Concepto desactivado.' : 'Concepto activado.');
+      showToast('Concepto activado.');
       await load();
     } catch (err) {
       setError(friendlyError(err, 'arca'));
@@ -190,6 +215,32 @@ export function ConceptosLiquidacionConfigSection({
       setSaving(false);
     }
   }
+
+  async function confirmarEliminar() {
+    if (!eliminando) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await apiJson(itemUrl(eliminando.id), () => getToken(), { method: 'DELETE' });
+      showToast('Concepto eliminado.');
+      if (editingId === eliminando.id) cancelForm();
+      setEliminando(null);
+      await load();
+    } catch (err) {
+      setEliminando(null);
+      setError(friendlyError(err, 'arca'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const hayInactivos = items.some((c) => !c.activo);
+  const montoUnitarioForm = form.monto.trim() !== '' ? Number(form.monto) : null;
+  const cantidadForm = form.cantidad.trim() !== '' ? Number(form.cantidad) : 1;
+  const montoTotalForm =
+    montoUnitarioForm != null && Number.isFinite(montoUnitarioForm) && Number.isFinite(cantidadForm)
+      ? Math.round(montoUnitarioForm * cantidadForm * 100) / 100
+      : null;
 
   return (
     <div className="space-y-4">
@@ -228,7 +279,7 @@ export function ConceptosLiquidacionConfigSection({
               <CrudFieldError message={fieldErrors.nombre} />
             </label>
             <label className="grid gap-1.5">
-              <CrudFieldLabel required>Signo</CrudFieldLabel>
+              <CrudFieldLabel required>Operación</CrudFieldLabel>
               <select
                 value={form.signo}
                 onChange={(e) =>
@@ -283,9 +334,9 @@ export function ConceptosLiquidacionConfigSection({
               <CrudFieldError message={fieldErrors.ivaPct} />
             </label>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-1.5">
-              <CrudFieldLabel>Monto base</CrudFieldLabel>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <label className="grid gap-1.5">
+              <CrudFieldLabel>Monto base unitario</CrudFieldLabel>
               <input
                 type="number"
                 min={0}
@@ -298,7 +349,48 @@ export function ConceptosLiquidacionConfigSection({
               />
               <CrudFieldError message={fieldErrors.monto} />
             </label>
-            <label className="flex items-start gap-2.5 self-start mt-2 sm:mt-7">
+            <div className="grid gap-1.5 content-start">
+              <CrudFieldLabel>Cantidad</CrudFieldLabel>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.cantidadIgualViajes ? '' : form.cantidad}
+                onChange={(e) => setForm((f) => ({ ...f, cantidad: e.target.value }))}
+                disabled={saving || form.cantidadIgualViajes}
+                placeholder={form.cantidadIgualViajes ? 'Cantidad de viajes' : '1'}
+                className={`${inputClass} disabled:bg-vialto-mist/60 ${fieldErrors.cantidad ? 'border-red-400' : ''}`}
+              />
+              <CrudFieldError message={fieldErrors.cantidad} />
+              <label className="flex items-center gap-2 text-xs text-vialto-steel">
+                <input
+                  type="checkbox"
+                  checked={form.cantidadIgualViajes}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, cantidadIgualViajes: e.target.checked }))
+                  }
+                  disabled={saving}
+                  className="h-4 w-4 rounded border-black/20 text-vialto-fire focus:ring-vialto-fire/35"
+                />
+                Igual a la cantidad de viajes
+              </label>
+            </div>
+            <div className="grid gap-1.5 content-start">
+              <CrudFieldLabel>Monto total base</CrudFieldLabel>
+              <div className="flex h-10 items-center rounded border border-black/10 bg-vialto-mist/60 px-3 text-sm tabular-nums text-vialto-charcoal">
+                {montoTotalForm == null
+                  ? '-'
+                  : form.cantidadIgualViajes
+                    ? `${fmtMoney(montoUnitarioForm ?? 0)} × viajes`
+                    : fmtMoney(montoTotalForm)}
+              </div>
+              <span className="text-xs leading-snug text-vialto-steel">
+                Monto unitario × cantidad.
+              </span>
+            </div>
+          </div>
+          <div className="grid gap-4">
+            <label className="flex items-start gap-2.5 self-start">
               <div className="flex h-5 items-center">
                 <input
                   type="checkbox"
@@ -350,20 +442,28 @@ export function ConceptosLiquidacionConfigSection({
                   Nombre
                 </th>
                 <th className="px-3 py-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel font-normal">
-                  Signo
+                  Operación
                 </th>
                 <th className="px-3 py-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel font-normal">
                   IVA
                 </th>
                 <th className="px-3 py-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel font-normal">
-                  Monto Base
+                  Monto unitario
+                </th>
+                <th className="px-3 py-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel font-normal">
+                  Cantidad
+                </th>
+                <th className="px-3 py-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel font-normal">
+                  Monto total
                 </th>
                 <th className="px-3 py-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel font-normal">
                   Auto
                 </th>
-                <th className="px-3 py-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel font-normal">
-                  Estado
-                </th>
+                {hayInactivos && (
+                  <th className="px-3 py-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel font-normal">
+                    Estado
+                  </th>
+                )}
                 <th className="px-3 py-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel font-normal text-right">
                   Acciones
                 </th>
@@ -376,22 +476,40 @@ export function ConceptosLiquidacionConfigSection({
                   <td className="px-3 py-2.5 text-vialto-steel">{signoLabel(c.signo)}</td>
                   <td className="px-3 py-2.5 tabular-nums text-vialto-charcoal">{c.ivaPct}%</td>
                   <td className="px-3 py-2.5 tabular-nums text-vialto-charcoal">
-                    {c.monto != null ? `$${c.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : '-'}
+                    {c.monto != null ? fmtMoney(c.monto) : '-'}
+                  </td>
+                  <td className="px-3 py-2.5 tabular-nums text-vialto-charcoal">
+                    {c.cantidadIgualViajes ? (
+                      <span title="Igual a la cantidad de viajes de la liquidación">
+                        🔒 Viajes
+                      </span>
+                    ) : (
+                      (c.cantidad ?? 1).toLocaleString('es-AR')
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 tabular-nums text-vialto-charcoal">
+                    {c.monto == null
+                      ? '-'
+                      : c.cantidadIgualViajes
+                        ? `${fmtMoney(c.monto)} × viajes`
+                        : fmtMoney(Math.round(c.monto * (c.cantidad ?? 1) * 100) / 100)}
                   </td>
                   <td className="px-3 py-2.5">
                     {c.bloqueado ? <span title="Se añade automáticamente">🔒</span> : '-'}
                   </td>
-                  <td className="px-3 py-2.5">
-                    <span
-                      className={
-                        c.activo
-                          ? 'text-xs text-emerald-700'
-                          : 'text-xs text-vialto-steel'
-                      }
-                    >
-                      {c.activo ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
+                  {hayInactivos && (
+                    <td className="px-3 py-2.5">
+                      <span
+                        className={
+                          c.activo
+                            ? 'text-xs text-emerald-700'
+                            : 'text-xs text-vialto-steel'
+                        }
+                      >
+                        {c.activo ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                  )}
                   <td className="px-3 py-2.5 text-right">
                     <div className="inline-flex items-center gap-2">
                       <button
@@ -402,13 +520,23 @@ export function ConceptosLiquidacionConfigSection({
                       >
                         Editar
                       </button>
+                      {!c.activo && (
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => void activar(c)}
+                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
+                        >
+                          Activar
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={saving}
-                        onClick={() => void toggleActivo(c)}
-                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
+                        onClick={() => setEliminando(c)}
+                        className="text-xs uppercase tracking-wider px-2 py-1 border border-red-300 text-red-800 hover:bg-red-50 disabled:opacity-50"
                       >
-                        {c.activo ? 'Desactivar' : 'Activar'}
+                        Eliminar
                       </button>
                     </div>
                   </td>
@@ -418,6 +546,17 @@ export function ConceptosLiquidacionConfigSection({
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={eliminando != null}
+        title="Eliminar concepto"
+        message={`¿Eliminar "${eliminando?.nombre ?? ''}"? Las liquidaciones que ya lo usan no cambian.`}
+        confirmLabel="Eliminar"
+        tone="danger"
+        busy={saving}
+        onConfirm={confirmarEliminar}
+        onCancel={() => setEliminando(null)}
+      />
     </div>
   );
 }

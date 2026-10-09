@@ -932,7 +932,12 @@ export interface ConceptoLiquidacion {
   nombre: string;
   signo: ConceptoLiquidacionSigno;
   ivaPct: number;
+  /** Monto base unitario. */
   monto: number | null;
+  /** Cantidad por defecto (default 1). Se ignora si `cantidadIgualViajes`. */
+  cantidad: number;
+  /** true = la cantidad es siempre la cantidad de viajes de la liquidación. */
+  cantidadIgualViajes: boolean;
   bloqueado: boolean;
   activo: boolean;
   createdAt: string;
@@ -946,7 +951,12 @@ export interface LiquidacionConceptoLinea {
   signo: ConceptoLiquidacionSigno;
   /** null = heredar el IVA de la liquidación; 0 = exento. */
   ivaPct: number | null;
+  /** = montoUnitario × cantidad, salvo TODOS_LOS_VIAJES (= unitario × viajes). */
   monto: number;
+  /** Cantidad cargada (1 en TODOS_LOS_VIAJES y en líneas viejas). */
+  cantidad?: number;
+  /** null = línea previa a la cantidad (unitario = monto). */
+  montoUnitario?: number | null;
   orden: number;
   modoAplicacion: string;
   viajeId: string | null;

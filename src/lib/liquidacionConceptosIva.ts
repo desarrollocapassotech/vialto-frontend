@@ -3,6 +3,16 @@
  * El monto persistido es la base; el valor de línea / aporte al total incluye el IVA del concepto.
  */
 
+/** Alícuotas de IVA que acepta AFIP (WSFEv1). Mismo criterio que el backend al emitir. */
+export const ALICUOTAS_IVA_AFIP = [0, 2.5, 5, 10.5, 21, 27] as const;
+
+export const ALICUOTAS_IVA_AFIP_LABEL = "0%, 2,5%, 5%, 10,5%, 21% o 27%";
+
+export function esAlicuotaIvaAfip(pct: number | null | undefined): boolean {
+  if (pct == null || !Number.isFinite(Number(pct))) return false;
+  return ALICUOTAS_IVA_AFIP.some((a) => Math.abs(a - Number(pct)) < 1e-9);
+}
+
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }

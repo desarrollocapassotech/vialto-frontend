@@ -19,6 +19,8 @@ type ConceptoLineaDisplay = {
   signo: ConceptoLiquidacionSigno;
   monto: number;
   ivaPct?: number | null;
+  cantidad?: number;
+  montoUnitario?: number | null;
 };
 
 type Props = {
@@ -172,9 +174,16 @@ export function LiquidacionMontosBreakdown({
         linePct,
       );
       const nombre = row.nombreSnapshot || row.nombre || "Concepto";
+      const cantidad = Number(row.cantidad) || 1;
+      const detalle = [
+        cantidad !== 1 && row.montoUnitario != null
+          ? `${cantidad.toLocaleString("es-AR")} × ${fmtLiquidacionMoney(row.montoUnitario)}`
+          : null,
+        linePct != null ? `IVA ${formatIvaLabel(linePct).replace(/^IVA /, "")}` : null,
+      ].filter(Boolean);
       return {
         key: row.id ?? `concepto-${idx}`,
-        label: `${nombre}${linePct != null ? ` (IVA ${formatIvaLabel(linePct).replace(/^IVA /, "")})` : ""}`,
+        label: `${nombre}${detalle.length ? ` (${detalle.join(", ")})` : ""}`,
         value: fmtSignedLiquidacionMoney(
           conIva,
           conIva >= 0 ? "plus" : "minus",

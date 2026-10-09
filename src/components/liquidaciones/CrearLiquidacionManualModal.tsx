@@ -1465,20 +1465,10 @@ export function CrearLiquidacionManualModal({
                         {selectedViajeIds.size > 0 && (
                           <span className="ml-1 normal-case text-vialto-charcoal">
                             ({selectedViajeIds.size} seleccionado
-                            {selectedViajeIds.size !== 1 ? "s" : ""}
-                            {monedaSeleccionada
-                              ? ` · ${monedaSeleccionada}`
-                              : ""}
-                            )
+                            {selectedViajeIds.size !== 1 ? "s" : ""})
                           </span>
                         )}
                       </p>
-                      {monedaSeleccionada && (
-                        <p className="mb-1.5 text-[11px] text-vialto-steel">
-                          Solo podés incluir viajes en {monedaSeleccionada}. Los
-                          de otra moneda quedan deshabilitados.
-                        </p>
-                      )}
                       <ViajesSeleccionTabla
                         viajes={viajes}
                         selectedIds={Array.from(selectedViajeIds)}
