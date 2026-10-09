@@ -555,6 +555,21 @@ export function LiquidacionesTenantPage() {
     getToken,
   ]);
 
+  // `?estado=pendiente_anulacion` (link del email semanal de pendientes de anular): abre el
+  // listado con ese filtro aplicado.
+  useEffect(() => {
+    if (searchParams.get("estado") !== "pendiente_anulacion") return;
+    aplicarFiltroEstado("pendiente_anulacion");
+    setSearchParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        next.delete("estado");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
+
   function onEmitirSuccess(updated: LiquidacionConTransportista) {
     setRows(
       (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
