@@ -1454,7 +1454,7 @@ export function CrearLiquidacionManualModal({
                         mostrarCliente
                         mostrarTransporte={false}
                         monedaDe={monedaViaje}
-                        montoLabel="Monto (s/IVA)"
+                        montoSinIva
                         renderMonto={(v, conMoneda) =>
                           fmtMoney(
                             v.precioTransportistaExterno,

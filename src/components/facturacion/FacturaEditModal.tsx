@@ -347,6 +347,7 @@ export function ViajesVinculadosEditor({
           viajes={pool}
           selectedIds={selected}
           onToggle={toggle}
+          montoSinIva
           renderMonto={(v, conMoneda) => textoMontoFacturarListado(v, conMoneda)}
           monedaDe={(v) => normalizeViajeMoneda(v.monedaMonto)}
           loading={loading}
@@ -367,6 +368,7 @@ export function ViajesVinculadosEditor({
       viajes={pool}
       selectedIds={selected}
       onToggle={toggle}
+      montoSinIva
       renderMonto={(v, conMoneda) => textoMontoFacturarListado(v, conMoneda)}
       monedaDe={(v) => normalizeViajeMoneda(v.monedaMonto)}
       loading={loading}
