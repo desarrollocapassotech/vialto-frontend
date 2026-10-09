@@ -1,4 +1,4 @@
-import { selectorTabClass } from '@/components/ui/SelectorOpcionesSheet';
+import { FiltroRapidoChip } from '@/components/listado/FiltroRapidoChip';
 import type { ViajePagoTransportistaFiltro } from '@/lib/viajesFiltroPagoTransportista';
 
 export type ViajesResumenFiltrosData = {
@@ -80,32 +80,13 @@ export function ViajesResumenFiltros({
         const active = valorActual[o.tipo] === o.id;
         const count = resumen[o.countKey];
         return (
-          <button
+          <FiltroRapidoChip
             key={o.id}
-            type="button"
-            role="tab"
-            aria-selected={active}
+            label={o.label}
+            active={active}
+            count={count}
             onClick={() => toggle(o.id, o.tipo)}
-            className={
-              active
-                ? 'rounded border border-vialto-fire bg-vialto-fire px-4 py-2 text-sm font-[family-name:var(--font-ui)] uppercase tracking-wider text-white transition-colors'
-                : selectorTabClass(false)
-            }
-          >
-            <span className="inline-flex items-center gap-2">
-              {o.label}
-              {count > 0 && (
-                <span
-                  className={[
-                    'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums leading-none',
-                    active ? 'bg-white/25 text-white' :'bg-black/10 text-vialto-steel',
-                  ].join(' ')}
-                >
-                  {count}
-                </span>
-              )}
-            </span>
-          </button>
+          />
         );
       })}
     </div>
