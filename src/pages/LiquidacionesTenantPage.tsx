@@ -18,6 +18,7 @@ import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 import { ArcaEmisionIndicadores } from "@/components/liquidaciones/ArcaEmisionIndicadores";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import {
@@ -940,6 +941,9 @@ export function LiquidacionesTenantPage() {
         <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide text-vialto-charcoal">
           Liquidaciones
         </h1>
+        {activeTenantId && anyFiltroActivo && (
+          <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
+        )}
 
         {hasArca && activeTenantId && (
           <ArcaEmisionIndicadores ambiente={config?.ambiente} />
@@ -948,15 +952,6 @@ export function LiquidacionesTenantPage() {
         {activeTenantId && (!error || !isSuperAdmin) && (
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {exportButton}
-            {anyFiltroActivo && (
-              <button
-                type="button"
-                onClick={limpiarFiltros}
-                className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-              >
-                Limpiar filtros
-              </button>
-            )}
 
             <button
               type="button"

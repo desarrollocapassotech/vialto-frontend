@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Ban, Eye, Trash2 } from "lucide-react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { filtrarVehiculos } from "@/components/forms/maestroSearchFilters";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
@@ -30,11 +31,14 @@ export function OrdenesTrabajoSection({
   reloadKey,
   onVer,
   onCambio,
+  limpiarFiltrosSlot,
 }: {
   getToken: () => Promise<string | null>;
   tenantId?: string;
   soloLectura: boolean;
   reloadKey: number;
+  /** Lugar junto al título de la página para "Limpiar filtros". */
+  limpiarFiltrosSlot?: HTMLElement | null;
   onVer: (ordenId: string) => void;
   /** Se anuló o borró una orden: el padre recarga también los vencimientos. */
   onCambio: () => void;
@@ -98,6 +102,15 @@ export function OrdenesTrabajoSection({
 
   const hayFiltros = !!vehiculoId || !!tipo || !!tallerId || !!desde || !!hasta;
 
+  function limpiarFiltros() {
+    setVehiculoId("");
+    setTipo("");
+    setTallerId("");
+    setDesde("");
+    setHasta("");
+    setPage(1);
+  }
+
   async function confirmar(accion: "anular" | "borrar") {
     const orden = accion === "anular" ? aAnular : aBorrar;
     if (!orden) return;
@@ -122,6 +135,12 @@ export function OrdenesTrabajoSection({
 
   return (
     <div>
+      <LimpiarFiltrosPortal
+        slot={limpiarFiltrosSlot}
+        visible={hayFiltros}
+        onClick={limpiarFiltros}
+        soloDesktop
+      />
       {error && (
         <p className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
       )}

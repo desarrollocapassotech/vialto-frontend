@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { TenantsTable } from "@/components/superadmin/TenantsTable";
 import { usePaginatedTenants } from "@/hooks/usePaginatedTenants";
@@ -16,6 +17,8 @@ export function SuperadminEmpresasPage() {
     toggleTenantEnabled,
     nextPage,
   } = usePaginatedTenants();
+  const [limpiarFiltrosSlot, setLimpiarFiltrosSlot] =
+    useState<HTMLDivElement | null>(null);
 
   return (
     <SuperadminOnly>
@@ -27,6 +30,8 @@ export function SuperadminEmpresasPage() {
               Empresas
             </h1>
           </div>
+          {/* La tabla portalea acá su "Limpiar filtros" (los filtros viven en TenantsTable). */}
+          <div ref={setLimpiarFiltrosSlot} className="empty:hidden" />
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <Link
               to="/superadmin/empresas/nueva"
@@ -51,6 +56,7 @@ export function SuperadminEmpresasPage() {
           items={items}
           statusUpdatingByOrgId={statusUpdatingByOrgId}
           onToggleEnabled={toggleTenantEnabled}
+          limpiarFiltrosSlot={limpiarFiltrosSlot}
         />
 
         {meta && (

@@ -30,6 +30,7 @@ import type {
   PaginatedMeta,
 } from "@/types/api";
 import { useHistorialStockFiltros } from "@/hooks/useHistorialStockFiltros";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 
 type IngresosPaginatedResponse = {
   items: StockOperacion[];
@@ -158,6 +159,18 @@ export function IngresosStockHistorialTenantPage({
             </h1>
           )}
         </div>
+        {(!!fechaDesde || !!fechaHasta || !!clienteId || !!depositoId || !!productoId) && (
+          <LimpiarFiltrosButton
+            onClick={() =>
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                for (const k of ["fechaDesde","fechaHasta","clienteId","depositoId","productoId"]) next.delete(k);
+                return next;
+              })
+            }
+            soloDesktop
+          />
+        )}
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">{exportButton}</div>
       </div>
 

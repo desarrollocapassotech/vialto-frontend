@@ -24,6 +24,7 @@ import {
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Presentacion } from "@/types/api";
 import { ConfirmDialog } from "@/components/crud/ConfirmDialog";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 
 type FormState = { nombre: string; activo: boolean };
 
@@ -229,16 +230,10 @@ export function PresentacionesSuperadminPage() {
             Catálogo de unidades para cantidad 1 y cantidad 2 de los productos.
           </p>
         </div>
+        {anyFiltroActivo && (
+          <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
+        )}
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          {anyFiltroActivo && (
-            <button
-              type="button"
-              onClick={limpiarFiltros}
-              className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-            >
-              Limpiar filtros
-            </button>
-          )}
           <button
             type="button"
             disabled={!filtroEmpresa}

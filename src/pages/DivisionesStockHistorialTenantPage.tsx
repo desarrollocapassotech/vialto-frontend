@@ -31,6 +31,7 @@ import type {
   Producto,
   PaginatedMeta,
 } from "@/types/api";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 
 type DivisionesPaginatedResponse = {
   items: StockOperacion[];
@@ -142,10 +143,22 @@ export function DivisionesStockHistorialTenantPage({
 
   return (
     <div className="w-full space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <h1 className="text-2xl font-semibold text-vialto-charcoal">
           Historial de divisiones
         </h1>
+        {(!!fechaDesde || !!fechaHasta || !!clienteId || !!depositoId || !!productoId) && (
+          <LimpiarFiltrosButton
+            onClick={() =>
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                for (const k of ["fechaDesde","fechaHasta","clienteId","depositoId","productoId"]) next.delete(k);
+                return next;
+              })
+            }
+            soloDesktop
+          />
+        )}
       </div>
 
       {/* Buscador de empresas para plataforma */}

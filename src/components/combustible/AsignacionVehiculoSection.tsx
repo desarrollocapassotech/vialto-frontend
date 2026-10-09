@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { History, Gauge, ListOrdered, Trash2, Truck } from "lucide-react";
 import { ListadoDatos, type ListadoColumn } from "@/components/listado/ListadoDatos";
+import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { AccionesFila } from "@/components/ui/AccionesFila";
@@ -100,11 +101,14 @@ export function AsignacionVehiculoSection({
   choferes,
   vehiculos,
   isReadOnly,
+  limpiarFiltrosSlot,
 }: {
   tenantId: string;
   choferes: ConEmpresa<Chofer>[];
   vehiculos: ConEmpresa<Vehiculo>[];
   isReadOnly: boolean;
+  /** Lugar junto al título de la página para "Limpiar filtros". */
+  limpiarFiltrosSlot?: HTMLElement | null;
 }) {
   const { getToken } = useAuth();
   const { showToast } = useToast();
@@ -262,6 +266,15 @@ export function AsignacionVehiculoSection({
 
   return (
     <div className="w-full">
+      <LimpiarFiltrosPortal
+        slot={limpiarFiltrosSlot}
+        visible={!!choferFiltroId || !!vehiculoFiltroId}
+        onClick={() => {
+          setChoferFiltroId("");
+          setVehiculoFiltroId("");
+        }}
+        soloDesktop
+      />
       <div className="mt-4 flex justify-end">
         {!isReadOnly && (
           <button

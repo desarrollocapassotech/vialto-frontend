@@ -52,6 +52,7 @@ import type {
   Producto,
   StockItem,
 } from "@/types/api";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 
 type ProductoModalState =
   | { mode: "closed" }
@@ -713,6 +714,9 @@ export function StockPanelTenantPage({
             Stock disponible en cada depósito, en tiempo real.
           </p>
         </div>
+        {(!isPlatform || activeTenantId) && activeFilterCount > 0 && (
+          <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
+        )}
 
         {/* Solo mostramos el botón de Excel si no estamos en la pantalla inicial de plataforma */}
         {(!isPlatform || activeTenantId) && (

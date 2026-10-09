@@ -42,6 +42,7 @@ import type {
   PaginatedResponse,
 } from "@/types/api";
 import { useSearchParams } from "react-router-dom";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 
 type Usuario = {
   id: string;
@@ -284,6 +285,18 @@ export function StockMovimientosTenantPage({
               fila por operación).
             </p>
           </div>
+        )}
+        {(!!productoId || !!tipo || !!fechaDesde || !!fechaHasta || !!clienteId || !!createdBy || !!depositoId || !!lote) && (
+          <LimpiarFiltrosButton
+            onClick={() =>
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                for (const k of ["productoId","tipo","fechaDesde","fechaHasta","clienteId","createdBy","depositoId","lote"]) next.delete(k);
+                return next;
+              })
+            }
+            soloDesktop
+          />
         )}
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {exportExcelButton}

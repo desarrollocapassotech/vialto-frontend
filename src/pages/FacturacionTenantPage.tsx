@@ -17,6 +17,7 @@ import { FacturaAccionesMenu } from "@/components/facturacion/FacturaAccionesMen
 import { AnularFacturaModal } from "@/components/facturacion/AnularFacturaModal";
 import { EmitirFacturaModal } from "@/components/facturacion/EmitirFacturaModal";
 import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 import { ArcaEmisionIndicadores } from "@/components/liquidaciones/ArcaEmisionIndicadores";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -1252,6 +1253,9 @@ export function FacturacionTenantPage({
             Facturas
           </h1>
         )}
+        {anyFiltroActivo && (
+          <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
+        )}
 
         {hasArca && (
           <ArcaEmisionIndicadores
@@ -1266,15 +1270,6 @@ export function FacturacionTenantPage({
 
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {exportButton}
-          {anyFiltroActivo && (
-            <button
-              type="button"
-              onClick={limpiarFiltros}
-              className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-            >
-              Limpiar filtros
-            </button>
-          )}
 
           <button
             type="button"
