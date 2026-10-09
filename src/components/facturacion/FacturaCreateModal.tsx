@@ -984,7 +984,7 @@ export function FacturaCreateModal({
           incompleteIndices={tramosIncomplete}
         />
       )}
-      <FacturaTotalesPreview draft={draft} viajes={derivedViajes} />
+      {/* Sin Neto/Total acá: ya los muestra el panel de la derecha (FacturaArcaPreviewPanel). */}
       {monedaInvalida && (
         <p className="shrink-0 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
           Los viajes seleccionados tienen distintas monedas. Una factura no
