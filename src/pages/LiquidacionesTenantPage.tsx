@@ -36,11 +36,10 @@ const LIQUIDACION_ACCIONES_DESTACADAS = [
   "reintentar",
   "emitir",
   "comprobante",
-  "pdf",
   "anular",
   "marcar-pendiente-anulacion",
   "confirmar-anulacion-manual",
-  "pdf-nc",
+  "ver-anulacion",
 ];
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AnularLiquidacionModal } from "@/components/liquidaciones/AnularLiquidacionModal";
@@ -53,7 +52,6 @@ import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { useToast } from "@/lib/toast";
 import { apiFetch, apiJson } from "@/lib/api";
-import { filenameFromContentDisposition } from "@/lib/downloadFilename";
 import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
 import { ivaFleteComisionDesdeTotal } from "@/lib/liquidacionConceptosIva";
 import { friendlyError } from "@/lib/friendlyError";
@@ -136,11 +134,9 @@ function LiquidacionAccionesMenu({
   hasArca,
   metodoAnulacion,
   isBusy,
-  isDownloading,
   onVer,
   onEmitir,
-  onPdf,
-  onPdfNc,
+  onVerAnulacion,
   onAnular,
   onMarcarPendienteAnulacion,
   onConfirmarAnulacionManual,
@@ -153,11 +149,9 @@ function LiquidacionAccionesMenu({
   hasArca: boolean;
   metodoAnulacion: "nota_credito_debito" | "manual";
   isBusy: boolean;
-  isDownloading: boolean;
   onVer: () => void;
   onEmitir: () => void;
-  onPdf: () => void;
-  onPdfNc: () => void;
+  onVerAnulacion: () => void;
   onAnular: () => void;
   onMarcarPendienteAnulacion: () => void;
   onConfirmarAnulacionManual: () => void;
@@ -193,7 +187,7 @@ function LiquidacionAccionesMenu({
     hasArca && liq.estado === "anulado" && Boolean(liq.anulacionCae);
   const tieneComprobanteAdjunto =
     !hasArca && Boolean(liq.comprobanteUrl?.trim());
-  // Con ARCA el comprobante es el PDF del CVLP: "Ver" lo abre en otra pestaña y "PDF" lo descarga.
+  // Con ARCA el comprobante es el PDF del CVLP: se abre en otra pestaña.
   const puedeVerComprobante = tieneComprobanteAdjunto || tienePdf;
 
   const options: AccionOpcion[] = [
@@ -217,24 +211,14 @@ function LiquidacionAccionesMenu({
       onClick: onVerComprobante,
     });
   }
-  if (tienePdf) {
-    options.push({
-      id: "pdf",
-      label: isDownloading ? "Descargando…" : "PDF",
-      icon: Download,
-      onClick: onPdf,
-      disabled: isDownloading,
-    });
-  }
   if (tienePdfNc) {
-    const comprobanteLabel = anulacionComprobanteLabel(liq.anulacionCbteTipo);
+    // Igual que "Ver Nota de Crédito" de Facturas: se abre en otra pestaña, no se descarga.
     options.push({
-      id: "pdf-nc",
-      label: isDownloading ? "Descargando…" : "PDF anulación",
-      description: comprobanteLabel,
+      id: "ver-anulacion",
+      label: "Ver anulación",
+      description: anulacionComprobanteLabel(liq.anulacionCbteTipo),
       icon: FileMinus,
-      onClick: onPdfNc,
-      disabled: isDownloading,
+      onClick: onVerAnulacion,
     });
   }
   if (puedeAnular) {
@@ -284,6 +268,7 @@ function LiquidacionAccionesMenu({
     <AccionesFila
       options={options}
       destacadas={LIQUIDACION_ACCIONES_DESTACADAS}
+      maxIconos={3}
       subtitle={transportistaNombre(liq)}
       open={open}
       onOpenChange={setOpen}
@@ -387,7 +372,6 @@ export function LiquidacionesTenantPage() {
     msg: string;
     detalle?: string;
   } | null>(null);
-  const [downloading, setDownloading] = useState<string | null>(null);
   const [verLoadingId, setVerLoadingId] = useState<string | null>(null);
   /** Fila/card clickeada: abre el menú de acciones de esa liquidación en vez del modal de detalle. */
   const [accionesAbiertoLiqId, setAccionesAbiertoLiqId] = useState<string | null>(null);
@@ -718,38 +702,7 @@ export function LiquidacionesTenantPage() {
     }
   }
 
-  async function descargarPdf(liq: LiquidacionConTransportista) {
-    setDownloading(liq.id);
-    try {
-      const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
-      const res = await apiFetch(
-        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf${qsTenant}`,
-        () => getToken(),
-      );
-      if (!res.ok) throw new Error("Error al generar el PDF");
-      const filename = filenameFromContentDisposition(
-        res.headers.get("Content-Disposition"),
-        `liquidacion-${liq.id}.pdf`,
-      );
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setActionError({
-        id: liq.id,
-        msg: friendlyError(err, "arca"),
-        detalle: getArcaErrorDetalle(err),
-      });
-    } finally {
-      setDownloading(null);
-    }
-  }
-
-  /** Abre el PDF en una pestaña nueva (a diferencia de descargarPdf/Nc, que fuerzan la descarga). */
+  /** Abre el PDF en una pestaña nueva. */
   async function verPdfEnPestania(
     url: string,
     errorMsg: string,
@@ -794,43 +747,12 @@ export function LiquidacionesTenantPage() {
     );
   }
 
-  async function descargarPdfNc(liq: LiquidacionConTransportista) {
-    setDownloading(liq.id);
-    try {
-      const res = await apiFetch(
-        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf-anulacion`,
-        () => getToken(),
-      );
-      if (!res.ok) throw new Error("Error al generar el PDF de la anulación");
-      const filename = filenameFromContentDisposition(
-        res.headers.get("Content-Disposition"),
-        `anulacion-${liq.id}.pdf`,
-      );
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setActionError({
-        id: liq.id,
-        msg: friendlyError(err, "arca"),
-        detalle: getArcaErrorDetalle(err),
-      });
-    } finally {
-      setDownloading(null);
-    }
-  }
-
   function accionesProps(liq: LiquidacionConTransportista) {
     return {
       liq,
       hasArca,
       metodoAnulacion,
       isBusy: busyId === liq.id,
-      isDownloading: downloading === liq.id,
       open: accionesAbiertoLiqId === liq.id,
       onOpenChange: (o: boolean) => setAccionesAbiertoLiqId(o ? liq.id : null),
       onVer: () => {
@@ -868,8 +790,7 @@ export function LiquidacionesTenantPage() {
         })();
       },
       onEmitir: () => setPendingEmitir(liq),
-      onPdf: () => void descargarPdf(liq),
-      onPdfNc: () => void descargarPdfNc(liq),
+      onVerAnulacion: () => void verPdfAnulacion(liq),
       onAnular: () => setAnularConfirm(liq),
       onMarcarPendienteAnulacion: () => setPendienteAnulacionConfirm(liq),
       onConfirmarAnulacionManual: () => setConfirmarAnulacionManualTarget(liq),
