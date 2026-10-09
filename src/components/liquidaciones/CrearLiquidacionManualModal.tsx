@@ -11,6 +11,10 @@ import {
   fmtLiquidacionMoney,
   fmtSignedLiquidacionMoney,
 } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
+import {
+  ViajeDetallePdfTooltip,
+  ViajeSubtotalTooltip,
+} from "@/components/liquidaciones/ViajeDetallePdfTooltip";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { EmisorArcaResumen } from "@/components/facturacion/EmisorArcaResumen";
@@ -84,6 +88,8 @@ type ViajeItem = Pick<
   | "precioTransportistaExterno"
   | "monedaPrecioTransportistaExterno"
   | "precioTransportistaIvaIncluidoPct"
+  | "cantidadTransportista"
+  | "precioUnitarioTransportista"
   | "liquidacionesViaje"
   | "liquidacionEstado"
   | "otrosGastos"
@@ -200,11 +206,6 @@ export function CrearLiquidacionManualModal({
 }: Props) {
   const showComprobante = !hasLiquidoProductoArca;
   const { showToast } = useToast();
-  const { isVisible: isViajesVisible } = useFieldConfig("viajes");
-  const ivaTransportistaVisible = isViajesVisible(
-    "detalle_viaje",
-    "precioTransportistaIvaIncluidoPct",
-  );
 
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -818,7 +819,9 @@ export function CrearLiquidacionManualModal({
     const ptoVentaInvalido =
       !ptoVenta.trim() || !Number.isInteger(ptoVentaNum) || ptoVentaNum < 1;
     if (action === "emitir" && ptoVentaInvalido) {
-      setError("Ingresá un punto de venta válido.");
+      setError(
+        "Falta el punto de venta de CVLP. Configuralo en Configuración ARCA.",
+      );
       return;
     }
     if (
@@ -1195,7 +1198,7 @@ export function CrearLiquidacionManualModal({
               ) : (
                 <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]">
                 <div className="min-h-0 space-y-4 overflow-y-auto px-6 py-4 lg:border-r lg:border-black/10">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3">
                     <div>
                       <label className={labelClass}>
                         Transportista <span className="text-red-500">*</span>
@@ -1232,25 +1235,7 @@ export function CrearLiquidacionManualModal({
                       )}
                     </div>
                     {/* La condición frente al IVA del transportista se ve en el tooltip del Receptor (panel derecho). */}
-                    {hasLiquidoProductoArca && (
-                      <div>
-                        <label
-                          htmlFor="ptoVentaLiquidacion"
-                          className={labelClass}
-                        >
-                          Punto de venta
-                        </label>
-                        <input
-                          id="ptoVentaLiquidacion"
-                          type="number"
-                          min={1}
-                          value={ptoVenta}
-                          onChange={(e) => setPtoVenta(e.target.value)}
-                          title="Solo se usa si emitís el comprobante ahora. Se precarga con el de Configuración ARCA."
-                          className={inputClass}
-                        />
-                      </div>
-                    )}
+                    {/* El punto de venta no se muestra: sale de Configuración ARCA (ptoVentaCvlp). */}
                   </div>
 
                   {/* Período */}
@@ -1327,12 +1312,6 @@ export function CrearLiquidacionManualModal({
                         }}
                         className={inputClass}
                       />
-                      <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
-                        Si lo dejás vacío se usa el default del tenant
-                        {resolvedConfig?.comisionPctDefault != null
-                          ? ` (${resolvedConfig.comisionPctDefault}%).`
-                          : "."}
-                      </p>
                     </div>
                     <div>
                       <label
@@ -1441,17 +1420,13 @@ export function CrearLiquidacionManualModal({
                         </div>
                         <div className="flex justify-between gap-3">
                           <span className="text-vialto-steel">
-                            Precio del viaje
+                            Precio del viaje (s/IVA)
                           </span>
                           <span className="font-medium tabular-nums text-vialto-charcoal">
                             {fmtMoney(
                               viajeInicial.precioTransportistaExterno,
                               viajeInicial.monedaPrecioTransportistaExterno,
                             )}
-                            {ivaTransportistaVisible &&
-                            viajeInicial.precioTransportistaIvaIncluidoPct
-                              ? ` (+${viajeInicial.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
-                              : ""}
                           </span>
                         </div>
                       </div>
@@ -1465,20 +1440,10 @@ export function CrearLiquidacionManualModal({
                         {selectedViajeIds.size > 0 && (
                           <span className="ml-1 normal-case text-vialto-charcoal">
                             ({selectedViajeIds.size} seleccionado
-                            {selectedViajeIds.size !== 1 ? "s" : ""}
-                            {monedaSeleccionada
-                              ? ` · ${monedaSeleccionada}`
-                              : ""}
-                            )
+                            {selectedViajeIds.size !== 1 ? "s" : ""})
                           </span>
                         )}
                       </p>
-                      {monedaSeleccionada && (
-                        <p className="mb-1.5 text-[11px] text-vialto-steel">
-                          Solo podés incluir viajes en {monedaSeleccionada}. Los
-                          de otra moneda quedan deshabilitados.
-                        </p>
-                      )}
                       <ViajesSeleccionTabla
                         viajes={viajes}
                         selectedIds={Array.from(selectedViajeIds)}
@@ -1491,16 +1456,13 @@ export function CrearLiquidacionManualModal({
                         mostrarCliente
                         mostrarTransporte={false}
                         monedaDe={monedaViaje}
+                        montoLabel="Monto (s/IVA)"
                         renderMonto={(v, conMoneda) =>
                           fmtMoney(
                             v.precioTransportistaExterno,
                             v.monedaPrecioTransportistaExterno,
                             conMoneda,
-                          ) +
-                          (ivaTransportistaVisible &&
-                          v.precioTransportistaIvaIncluidoPct
-                            ? ` (+${v.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
-                            : "")
+                          )
                         }
                         disabledCheck={(v) => {
                           const moneda = monedaViaje(v);
@@ -1567,20 +1529,15 @@ export function CrearLiquidacionManualModal({
                 {/* Panel derecho con el mismo formato que "Nueva factura" (FacturaArcaPreviewPanel). */}
                 <aside className="flex min-h-0 flex-col border-t border-black/10 bg-white lg:border-t-0">
                   <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-                    {hasLiquidoProductoArca && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs uppercase tracking-wider text-vialto-steel">
-                          Tipo:
-                        </span>
-                        <span className="text-xs font-semibold uppercase tracking-wider text-vialto-charcoal">
-                          {cvlpCbteLabel(60)}
-                        </span>
-                      </div>
-                    )}
-
                     <div className="grid grid-cols-2 gap-4">
                       {hasLiquidoProductoArca && (
-                        <EmisorArcaResumen arcaConfig={resolvedConfig} />
+                        <>
+                          <ParteFacturaResumen
+                            titulo="Tipo"
+                            nombre={cvlpCbteLabel(60)}
+                          />
+                          <EmisorArcaResumen arcaConfig={resolvedConfig} />
+                        </>
                       )}
                       <ParteFacturaResumen
                         titulo="Receptor"
@@ -1669,17 +1626,17 @@ export function CrearLiquidacionManualModal({
                               key={v.id}
                               className="flex items-start justify-between text-sm"
                             >
-                              <div className="pr-4 text-vialto-charcoal">
-                                Viaje #{numeroVisibleViaje(v)} {v.origen ?? "—"} — {v.destino ?? "—"}
-                              </div>
-                              <div className="shrink-0 text-right">
-                                <div className="font-medium tabular-nums text-vialto-charcoal">
-                                  {fmtMoney(v.precioTransportistaExterno ?? null, monedaViaje(v))}
-                                </div>
-                                <div className="mt-0.5 text-xs tabular-nums text-vialto-steel">
-                                  IVA: {v.precioTransportistaIvaIncluidoPct || ivaPctNum}%
-                                </div>
-                              </div>
+                              <ViajeDetallePdfTooltip
+                                viaje={v}
+                                ivaPct={v.precioTransportistaIvaIncluidoPct || ivaPctNum}
+                                idPropio2Habilitado={idPropio2Habilitado}
+                                idPropio2Label={idPropio2Label}
+                              />
+                              <ViajeSubtotalTooltip
+                                viaje={v}
+                                ivaPct={v.precioTransportistaIvaIncluidoPct || ivaPctNum}
+                                formatMonto={(n) => fmtMoney(n, monedaViaje(v))}
+                              />
                             </div>
                           ))}
                         </div>

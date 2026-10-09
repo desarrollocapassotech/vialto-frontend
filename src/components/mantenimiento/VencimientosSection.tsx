@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Wrench } from "lucide-react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { filtrarVehiculos } from "@/components/forms/maestroSearchFilters";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
@@ -43,12 +44,15 @@ export function VencimientosSection({
   soloLectura,
   reloadKey,
   onRegistrarService,
+  limpiarFiltrosSlot,
 }: {
   getToken: () => Promise<string | null>;
   tenantId?: string;
   soloLectura: boolean;
   reloadKey: number;
   onRegistrarService: (precarga: PrecargaOrden) => void;
+  /** Lugar junto al título de la página para "Limpiar filtros". */
+  limpiarFiltrosSlot?: HTMLElement | null;
 }) {
   const maestro = useMaestroData();
   const [filas, setFilas] = useState<FilaVencimiento[] | null>(null);
@@ -109,6 +113,16 @@ export function VencimientosSection({
 
   return (
     <div>
+      <LimpiarFiltrosPortal
+        slot={limpiarFiltrosSlot}
+        visible={hayFiltros}
+        onClick={() => {
+          setEstado("");
+          setVehiculoId("");
+          setCategoria("");
+        }}
+        soloDesktop
+      />
       {error && (
         <p className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
       )}

@@ -30,6 +30,7 @@ import {
 import { MovimientoCcFormModal } from './MovimientoCcFormModal';
 import { ImputarPagoModal } from './ImputarPagoModal';
 import { ExportarEstadoCuentaModal } from './ExportarEstadoCuentaModal';
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 
 type ModalState =
   | { kind: 'nuevo'; tipoInicial: TipoMovimientoCc }
@@ -259,9 +260,14 @@ export function CuentaContraparteView({
     <div>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-[family-name:var(--font-display)] text-2xl tracking-wide">
-            {contraparteNombre}
-          </h2>
+          <div className="flex flex-wrap items-center gap-x-4">
+            <h2 className="font-[family-name:var(--font-display)] text-2xl tracking-wide">
+              {contraparteNombre}
+            </h2>
+            {anyFiltroActivo && (
+              <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
+            )}
+          </div>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {saldos && saldos.length > 0 ? (
               saldos.map((s) => (

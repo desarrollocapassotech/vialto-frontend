@@ -112,6 +112,8 @@ function normalizeConceptosLineas(
       nombreSnapshot: row.nombreSnapshot || row.nombre || "Concepto",
       signo,
       monto: Number(row.monto) || 0,
+      cantidad: Number(row.cantidad) || 1,
+      montoUnitario: row.montoUnitario != null ? Number(row.montoUnitario) : null,
       // null = usar el IVA de la liquidación; 0 = exento (no confundir).
       ivaPct: row.ivaPct != null ? Number(row.ivaPct) : null,
       orden: row.orden ?? i,
@@ -346,7 +348,7 @@ export function LiquidacionViewModal({
         }
         onClose={onClose}
         scrollBody
-        maxWidthClass="sm:max-w-2xl"
+        maxWidthClass="sm:max-w-4xl"
         footer={
           <>
             <button

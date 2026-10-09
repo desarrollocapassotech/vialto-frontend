@@ -15,6 +15,7 @@ import {
 } from "@/lib/listadoTabla";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { DireccionEntrega, PaginatedMeta } from "@/types/api";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 
 export function DireccionesEntregaTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -146,16 +147,10 @@ export function DireccionesEntregaTenantPage() {
             Direcciones y rutas frecuentes para egresos de stock.
           </p>
         </div>
+        {anyFiltroActivo && (
+          <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
+        )}
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          {anyFiltroActivo && (
-            <button
-              type="button"
-              onClick={limpiarFiltros}
-              className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-            >
-              Limpiar filtros
-            </button>
-          )}
           <Link
             to="/direcciones-entrega/nuevo"
             className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"

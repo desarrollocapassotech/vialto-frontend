@@ -17,6 +17,7 @@ import type { Producto, PaginatedMeta } from "@/types/api";
 import { ProductoModal } from "@/components/stock/ProductoModal";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 
 type Paginated = { items: Producto[]; meta: PaginatedMeta };
 
@@ -229,6 +230,9 @@ export function ProductosSuperadminPage() {
             catálogo.
           </p>
         </div>
+        {filtroEmpresa && activeFilterCount > 0 && (
+          <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
+        )}
         {filtroEmpresa && (
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <button

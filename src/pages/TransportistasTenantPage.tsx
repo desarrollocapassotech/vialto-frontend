@@ -17,6 +17,7 @@ import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHead
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useIdFiscalLabel } from "@/hooks/useIdFiscalLabel";
 import type { PaginatedMeta, Transportista } from "@/types/api";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 
 type TransportistasPaginatedResponse = {
   items: Transportista[];
@@ -135,16 +136,10 @@ export function TransportistasTenantPage() {
             Gestión de los transportistas externos (fleteros).
           </p>
         </div>
+        {anyFiltroActivo && (
+          <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
+        )}
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          {anyFiltroActivo && (
-            <button
-              type="button"
-              onClick={limpiarFiltros}
-              className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-            >
-              Limpiar filtros
-            </button>
-          )}
           <Link
             to="/transportistas/nuevo"
             className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"

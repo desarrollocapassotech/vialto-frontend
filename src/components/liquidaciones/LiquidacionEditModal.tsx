@@ -192,6 +192,8 @@ export function LiquidacionEditModal({
         .map((l) => ({
           conceptoLiquidacionId: l.conceptoLiquidacionId as string,
           monto: l.monto,
+          cantidad: l.cantidad ?? 1,
+          montoUnitario: l.montoUnitario ?? undefined,
           nombre: l.nombreSnapshot,
           signo: l.signo,
           ivaPct: l.ivaPct ?? undefined,
@@ -237,6 +239,8 @@ export function LiquidacionEditModal({
             .map((l) => ({
               conceptoLiquidacionId: l.conceptoLiquidacionId as string,
               monto: l.monto,
+              cantidad: l.cantidad ?? 1,
+              montoUnitario: l.montoUnitario ?? undefined,
               nombre: l.nombreSnapshot,
               signo: l.signo,
               ivaPct: l.ivaPct ?? undefined,
@@ -565,20 +569,10 @@ export function LiquidacionEditModal({
                   {selectedViajeIds.size > 0 && (
                     <span className="ml-1 normal-case text-vialto-charcoal">
                       ({selectedViajeIds.size} seleccionado
-                      {selectedViajeIds.size !== 1 ? "s" : ""}
-                      {monedaSeleccionadaViajes
-                        ? ` · ${monedaSeleccionadaViajes}`
-                        : ""}
-                      )
+                      {selectedViajeIds.size !== 1 ? "s" : ""})
                     </span>
                   )}
                 </p>
-                {monedaSeleccionadaViajes && (
-                  <p className="mb-1.5 text-[11px] text-vialto-steel">
-                    Solo podés incluir viajes en {monedaSeleccionadaViajes}. Los
-                    de otra moneda quedan deshabilitados.
-                  </p>
-                )}
                 <ViajesSeleccionTabla
                   viajes={viajesParaTabla}
                   selectedIds={Array.from(selectedViajeIds)}
@@ -596,6 +590,7 @@ export function LiquidacionEditModal({
                     )
                   }
                   monedaDe={monedaDeViaje}
+                  montoLabel="Monto (s/IVA)"
                   disabledCheck={(v) => {
                     const moneda = monedaDeViaje(v);
                     const disabled =

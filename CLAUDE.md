@@ -519,6 +519,15 @@ Bug real corregido sep 2026: `VehiculoViewModal.tsx` (`fmtDate` sin `timeZone: "
 
 ---
 
+## "Limpiar filtros": al lado del título, sutil (oct 2026)
+
+**Regla global para toda tabla con filtros por columna.** El botón va **junto al `<h1>`/`<h2>`** de la pantalla (no entre las acciones de la derecha, no arriba de la tabla), con el estilo sutil de Viajes: `× Limpiar filtros` en texto gris chico, subrayado al hover. Usar `LimpiarFiltrosButton` (`components/listado/LimpiarFiltrosButton.tsx`) con `soloDesktop` (en mobile se limpia desde `ListadoFiltrosSheet`); `cantidad` opcional muestra "(n)".
+
+- Si los filtros viven en un componente hijo (pestañas: Mantenimiento, Asignación de vehículos de Combustible, `TenantsTable`), la página deja `<div ref={setSlot} className="empty:hidden" />` junto al título y le pasa el elemento al hijo, que usa `LimpiarFiltrosPortal`.
+- Indicadores de pantalla tipo "Emisión electrónica vía ARCA" / "Ambiente de pruebas" no van junto al título sino en la línea del breadcrumb, a la derecha: `BreadcrumbExtras` (`hooks/useBreadcrumbOverride.tsx`), ver `ArcaEmisionIndicadores`.
+
+---
+
 ## Checklist para nuevas funcionalidades frontend
 
 - Definir si la vista es `tenant`, `superadmin` o ambas.

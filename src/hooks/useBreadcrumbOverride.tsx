@@ -6,29 +6,49 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import type { Crumb } from "@/lib/breadcrumbs";
 
-type SetterCtx = { setOverride: (crumbs: Crumb[] | null) => void };
+type SetterCtx = {
+  setOverride: (crumbs: Crumb[] | null) => void;
+  /** Contenedor a la derecha del breadcrumb (ver `BreadcrumbExtras`). */
+  extrasEl: HTMLElement | null;
+};
 
 const BreadcrumbSetterContext = createContext<SetterCtx | null>(null);
 
 /**
  * Sostiene el override de breadcrumb activo y lo expone a `AppShell` vía render-prop,
  * mientras que el setter se expone a las pantallas hijas (`Outlet`) vía contexto.
+ * El segundo argumento del render-prop es el ref del contenedor de extras del breadcrumb.
  */
 export function BreadcrumbOverrideProvider({
   children,
 }: {
-  children: (override: Crumb[] | null) => ReactNode;
+  children: (
+    override: Crumb[] | null,
+    extrasRef: (el: HTMLElement | null) => void,
+  ) => ReactNode;
 }) {
   const [override, setOverride] = useState<Crumb[] | null>(null);
-  const value = useMemo(() => ({ setOverride }), []);
+  const [extrasEl, setExtrasEl] = useState<HTMLElement | null>(null);
+  const value = useMemo(() => ({ setOverride, extrasEl }), [extrasEl]);
 
   return (
     <BreadcrumbSetterContext.Provider value={value}>
-      {children(override)}
+      {children(override, setExtrasEl)}
     </BreadcrumbSetterContext.Provider>
   );
+}
+
+/**
+ * Indicadores chicos de la pantalla (ej. "Emisión vía ARCA") en la misma línea que el
+ * breadcrumb, alineados a la derecha. Sin breadcrumb montado, se renderizan en el lugar.
+ */
+export function BreadcrumbExtras({ children }: { children: ReactNode }) {
+  const ctx = useContext(BreadcrumbSetterContext);
+  if (!ctx?.extrasEl) return <>{children}</>;
+  return createPortal(children, ctx.extrasEl);
 }
 
 /**

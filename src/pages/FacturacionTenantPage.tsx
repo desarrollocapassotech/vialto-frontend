@@ -17,7 +17,9 @@ import { FacturaAccionesMenu } from "@/components/facturacion/FacturaAccionesMen
 import { AnularFacturaModal } from "@/components/facturacion/AnularFacturaModal";
 import { EmitirFacturaModal } from "@/components/facturacion/EmitirFacturaModal";
 import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
-import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { FiltrosRapidos } from "@/components/listado/FiltrosRapidos";
+import { ArcaEmisionIndicadores } from "@/components/liquidaciones/ArcaEmisionIndicadores";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -33,7 +35,7 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
-import { Clock, Download, FlaskConical, Landmark } from "lucide-react";
+import { Clock, Download, FlaskConical } from "lucide-react";
 import {
   clientesConViajesPendientesFactura,
   monedaUnicaDeViajes,
@@ -101,7 +103,7 @@ function fmtFecha(iso: string | null) {
   if (!iso) return "—";
   const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (match) {
-    const [_, year, month, day] = match;
+    const [, year, month, day] = match;
     return `${day}/${month}/${year}`;
   }
   return new Date(iso).toLocaleDateString("es-AR", {
@@ -269,7 +271,16 @@ export function FacturacionTenantPage({
   const [vencimientoDesdeFiltro, setVencimientoDesdeFiltro] = useState("");
   const [vencimientoHastaFiltro, setVencimientoHastaFiltro] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
+  /** Filtro rápido (ícono al lado del título): eje de cobro, combinable con Estado. */
+  const [cobroFiltro, setCobroFiltro] = useState<"" | "sin_cobrar" | "vencida">(
+    "",
+  );
 
+  /** Conteos de los chips de filtro rápido (sin cobrar / vencidas), sobre todas las facturas. */
+  const [resumenCobroApi, setResumenCobroApi] = useState<{
+    sinCobrar: number;
+    vencidas: number;
+  } | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportandoExcel, setExportandoExcel] = useState(false);
 
@@ -351,6 +362,7 @@ export function FacturacionTenantPage({
     if (emisionDesdeFiltro || emisionHastaFiltro) n += 1;
     if (vencimientoDesdeFiltro || vencimientoHastaFiltro) n += 1;
     if (estadoFiltro) n += 1;
+    if (cobroFiltro) n += 1;
     return n;
   }, [
     numFiltro,
@@ -360,6 +372,7 @@ export function FacturacionTenantPage({
     vencimientoDesdeFiltro,
     vencimientoHastaFiltro,
     estadoFiltro,
+    cobroFiltro,
   ]);
 
   const anyFiltroActivo = activeFilterCount > 0;
@@ -393,6 +406,9 @@ export function FacturacionTenantPage({
         )
           return false;
       }
+      if (cobroFiltro === "sin_cobrar" && (f.cobrado || f.estado === "anulado"))
+        return false;
+      if (cobroFiltro === "vencida" && !f.vencida) return false;
       return true;
     });
   }, [
@@ -405,7 +421,40 @@ export function FacturacionTenantPage({
     vencimientoDesdeFiltro,
     vencimientoHastaFiltro,
     estadoFiltro,
+    cobroFiltro,
   ]);
+
+  // Superadmin trae todas las facturas: se cuenta en el cliente. Tenant: endpoint de conteos,
+  // que se vuelve a pedir cada vez que cambia el listado (alta, cobro, anulación, etc.).
+  const resumenCobro = useMemo(() => {
+    if (!platform) return resumenCobroApi;
+    if (!facturas) return null;
+    let sinCobrar = 0;
+    let vencidas = 0;
+    for (const f of facturas) {
+      if (!f.cobrado && f.estado !== "anulado") sinCobrar += 1;
+      if (f.vencida) vencidas += 1;
+    }
+    return { sinCobrar, vencidas };
+  }, [platform, facturas, resumenCobroApi]);
+
+  useEffect(() => {
+    if (platform || !isLoaded || !isSignedIn || facturas === null) return;
+    let cancelled = false;
+    apiJson<{ sinCobrar: number; vencidas: number }>(
+      "/api/facturacion/facturas/resumen-cobro",
+      () => getToken(),
+    )
+      .then((r) => {
+        if (!cancelled) setResumenCobroApi(r);
+      })
+      .catch(() => {
+        // Sin conteo, los chips se muestran igual (sin número).
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [platform, isLoaded, isSignedIn, facturas, getToken]);
 
   const metaListado = useMemo(() => {
     if (platform) {
@@ -469,6 +518,7 @@ export function FacturacionTenantPage({
       if (vencimientoHastaFiltro)
         params.set("vencimientoHasta", vencimientoHastaFiltro);
       if (estadoFiltro) params.set("estado", estadoFiltro);
+      if (cobroFiltro) params.set("cobro", cobroFiltro);
       return params.toString();
     },
     [
@@ -479,6 +529,7 @@ export function FacturacionTenantPage({
       vencimientoDesdeFiltro,
       vencimientoHastaFiltro,
       estadoFiltro,
+      cobroFiltro,
     ],
   );
 
@@ -881,7 +932,7 @@ export function FacturacionTenantPage({
           <span
             title="Emitida en ambiente de pruebas (homologación)"
             aria-label="Emitida en ambiente de pruebas"
-            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-amber-300 bg-amber-50 text-amber-800"
+            className="inline-flex shrink-0 items-center text-amber-600"
           >
             <FlaskConical className="h-3 w-3" strokeWidth={2} aria-hidden />
           </span>
@@ -1001,6 +1052,7 @@ export function FacturacionTenantPage({
     setVencimientoDesdeFiltro("");
     setVencimientoHastaFiltro("");
     setEstadoFiltro("");
+    setCobroFiltro("");
     setListadoRefetching(true);
     setPage(1);
   }
@@ -1074,7 +1126,7 @@ export function FacturacionTenantPage({
       );
 
       showToast("Excel exportado exitosamente", "success");
-    } catch (err) {
+    } catch {
       showToast("Ocurrió un error al exportar el Excel", "error");
     } finally {
       setExportandoExcel(false);
@@ -1088,6 +1140,18 @@ export function FacturacionTenantPage({
     !(platform && (facturas?.length ?? 0) > 0)
       ? 'Todavía no hay facturas. Hacé clic en "Nueva factura" para empezar.'
       : "No hay facturas que coincidan con los filtros aplicados.";
+
+  /** Opciones del filtro de estado (columna y sheet mobile), en este orden. */
+  const estadoFiltroOptions = (
+    <>
+      <option value="">Todas</option>
+      <option value="facturado">FACTURADO</option>
+      <option value="vencida">VENCIDA</option>
+      <option value="cobrado">COBRADA</option>
+      {hasArca && <option value="anulado">ANULADA</option>}
+      {hasArca && <option value="borrador">BORRADOR</option>}
+    </>
+  );
 
   const facturasListadoFiltros = (
     <>
@@ -1213,14 +1277,7 @@ export function FacturacionTenantPage({
           }`}
           aria-label="Filtrar por estado"
         >
-          <option value="">Todos</option>
-          {hasArca && <option value="borrador">Borrador</option>}
-          {hasArca && <option value="esperando_afip">Esperando AFIP</option>}
-          <option value="facturado">Facturado</option>
-          <option value="cobrado">Cobrado</option>
-          {hasArca && <option value="error_afip">Error de AFIP</option>}
-          {hasArca && <option value="anulado">Anulado</option>}
-          <option value="vencida">Vencida</option>
+          {estadoFiltroOptions}
         </select>
       </ListadoFiltroCampo>
     </>
@@ -1252,35 +1309,40 @@ export function FacturacionTenantPage({
             Facturas
           </h1>
         )}
+        <FiltrosRapidos
+          opciones={[
+            {
+              id: "sin_cobrar",
+              label: "Sin cobrar",
+              count: resumenCobro?.sinCobrar,
+            },
+            { id: "vencida", label: "Vencidas", count: resumenCobro?.vencidas },
+          ]}
+          value={cobroFiltro}
+          onChange={(v) => {
+            if (!platform) setListadoRefetching(true);
+            setPage(1);
+            setCobroFiltro(v);
+          }}
+          ariaLabel="Filtros rápidos de facturas"
+        />
+        {anyFiltroActivo && (
+          <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
+        )}
 
         {hasArca && (
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
-              <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
-              Emisión electrónica vía ARCA
-            </div>
-            <AmbienteTestBadge
-              ambiente={ambienteArca}
-              to={
-                embeddedInSuperadmin
-                  ? undefined
-                  : "/configuracion/arca?tab=ambiente"
-              }
-            />
-          </div>
+          <ArcaEmisionIndicadores
+            ambiente={ambienteArca}
+            to={
+              embeddedInSuperadmin
+                ? undefined
+                : "/configuracion/arca?tab=ambiente"
+            }
+          />
         )}
 
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {exportButton}
-          {anyFiltroActivo && (
-            <button
-              type="button"
-              onClick={limpiarFiltros}
-              className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-            >
-              Limpiar filtros
-            </button>
-          )}
 
           <button
             type="button"
@@ -1497,16 +1559,7 @@ export function FacturacionTenantPage({
                   }`}
                   aria-label="Filtrar por estado"
                 >
-                  <option value="">Todos</option>
-                  {hasArca && <option value="borrador">Borrador</option>}
-                  {hasArca && (
-                    <option value="esperando_afip">Esperando AFIP</option>
-                  )}
-                  <option value="facturado">Facturado</option>
-                  <option value="cobrado">Cobrado</option>
-                  {hasArca && <option value="error_afip">Error de AFIP</option>}
-                  {hasArca && <option value="anulado">Anulado</option>}
-                  <option value="vencida">Vencida</option>
+                  {estadoFiltroOptions}
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>

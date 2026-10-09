@@ -21,6 +21,7 @@ import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHead
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useIdFiscalLabel } from "@/hooks/useIdFiscalLabel";
 import type { Cliente, ConEmpresa, PaginatedMeta } from "@/types/api";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 
 export function ClientesSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -169,16 +170,10 @@ export function ClientesSuperadminPage() {
             servidor.
           </p>
         </div>
+        {anyFiltroActivo && (
+          <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
+        )}
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          {anyFiltroActivo && (
-            <button
-              type="button"
-              onClick={limpiarFiltros}
-              className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-            >
-              Limpiar filtros
-            </button>
-          )}
           <Link
             to={
               filtroEmpresa

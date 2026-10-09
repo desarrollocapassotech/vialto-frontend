@@ -40,6 +40,7 @@ import type {
   PaginatedMeta,
   Vehiculo,
 } from "@/types/api";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 
 type CombustibleListResponse = {
   cargas: CargaCombustible[];
@@ -132,6 +133,8 @@ export function CombustibleTenantPage({
   }, [orgRole, user?.publicMetadata]);
 
   const [tab, setTab] = useState<"cargas" | "asignaciones">("cargas");
+  const [limpiarFiltrosSlot, setLimpiarFiltrosSlot] =
+    useState<HTMLDivElement | null>(null);
 
   const [rows, setRows] = useState<CargaCombustible[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -671,6 +674,16 @@ export function CombustibleTenantPage({
             </button>
           ))}
         </div>
+        {/* La pestaña Asignación de vehículos portalea acá su "Limpiar filtros". */}
+        <div ref={setLimpiarFiltrosSlot} className="empty:hidden" />
+        {tab === "cargas" && activeTenantId && hayFiltros && (
+          <LimpiarFiltrosButton
+            onClick={handleClearFilters}
+            cantidad={cantFiltros}
+            disabled={rows === null}
+            soloDesktop
+          />
+        )}
         {tab === "cargas" && (
           <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
             <div className="flex items-center gap-3">
@@ -743,25 +756,6 @@ export function CombustibleTenantPage({
                 </div>
               )}
 
-              {activeTenantId && hayFiltros && (
-                <div className="hidden min-h-10 items-center lg:flex">
-                  <button
-                    type="button"
-                    onClick={handleClearFilters}
-                    disabled={rows === null}
-                    className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
-                    aria-label={`Limpiar filtros (${cantFiltros} activo${cantFiltros !== 1 ? "s" : ""})`}
-                  >
-                    Limpiar filtros
-                    <span
-                      className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
-                      aria-hidden
-                    >
-                      {cantFiltros}
-                    </span>
-                  </button>
-                </div>
-              )}
             </div>
 
             <div className="flex items-center gap-3">
@@ -806,6 +800,7 @@ export function CombustibleTenantPage({
           choferes={choferes}
           vehiculos={vehiculos}
           isReadOnly={isReadOnly}
+          limpiarFiltrosSlot={limpiarFiltrosSlot}
         />
       )}
 

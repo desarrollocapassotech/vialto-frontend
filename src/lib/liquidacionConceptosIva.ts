@@ -3,6 +3,16 @@
  * El monto persistido es la base; el valor de línea / aporte al total incluye el IVA del concepto.
  */
 
+/** Alícuotas de IVA que acepta AFIP (WSFEv1). Mismo criterio que el backend al emitir. */
+export const ALICUOTAS_IVA_AFIP = [0, 2.5, 5, 10.5, 21, 27] as const;
+
+export const ALICUOTAS_IVA_AFIP_LABEL = "0%, 2,5%, 5%, 10,5%, 21% o 27%";
+
+export function esAlicuotaIvaAfip(pct: number | null | undefined): boolean {
+  if (pct == null || !Number.isFinite(Number(pct))) return false;
+  return ALICUOTAS_IVA_AFIP.some((a) => Math.abs(a - Number(pct)) < 1e-9);
+}
+
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
@@ -28,6 +38,24 @@ export function signedMontoConIvaConcepto(
   const conIva = montoConIvaConcepto(monto, ivaPct);
   if (!signo) return 0;
   return signo === "contra" ? -Math.abs(conIva) : Math.abs(conIva);
+}
+
+/**
+ * Para mostrar una liquidación ya guardada: `gastosAdminIva` persistido es el IVA total
+ * de AFIP (flete/comisión + IVA de cada concepto). Como cada concepto se muestra con su
+ * IVA incluido, la línea de IVA general solo debe llevar la parte de flete/comisión.
+ */
+export function ivaFleteComisionDesdeTotal(
+  ivaTotal: number,
+  conceptos: { signo: string | null | undefined; monto: number; ivaPct?: number | null }[],
+): number {
+  const ivaConceptos = conceptos.reduce((acc, l) => {
+    const base = Math.abs(Number(l.monto) || 0);
+    const conIva = signedMontoConIvaConcepto(l.signo, base, l.ivaPct);
+    const signedBase = l.signo === "contra" ? -base : l.signo ? base : 0;
+    return acc + (conIva - signedBase);
+  }, 0);
+  return round2((Number(ivaTotal) || 0) - ivaConceptos);
 }
 
 /** IVA general del comprobante: solo sobre (bruto − comisión), sin pisar el IVA de cada concepto. */

@@ -19,6 +19,7 @@ import {
 } from "@/lib/listadoTabla";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { PlatformUser, PaginatedMeta } from "@/types/api";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 
 function formatRole(role: string, platformRole?: string | null) {
   if (platformRole === "superadmin") return "Superadmin";
@@ -219,16 +220,10 @@ export function SuperadminUsersPage() {
               Visualizá miembros de cada empresa para control de accesos y roles.
             </p>
           </div>
+          {anyFiltroActivo && (
+            <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
+          )}
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-            {anyFiltroActivo && (
-              <button
-                type="button"
-                onClick={limpiarFiltros}
-                className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-              >
-                Limpiar filtros
-              </button>
-            )}
             <Link
               to={
                 filtroEmpresa

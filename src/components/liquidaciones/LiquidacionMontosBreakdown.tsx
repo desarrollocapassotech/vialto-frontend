@@ -4,6 +4,10 @@ import {
   fmtSignedLiquidacionMoney,
   round2,
 } from "@/lib/liquidacionMoney";
+import {
+  ivaFleteComisionDesdeTotal,
+  signedMontoConIvaConcepto,
+} from "@/lib/liquidacionConceptosIva";
 
 
 // Re-export para no romper imports existentes.
@@ -15,6 +19,8 @@ type ConceptoLineaDisplay = {
   signo: ConceptoLiquidacionSigno;
   monto: number;
   ivaPct?: number | null;
+  cantidad?: number;
+  montoUnitario?: number | null;
 };
 
 type Props = {
@@ -123,23 +129,21 @@ export function LiquidacionMontosBreakdown({
   ivaPct,
   liquido,
   variant = "filas",
-  brutoLabel = "Sub total",
+  brutoLabel = "Bruto",
   totalLabel = "Total neto a liquidar",
 }: Props) {
-  // El IVA general de la liquidación ahora representa el IVA total de AFIP
-  // (incluyendo el impacto de los conceptos).
-  const ivaGeneral = Number(gastosAdminIva) || 0;
-  const conceptosBaseSum = conceptosLineas.reduce((acc, l) => {
-    const row = l as ConceptoLineaDisplay & { nombre?: string };
-    const absBase = Math.abs(Number(row.monto) || 0);
-    return acc + (row.signo === "favor" ? absBase : -absBase);
-  }, 0);
-  const netoBase = round2(bruto - comision + conceptosBaseSum);
+  // `gastosAdminIva` es el IVA total de AFIP (incluye el IVA de los conceptos). Cada
+  // concepto se muestra con su IVA incluido, igual que al armar la liquidación, así que
+  // la línea de IVA general solo lleva flete/comisión. El total no se recalcula: es `liquido`.
+  const ivaGeneral = ivaFleteComisionDesdeTotal(gastosAdminIva, conceptosLineas);
+  const conceptosConIvaSum = conceptosLineas.reduce(
+    (acc, l) =>
+      acc + signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct),
+    0,
+  );
+  const subtotal = round2(bruto - comision + conceptosConIvaSum);
   const pctEfectivo = coerceIvaPct(ivaPct);
-  const ivaLabel =
-    pctEfectivo != null
-      ? `${formatIvaLabel(pctEfectivo)}`
-      : "IVA";
+  const ivaLabel = `${formatIvaLabel(pctEfectivo)} (flete/comisión)`;
   const comisionLabel = `Comisión (${comisionPct}%)`;
 
   const lineItems: {
@@ -163,25 +167,34 @@ export function LiquidacionMontosBreakdown({
     },
     ...conceptosLineas.map((l, idx) => {
       const row = l as ConceptoLineaDisplay & { nombre?: string };
-      const absBase = Math.abs(Number(row.monto) || 0);
-      const isFavor = row.signo === "favor";
-      const signed = isFavor ? absBase : -absBase;
-      const nombre = row.nombreSnapshot || row.nombre || "Concepto";
       const linePct = coerceIvaPct(row.ivaPct);
+      const conIva = signedMontoConIvaConcepto(
+        row.signo,
+        Number(row.monto) || 0,
+        linePct,
+      );
+      const nombre = row.nombreSnapshot || row.nombre || "Concepto";
+      const cantidad = Number(row.cantidad) || 1;
+      const detalle = [
+        cantidad !== 1 && row.montoUnitario != null
+          ? `${cantidad.toLocaleString("es-AR")} × ${fmtLiquidacionMoney(row.montoUnitario)}`
+          : null,
+        linePct != null ? `IVA ${formatIvaLabel(linePct).replace(/^IVA /, "")}` : null,
+      ].filter(Boolean);
       return {
         key: row.id ?? `concepto-${idx}`,
-        label: `${nombre}${linePct != null ? ` (IVA ${formatIvaLabel(linePct).replace(/^IVA /, "")})` : ""}`,
+        label: `${nombre}${detalle.length ? ` (${detalle.join(", ")})` : ""}`,
         value: fmtSignedLiquidacionMoney(
-          absBase,
-          signed >= 0 ? "plus" : "minus",
+          conIva,
+          conIva >= 0 ? "plus" : "minus",
         ),
         muted: true,
       };
     }),
     {
-      key: "neto",
-      label: "Neto gravado",
-      value: fmtLiquidacionMoney(netoBase),
+      key: "subtotal",
+      label: "Subtotal",
+      value: fmtLiquidacionMoney(subtotal),
       separator: true,
     },
     {

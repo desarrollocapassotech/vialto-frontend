@@ -47,6 +47,8 @@ export function MantenimientoTenantPage({
 
   const [modal, setModal] = useState<OrdenModalEstado | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [limpiarFiltrosSlot, setLimpiarFiltrosSlot] =
+    useState<HTMLDivElement | null>(null);
   const recargar = useCallback(() => setReloadKey((k) => k + 1), []);
 
   function setTab(tab: Tab) {
@@ -69,6 +71,8 @@ export function MantenimientoTenantPage({
     <div className="w-full">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">Mantenimiento</h1>
+        {/* Cada sección portalea acá su "Limpiar filtros". */}
+        <div ref={setLimpiarFiltrosSlot} className="empty:hidden" />
         {!soloLectura && (
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <button
@@ -139,6 +143,7 @@ export function MantenimientoTenantPage({
             tenantId={tenantId}
             soloLectura={soloLectura}
             reloadKey={reloadKey}
+            limpiarFiltrosSlot={limpiarFiltrosSlot}
             onRegistrarService={(precarga: PrecargaOrden) => setModal({ modo: "crear", precarga })}
           />
         )}
@@ -148,6 +153,7 @@ export function MantenimientoTenantPage({
             tenantId={tenantId}
             soloLectura={soloLectura}
             reloadKey={reloadKey}
+            limpiarFiltrosSlot={limpiarFiltrosSlot}
             onVer={(ordenId) => setModal({ modo: "ver", ordenId })}
             onCambio={recargar}
           />

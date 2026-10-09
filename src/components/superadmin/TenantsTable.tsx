@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import {
   listadoTablaAccionClass,
@@ -17,6 +18,8 @@ interface TenantsTableProps {
   items: Tenant[];
   statusUpdatingByOrgId: Record<string, boolean>;
   onToggleEnabled: (clerkOrgId: string, enabled: boolean) => void;
+  /** Lugar junto al título de la página donde va "Limpiar filtros" (vía portal). */
+  limpiarFiltrosSlot?: HTMLElement | null;
 }
 
 function formatDate(iso: string) {
@@ -36,6 +39,7 @@ export function TenantsTable({
   items,
   statusUpdatingByOrgId,
   onToggleEnabled,
+  limpiarFiltrosSlot,
 }: TenantsTableProps) {
   const navigate = useNavigate();
   const [viewingTenant, setViewingTenant] = useState<Tenant | null>(null);
@@ -95,20 +99,15 @@ export function TenantsTable({
         />
       )}
 
-      {anyFiltroActivo && (
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={limpiarFiltros}
-            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-          >
-            Limpiar filtros
-          </button>
-        </div>
-      )}
+      <LimpiarFiltrosPortal
+        slot={limpiarFiltrosSlot}
+        visible={anyFiltroActivo}
+        onClick={limpiarFiltros}
+        soloDesktop
+      />
 
       <ListadoDatos
-        className={anyFiltroActivo ? "mt-4" : "mt-10"}
+        className="mt-10"
         tableColSpan={5}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>

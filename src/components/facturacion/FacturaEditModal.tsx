@@ -30,6 +30,7 @@ import {
   computeFacturaTotalesFromBases,
   importeNetoViajeParaFactura,
 } from "@/lib/facturaTotales";
+import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 import type { Cliente, Factura, Viaje } from "@/types/api";
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -72,9 +73,8 @@ export type FacturaDraft = {
   comprobanteFile: File | null;
 };
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
+// Hoy en Argentina, no en UTC (desde las 21 h el UTC ya es el día siguiente).
+const todayIso = hoyArgentinaIso;
 
 function isoToDate(iso: string | null | undefined) {
   if (!iso) return "";
