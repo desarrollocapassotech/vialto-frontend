@@ -155,7 +155,7 @@ export function OrdenesTrabajoSection({
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
-                title="Unidad"
+                title="Vehículo"
                 filterActive={!!vehiculoId}
                 filterSignature={vehiculoId}
                 onClear={() => filtro(setVehiculoId)("")}
@@ -168,12 +168,12 @@ export function OrdenesTrabajoSection({
                   filterItems={filtrarVehiculos}
                   getPrimaryLabel={(v) => v.patente}
                   getSecondaryLabel={(v) => [v.marca, v.modelo].filter(Boolean).join(" · ") || null}
-                  placeholderCerrado="Todas"
+                  placeholderCerrado="Todos"
                   placeholderBuscar="Buscar patente o marca…"
-                  searchAriaLabel="Filtrar unidades"
+                  searchAriaLabel="Filtrar vehículos"
                   allowEmptyValue
-                  emptyListChoiceLabel="Todas"
-                  aria-label="Filtrar por unidad"
+                  emptyListChoiceLabel="Todos"
+                  aria-label="Filtrar por vehículo"
                   inputClassName={`${FILTRO_INPUT} ${vehiculoId ? "text-vialto-fire" : "text-vialto-charcoal"}`}
                 />
               </ViajesListadoHeaderFiltro>
@@ -226,7 +226,7 @@ export function OrdenesTrabajoSection({
         columns={[
           { id: "numero", header: "N°", cell: (o) => <span className="tabular-nums">{o.numero}</span> },
           { id: "fecha", header: "Fecha", cell: (o) => fmtFecha(o.fecha) },
-          { id: "unidad", header: "Unidad", primary: true, cell: (o) => o.vehiculo.patente },
+          { id: "unidad", header: "Vehículo", primary: true, cell: (o) => o.vehiculo.patente },
           { id: "tipo", header: "Tipo", cell: (o) => fmtTipoOrden(o.tipo) },
           { id: "taller", header: "Taller", cell: (o) => o.taller?.nombre ?? "—" },
           { id: "km", header: "Km", cell: (o) => fmtKm(o.km) },

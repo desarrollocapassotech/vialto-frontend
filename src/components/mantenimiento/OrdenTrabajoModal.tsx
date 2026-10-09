@@ -189,7 +189,7 @@ export function OrdenTrabajoModal({
 
   function validar(): boolean {
     const errs: Record<string, string> = {};
-    if (!vehiculoId) errs.vehiculoId = "Elegí la unidad.";
+    if (!vehiculoId) errs.vehiculoId = "Elegí el vehículo.";
     if (!fecha) errs.fecha = "Ingresá la fecha del trabajo.";
     if (km.trim() && (!/^\d+$/.test(km.trim()) || Number(km) < 0)) errs.km = "El km tiene que ser un número entero.";
     const errsLineas: Record<string, { descripcion?: string; importe?: string }> = {};
@@ -319,7 +319,7 @@ export function OrdenTrabajoModal({
         <div className="grid gap-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="grid gap-1.5">
-              <CrudFieldLabel required>Unidad</CrudFieldLabel>
+              <CrudFieldLabel required>Vehículo</CrudFieldLabel>
               <SearchableEntitySelect<Vehiculo>
                 items={maestro.vehiculos.filter((v) => v.activo || v.id === vehiculoId)}
                 value={vehiculoId}
@@ -327,10 +327,10 @@ export function OrdenTrabajoModal({
                 filterItems={filtrarVehiculos}
                 getPrimaryLabel={(v) => v.patente}
                 getSecondaryLabel={(v) => [v.marca, v.modelo].filter(Boolean).join(" · ") || null}
-                placeholderCerrado="Elegí la unidad…"
+                placeholderCerrado="Elegí el vehículo…"
                 placeholderBuscar="Buscar patente o marca…"
-                searchAriaLabel="Filtrar unidades"
-                aria-label="Unidad"
+                searchAriaLabel="Filtrar vehículos"
+                aria-label="Vehículo"
                 inputClassName={`${INPUT} ${fieldErrors.vehiculoId ? "border-red-400" : "border-black/15"}`}
               />
               <CrudFieldError message={fieldErrors.vehiculoId} />
@@ -351,7 +351,7 @@ export function OrdenTrabajoModal({
               <CrudFieldError message={fieldErrors.fecha} />
             </label>
             <label className="grid gap-1.5">
-              <CrudFieldLabel>Km de la unidad</CrudFieldLabel>
+              <CrudFieldLabel>Km del vehículo</CrudFieldLabel>
               <input
                 type="text"
                 inputMode="numeric"
@@ -418,7 +418,7 @@ export function OrdenTrabajoModal({
           </label>
 
           {vehiculo && modo === "crear" && !kmTocado && vehiculo.kmActual > 0 && (
-            <p className="text-xs text-vialto-steel">El km sugerido es el último cargado en la unidad.</p>
+            <p className="text-xs text-vialto-steel">El km sugerido es el último cargado en el vehículo.</p>
           )}
           <CrudFormErrorAlert message={error} />
         </div>
@@ -451,10 +451,10 @@ function VistaOrden({
         </div>
       )}
       <div className={viewModalGridClass}>
-        <Campo label="Unidad">{orden.vehiculo.patente}</Campo>
+        <Campo label="Vehículo">{orden.vehiculo.patente}</Campo>
         <Campo label="Fecha del trabajo">{fmtFecha(orden.fecha)}</Campo>
         <Campo label="Tipo">{fmtTipoOrden(orden.tipo)}</Campo>
-        <Campo label="Km de la unidad">{fmtKm(orden.km)}</Campo>
+        <Campo label="Km del vehículo">{fmtKm(orden.km)}</Campo>
         <Campo label="Taller">{orden.taller?.nombre ?? "—"}</Campo>
         <Campo label="Planes que cumple">
           {orden.planes.length ? orden.planes.map((p) => p.vehiculoPlan.plan.nombre).join(", ") : "—"}

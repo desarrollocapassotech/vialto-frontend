@@ -56,13 +56,13 @@ export function PlanesCumpleCheckboxes({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehiculoId, tenantId, getToken]);
 
-  if (!vehiculoId) return <p className="text-sm text-vialto-steel">Elegí la unidad para ver sus planes.</p>;
+  if (!vehiculoId) return <p className="text-sm text-vialto-steel">Elegí el vehículo para ver sus planes.</p>;
   if (planes === null) return <p className="text-sm text-vialto-steel">Cargando planes…</p>;
   if (error) return <p className="text-xs font-medium text-red-600">{error}</p>;
 
   const visibles = planes.filter((p) => (p.activo && p.plan.activo) || value.includes(p.id));
   if (visibles.length === 0) {
-    return <p className="text-sm text-vialto-steel">La unidad no tiene planes asignados.</p>;
+    return <p className="text-sm text-vialto-steel">El vehículo no tiene planes asignados.</p>;
   }
 
   return (

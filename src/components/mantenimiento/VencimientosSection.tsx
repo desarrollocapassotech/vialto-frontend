@@ -164,7 +164,7 @@ export function VencimientosSection({
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
-                title="Unidad"
+                title="Vehículo"
                 filterActive={!!vehiculoId}
                 filterSignature={vehiculoId}
                 onClear={() => setVehiculoId("")}
@@ -177,12 +177,12 @@ export function VencimientosSection({
                   filterItems={filtrarVehiculos}
                   getPrimaryLabel={(v) => v.patente}
                   getSecondaryLabel={(v) => [v.marca, v.modelo].filter(Boolean).join(" · ") || null}
-                  placeholderCerrado="Todas"
+                  placeholderCerrado="Todos"
                   placeholderBuscar="Buscar patente o marca…"
-                  searchAriaLabel="Filtrar unidades"
+                  searchAriaLabel="Filtrar vehículos"
                   allowEmptyValue
-                  emptyListChoiceLabel="Todas"
-                  aria-label="Filtrar por unidad"
+                  emptyListChoiceLabel="Todos"
+                  aria-label="Filtrar por vehículo"
                   inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${vehiculoId ? "text-vialto-fire" : "text-vialto-charcoal"}`}
                 />
               </ViajesListadoHeaderFiltro>
@@ -215,7 +215,7 @@ export function VencimientosSection({
         }
         columns={[
           { id: "estado", header: "Estado", cell: (f) => <EstadoVencimientoBadge estado={f.estado} /> },
-          { id: "unidad", header: "Unidad", primary: true, cell: (f) => f.vehiculo.patente },
+          { id: "unidad", header: "Vehículo", primary: true, cell: (f) => f.vehiculo.patente },
           {
             id: "plan",
             header: "Plan",
@@ -255,7 +255,7 @@ export function VencimientosSection({
             ? "No se pudieron cargar los vencimientos."
             : hayFiltros
               ? "No hay vencimientos que coincidan con los filtros aplicados."
-              : "Todavía no hay planes asignados a las unidades."
+              : "Todavía no hay planes asignados a los vehículos."
         }
         loadingMessage="Calculando vencimientos…"
         actionsTdClassName={listadoTablaTdClass}

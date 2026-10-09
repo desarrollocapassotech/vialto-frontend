@@ -174,10 +174,10 @@ const FUENTE_KM_LABELS: Record<string, string> = {
   orden_trabajo: "Orden de trabajo",
 };
 
-/** De dónde sale el km: "Carga de combustible del 12/09/2026", "Km cargado en la unidad", etc. */
+/** De dónde sale el km: "Carga de combustible del 12/09/2026", "Km cargado en el vehículo", etc. */
 export function fmtOrigenKm(odometro: { fecha: string; fuente: FuenteKm } | null): string {
   if (!odometro) return "Sin lecturas";
-  if (odometro.fuente === "vehiculo") return "Km cargado en la unidad";
+  if (odometro.fuente === "vehiculo") return "Km cargado en el vehículo";
   return `${FUENTE_KM_LABELS[odometro.fuente] ?? odometro.fuente} del ${fmtFecha(odometro.fecha)}`;
 }
 
