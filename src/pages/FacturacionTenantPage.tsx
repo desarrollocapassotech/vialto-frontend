@@ -18,6 +18,7 @@ import { AnularFacturaModal } from "@/components/facturacion/AnularFacturaModal"
 import { EmitirFacturaModal } from "@/components/facturacion/EmitirFacturaModal";
 import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { FiltrosRapidos } from "@/components/listado/FiltrosRapidos";
 import { ArcaEmisionIndicadores } from "@/components/liquidaciones/ArcaEmisionIndicadores";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -270,6 +271,10 @@ export function FacturacionTenantPage({
   const [vencimientoDesdeFiltro, setVencimientoDesdeFiltro] = useState("");
   const [vencimientoHastaFiltro, setVencimientoHastaFiltro] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
+  /** Filtro rápido (ícono al lado del título): eje de cobro, combinable con Estado. */
+  const [cobroFiltro, setCobroFiltro] = useState<"" | "sin_cobrar" | "vencida">(
+    "",
+  );
 
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportandoExcel, setExportandoExcel] = useState(false);
@@ -352,6 +357,7 @@ export function FacturacionTenantPage({
     if (emisionDesdeFiltro || emisionHastaFiltro) n += 1;
     if (vencimientoDesdeFiltro || vencimientoHastaFiltro) n += 1;
     if (estadoFiltro) n += 1;
+    if (cobroFiltro) n += 1;
     return n;
   }, [
     numFiltro,
@@ -361,6 +367,7 @@ export function FacturacionTenantPage({
     vencimientoDesdeFiltro,
     vencimientoHastaFiltro,
     estadoFiltro,
+    cobroFiltro,
   ]);
 
   const anyFiltroActivo = activeFilterCount > 0;
@@ -394,6 +401,9 @@ export function FacturacionTenantPage({
         )
           return false;
       }
+      if (cobroFiltro === "sin_cobrar" && (f.cobrado || f.estado === "anulado"))
+        return false;
+      if (cobroFiltro === "vencida" && !f.vencida) return false;
       return true;
     });
   }, [
@@ -406,6 +416,7 @@ export function FacturacionTenantPage({
     vencimientoDesdeFiltro,
     vencimientoHastaFiltro,
     estadoFiltro,
+    cobroFiltro,
   ]);
 
   const metaListado = useMemo(() => {
@@ -470,6 +481,7 @@ export function FacturacionTenantPage({
       if (vencimientoHastaFiltro)
         params.set("vencimientoHasta", vencimientoHastaFiltro);
       if (estadoFiltro) params.set("estado", estadoFiltro);
+      if (cobroFiltro) params.set("cobro", cobroFiltro);
       return params.toString();
     },
     [
@@ -480,6 +492,7 @@ export function FacturacionTenantPage({
       vencimientoDesdeFiltro,
       vencimientoHastaFiltro,
       estadoFiltro,
+      cobroFiltro,
     ],
   );
 
@@ -1002,6 +1015,7 @@ export function FacturacionTenantPage({
     setVencimientoDesdeFiltro("");
     setVencimientoHastaFiltro("");
     setEstadoFiltro("");
+    setCobroFiltro("");
     setListadoRefetching(true);
     setPage(1);
   }
@@ -1258,6 +1272,19 @@ export function FacturacionTenantPage({
             Facturas
           </h1>
         )}
+        <FiltrosRapidos
+          opciones={[
+            { id: "sin_cobrar", label: "Sin cobrar" },
+            { id: "vencida", label: "Vencidas" },
+          ]}
+          value={cobroFiltro}
+          onChange={(v) => {
+            if (!platform) setListadoRefetching(true);
+            setPage(1);
+            setCobroFiltro(v);
+          }}
+          ariaLabel="Filtros rápidos de facturas"
+        />
         {anyFiltroActivo && (
           <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
         )}
