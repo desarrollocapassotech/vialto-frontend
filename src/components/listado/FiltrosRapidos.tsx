@@ -28,6 +28,12 @@ export function FiltrosRapidos<T extends string>({
   ariaLabel,
 }: Props<T>) {
   const [abierto, setAbierto] = useState(value !== "");
+  // Si el filtro se activa desde afuera (ej. un link con ?estado=), mostrar los chips.
+  const [valorPrevio, setValorPrevio] = useState(value);
+  if (value !== valorPrevio) {
+    setValorPrevio(value);
+    if (value !== "") setAbierto(true);
+  }
 
   return (
     <>
