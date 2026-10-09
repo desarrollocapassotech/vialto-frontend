@@ -31,8 +31,6 @@ import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiq
 import {
   type FacturaLetra,
   facturaLetraFromCondicionIva,
-  facturaLetraLabel,
-  condicionIvaLabel,
 } from "@/lib/arcaCbteTipo";
 import { apiJson, apiFetch, ApiError } from "@/lib/api";
 import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
@@ -52,6 +50,7 @@ import {
   idPropio2Label,
   transportistaEfectivoIdDesdeViaje,
   viajeFacturableParaCliente,
+  viajesFiltradosParaFactura,
   type MaestroListasViaje,
 } from "@/lib/viajesFlota";
 import { ViajeOrigenDestinoLinea } from "@/components/viajes/ViajeOrigenDestinoLinea";
@@ -64,7 +63,6 @@ import { Spinner } from "@/components/ui/Spinner";
 import { otroGastoDraftFromApi } from "@/components/viajes/OtrosGastosFieldset";
 import { pagoTransportistaDraftFromApi } from "@/components/viajes/PagosTransportistaFieldset";
 import { type PaisCodigo } from "@/lib/ciudades";
-import { paisCodigoDesdeTexto } from "@/lib/ciudades/paises";
 import {
   formatIsoFechaCortaListadoEsAr,
   formatIsoFechaHoraListadoEsAr,
@@ -400,6 +398,41 @@ export function ViajesTenantPage({
   // la columna "Transporte" diría siempre "Flota propia".
   const { transportistaExternoVisible: mostrarColumnaTransporte } =
     useTipoFlotaVisible(tid || undefined);
+
+  // "Nueva factura" desde Viajes: el modal necesita TODOS los viajes del cliente, no
+  // la página visible de la grilla (`rows`, paginada y con los filtros del listado).
+  // Se traen completos al abrir el modal y se filtran con el mismo criterio que la
+  // pantalla de Facturas (`viajesFiltradosParaFactura`): sin factura vigente — un
+  // borrador cuenta como facturado, una anulada vuelve a estar disponible.
+  const [viajesFactura, setViajesFactura] = useState<Viaje[]>([]);
+  const [viajesFacturaLoading, setViajesFacturaLoading] = useState(false);
+  useEffect(() => {
+    if (!isFacturaModalOpen) return;
+    let cancelado = false;
+    setViajesFacturaLoading(true);
+    const url = platform
+      ? `/api/platform/viajes?tenantId=${encodeURIComponent(tid)}`
+      : "/api/viajes";
+    apiJson<Viaje[]>(url, () => getToken())
+      .then((data) => {
+        if (!cancelado) setViajesFactura(data);
+      })
+      .catch(() => {
+        // best-effort: si falla, el selector de viajes de la factura queda vacío
+        if (!cancelado) setViajesFactura([]);
+      })
+      .finally(() => {
+        if (!cancelado) setViajesFacturaLoading(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [isFacturaModalOpen, platform, tid, getToken]);
+  const viajesNuevaFactura = useMemo(() => {
+    const list = viajesFiltradosParaFactura(viajesFactura, facturaDraft.clienteId);
+    if (!hasFacturasArca) return list;
+    return list.filter((v) => !arcaBloqueaFacturarUsd(true, v.monedaMonto));
+  }, [viajesFactura, facturaDraft.clienteId, hasFacturasArca]);
 
   const [clientesP, setClientesP] = useState<Cliente[]>([]);
   const [choferesP, setChoferesP] = useState<Chofer[]>([]);
@@ -1903,16 +1936,6 @@ export function ViajesTenantPage({
         v.clientesViaje?.find((cv) => cv.clienteId === cid)?.cliente;
       const clienteFull = cliente as Partial<Cliente> | undefined;
       const letra = facturaLetraFromCondicionIva(clienteFull?.condicionIva ?? null);
-      const paisCodigo = clienteFull?.pais ? paisCodigoDesdeTexto(clienteFull.pais) : "AR";
-      const esExterior = Boolean(paisCodigo && paisCodigo !== "AR");
-      const condTexto = esExterior
-        ? clienteFull?.condicionTributaria?.trim() || "Cliente del Exterior"
-        : condicionIvaLabel(clienteFull?.condicionIva ?? null);
-
-      showToast(
-        `Se emitirá ${facturaLetraLabel(letra)} — ${condTexto}`,
-        "success",
-      );
       void navigateToFacturacion(v, letra, targetClienteId);
     } else {
       void navigateToFacturacion(v, undefined, targetClienteId);
@@ -4130,9 +4153,9 @@ export function ViajesTenantPage({
             draft={facturaDraft}
             setDraft={setFacturaDraft}
             clientes={clientes}
-            viajes={rows ?? []}
-            viajesNueva={rows ?? []}
-            viajesLoading={listadoRefetching}
+            viajes={viajesFactura}
+            viajesNueva={viajesNuevaFactura}
+            viajesLoading={viajesFacturaLoading}
             onClose={() => setIsFacturaModalOpen(false)}
             hasArca={hasFacturasArca}
             tenantId={platform ? tid : undefined}

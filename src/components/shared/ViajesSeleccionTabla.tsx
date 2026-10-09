@@ -285,7 +285,7 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                 {mostrarTransporte && (
                   <th className="px-2 py-2 text-left">Transporte</th>
                 )}
-                <th className="px-2 py-2 text-right">
+                <th className="whitespace-nowrap px-2 py-2 text-right">
                   Monto{monedaUnica ? ` (${monedaUnica})` : ""}
                 </th>
               </tr>
@@ -357,7 +357,7 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                         {v.transportista?.nombre ?? "—"}
                       </td>
                     )}
-                    <td className="px-2 py-1.5 text-right tabular-nums text-vialto-steel">
+                    <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-vialto-steel">
                       {renderMonto(v, !monedaUnica)}
                     </td>
                   </tr>

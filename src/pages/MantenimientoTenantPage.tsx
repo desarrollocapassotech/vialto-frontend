@@ -1,149 +1,53 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ChevronDown, Eye, Trash2, TriangleAlert, Wrench } from "lucide-react";
-import { ListadoDatos } from "@/components/listado/ListadoDatos";
-import { AccionesFila } from "@/components/ui/AccionesFila";
-import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ChevronDown, ClipboardList, Gauge } from "lucide-react";
 import {
   SelectorOpcionesSheet,
   selectorTriggerClass,
   type SelectorOpcion,
 } from "@/components/ui/SelectorOpcionesSheet";
-import { IntervencionModal } from "@/components/mantenimiento/IntervencionModal";
-import { MantenimientoAlertasSection } from "@/components/mantenimiento/MantenimientoAlertasSection";
-import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
-import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
-import { filtrarVehiculos } from "@/components/forms/maestroSearchFilters";
-import { useMaestroData } from "@/hooks/useMaestroData";
-import { apiJson } from "@/lib/api";
-import { friendlyError } from "@/lib/friendlyError";
-import { useToast } from "@/lib/toast";
-import {
-  listadoTablaHeadRowClass,
-  listadoTablaTdClass,
-  listadoTablaThClass,
-} from "@/lib/listadoTabla";
-import {
-  fmtFechaIntervencion,
-  fmtKm,
-  fmtTipoIntervencion,
-  fmtTiposIntervencion,
-} from "@/lib/mantenimientoLabels";
-import { calcularAlertasMantenimiento } from "@/lib/mantenimientoAlertas";
+import { VencimientosSection } from "@/components/mantenimiento/VencimientosSection";
+import { OrdenesTrabajoSection } from "@/components/mantenimiento/OrdenesTrabajoSection";
+import { OrdenTrabajoModal, type OrdenModalEstado } from "@/components/mantenimiento/OrdenTrabajoModal";
 import { isOrgMember } from "@/lib/roleLabels";
-import type { Intervencion, Vehiculo } from "@/types/api";
+import type { PrecargaOrden } from "@/types/mantenimiento";
 
-type Tab = "intervenciones" | "alertas";
+type Tab = "vencimientos" | "ordenes";
 
-const TABS: { id: Tab; label: string; icon: typeof Wrench }[] = [
-  { id: "intervenciones", label: "Intervenciones", icon: Wrench },
-  { id: "alertas", label: "Alertas", icon: TriangleAlert },
+const TABS: { id: Tab; label: string; icon: typeof Gauge }[] = [
+  { id: "vencimientos", label: "Vencimientos", icon: Gauge },
+  { id: "ordenes", label: "Órdenes de trabajo", icon: ClipboardList },
 ];
 
-export function MantenimientoTenantPage() {
-  const { getToken, isLoaded, isSignedIn, orgRole } = useAuth();
+/**
+ * Mantenimiento de flota (ver vialto-backend/docs/mantenimiento-plan.md): semáforo de
+ * vencimientos y órdenes de trabajo. `tenantId`/`embeddedInSuperadmin` siguen el patrón de las
+ * demás pantallas para una futura vista de superadmin (hoy no hay ruta de superadmin).
+ */
+export function MantenimientoTenantPage({
+  tenantId,
+  embeddedInSuperadmin = false,
+}: {
+  tenantId?: string;
+  embeddedInSuperadmin?: boolean;
+} = {}) {
+  const { getToken, orgRole } = useAuth();
   const { user } = useUser();
-  const { showToast } = useToast();
-  const maestro = useMaestroData();
-
-  const isReadOnly = useMemo(
-    () => isOrgMember({ orgRole, publicMetadata: user?.publicMetadata }),
-    [orgRole, user?.publicMetadata],
+  const soloLectura = useMemo(
+    () => !embeddedInSuperadmin && isOrgMember({ orgRole, publicMetadata: user?.publicMetadata }),
+    [embeddedInSuperadmin, orgRole, user?.publicMetadata],
   );
+  const token = useCallback(() => getToken(), [getToken]);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get("tab") as Tab | null;
-  const activeTab: Tab = TABS.some((t) => t.id === rawTab) ? (rawTab as Tab) : "intervenciones";
+  const activeTab: Tab = TABS.some((t) => t.id === rawTab) ? (rawTab as Tab) : "vencimientos";
   const [sectionSheetOpen, setSectionSheetOpen] = useState(false);
 
-  const [vehiculoIdFiltro, setVehiculoIdFiltro] = useState(
-    searchParams.get("vehiculoId") ?? "",
-  );
-  const [tipoFiltro, setTipoFiltro] = useState("");
-  const [fechaDesdeFiltro, setFechaDesdeFiltro] = useState("");
-  const [fechaHastaFiltro, setFechaHastaFiltro] = useState("");
-
-  const [intervenciones, setIntervenciones] = useState<Intervencion[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [modal, setModal] = useState<OrdenModalEstado | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-
-  const [modal, setModal] = useState<
-    | { mode: "create" }
-    | { mode: "view" | "edit"; intervencion: Intervencion }
-    | null
-  >(null);
-  const [deleteTarget, setDeleteTarget] = useState<Intervencion | null>(null);
-  const [deleting, setDeleting] = useState(false);
-
-  // Se traen siempre TODAS las intervenciones (sin filtrar por vehículo en el
-  // servidor) para que la pestaña de Alertas nunca dependa del filtro elegido
-  // en Intervenciones; el filtro de esa pestaña se aplica en el cliente.
-  const load = useCallback(async () => {
-    return apiJson<Intervencion[]>(
-      "/api/mantenimiento/intervenciones",
-      () => getToken(),
-    );
-  }, [getToken]);
-
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-    let cancelled = false;
-    setIntervenciones(null);
-    (async () => {
-      try {
-        const data = await load();
-        if (!cancelled) {
-          setIntervenciones(data);
-          setError(null);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setIntervenciones([]);
-          setError(friendlyError(e, "mantenimiento"));
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoaded, isSignedIn, load, reloadKey]);
-
-  const hayFiltrosIntervenciones =
-    !!vehiculoIdFiltro ||
-    !!tipoFiltro.trim() ||
-    !!fechaDesdeFiltro ||
-    !!fechaHastaFiltro;
-
-  const intervencionesFiltradas = useMemo(() => {
-    if (!hayFiltrosIntervenciones) return intervenciones;
-    const tipoQuery = tipoFiltro.trim().toLowerCase();
-    return (intervenciones ?? []).filter((i) => {
-      if (vehiculoIdFiltro && i.vehiculoId !== vehiculoIdFiltro) return false;
-      if (
-        tipoQuery &&
-        !fmtTiposIntervencion(i.tipos).toLowerCase().includes(tipoQuery)
-      )
-        return false;
-      const fechaValor = i.fecha.slice(0, 10);
-      if (fechaDesdeFiltro && fechaValor < fechaDesdeFiltro) return false;
-      if (fechaHastaFiltro && fechaValor > fechaHastaFiltro) return false;
-      return true;
-    });
-  }, [
-    intervenciones,
-    vehiculoIdFiltro,
-    tipoFiltro,
-    fechaDesdeFiltro,
-    fechaHastaFiltro,
-    hayFiltrosIntervenciones,
-  ]);
-
-  const alertas = useMemo(
-    () => calcularAlertasMantenimiento(maestro.vehiculos, intervenciones ?? []),
-    [maestro.vehiculos, intervenciones],
-  );
+  const recargar = useCallback(() => setReloadKey((k) => k + 1), []);
 
   function setTab(tab: Tab) {
     setSearchParams(
@@ -157,61 +61,22 @@ export function MantenimientoTenantPage() {
     setSectionSheetOpen(false);
   }
 
-  function handleVehiculoFiltroChange(v: string) {
-    setVehiculoIdFiltro(v);
-    setSearchParams(
-      (prev) => {
-        const qs = new URLSearchParams(prev);
-        if (v) qs.set("vehiculoId", v);
-        else qs.delete("vehiculoId");
-        return qs;
-      },
-      { replace: true },
-    );
-  }
-
-  async function handleConfirmDelete() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      await apiJson<{ deleted: string }>(
-        `/api/mantenimiento/intervenciones/${encodeURIComponent(deleteTarget.id)}`,
-        () => getToken(),
-        { method: "DELETE" },
-      );
-      showToast("Intervención eliminada correctamente", "success");
-      setDeleteTarget(null);
-      setReloadKey((k) => k + 1);
-    } catch (e) {
-      showToast(friendlyError(e, "mantenimiento"), "error");
-    } finally {
-      setDeleting(false);
-    }
-  }
-
-  const vehiculoOptions = maestro.vehiculos.filter((v) => v.activo);
   const activeTabDef = TABS.find((t) => t.id === activeTab);
   const ActiveIcon = activeTabDef?.icon;
-  const sectionOptions: SelectorOpcion[] = TABS.map((t) => ({
-    id: t.id,
-    label: t.label,
-  }));
+  const sectionOptions: SelectorOpcion[] = TABS.map((t) => ({ id: t.id, label: t.label }));
 
   return (
     <div className="w-full">
-      {/* Título a la izquierda; acción de la pestaña activa a la derecha, en la misma línea. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
-          Mantenimiento
-        </h1>
-        {activeTab === "intervenciones" && !isReadOnly && (
+        <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">Mantenimiento</h1>
+        {!soloLectura && (
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
-              onClick={() => setModal({ mode: "create" })}
+              onClick={() => setModal({ modo: "crear" })}
               className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
             >
-              Nueva intervención
+              Nueva orden de trabajo
             </button>
           </div>
         )}
@@ -230,13 +95,7 @@ export function MantenimientoTenantPage() {
               Sección
             </span>
             <span className="flex min-w-0 flex-1 items-center justify-end gap-2">
-              {ActiveIcon && (
-                <ActiveIcon
-                  className="h-4 w-4 shrink-0 text-vialto-steel"
-                  strokeWidth={1.75}
-                  aria-hidden
-                />
-              )}
+              {ActiveIcon && <ActiveIcon className="h-4 w-4 shrink-0 text-vialto-steel" strokeWidth={1.75} aria-hidden />}
               <span className="truncate font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-vialto-charcoal">
                 {activeTabDef?.label}
               </span>
@@ -253,10 +112,7 @@ export function MantenimientoTenantPage() {
           />
         </div>
 
-        <nav
-          className="-mb-px hidden gap-1 overflow-x-auto lg:flex"
-          aria-label="Secciones de mantenimiento"
-        >
+        <nav className="-mb-px hidden gap-1 overflow-x-auto lg:flex" aria-label="Secciones de mantenimiento">
           {TABS.map((tab) => (
             <button
               key={tab.id}
@@ -271,243 +127,43 @@ export function MantenimientoTenantPage() {
             >
               <tab.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
               {tab.label}
-              {tab.id === "alertas" && alertas.length > 0 && (
-                <span className="inline-flex min-h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-vialto-fire px-1 font-[family-name:var(--font-ui)] text-[10px] font-semibold tabular-nums leading-none text-white">
-                  {alertas.length}
-                </span>
-              )}
             </button>
           ))}
         </nav>
       </div>
 
       <div className="mt-6">
-        {activeTab === "intervenciones" && (
-          <>
-            {error && (
-              <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-                {error}
-              </p>
-            )}
-
-            <ListadoDatos<Intervencion>
-              className="mt-6"
-              tableColSpan={7}
-              tableHead={
-                <tr className={listadoTablaHeadRowClass}>
-                  <th scope="col" className={`${listadoTablaThClass} align-top`}>
-                    <ViajesListadoHeaderFiltro
-                      title="Vehículo"
-                      filterActive={!!vehiculoIdFiltro}
-                      filterSignature={vehiculoIdFiltro}
-                      onClear={() => handleVehiculoFiltroChange("")}
-                    >
-                      <SearchableEntitySelect<Vehiculo>
-                        id="mantenimiento-filtro-vehiculo"
-                        items={vehiculoOptions}
-                        value={vehiculoIdFiltro}
-                        onChange={(id) => handleVehiculoFiltroChange(id)}
-                        filterItems={filtrarVehiculos}
-                        getPrimaryLabel={(v) => v.patente}
-                        getSecondaryLabel={(v) =>
-                          [v.marca, v.modelo].filter(Boolean).join(" · ") || null
-                        }
-                        placeholderCerrado="Todos"
-                        placeholderBuscar="Buscar patente o marca…"
-                        searchAriaLabel="Filtrar vehículos"
-                        allowEmptyValue
-                        emptyListChoiceLabel="Todos"
-                        aria-label="Filtrar por vehículo"
-                        inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                          vehiculoIdFiltro ? "text-vialto-fire" : "text-vialto-charcoal"
-                        }`}
-                      />
-                    </ViajesListadoHeaderFiltro>
-                  </th>
-                  <th scope="col" className={`${listadoTablaThClass} align-top`}>
-                    <ViajesListadoHeaderFiltro
-                      title="Tipo"
-                      filterActive={!!tipoFiltro.trim()}
-                      filterSignature={tipoFiltro}
-                      onClear={() => setTipoFiltro("")}
-                    >
-                      <input
-                        type="text"
-                        value={tipoFiltro}
-                        onChange={(e) => setTipoFiltro(e.target.value)}
-                        placeholder="Buscar tipo…"
-                        className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                          tipoFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
-                        }`}
-                        aria-label="Filtrar por tipo"
-                      />
-                    </ViajesListadoHeaderFiltro>
-                  </th>
-                  <th scope="col" className={`${listadoTablaThClass} align-top`}>
-                    <ViajesListadoHeaderFiltro
-                      title="Fecha de intervención"
-                      filterActive={!!fechaDesdeFiltro || !!fechaHastaFiltro}
-                      filterSignature={`${fechaDesdeFiltro}|${fechaHastaFiltro}`}
-                      onClear={() => {
-                        setFechaDesdeFiltro("");
-                        setFechaHastaFiltro("");
-                      }}
-                    >
-                      <div className="flex flex-col gap-2">
-                        <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
-                          Desde
-                          <input
-                            type="date"
-                            value={fechaDesdeFiltro}
-                            onChange={(e) => setFechaDesdeFiltro(e.target.value)}
-                            className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                          />
-                        </label>
-                        <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
-                          Hasta
-                          <input
-                            type="date"
-                            value={fechaHastaFiltro}
-                            onChange={(e) => setFechaHastaFiltro(e.target.value)}
-                            className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                          />
-                        </label>
-                      </div>
-                    </ViajesListadoHeaderFiltro>
-                  </th>
-                  <th scope="col" className={listadoTablaThClass}>Km</th>
-                  <th scope="col" className={listadoTablaThClass}>Próximo km</th>
-                  <th scope="col" className={listadoTablaThClass}>Vencimiento</th>
-                  <th scope="col" className={`${listadoTablaThClass} text-right`}>Acciones</th>
-                </tr>
-              }
-              columns={[
-                {
-                  id: "vehiculo",
-                  header: "Vehículo",
-                  primary: true,
-                  cell: (r) =>
-                    maestro.vehiculos.find((v) => v.id === r.vehiculoId)?.patente ??
-                    r.vehiculoId,
-                },
-                {
-                  id: "tipo",
-                  header: "Tipo",
-                  cell: (r) => {
-                    const labels = r.tipos.map(fmtTipoIntervencion);
-                    const visibles = labels.slice(0, 2);
-                    const restantes = labels.length - visibles.length;
-                    return (
-                      <span>
-                        {visibles.join(", ")}
-                        {restantes > 0 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setModal({ mode: "view", intervencion: r });
-                            }}
-                            className="ml-1 text-xs font-medium text-vialto-fire hover:underline"
-                          >
-                            +{restantes}
-                          </button>
-                        )}
-                      </span>
-                    );
-                  },
-                },
-                {
-                  id: "fecha",
-                  header: "Fecha de intervención",
-                  cell: (r) => fmtFechaIntervencion(r.fecha),
-                },
-                { id: "km", header: "Km", cell: (r) => fmtKm(r.km) },
-                {
-                  id: "proximoKm",
-                  header: "Próximo km",
-                  cell: (r) => fmtKm(r.proximoKm),
-                },
-                {
-                  id: "proximaFecha",
-                  header: "Vencimiento",
-                  cell: (r) =>
-                    r.proximaFecha ? fmtFechaIntervencion(r.proximaFecha) : "—",
-                },
-              ]}
-              rows={error ? [] : intervencionesFiltradas}
-              rowKey={(r) => r.id}
-              onRowClick={(r) => setModal({ mode: "view", intervencion: r })}
-              emptyMessage={
-                error
-                  ? "No se pudieron cargar las intervenciones."
-                  : hayFiltrosIntervenciones
-                    ? "No hay intervenciones que coincidan con los filtros aplicados."
-                    : "Todavía no hay intervenciones cargadas."
-              }
-              loadingMessage="Cargando…"
-              actionsTdClassName={listadoTablaTdClass}
-              renderActions={(r) => {
-                const options: AccionOpcion[] = [
-                  {
-                    id: "ver",
-                    label: "Ver",
-                    icon: Eye,
-                    onClick: () => setModal({ mode: "view", intervencion: r }),
-                  },
-                ];
-                if (!isReadOnly) {
-                  options.push({
-                    id: "eliminar",
-                    label: "Eliminar",
-                    icon: Trash2,
-                    danger: true,
-                    onClick: () => setDeleteTarget(r),
-                  });
-                }
-                return <AccionesFila options={options} destacadas={["ver"]} />;
-              }}
-            />
-          </>
+        {activeTab === "vencimientos" && (
+          <VencimientosSection
+            getToken={token}
+            tenantId={tenantId}
+            soloLectura={soloLectura}
+            reloadKey={reloadKey}
+            onRegistrarService={(precarga: PrecargaOrden) => setModal({ modo: "crear", precarga })}
+          />
         )}
-
-        {activeTab === "alertas" && (
-          <MantenimientoAlertasSection
-            vehiculos={maestro.vehiculos}
-            intervenciones={intervenciones ?? []}
+        {activeTab === "ordenes" && (
+          <OrdenesTrabajoSection
+            getToken={token}
+            tenantId={tenantId}
+            soloLectura={soloLectura}
+            reloadKey={reloadKey}
+            onVer={(ordenId) => setModal({ modo: "ver", ordenId })}
+            onCambio={recargar}
           />
         )}
       </div>
 
       {modal && (
-        <IntervencionModal
-          modo={modal.mode}
-          intervencionInicial={modal.mode === "create" ? undefined : modal.intervencion}
-          vehiculos={maestro.vehiculos}
-          vehiculoIdFiltro={vehiculoIdFiltro || undefined}
-          getToken={getToken}
+        <OrdenTrabajoModal
+          estado={modal}
+          soloLectura={soloLectura}
+          getToken={token}
+          tenantId={tenantId}
           onClose={() => setModal(null)}
-          onEdit={
-            modal.mode === "view"
-              ? () => setModal({ mode: "edit", intervencion: modal.intervencion })
-              : undefined
-          }
-          onSaved={() => {
-            setModal(null);
-            setReloadKey((k) => k + 1);
-          }}
+          onGuardada={recargar}
         />
       )}
-
-      <ConfirmDialog
-        open={!!deleteTarget}
-        title="Eliminar intervención"
-        message="¿Seguro que querés eliminar esta intervención? Esta acción no se puede deshacer."
-        confirmLabel="Eliminar"
-        tone="danger"
-        busy={deleting}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setDeleteTarget(null)}
-      />
     </div>
   );
 }

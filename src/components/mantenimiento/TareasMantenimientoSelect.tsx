@@ -9,27 +9,27 @@ import {
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import {
-  fmtTipoIntervencion,
-  TIPO_INTERVENCION_CATEGORIAS,
-  TIPO_INTERVENCION_OTRO,
+  fmtTarea,
+  TAREAS_POR_CATEGORIA,
+  TAREA_OTRO,
 } from "@/lib/mantenimientoLabels";
-import type { TipoIntervencionMantenimiento } from "@/types/api";
+import type { TareaMantenimiento } from "@/types/mantenimiento";
 
 const GRUPOS = [
-  ...TIPO_INTERVENCION_CATEGORIAS,
-  { id: "otro" as const, label: "Otro", opciones: [TIPO_INTERVENCION_OTRO] },
+  ...TAREAS_POR_CATEGORIA,
+  { id: "otro" as const, label: "Otro", opciones: [TAREA_OTRO] },
 ];
 
 const PANEL_MAX_H = 288; // max-h-72
 const GAP = 4;
 
-export function TipoIntervencionSelect({
+export function TareasMantenimientoSelect({
   value,
   onChange,
   error,
 }: {
-  value: TipoIntervencionMantenimiento[];
-  onChange: (next: TipoIntervencionMantenimiento[]) => void;
+  value: TareaMantenimiento[];
+  onChange: (next: TareaMantenimiento[]) => void;
   error?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -65,7 +65,6 @@ export function TipoIntervencionSelect({
       return;
     }
     updateMenuPosition();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   useEffect(() => {
@@ -110,7 +109,7 @@ export function TipoIntervencionSelect({
     })).filter((g) => g.opciones.length > 0);
   }, [q]);
 
-  function toggle(v: TipoIntervencionMantenimiento) {
+  function toggle(v: TareaMantenimiento) {
     onChange(
       value.includes(v) ? value.filter((x) => x !== v) : [...value, v],
     );
@@ -130,7 +129,7 @@ export function TipoIntervencionSelect({
             autoComplete="off"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar tipo…"
+            placeholder="Buscar tarea…"
             className="h-11 w-full border border-black/15 px-3 text-base outline-none focus:border-black/25 sm:h-9 sm:px-2 sm:text-sm"
           />
         </div>
@@ -181,11 +180,11 @@ export function TipoIntervencionSelect({
               key={v}
               className="inline-flex items-center gap-1.5 border border-vialto-fire/40 bg-vialto-fire/10 px-2.5 py-1.5 text-sm text-vialto-charcoal sm:px-2 sm:py-1 sm:text-xs"
             >
-              {fmtTipoIntervencion(v)}
+              {fmtTarea(v)}
               <button
                 type="button"
                 onClick={() => toggle(v)}
-                aria-label={`Quitar ${fmtTipoIntervencion(v)}`}
+                aria-label={`Quitar ${fmtTarea(v)}`}
                 className="text-vialto-steel hover:text-vialto-charcoal"
               >
                 <X className="h-3.5 w-3.5" strokeWidth={2.5} />
@@ -205,7 +204,7 @@ export function TipoIntervencionSelect({
           error ? "border-red-400" : "border-black/15"
         }`}
       >
-        {value.length === 0 ? "Agregar tipo…" : "+ Agregar otro tipo…"}
+        {value.length === 0 ? "Agregar tarea…" : "+ Agregar otra tarea…"}
       </button>
 
       {typeof document !== "undefined" && panelEl

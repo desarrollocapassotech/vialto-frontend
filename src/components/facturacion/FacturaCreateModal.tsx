@@ -59,6 +59,7 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
+import { MSG_EMITIR_MONTO_CERO } from "@/lib/arcaMontoCero";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useToast } from "@/lib/toast";
 import {
@@ -382,10 +383,10 @@ export function FacturaCreateModal({
     ? `/api/platform/arca/config?tenantId=${encodeURIComponent(tenantId!)}`
     : "/api/integracion-arca/config";
 
+  // Campo vacío = 0%. El valor por defecto se precarga en el campo al abrir (ver
+  // `ivaPrecargadoRef`); si el usuario lo borra, se factura sin IVA.
   const ivaPctDefault =
-    draft.ivaPct.trim() !== ""
-      ? Number(draft.ivaPct)
-      : (arcaConfig?.ivaGastosAdmin ?? 21);
+    draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0;
 
   const bloqueadoUsd = useMemo(() => {
     if (!hasArca) return false;
@@ -470,6 +471,8 @@ export function FacturaCreateModal({
     () => computeFacturaTotales(frozenLineas ?? lineas, ivaPctDefault),
     [lineas, frozenLineas, ivaPctDefault],
   );
+  // ARCA no admite un comprobante por $0: no se deja emitir (el borrador sí se puede guardar).
+  const montoCero = totales.total <= 0;
 
   const condicionIva = clienteDetalle?.condicionIva ?? null;
   const letra = facturaLetraFromCondicionIva(condicionIva);
@@ -542,6 +545,22 @@ export function FacturaCreateModal({
     platform,
     tenantId,
   ]);
+
+  // IVA (%) precargado con el valor por defecto (el mismo que ya se usa para calcular,
+  // `ivaPctDefault`), en vez de dejar el campo vacío con solo el placeholder. Se espera
+  // a `datosReady` para que con ARCA ya esté la config del tenant (`ivaGastosAdmin`).
+  // Una vez por apertura: si el usuario lo borra, no se vuelve a completar solo.
+  const ivaPrecargadoRef = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      ivaPrecargadoRef.current = false;
+      return;
+    }
+    if (!datosReady || ivaPrecargadoRef.current) return;
+    ivaPrecargadoRef.current = true;
+    const sugerido = String(arcaConfig?.ivaGastosAdmin ?? 21);
+    setDraft((d) => (d.ivaPct.trim() === "" ? { ...d, ivaPct: sugerido } : d));
+  }, [open, datosReady, arcaConfig, setDraft]);
 
   // Limpiar errores de línea cuando cambian las líneas derivadas
   useEffect(() => {
@@ -651,6 +670,10 @@ export function FacturaCreateModal({
       if (!lineasCheck.ok) {
         setLineasIncomplete(lineasCheck.indices);
         notifyError(lineasCheck.message);
+        return;
+      }
+      if (montoCero) {
+        notifyError(MSG_EMITIR_MONTO_CERO);
         return;
       }
     }
@@ -823,7 +846,7 @@ export function FacturaCreateModal({
         step="0.01"
         value={draft.ivaPct}
         onChange={(e) => patch({ ivaPct: e.target.value })}
-        placeholder="21"
+        placeholder="0"
         className={`${compactInputClass} sm:max-w-[8rem]`}
       />
     </div>
@@ -1004,7 +1027,7 @@ export function FacturaCreateModal({
             step="0.01"
             value={draft.ivaPct}
             onChange={(e) => patch({ ivaPct: e.target.value })}
-            placeholder="21"
+            placeholder="0"
             className="h-9 border border-black/20 bg-white px-3 text-sm"
           />
         </div>
@@ -1059,9 +1082,7 @@ export function FacturaCreateModal({
               }}
               viajeIds={draft.viajeIds}
               viajes={derivedViajes}
-              ivaPctDefault={
-                draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 21
-              }
+              ivaPctDefault={ivaPctDefault}
               disabled={busy}
               incompleteIndices={tramosIncomplete}
             />
@@ -1130,9 +1151,7 @@ export function FacturaCreateModal({
                 : "sm:h-auto sm:max-h-[92vh]",
             step === "autorizada"
               ? "max-w-[min(34rem,calc(100vw-1rem))]"
-              : unifiedArca
-                ? "max-w-[min(90rem,calc(100vw-1rem))]"
-                : "max-w-[min(90rem,calc(100vw-1rem))]",
+              : "max-w-[min(110rem,calc(100vw-1rem))]",
           ].join(" ")}
           onClick={(e) => e.stopPropagation()}
         >
@@ -1209,10 +1228,10 @@ export function FacturaCreateModal({
             {step === "form" ? (
               unifiedArca ? (
                 <>
-                  <div className="flex min-h-0 flex-col overflow-y-auto border-b border-black/10 px-4 py-4 sm:px-5 lg:w-[65%] lg:max-w-[65%] lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+                  <div className="flex min-h-0 flex-col overflow-y-auto border-b border-black/10 px-4 py-4 sm:px-5 lg:w-[68%] lg:max-w-[68%] lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
                     {compactFields}
                   </div>
-                  <div className="min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:w-[35%] lg:max-w-[35%] lg:shrink-0 lg:min-w-0">
+                  <div className="min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:w-[32%] lg:max-w-[32%] lg:shrink-0 lg:min-w-0">
                     <FacturaArcaPreviewPanel
                       arcaConfig={arcaConfig}
                       clienteDetalle={clienteDetalle}
@@ -1424,7 +1443,8 @@ export function FacturaCreateModal({
                       deshabilitado y el click hace zumbar el aviso del pie. */}
                   <button
                     type="button"
-                    disabled={busy || monedaInvalida || bloqueadoUsd}
+                    disabled={busy || monedaInvalida || bloqueadoUsd || montoCero}
+                    title={montoCero ? MSG_EMITIR_MONTO_CERO : undefined}
                     aria-disabled={datosEmitIncompletos || undefined}
                     onClick={() => {
                       if (datosEmitIncompletos) {

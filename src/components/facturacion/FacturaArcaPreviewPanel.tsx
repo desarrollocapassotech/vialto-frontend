@@ -21,9 +21,9 @@ import { paisCodigoDesdeTexto, idFiscalPorPais } from "@/lib/ciudades/paises";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between text-xs">
+    <div className="flex justify-between gap-3 text-xs">
       <span className="text-vialto-steel">{label}</span>
-      <span className="tabular-nums text-vialto-charcoal">{value}</span>
+      <span className="whitespace-nowrap tabular-nums text-vialto-charcoal">{value}</span>
     </div>
   );
 }
@@ -172,11 +172,11 @@ export function FacturaArcaPreviewPanel({
                 key={idx}
                 className="flex justify-between items-start text-sm"
               >
-                <div className="text-vialto-charcoal pr-4 whitespace-pre-wrap">
+                <div className="min-w-0 text-vialto-charcoal pr-4 whitespace-pre-wrap break-words">
                   {linea.descripcion || "Sin descripción"}
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="tabular-nums font-medium text-vialto-charcoal">
+                  <div className="whitespace-nowrap tabular-nums font-medium text-vialto-charcoal">
                     {fmtMoney(linea.importe || 0)}
                   </div>
                   <div className="text-xs text-vialto-steel tabular-nums mt-0.5">
@@ -202,9 +202,9 @@ export function FacturaArcaPreviewPanel({
       <div className="space-y-1 border-t border-black/10 pt-2">
         <Row label="Neto" value={fmtMoney(totales.neto)} />
         <Row label="IVA" value={fmtMoney(totales.iva)} />
-        <div className="flex justify-between text-xs font-semibold text-vialto-charcoal pt-1">
+        <div className="flex justify-between gap-3 text-xs font-semibold text-vialto-charcoal pt-1">
           <span>Total a facturar</span>
-          <span className="tabular-nums">{fmtMoney(totales.total)}</span>
+          <span className="whitespace-nowrap tabular-nums">{fmtMoney(totales.total)}</span>
         </div>
       </div>
 
