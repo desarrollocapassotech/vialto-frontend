@@ -1,4 +1,5 @@
 import { FacturaLineaDetalle } from "@/components/facturacion/FacturaLineaDetalle";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import {
   useEffect,
   useMemo,
@@ -76,6 +77,8 @@ export function EmitirFacturaModal({
   onEmitido,
   onDataSaved,
 }: Props) {
+  // Empresa efectiva (propia u override de superadmin) para armar el detalle como en el PDF.
+  const { tenant: tenantPdf } = useTenantPaisFijo(tenantId);
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -472,6 +475,7 @@ export function EmitirFacturaModal({
                           linea={linea}
                           ivaPctDefault={ivaPctDefault}
                           formatMonto={fmtMoney}
+                          tenant={tenantPdf}
                         />
                       ))}
                     </div>
