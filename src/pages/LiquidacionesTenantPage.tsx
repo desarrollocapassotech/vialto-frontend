@@ -35,6 +35,7 @@ import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 const LIQUIDACION_ACCIONES_DESTACADAS = [
   "reintentar",
   "emitir",
+  "comprobante",
   "pdf",
   "anular",
   "marcar-pendiente-anulacion",
@@ -193,6 +194,8 @@ function LiquidacionAccionesMenu({
     hasArca && liq.estado === "anulado" && Boolean(liq.anulacionCae);
   const tieneComprobanteAdjunto =
     !hasArca && Boolean(liq.comprobanteUrl?.trim());
+  // Con ARCA el comprobante es el PDF del CVLP: "Ver" lo abre en otra pestaña y "PDF" lo descarga.
+  const puedeVerComprobante = tieneComprobanteAdjunto || tienePdf;
 
   const options: AccionOpcion[] = [
     { id: "ver", label: "Ver", icon: Eye, onClick: onVer },
@@ -205,6 +208,14 @@ function LiquidacionAccionesMenu({
       icon: conError ? RotateCw : Receipt,
       onClick: onEmitir,
       disabled: isBusy,
+    });
+  }
+  if (puedeVerComprobante) {
+    options.push({
+      id: "comprobante",
+      label: "Ver comprobante",
+      icon: FileText,
+      onClick: onVerComprobante,
     });
   }
   if (tienePdf) {
@@ -225,14 +236,6 @@ function LiquidacionAccionesMenu({
       icon: FileMinus,
       onClick: onPdfNc,
       disabled: isDownloading,
-    });
-  }
-  if (tieneComprobanteAdjunto) {
-    options.push({
-      id: "comprobante",
-      label: "Ver comprobante",
-      icon: FileText,
-      onClick: onVerComprobante,
     });
   }
   if (puedeAnular) {
@@ -873,7 +876,8 @@ export function LiquidacionesTenantPage() {
       onConfirmarAnulacionManual: () => setConfirmarAnulacionManualTarget(liq),
       onEliminar: () => setEliminarConfirm(liq),
       onVerComprobante: () => {
-        if (liq.comprobanteUrl) setPreviewComprobanteUrl(liq.comprobanteUrl);
+        if (hasArca) void verPdf(liq);
+        else if (liq.comprobanteUrl) setPreviewComprobanteUrl(liq.comprobanteUrl);
       },
     };
   }
