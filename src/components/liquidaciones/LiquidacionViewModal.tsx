@@ -346,7 +346,7 @@ export function LiquidacionViewModal({
         }
         onClose={onClose}
         scrollBody
-        maxWidthClass="sm:max-w-2xl"
+        maxWidthClass="sm:max-w-4xl"
         footer={
           <>
             <button

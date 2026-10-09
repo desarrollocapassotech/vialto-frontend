@@ -52,6 +52,7 @@ import { useToast } from "@/lib/toast";
 import { apiFetch, apiJson } from "@/lib/api";
 import { filenameFromContentDisposition } from "@/lib/downloadFilename";
 import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
+import { ivaFleteComisionDesdeTotal } from "@/lib/liquidacionConceptosIva";
 import { friendlyError } from "@/lib/friendlyError";
 import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
@@ -1169,7 +1170,10 @@ export function LiquidacionesTenantPage() {
             // Mismo monto que la línea de IVA del detalle (LiquidacionMontosBreakdown).
             // Verde si se suma al líquido, rojo si se resta (IVA negativo).
             cell: (liq) => {
-              const iva = Number(liq.gastosAdminIva) || 0;
+              const iva = ivaFleteComisionDesdeTotal(
+                liq.gastosAdminIva,
+                liq.conceptosLineas ?? [],
+              );
               return (
                 <span
                   className={iva < 0 ? "text-red-700" : "text-emerald-700"}
