@@ -930,6 +930,16 @@ export function FacturaCreateModal({
         {!hasArca && <div className="sm:col-span-2">{compactIvaField}</div>}
       </div>
       <div className="flex min-h-[14rem] flex-1 flex-col gap-1 overflow-hidden">
+        {/* Mismo título que "Nueva liquidación" (sin asterisco: en facturas los viajes son opcionales). */}
+        <p className={compactLabelClass}>
+          Viajes a incluir
+          {draft.viajeIds.length > 0 && (
+            <span className="ml-1 normal-case text-vialto-charcoal">
+              ({draft.viajeIds.length} seleccionado
+              {draft.viajeIds.length !== 1 ? "s" : ""})
+            </span>
+          )}
+        </p>
         <div className="min-h-0 flex-1 overflow-hidden">
           <ViajesVinculadosEditor
             viajes={derivedViajes}

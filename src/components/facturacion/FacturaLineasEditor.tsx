@@ -27,6 +27,8 @@ export type FacturaLineaDraft = {
   producto?: string;
   cantidad?: number;
   precioUnitario?: number;
+  /** Solo para mostrar (tooltip de "Detalles del viaje"); no viaja al backend. */
+  viaje?: Viaje;
 };
 
 const inputClass =
@@ -170,6 +172,7 @@ export function defaultFacturaLineasFromDraft(
         producto: productoKeyViaje(v),
         cantidad: v.cantidadFactura ?? undefined,
         precioUnitario: v.precioUnitarioFactura ?? undefined,
+        viaje: v,
       };
     });
     const netoLineas = lineas.reduce((s, l) => s + l.importe, 0);
@@ -249,6 +252,7 @@ export function defaultFacturaLineas(
         producto: productoKeyViaje(v),
         cantidad: v.cantidadFactura ?? undefined,
         precioUnitario: v.precioUnitarioFactura ?? undefined,
+        viaje: v,
       };
     });
     const netoLineas = lineas.reduce((s, l) => s + l.importe, 0);

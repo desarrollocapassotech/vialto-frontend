@@ -45,7 +45,7 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
   selectedIds,
   onToggle,
   renderMonto,
-  montoLabel,
+  montoSinIva,
   disabledCheck,
   loading,
   maxHeightClass = "max-h-72",
@@ -94,8 +94,8 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
    * encabezado ("Monto (ARS)") y `renderMonto` recibe `conMoneda: false` (solo "$").
    */
   monedaDe?: (v: T) => string;
-  /** Encabezado de la columna de monto en lugar de "Monto (moneda)" (ej. "Monto (sin IVA)"). */
-  montoLabel?: string;
+  /** true = el monto es sin IVA: el encabezado dice "Monto (s/IVA)", sin la moneda. */
+  montoSinIva?: boolean;
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
@@ -289,7 +289,9 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                   <th className="px-2 py-2 text-left">Transporte</th>
                 )}
                 <th className="whitespace-nowrap px-2 py-2 text-right">
-                  {montoLabel ?? `Monto${monedaUnica ? ` (${monedaUnica})` : ""}`}
+                  {montoSinIva
+                    ? "Monto (s/IVA)"
+                    : `Monto${monedaUnica ? ` (${monedaUnica})` : ""}`}
                 </th>
               </tr>
             </thead>
