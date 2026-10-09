@@ -49,6 +49,7 @@ import {
 import { friendlyError } from "@/lib/friendlyError";
 import {
   signedMontoConIvaConcepto,
+  signedMontoNetoConcepto,
 } from "@/lib/liquidacionConceptosIva";
 import { useToast } from "@/lib/toast";
 import {
@@ -983,6 +984,27 @@ export function CrearLiquidacionManualModal({
     ivaGeneral = ((bruto - comisionMonto) * ivaPctNum) / 100;
   }
   const ivaMonto = netoGravado !== null ? ivaGeneral : null;
+  // Resumen con el mismo criterio que el PDF del CVLP: los conceptos suman su base al
+  // neto gravado y su IVA va junto con el de flete/comisión en una sola línea de IVA.
+  const conceptosNeto = conceptosCompletos.reduce(
+    (sum, l) =>
+      sum +
+      signedMontoNetoConcepto(l.signo, Number(l.monto) || 0) *
+        getMultiplicador(l.modoAplicacion),
+    0,
+  );
+  const netoGravadoPdf =
+    netoGravado !== null ? netoGravado + conceptosNeto : null;
+  const ivaTotalPdf =
+    ivaMonto !== null ? ivaMonto + (conceptosEfecto - conceptosNeto) : null;
+  // Si todo va a la misma alícuota se muestra (ej. "IVA 21%"); si hay mezcla, solo "IVA".
+  const alicuotasResumen = new Set<number>([
+    ...selectedViajes.map((v) => v.precioTransportistaIvaIncluidoPct || ivaPctNum),
+    ...(comisionMonto > 0 ? [ivaPctNum] : []),
+    ...conceptosCompletos.map((l) => Number(l.ivaPct ?? ivaPctNum)),
+  ]);
+  const ivaResumenLabel =
+    alicuotasResumen.size === 1 ? `IVA ${[...alicuotasResumen][0]}%` : "IVA";
   const totalALiquidar =
     netoGravado !== null && ivaMonto !== null
       ? netoGravado + ivaMonto + conceptosEfecto
@@ -1658,30 +1680,26 @@ export function CrearLiquidacionManualModal({
                         )}
                         {conceptosCompletos.map((l, idx) => {
                           const mult = getMultiplicador(l.modoAplicacion);
-                          const conIva =
-                            signedMontoConIvaConcepto(
-                              l.signo,
-                              Number(l.monto) || 0,
-                              l.ivaPct,
-                            ) * mult;
+                          const neto =
+                            signedMontoNetoConcepto(l.signo, Number(l.monto) || 0) * mult;
                           return (
                             <ResumenRow
                               key={`${l.conceptoLiquidacionId}-${idx}`}
                               label={`${l.nombre || "Concepto"}${mult > 1 ? ` (×${mult} viajes)` : ""}${l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ""}`}
-                              value={`${fmtSignedLiquidacionMoney(Math.abs(conIva), conIva >= 0 ? "plus" : "minus")} ${monedaResumen}`}
+                              value={`${fmtSignedLiquidacionMoney(Math.abs(neto), neto >= 0 ? "plus" : "minus")} ${monedaResumen}`}
                             />
                           );
                         })}
-                        {netoGravado !== null && (
+                        {netoGravadoPdf !== null && (
                           <ResumenRow
-                            label="Subtotal"
-                            value={`${fmtLiquidacionMoney(netoGravado + conceptosEfecto)} ${monedaResumen}`}
+                            label="Neto gravado"
+                            value={`${fmtLiquidacionMoney(netoGravadoPdf)} ${monedaResumen}`}
                           />
                         )}
-                        {ivaMonto !== null && (
+                        {ivaTotalPdf !== null && (
                           <ResumenRow
-                            label={`IVA ${ivaPctNum}% (flete/comisión)`}
-                            value={`${fmtSignedLiquidacionMoney(ivaMonto, "plus")} ${monedaResumen}`}
+                            label={ivaResumenLabel}
+                            value={`${fmtSignedLiquidacionMoney(ivaTotalPdf, "plus")} ${monedaResumen}`}
                           />
                         )}
                         {totalALiquidar !== null && (
