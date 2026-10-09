@@ -394,19 +394,7 @@ export function ConceptosLiquidacionLineasEditor({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={labelClass + " mb-0"}>Conceptos de liquidación</p>
-        {!disabled && (
-          <button
-            type="button"
-            disabled={loading || showQuick}
-            onClick={addRow}
-            className="text-[10px] uppercase tracking-wider text-vialto-charcoal hover:text-vialto-fire disabled:opacity-50"
-          >
-            + Agregar concepto
-          </button>
-        )}
-      </div>
+      <p className={labelClass + " mb-0"}>Conceptos de liquidación</p>
 
       {error && (
         <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
@@ -714,7 +702,7 @@ export function ConceptosLiquidacionLineasEditor({
                 </label>
 
                 <div>
-                  <span className={labelClass}>Subtotal</span>
+                  <span className={labelClass}>Subtotal c/IVA</span>
                   <div
                     className={`flex h-9 items-center rounded border border-black/10 bg-vialto-mist/60 px-2 text-sm tabular-nums ${
                       aFavor ? "text-emerald-700" : "text-red-700"
@@ -745,6 +733,19 @@ export function ConceptosLiquidacionLineasEditor({
               <option key={p} value={p} />
             ))}
           </datalist>
+        </div>
+      )}
+
+      {!disabled && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            disabled={loading || showQuick}
+            onClick={addRow}
+            className="text-[10px] uppercase tracking-wider text-vialto-charcoal hover:text-vialto-fire disabled:opacity-50"
+          >
+            + Agregar concepto
+          </button>
         </div>
       )}
 

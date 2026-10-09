@@ -590,6 +590,7 @@ export function LiquidacionEditModal({
                     )
                   }
                   monedaDe={monedaDeViaje}
+                  montoLabel="Monto (s/IVA)"
                   disabledCheck={(v) => {
                     const moneda = monedaDeViaje(v);
                     const disabled =
