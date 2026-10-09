@@ -17,7 +17,7 @@ import { FacturaAccionesMenu } from "@/components/facturacion/FacturaAccionesMen
 import { AnularFacturaModal } from "@/components/facturacion/AnularFacturaModal";
 import { EmitirFacturaModal } from "@/components/facturacion/EmitirFacturaModal";
 import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
-import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
+import { ArcaEmisionIndicadores } from "@/components/liquidaciones/ArcaEmisionIndicadores";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -33,7 +33,7 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
-import { Clock, Download, FlaskConical, Landmark } from "lucide-react";
+import { Clock, Download, FlaskConical } from "lucide-react";
 import {
   clientesConViajesPendientesFactura,
   monedaUnicaDeViajes,
@@ -101,7 +101,7 @@ function fmtFecha(iso: string | null) {
   if (!iso) return "—";
   const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (match) {
-    const [_, year, month, day] = match;
+    const [, year, month, day] = match;
     return `${day}/${month}/${year}`;
   }
   return new Date(iso).toLocaleDateString("es-AR", {
@@ -881,7 +881,7 @@ export function FacturacionTenantPage({
           <span
             title="Emitida en ambiente de pruebas (homologación)"
             aria-label="Emitida en ambiente de pruebas"
-            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-amber-300 bg-amber-50 text-amber-800"
+            className="inline-flex shrink-0 items-center text-amber-600"
           >
             <FlaskConical className="h-3 w-3" strokeWidth={2} aria-hidden />
           </span>
@@ -1074,7 +1074,7 @@ export function FacturacionTenantPage({
       );
 
       showToast("Excel exportado exitosamente", "success");
-    } catch (err) {
+    } catch {
       showToast("Ocurrió un error al exportar el Excel", "error");
     } finally {
       setExportandoExcel(false);
@@ -1254,20 +1254,14 @@ export function FacturacionTenantPage({
         )}
 
         {hasArca && (
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
-              <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
-              Emisión electrónica vía ARCA
-            </div>
-            <AmbienteTestBadge
-              ambiente={ambienteArca}
-              to={
-                embeddedInSuperadmin
-                  ? undefined
-                  : "/configuracion/arca?tab=ambiente"
-              }
-            />
-          </div>
+          <ArcaEmisionIndicadores
+            ambiente={ambienteArca}
+            to={
+              embeddedInSuperadmin
+                ? undefined
+                : "/configuracion/arca?tab=ambiente"
+            }
+          />
         )}
 
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">

@@ -10,6 +10,15 @@ const ESTADO_LABEL: Record<string, string> = {
   anulado: "ANULADO",
 };
 
+/** Empresa con país fijo en Argentina (`useTenantPaisFijo`): el ID fiscal es CUIT/CUIL. */
+export function liquidacionesExportColumns(
+  paisFijo: string | null,
+): ExcelExportColOption[] {
+  return LIQUIDACIONES_EXPORT_COLUMNS.map((c) =>
+    c.id === "idFiscal" && paisFijo === "AR" ? { ...c, label: "CUIT/CUIL" } : c,
+  );
+}
+
 export const LIQUIDACIONES_EXPORT_COLUMNS: ExcelExportColOption[] = [
   { id: "transportista", label: "Transportista", required: true },
   { id: "idFiscal", label: "ID Fiscal (CUIT/RUT)" },
@@ -22,6 +31,16 @@ export const LIQUIDACIONES_EXPORT_COLUMNS: ExcelExportColOption[] = [
   { id: "estado", label: "Estado" },
   { id: "cbteNro", label: "Nº Comprobante" },
 ];
+
+/** Formato AFIP: punto de venta (4 dígitos) - número (8 dígitos), ej. 0003-00000070. */
+function fmtNroComprobante(
+  ptoVenta: number | null | undefined,
+  cbteNro: number | null | undefined,
+): string {
+  if (cbteNro == null) return "";
+  const nro = String(cbteNro).padStart(8, "0");
+  return ptoVenta != null ? `${String(ptoVenta).padStart(4, "0")}-${nro}` : nro;
+}
 
 function fmtDate(iso: string) {
   if (!iso) return "";
@@ -68,7 +87,7 @@ export async function generarLiquidacionesExcel(
           row[col.label] = ESTADO_LABEL[liq.estado] ?? liq.estado;
           break;
         case "cbteNro":
-          row[col.label] = liq.cbteNro || "";
+          row[col.label] = fmtNroComprobante(liq.ptoVenta, liq.cbteNro);
           break;
         default:
           row[col.label] = "";

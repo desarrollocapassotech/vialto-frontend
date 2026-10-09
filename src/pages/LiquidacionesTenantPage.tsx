@@ -1,4 +1,5 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -8,7 +9,6 @@ import {
   FileMinus,
   FileText,
   FlaskConical,
-  Landmark,
   Receipt,
   RotateCw,
   Trash2,
@@ -18,6 +18,7 @@ import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
+import { ArcaEmisionIndicadores } from "@/components/liquidaciones/ArcaEmisionIndicadores";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import {
   LiquidacionViewModal,
@@ -71,7 +72,7 @@ import {
 } from "@/lib/viajesFlota";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import {
-  LIQUIDACIONES_EXPORT_COLUMNS,
+  liquidacionesExportColumns,
   generarLiquidacionesExcel,
 } from "@/lib/liquidacionesExcelExport";
 import {
@@ -88,6 +89,14 @@ const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
   anulado: "ANULADO",
   pendiente_anulacion: "PENDIENTE DE ANULACIÓN",
 };
+
+/** Estados ofrecidos en el filtro del listado, en este orden. */
+const ESTADOS_FILTRO: LiquidacionEstado[] = [
+  "autorizado",
+  "pendiente_anulacion",
+  "anulado",
+  "borrador",
+];
 
 const ESTADO_CLASS: Record<LiquidacionEstado, string> = {
   borrador: "bg-gray-100 text-gray-700",
@@ -296,6 +305,13 @@ export function LiquidacionesTenantPage() {
   );
 
   const activeTenantId = isSuperAdmin ? filtroEmpresa : (orgId ?? "");
+  const { paisFijo } = useTenantPaisFijo(
+    isSuperAdmin && activeTenantId ? activeTenantId : undefined,
+  );
+  const exportColumns = useMemo(
+    () => liquidacionesExportColumns(paisFijo),
+    [paisFijo],
+  );
   const empresaModules = isSuperAdmin
     ? (tenants?.find((t) => t.clerkOrgId === activeTenantId)?.modules ?? [])
     : (tenant?.modules ?? []);
@@ -888,7 +904,7 @@ export function LiquidacionesTenantPage() {
     }
     try {
       setExportandoExcel(true);
-      const cols = LIQUIDACIONES_EXPORT_COLUMNS.filter((c) =>
+      const cols = exportColumns.filter((c) =>
         selectedIds.includes(c.id),
       );
       await generarLiquidacionesExcel(
@@ -897,7 +913,7 @@ export function LiquidacionesTenantPage() {
         "Liquidaciones_Exportadas",
       );
       showToast("Excel exportado exitosamente", "success");
-    } catch (err) {
+    } catch {
       showToast("Ocurrió un error al exportar el Excel", "error");
     } finally {
       setExportandoExcel(false);
@@ -926,13 +942,7 @@ export function LiquidacionesTenantPage() {
         </h1>
 
         {hasArca && activeTenantId && (
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
-              <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
-              Emisión electrónica vía ARCA
-            </div>
-            <AmbienteTestBadge ambiente={config?.ambiente} />
-          </div>
+          <ArcaEmisionIndicadores ambiente={config?.ambiente} />
         )}
 
         {activeTenantId && (!error || !isSuperAdmin) && (
@@ -1088,9 +1098,9 @@ export function LiquidacionesTenantPage() {
                     aria-label="Filtrar listado por estado"
                   >
                     <option value="todos">Todos</option>
-                    {Object.entries(ESTADO_LABEL).map(([val, label]) => (
+                    {ESTADOS_FILTRO.map((val) => (
                       <option key={val} value={val}>
-                        {label}
+                        {ESTADO_LABEL[val]}
                       </option>
                     ))}
                   </select>
@@ -1211,7 +1221,7 @@ export function LiquidacionesTenantPage() {
                         <span
                           title="Emitida en ambiente de pruebas (homologación)"
                           aria-label="Emitida en ambiente de pruebas"
-                          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-amber-300 bg-amber-50 text-amber-800"
+                          className="inline-flex shrink-0 items-center text-amber-600"
                         >
                           <FlaskConical className="h-3 w-3" strokeWidth={2} aria-hidden />
                         </span>
@@ -1607,7 +1617,7 @@ export function LiquidacionesTenantPage() {
 
       {exportModalOpen && (
         <ExcelExportModal
-          columns={LIQUIDACIONES_EXPORT_COLUMNS}
+          columns={exportColumns}
           rowCount={filteredRows?.length ?? 0}
           onExport={handleExportarExcel}
           onClose={() => !exportandoExcel && setExportModalOpen(false)}

@@ -4,11 +4,14 @@ import { resolveBreadcrumbs, type Crumb } from "@/lib/breadcrumbs";
 
 export function Breadcrumbs({
   override,
+  extrasRef,
   superadmin,
   stockViewer,
   stockOperator,
 }: {
   override: Crumb[] | null;
+  /** Contenedor a la derecha donde las pantallas portalean indicadores (`BreadcrumbExtras`). */
+  extrasRef?: (el: HTMLElement | null) => void;
   superadmin: boolean;
   stockViewer: boolean;
   stockOperator: boolean;
@@ -22,10 +25,17 @@ export function Breadcrumbs({
       stockOperator,
     });
 
-  if (crumbs.length <= 1) return null;
+  const extras = (
+    <div ref={extrasRef} className="ml-auto flex flex-wrap items-center justify-end gap-3 empty:hidden" />
+  );
+
+  if (crumbs.length <= 1) {
+    return <div className="mb-4 flex empty:hidden has-[>div:empty]:hidden">{extras}</div>;
+  }
 
   return (
-    <nav aria-label="Ruta de navegación" className="mb-4 flex flex-wrap items-center gap-1 text-sm">
+    <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1">
+    <nav aria-label="Ruta de navegación" className="flex flex-wrap items-center gap-1 text-sm">
       {crumbs.map((crumb, i) => {
         const isLast = i === crumbs.length - 1;
         return (
@@ -50,5 +60,7 @@ export function Breadcrumbs({
         );
       })}
     </nav>
+    {extras}
+    </div>
   );
 }
