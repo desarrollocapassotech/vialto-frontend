@@ -120,7 +120,8 @@ export function facturaPayloadFromDraft(
   draft: FacturaDraft,
   comprobanteUrl?: string | null,
 ) {
-  const ivaN = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : undefined;
+  // Campo de IVA vacío = 0% (no el default del backend).
+  const ivaN = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0;
   const facturarPorTramo =
     draft.facturarPorTramo && draft.viajeIds.length > 0;
   const base: Record<string, unknown> = {
@@ -545,7 +546,7 @@ export function FacturaEditModal({
 
   function handleToggleFacturarPorTramo(checked: boolean) {
     const ivaDefault =
-      draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 21;
+      draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0;
     patch({
       facturarPorTramo: checked,
       tramos: checked
@@ -715,7 +716,7 @@ export function FacturaEditModal({
                 step="0.01"
                 value={draft.ivaPct}
                 onChange={(e) => patch({ ivaPct: e.target.value })}
-                placeholder="21"
+                placeholder="0"
                 className="h-9 border border-black/20 bg-white px-3 text-sm"
               />
             </div>
@@ -776,7 +777,7 @@ export function FacturaEditModal({
                   viajeIds={draft.viajeIds}
                   viajes={viajes}
                   ivaPctDefault={
-                    draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 21
+                    draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0
                   }
                   disabled={saving}
                   incompleteIndices={tramosIncomplete}

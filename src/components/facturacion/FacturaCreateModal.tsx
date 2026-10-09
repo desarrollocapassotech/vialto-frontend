@@ -382,10 +382,10 @@ export function FacturaCreateModal({
     ? `/api/platform/arca/config?tenantId=${encodeURIComponent(tenantId!)}`
     : "/api/integracion-arca/config";
 
+  // Campo vacío = 0%. El valor por defecto se precarga en el campo al abrir (ver
+  // `ivaPrecargadoRef`); si el usuario lo borra, se factura sin IVA.
   const ivaPctDefault =
-    draft.ivaPct.trim() !== ""
-      ? Number(draft.ivaPct)
-      : (arcaConfig?.ivaGastosAdmin ?? 21);
+    draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0;
 
   const bloqueadoUsd = useMemo(() => {
     if (!hasArca) return false;
@@ -542,6 +542,22 @@ export function FacturaCreateModal({
     platform,
     tenantId,
   ]);
+
+  // IVA (%) precargado con el valor por defecto (el mismo que ya se usa para calcular,
+  // `ivaPctDefault`), en vez de dejar el campo vacío con solo el placeholder. Se espera
+  // a `datosReady` para que con ARCA ya esté la config del tenant (`ivaGastosAdmin`).
+  // Una vez por apertura: si el usuario lo borra, no se vuelve a completar solo.
+  const ivaPrecargadoRef = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      ivaPrecargadoRef.current = false;
+      return;
+    }
+    if (!datosReady || ivaPrecargadoRef.current) return;
+    ivaPrecargadoRef.current = true;
+    const sugerido = String(arcaConfig?.ivaGastosAdmin ?? 21);
+    setDraft((d) => (d.ivaPct.trim() === "" ? { ...d, ivaPct: sugerido } : d));
+  }, [open, datosReady, arcaConfig, setDraft]);
 
   // Limpiar errores de línea cuando cambian las líneas derivadas
   useEffect(() => {
@@ -823,7 +839,7 @@ export function FacturaCreateModal({
         step="0.01"
         value={draft.ivaPct}
         onChange={(e) => patch({ ivaPct: e.target.value })}
-        placeholder="21"
+        placeholder="0"
         className={`${compactInputClass} sm:max-w-[8rem]`}
       />
     </div>
@@ -1004,7 +1020,7 @@ export function FacturaCreateModal({
             step="0.01"
             value={draft.ivaPct}
             onChange={(e) => patch({ ivaPct: e.target.value })}
-            placeholder="21"
+            placeholder="0"
             className="h-9 border border-black/20 bg-white px-3 text-sm"
           />
         </div>
@@ -1059,9 +1075,7 @@ export function FacturaCreateModal({
               }}
               viajeIds={draft.viajeIds}
               viajes={derivedViajes}
-              ivaPctDefault={
-                draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 21
-              }
+              ivaPctDefault={ivaPctDefault}
               disabled={busy}
               incompleteIndices={tramosIncomplete}
             />

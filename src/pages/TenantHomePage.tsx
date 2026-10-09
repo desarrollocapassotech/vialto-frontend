@@ -11,8 +11,6 @@ import { ViajeEditModal } from "@/components/viajes/ViajeEditModal";
 import {
   type FacturaLetra,
   facturaLetraFromCondicionIva,
-  facturaLetraLabel,
-  condicionIvaLabel,
 } from "@/lib/arcaCbteTipo";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import { FacturaCreateModal } from "@/components/facturacion/FacturaCreateModal";
@@ -259,10 +257,6 @@ export function TenantHomePage() {
                   if (hasFacturasArca) {
                     const cliente = maestro.clientes?.find((c) => c.id === v.clienteId);
                     letra = facturaLetraFromCondicionIva(cliente?.condicionIva ?? null);
-                    showToast(
-                      `Se emitirá ${facturaLetraLabel(letra)} — ${condicionIvaLabel(cliente?.condicionIva ?? null)}`,
-                      "success",
-                    );
                   }
                   void (async () => {
                     setAbriendoFacturar(true);
