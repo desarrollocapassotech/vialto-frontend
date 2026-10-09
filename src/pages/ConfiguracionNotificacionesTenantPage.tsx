@@ -161,6 +161,9 @@ function agruparPorModulo(
 const MODULO_LABEL: Record<string, string> = {
   facturacion: "Facturación",
   combustible: "Combustible",
+  "cuenta-corriente": "Cuenta corriente",
+  liquidaciones: "Liquidaciones",
+  mantenimiento: "Mantenimiento",
 };
 
 export function ConfiguracionNotificacionesTenantPage({

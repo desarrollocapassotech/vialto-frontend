@@ -4,8 +4,8 @@ import { ChevronDown } from 'lucide-react';
 import { AccionesMenuTrigger } from '@/components/ui/AccionesMenuTrigger';
 import { AccionesOpcionesSheet, type AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 
-/** Máximo de acciones que se muestran como ícono directo en la fila. */
-const MAX_ICONOS = 2;
+/** Máximo default de acciones que se muestran como ícono directo en la fila. */
+const MAX_ICONOS_DEFAULT = 2;
 const DROPDOWN_WIDTH_PX = 240;
 const ID_ELIMINAR = 'eliminar';
 const ID_VER = 'ver';
@@ -14,11 +14,13 @@ type Props = {
   options: AccionOpcion[];
   /**
    * Ids de las acciones a mostrar como ícono, en orden de prioridad. Se muestran las
-   * primeras {@link MAX_ICONOS} que estén disponibles en `options` para esa fila.
+   * primeras `maxIconos` que estén disponibles en `options` para esa fila.
    * Si sobra lugar se completa con "Ver" (id `ver`) y después con "Eliminar" (id
    * `eliminar`); las demás acciones `danger` no se listan acá salvo que la pantalla lo pida.
    */
   destacadas: string[];
+  /** Cuántos íconos se muestran en desktop (default 2; Facturas y Liquidaciones usan 3). */
+  maxIconos?: number;
   /** Subtítulo del modal de acciones (ej. "Viaje #123"). */
   subtitle?: ReactNode;
   /** Modal de acciones (se abre al tocar la fila). Controlado por el padre si se pasan ambos. */
@@ -28,11 +30,18 @@ type Props = {
 
 /**
  * Columna de acciones de un listado.
- * - Desktop: hasta 2 íconos con las acciones principales + flecha con desplegable de todas.
+ * - Desktop: hasta `maxIconos` íconos con las acciones principales + flecha con desplegable de todas.
  * - Mobile: botón "Acciones" que abre el modal (sheet).
  * El modal con todas las acciones sigue disponible (click en la fila, vía `open`/`onOpenChange`).
  */
-export function AccionesFila({ options, destacadas, subtitle, open: openProp, onOpenChange }: Props) {
+export function AccionesFila({
+  options,
+  destacadas,
+  maxIconos = MAX_ICONOS_DEFAULT,
+  subtitle,
+  open: openProp,
+  onOpenChange,
+}: Props) {
   const [internalOpen, setInternalOpen] = useState(false);
   const controlado = openProp !== undefined;
   const sheetOpen = controlado ? openProp : internalOpen;
@@ -43,16 +52,16 @@ export function AccionesFila({ options, destacadas, subtitle, open: openProp, on
     // Una acción `danger` solo va como ícono si la pantalla la lista explícitamente
     // en `destacadas` (ej. Anular en Liquidaciones).
     .filter((o): o is AccionOpcion => Boolean(o && o.icon))
-    .slice(0, MAX_ICONOS);
+    .slice(0, maxIconos);
   // "Ver" va como ícono si sobra lugar (ej. la fila tiene una sola acción destacada):
   // primero, y con prioridad sobre "Eliminar".
   const ver = options.find((o) => o.id === ID_VER && o.icon);
-  if (ver && iconos.length < MAX_ICONOS && !iconos.includes(ver)) {
+  if (ver && iconos.length < maxIconos && !iconos.includes(ver)) {
     iconos.unshift(ver);
   }
   // "Eliminar" solo va como ícono si sobra lugar (igual pide confirmación al tocarlo).
   const eliminar = options.find((o) => o.id === ID_ELIMINAR && o.icon);
-  if (eliminar && iconos.length < MAX_ICONOS && !iconos.includes(eliminar)) {
+  if (eliminar && iconos.length < maxIconos && !iconos.includes(eliminar)) {
     iconos.push(eliminar);
   }
   // Las acciones peligrosas (Anular, Eliminar) nunca van primero: siempre al final.

@@ -49,6 +49,7 @@ import {
 import { friendlyError } from "@/lib/friendlyError";
 import {
   signedMontoConIvaConcepto,
+  signedMontoNetoConcepto,
 } from "@/lib/liquidacionConceptosIva";
 import { useToast } from "@/lib/toast";
 import {
@@ -983,6 +984,27 @@ export function CrearLiquidacionManualModal({
     ivaGeneral = ((bruto - comisionMonto) * ivaPctNum) / 100;
   }
   const ivaMonto = netoGravado !== null ? ivaGeneral : null;
+  // Resumen con el mismo criterio que el PDF del CVLP: los conceptos suman su base al
+  // neto gravado y su IVA va junto con el de flete/comisión en una sola línea de IVA.
+  const conceptosNeto = conceptosCompletos.reduce(
+    (sum, l) =>
+      sum +
+      signedMontoNetoConcepto(l.signo, Number(l.monto) || 0) *
+        getMultiplicador(l.modoAplicacion),
+    0,
+  );
+  const netoGravadoPdf =
+    netoGravado !== null ? netoGravado + conceptosNeto : null;
+  const ivaTotalPdf =
+    ivaMonto !== null ? ivaMonto + (conceptosEfecto - conceptosNeto) : null;
+  // Si todo va a la misma alícuota se muestra (ej. "IVA 21%"); si hay mezcla, solo "IVA".
+  const alicuotasResumen = new Set<number>([
+    ...selectedViajes.map((v) => v.precioTransportistaIvaIncluidoPct || ivaPctNum),
+    ...(comisionMonto > 0 ? [ivaPctNum] : []),
+    ...conceptosCompletos.map((l) => Number(l.ivaPct ?? ivaPctNum)),
+  ]);
+  const ivaResumenLabel =
+    alicuotasResumen.size === 1 ? `IVA ${[...alicuotasResumen][0]}%` : "IVA";
   const totalALiquidar =
     netoGravado !== null && ivaMonto !== null
       ? netoGravado + ivaMonto + conceptosEfecto
@@ -1198,7 +1220,8 @@ export function CrearLiquidacionManualModal({
               ) : (
                 <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]">
                 <div className="min-h-0 space-y-4 overflow-y-auto px-6 py-4 lg:border-r lg:border-black/10">
-                  <div className="grid grid-cols-1 gap-3">
+                  {/* Transportista, comisión e IVA en una sola fila. */}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
                     <div>
                       <label className={labelClass}>
                         Transportista <span className="text-red-500">*</span>
@@ -1236,6 +1259,53 @@ export function CrearLiquidacionManualModal({
                     </div>
                     {/* La condición frente al IVA del transportista se ve en el tooltip del Receptor (panel derecho). */}
                     {/* El punto de venta no se muestra: sale de Configuración ARCA (ptoVentaCvlp). */}
+                    <div>
+                      <label htmlFor="comisionPct" className={labelClass}>
+                        Comisión por flete (%)
+                      </label>
+                      <input
+                        id="comisionPct"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={comisionPct}
+                        onChange={(e) => {
+                          comisionEditadaManualmente.current = true;
+                          setComisionPct(e.target.value);
+                        }}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="ivaPct"
+                        className="mb-1 flex items-center gap-1.5 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.18em] text-vialto-steel"
+                      >
+                        <span>IVA sobre comisión (%)</span>
+                        <div className="group relative flex items-center">
+                          <HelpCircle className="h-3.5 w-3.5 cursor-help text-vialto-steel transition-colors hover:text-vialto-charcoal" />
+                          <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[220px] -translate-x-1/2 whitespace-normal rounded bg-vialto-charcoal px-2.5 py-1.5 text-[11px] normal-case leading-tight tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100">
+                            Alícuotas válidas de AFIP: 0%, 2.5%, 5%, 10.5%, 21%
+                            y 27%
+                            <span className="absolute left-1/2 top-full -mt-[1px] -translate-x-1/2 border-[5px] border-transparent border-t-vialto-charcoal"></span>
+                          </div>
+                        </div>
+                      </label>
+                      <input
+                        id="ivaPct"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={ivaPct}
+                        onChange={(e) => {
+                          ivaEditadaManualmente.current = true;
+                          setIvaPct(e.target.value);
+                        }}
+                        className={inputClass}
+                      />
+                    </div>
                   </div>
 
                   {/* Período */}
@@ -1293,56 +1363,6 @@ export function CrearLiquidacionManualModal({
                       )}
                     </div>
                   )}
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label htmlFor="comisionPct" className={labelClass}>
-                        Comisión por flete (%)
-                      </label>
-                      <input
-                        id="comisionPct"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={comisionPct}
-                        onChange={(e) => {
-                          comisionEditadaManualmente.current = true;
-                          setComisionPct(e.target.value);
-                        }}
-                        className={inputClass}
-                      />
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="ivaPct"
-                        className="mb-1 flex items-center gap-1.5 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.18em] text-vialto-steel"
-                      >
-                        <span>IVA sobre comisión (%)</span>
-                        <div className="group relative flex items-center">
-                          <HelpCircle className="h-3.5 w-3.5 cursor-help text-vialto-steel transition-colors hover:text-vialto-charcoal" />
-                          <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[220px] -translate-x-1/2 whitespace-normal rounded bg-vialto-charcoal px-2.5 py-1.5 text-[11px] normal-case leading-tight tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100">
-                            Alícuotas válidas de AFIP: 0%, 2.5%, 5%, 10.5%, 21%
-                            y 27%
-                            <span className="absolute left-1/2 top-full -mt-[1px] -translate-x-1/2 border-[5px] border-transparent border-t-vialto-charcoal"></span>
-                          </div>
-                        </div>
-                      </label>
-                      <input
-                        id="ivaPct"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={ivaPct}
-                        onChange={(e) => {
-                          ivaEditadaManualmente.current = true;
-                          setIvaPct(e.target.value);
-                        }}
-                        className={inputClass}
-                      />
-                    </div>
-                  </div>
 
                   <ConceptosLiquidacionLineasEditor
                     getToken={getToken}
@@ -1456,7 +1476,7 @@ export function CrearLiquidacionManualModal({
                         mostrarCliente
                         mostrarTransporte={false}
                         monedaDe={monedaViaje}
-                        montoLabel="Monto (s/IVA)"
+                        montoSinIva
                         renderMonto={(v, conMoneda) =>
                           fmtMoney(
                             v.precioTransportistaExterno,
@@ -1629,8 +1649,11 @@ export function CrearLiquidacionManualModal({
                               <ViajeDetallePdfTooltip
                                 viaje={v}
                                 ivaPct={v.precioTransportistaIvaIncluidoPct || ivaPctNum}
-                                idPropio2Habilitado={idPropio2Habilitado}
-                                idPropio2Label={idPropio2Label}
+                                tenant={tenantEfectivo}
+                                unSoloViaje={selectedViajes.length === 1}
+                                algunoConIdPropio={selectedViajes.some((x) =>
+                                  x.numeroIdentificacionPersonalizado?.trim(),
+                                )}
                               />
                               <ViajeSubtotalTooltip
                                 viaje={v}
@@ -1657,30 +1680,26 @@ export function CrearLiquidacionManualModal({
                         )}
                         {conceptosCompletos.map((l, idx) => {
                           const mult = getMultiplicador(l.modoAplicacion);
-                          const conIva =
-                            signedMontoConIvaConcepto(
-                              l.signo,
-                              Number(l.monto) || 0,
-                              l.ivaPct,
-                            ) * mult;
+                          const neto =
+                            signedMontoNetoConcepto(l.signo, Number(l.monto) || 0) * mult;
                           return (
                             <ResumenRow
                               key={`${l.conceptoLiquidacionId}-${idx}`}
                               label={`${l.nombre || "Concepto"}${mult > 1 ? ` (×${mult} viajes)` : ""}${l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ""}`}
-                              value={`${fmtSignedLiquidacionMoney(Math.abs(conIva), conIva >= 0 ? "plus" : "minus")} ${monedaResumen}`}
+                              value={`${fmtSignedLiquidacionMoney(Math.abs(neto), neto >= 0 ? "plus" : "minus")} ${monedaResumen}`}
                             />
                           );
                         })}
-                        {netoGravado !== null && (
+                        {netoGravadoPdf !== null && (
                           <ResumenRow
-                            label="Subtotal"
-                            value={`${fmtLiquidacionMoney(netoGravado + conceptosEfecto)} ${monedaResumen}`}
+                            label="Neto gravado"
+                            value={`${fmtLiquidacionMoney(netoGravadoPdf)} ${monedaResumen}`}
                           />
                         )}
-                        {ivaMonto !== null && (
+                        {ivaTotalPdf !== null && (
                           <ResumenRow
-                            label={`IVA ${ivaPctNum}% (flete/comisión)`}
-                            value={`${fmtSignedLiquidacionMoney(ivaMonto, "plus")} ${monedaResumen}`}
+                            label={ivaResumenLabel}
+                            value={`${fmtSignedLiquidacionMoney(ivaTotalPdf, "plus")} ${monedaResumen}`}
                           />
                         )}
                         {totalALiquidar !== null && (

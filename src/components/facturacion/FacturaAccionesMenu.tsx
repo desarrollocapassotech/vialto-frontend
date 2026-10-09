@@ -147,6 +147,7 @@ export function FacturaAccionesMenu({
     <AccionesFila
       options={options}
       destacadas={FACTURA_ACCIONES_DESTACADAS}
+      maxIconos={3}
       subtitle={factura.numero}
       open={open}
       onOpenChange={setOpen}
