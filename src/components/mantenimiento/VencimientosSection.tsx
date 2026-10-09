@@ -5,6 +5,7 @@ import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelec
 import { filtrarVehiculos } from "@/components/forms/maestroSearchFilters";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { AccionesFila } from "@/components/ui/AccionesFila";
+import { VehiculoHoverCard } from "@/components/vehiculos/VehiculoHoverCard";
 import { EstadoVencimientoBadge } from "@/components/mantenimiento/MantenimientoBadges";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { apiJson } from "@/lib/api";
@@ -215,7 +216,7 @@ export function VencimientosSection({
         }
         columns={[
           { id: "estado", header: "Estado", cell: (f) => <EstadoVencimientoBadge estado={f.estado} /> },
-          { id: "unidad", header: "Vehículo", primary: true, cell: (f) => f.vehiculo.patente },
+          { id: "unidad", header: "Vehículo", primary: true, cell: (f) => <VehiculoHoverCard vehiculoId={f.vehiculo.id}>{f.vehiculo.patente}</VehiculoHoverCard> },
           {
             id: "plan",
             header: "Plan",

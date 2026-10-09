@@ -8,6 +8,7 @@ import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHead
 import { AccionesFila } from "@/components/ui/AccionesFila";
 import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { VehiculoHoverCard } from "@/components/vehiculos/VehiculoHoverCard";
 import { EstadoOrdenBadge } from "@/components/mantenimiento/MantenimientoBadges";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { apiJson } from "@/lib/api";
@@ -226,7 +227,7 @@ export function OrdenesTrabajoSection({
         columns={[
           { id: "numero", header: "N°", cell: (o) => <span className="tabular-nums">{o.numero}</span> },
           { id: "fecha", header: "Fecha", cell: (o) => fmtFecha(o.fecha) },
-          { id: "unidad", header: "Vehículo", primary: true, cell: (o) => o.vehiculo.patente },
+          { id: "unidad", header: "Vehículo", primary: true, cell: (o) => <VehiculoHoverCard vehiculoId={o.vehiculo.id}>{o.vehiculo.patente}</VehiculoHoverCard> },
           { id: "tipo", header: "Tipo", cell: (o) => fmtTipoOrden(o.tipo) },
           { id: "taller", header: "Taller", cell: (o) => o.taller?.nombre ?? "—" },
           { id: "km", header: "Km", cell: (o) => fmtKm(o.km) },

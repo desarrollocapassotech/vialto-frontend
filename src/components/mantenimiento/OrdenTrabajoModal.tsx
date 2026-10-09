@@ -12,6 +12,7 @@ import { PlanesCumpleCheckboxes } from "@/components/mantenimiento/PlanesCumpleC
 import { AdjuntosOrdenField } from "@/components/mantenimiento/AdjuntosOrdenField";
 import { ItemsCostoFieldset } from "@/components/mantenimiento/ItemsCostoFieldset";
 import { nuevaLineaCosto, type LineaCosto } from "@/lib/mantenimientoCostos";
+import { VehiculoHoverCard } from "@/components/vehiculos/VehiculoHoverCard";
 import { EstadoOrdenBadge } from "@/components/mantenimiento/MantenimientoBadges";
 import { Spinner } from "@/components/ui/Spinner";
 import {
@@ -451,7 +452,9 @@ function VistaOrden({
         </div>
       )}
       <div className={viewModalGridClass}>
-        <Campo label="Vehículo">{orden.vehiculo.patente}</Campo>
+        <Campo label="Vehículo">
+          <VehiculoHoverCard vehiculoId={orden.vehiculo.id}>{orden.vehiculo.patente}</VehiculoHoverCard>
+        </Campo>
         <Campo label="Fecha del trabajo">{fmtFecha(orden.fecha)}</Campo>
         <Campo label="Tipo">{fmtTipoOrden(orden.tipo)}</Campo>
         <Campo label="Km del vehículo">{fmtKm(orden.km)}</Campo>
