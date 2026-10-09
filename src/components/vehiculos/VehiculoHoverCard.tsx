@@ -15,7 +15,7 @@ const fmtNum = (n: number) => n.toLocaleString("es-AR");
 
 /**
  * Patente (u otro contenido) que al pasar el cursor —o al enfocarla con teclado— muestra la
- * ficha del vehículo: los mismos campos que `VehiculoViewModal`, ocultando los vacíos y los
+ * ficha del vehículo: los campos de `VehiculoViewModal` salvo km y pertenencia (pedido de Elias), ocultando los vacíos y los
  * que la empresa tiene deshabilitados en "detalle_vehiculo". Los datos salen de `useMaestroData`
  * (sin fetch extra). Si el vehículo no está en el maestro, solo muestra el contenido.
  */
@@ -60,9 +60,6 @@ export function VehiculoHoverCard({ vehiculoId, children }: { vehiculoId: string
 
   if (!vehiculo) return <>{children}</>;
 
-  const transportista = vehiculo.transportistaId
-    ? (maestro.transportistas.find((t) => t.id === vehiculo.transportistaId)?.nombre ?? "Transportista externo")
-    : "Flota propia";
   const anio = vehiculo.año ?? vehiculo.anio;
 
   const campos: { campo: string; label: string; value: string | number | null | undefined }[] = [
@@ -70,16 +67,14 @@ export function VehiculoHoverCard({ vehiculoId, children }: { vehiculoId: string
     { campo: "marca", label: "Marca", value: vehiculo.marca },
     { campo: "modelo", label: "Modelo", value: vehiculo.modelo },
     { campo: "anio", label: "Año", value: anio },
-    { campo: "kmActual", label: "Km cargado", value: vehiculo.kmActual > 0 ? `${fmtNum(vehiculo.kmActual)} km` : null },
     { campo: "nroChasis", label: "N.° Chasis", value: vehiculo.nroChasis },
     { campo: "poliza", label: "Póliza", value: vehiculo.poliza },
     { campo: "vencimientoPoliza", label: "Vto. Póliza", value: fmtFecha(vehiculo.vencimientoPoliza) },
     { campo: "tara", label: "Tara (kg)", value: vehiculo.tara != null ? fmtNum(vehiculo.tara) : null },
     { campo: "precinto", label: "Precinto", value: vehiculo.precinto },
-    { campo: "transportistaId", label: "Pertenencia", value: transportista },
   ];
   const visibles = campos.filter(
-    (c) => c.value != null && c.value !== "" && (c.campo === "transportistaId" || isVisible("detalle_vehiculo", c.campo)),
+    (c) => c.value != null && c.value !== "" && isVisible("detalle_vehiculo", c.campo),
   );
 
   return (
