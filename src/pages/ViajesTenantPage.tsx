@@ -33,6 +33,7 @@ import {
   facturaLetraFromCondicionIva,
 } from "@/lib/arcaCbteTipo";
 import { apiJson, apiFetch, ApiError } from "@/lib/api";
+import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
 import { useToast } from "@/lib/toast";
 import { friendlyError } from "@/lib/friendlyError";
@@ -349,7 +350,7 @@ export function ViajesTenantPage({
     transportistaId: "",
     clienteId: "",
     numero: "",
-    fechaEmision: new Date().toISOString().split("T")[0],
+    fechaEmision: hoyArgentinaIso(),
     fechaVencimiento: "",
     ivaPct: "",
     viajeIds: [],
@@ -1582,7 +1583,7 @@ export function ViajesTenantPage({
       transportistaId: "",
       clienteId: cid,
       numero: "",
-      fechaEmision: new Date().toISOString().split("T")[0],
+      fechaEmision: hoyArgentinaIso(),
       fechaVencimiento: "",
       ivaPct: "",
       viajeIds: ids,
@@ -1976,7 +1977,7 @@ export function ViajesTenantPage({
       transportistaId: "",
       clienteId: targetClienteId ?? v.clienteId ?? "",
       numero: "",
-      fechaEmision: new Date().toISOString().split("T")[0],
+      fechaEmision: hoyArgentinaIso(),
       fechaVencimiento: "",
       ivaPct: "",
       viajeIds: [v.id],

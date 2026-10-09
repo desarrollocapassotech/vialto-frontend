@@ -12,6 +12,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { Receipt } from "lucide-react";
 import { useHiddenFiscalFields } from "@/hooks/useHiddenFiscalFields";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPreviewPanel";
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
@@ -60,6 +61,10 @@ import {
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
 import { MSG_EMITIR_MONTO_CERO } from "@/lib/arcaMontoCero";
+import {
+  errorFechaEmisionArca,
+  rangoFechaEmisionArca,
+} from "@/lib/facturaFechaEmision";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useToast } from "@/lib/toast";
 import {
@@ -473,6 +478,12 @@ export function FacturaCreateModal({
   );
   // ARCA no admite un comprobante por $0: no se deja emitir (el borrador sí se puede guardar).
   const montoCero = totales.total <= 0;
+  // Con ARCA la fecha de emisión se informa tal cual: tiene que caer en el rango que
+  // ARCA admite (el backend vuelve a validar, ver `resolveFechaCbteFactura`).
+  const rangoFechaArca = unifiedArca ? rangoFechaEmisionArca() : null;
+  const errorFechaArca = unifiedArca
+    ? errorFechaEmisionArca(draft.fechaEmision)
+    : null;
 
   const condicionIva = clienteDetalle?.condicionIva ?? null;
   const letra = facturaLetraFromCondicionIva(condicionIva);
@@ -674,6 +685,10 @@ export function FacturaCreateModal({
       }
       if (montoCero) {
         notifyError(MSG_EMITIR_MONTO_CERO);
+        return;
+      }
+      if (errorFechaArca) {
+        notifyError(errorFechaArca);
         return;
       }
     }
@@ -891,9 +906,16 @@ export function FacturaCreateModal({
             <input
               type="date"
               value={draft.fechaEmision}
+              min={rangoFechaArca?.min}
+              max={rangoFechaArca?.max}
               onChange={(e) => patch({ fechaEmision: e.target.value })}
-              className={compactInputClass}
+              className={
+                errorFechaArca
+                  ? compactInputClass.replace("border-black/15", "border-red-400")
+                  : compactInputClass
+              }
             />
+            <CrudFieldError message={errorFechaArca} />
           </div>
           <div className="flex flex-col gap-1">
             <label className={compactLabelClass}>Fecha de vencimiento</label>
