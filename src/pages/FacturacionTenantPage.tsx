@@ -1090,6 +1090,18 @@ export function FacturacionTenantPage({
       ? 'Todavía no hay facturas. Hacé clic en "Nueva factura" para empezar.'
       : "No hay facturas que coincidan con los filtros aplicados.";
 
+  /** Opciones del filtro de estado (columna y sheet mobile), en este orden. */
+  const estadoFiltroOptions = (
+    <>
+      <option value="">Todas</option>
+      <option value="facturado">FACTURADO</option>
+      <option value="vencida">VENCIDA</option>
+      <option value="cobrado">COBRADA</option>
+      {hasArca && <option value="anulado">ANULADA</option>}
+      {hasArca && <option value="borrador">BORRADOR</option>}
+    </>
+  );
+
   const facturasListadoFiltros = (
     <>
       <ListadoFiltroCampo label="Número" active={!!numFiltro.trim()}>
@@ -1214,14 +1226,7 @@ export function FacturacionTenantPage({
           }`}
           aria-label="Filtrar por estado"
         >
-          <option value="">Todos</option>
-          {hasArca && <option value="borrador">Borrador</option>}
-          {hasArca && <option value="esperando_afip">Esperando AFIP</option>}
-          <option value="facturado">Facturado</option>
-          <option value="cobrado">Cobrado</option>
-          {hasArca && <option value="error_afip">Error de AFIP</option>}
-          {hasArca && <option value="anulado">Anulado</option>}
-          <option value="vencida">Vencida</option>
+          {estadoFiltroOptions}
         </select>
       </ListadoFiltroCampo>
     </>
@@ -1486,16 +1491,7 @@ export function FacturacionTenantPage({
                   }`}
                   aria-label="Filtrar por estado"
                 >
-                  <option value="">Todos</option>
-                  {hasArca && <option value="borrador">Borrador</option>}
-                  {hasArca && (
-                    <option value="esperando_afip">Esperando AFIP</option>
-                  )}
-                  <option value="facturado">Facturado</option>
-                  <option value="cobrado">Cobrado</option>
-                  {hasArca && <option value="error_afip">Error de AFIP</option>}
-                  {hasArca && <option value="anulado">Anulado</option>}
-                  <option value="vencida">Vencida</option>
+                  {estadoFiltroOptions}
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>
