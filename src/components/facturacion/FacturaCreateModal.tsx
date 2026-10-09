@@ -59,6 +59,7 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
+import { MSG_EMITIR_MONTO_CERO } from "@/lib/arcaMontoCero";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useToast } from "@/lib/toast";
 import {
@@ -470,6 +471,8 @@ export function FacturaCreateModal({
     () => computeFacturaTotales(frozenLineas ?? lineas, ivaPctDefault),
     [lineas, frozenLineas, ivaPctDefault],
   );
+  // ARCA no admite un comprobante por $0: no se deja emitir (el borrador sí se puede guardar).
+  const montoCero = totales.total <= 0;
 
   const condicionIva = clienteDetalle?.condicionIva ?? null;
   const letra = facturaLetraFromCondicionIva(condicionIva);
@@ -667,6 +670,10 @@ export function FacturaCreateModal({
       if (!lineasCheck.ok) {
         setLineasIncomplete(lineasCheck.indices);
         notifyError(lineasCheck.message);
+        return;
+      }
+      if (montoCero) {
+        notifyError(MSG_EMITIR_MONTO_CERO);
         return;
       }
     }
@@ -1436,7 +1443,8 @@ export function FacturaCreateModal({
                       deshabilitado y el click hace zumbar el aviso del pie. */}
                   <button
                     type="button"
-                    disabled={busy || monedaInvalida || bloqueadoUsd}
+                    disabled={busy || monedaInvalida || bloqueadoUsd || montoCero}
+                    title={montoCero ? MSG_EMITIR_MONTO_CERO : undefined}
                     aria-disabled={datosEmitIncompletos || undefined}
                     onClick={() => {
                       if (datosEmitIncompletos) {

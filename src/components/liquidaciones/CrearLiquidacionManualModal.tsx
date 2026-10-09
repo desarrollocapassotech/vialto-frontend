@@ -36,6 +36,7 @@ import {
   MSG_ARCA_NO_LIQUIDA_USD,
   arcaBloqueaLiquidarUsd,
 } from "@/lib/arcaUsdRestriction";
+import { MSG_EMITIR_MONTO_CERO } from "@/lib/arcaMontoCero";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
 import {
   normalizeViajeMoneda,
@@ -836,6 +837,10 @@ export function CrearLiquidacionManualModal({
       );
       return;
     }
+    if (action === "emitir" && montoCero) {
+      setError(MSG_EMITIR_MONTO_CERO);
+      return;
+    }
 
     setConceptosIncomplete([]);
     setError(null);
@@ -981,6 +986,8 @@ export function CrearLiquidacionManualModal({
       : null;
   const showSummary =
     anyHasPrice && (viajeInicial != null || selectedViajeIds.size > 0);
+  // ARCA no admite un comprobante por $0: no se deja emitir (el borrador sí se puede guardar).
+  const montoCero = !(totalALiquidar != null && totalALiquidar > 0);
 
   const periodoInvalido = Boolean(
     showFechaDesde && showFechaHasta && periodoDesde && periodoHasta && periodoHasta < periodoDesde,
@@ -1779,8 +1786,10 @@ export function CrearLiquidacionManualModal({
                       submitting ||
                       !canSubmitBase ||
                       ptoVentaInvalidoPreview ||
-                      cvlpClaseBAlerta
+                      cvlpClaseBAlerta ||
+                      montoCero
                     }
+                    title={montoCero ? MSG_EMITIR_MONTO_CERO : undefined}
                     aria-disabled={datosEmitIncompletos || undefined}
                     onClick={(e) => {
                       if (datosEmitIncompletos) {
