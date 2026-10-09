@@ -276,6 +276,11 @@ export function FacturacionTenantPage({
     "",
   );
 
+  /** Conteos de los chips de filtro rápido (sin cobrar / vencidas), sobre todas las facturas. */
+  const [resumenCobroApi, setResumenCobroApi] = useState<{
+    sinCobrar: number;
+    vencidas: number;
+  } | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportandoExcel, setExportandoExcel] = useState(false);
 
@@ -418,6 +423,38 @@ export function FacturacionTenantPage({
     estadoFiltro,
     cobroFiltro,
   ]);
+
+  // Superadmin trae todas las facturas: se cuenta en el cliente. Tenant: endpoint de conteos,
+  // que se vuelve a pedir cada vez que cambia el listado (alta, cobro, anulación, etc.).
+  const resumenCobro = useMemo(() => {
+    if (!platform) return resumenCobroApi;
+    if (!facturas) return null;
+    let sinCobrar = 0;
+    let vencidas = 0;
+    for (const f of facturas) {
+      if (!f.cobrado && f.estado !== "anulado") sinCobrar += 1;
+      if (f.vencida) vencidas += 1;
+    }
+    return { sinCobrar, vencidas };
+  }, [platform, facturas, resumenCobroApi]);
+
+  useEffect(() => {
+    if (platform || !isLoaded || !isSignedIn || facturas === null) return;
+    let cancelled = false;
+    apiJson<{ sinCobrar: number; vencidas: number }>(
+      "/api/facturacion/facturas/resumen-cobro",
+      () => getToken(),
+    )
+      .then((r) => {
+        if (!cancelled) setResumenCobroApi(r);
+      })
+      .catch(() => {
+        // Sin conteo, los chips se muestran igual (sin número).
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [platform, isLoaded, isSignedIn, facturas, getToken]);
 
   const metaListado = useMemo(() => {
     if (platform) {
@@ -1274,8 +1311,12 @@ export function FacturacionTenantPage({
         )}
         <FiltrosRapidos
           opciones={[
-            { id: "sin_cobrar", label: "Sin cobrar" },
-            { id: "vencida", label: "Vencidas" },
+            {
+              id: "sin_cobrar",
+              label: "Sin cobrar",
+              count: resumenCobro?.sinCobrar,
+            },
+            { id: "vencida", label: "Vencidas", count: resumenCobro?.vencidas },
           ]}
           value={cobroFiltro}
           onChange={(v) => {

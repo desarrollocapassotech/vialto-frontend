@@ -946,7 +946,12 @@ export function LiquidacionesTenantPage() {
         {hasArca && activeTenantId && metodoAnulacion === "manual" && (
           <FiltrosRapidos
             opciones={[
-              { id: "pendiente_anulacion", label: "Pendientes de anular" },
+              {
+                id: "pendiente_anulacion",
+                label: "Pendientes de anular",
+                count: rows?.filter((r) => r.estado === "pendiente_anulacion")
+                  .length,
+              },
             ]}
             value={estadoFilter === "pendiente_anulacion" ? estadoFilter : ""}
             onChange={(v) => aplicarFiltroEstado(v || "todos")}

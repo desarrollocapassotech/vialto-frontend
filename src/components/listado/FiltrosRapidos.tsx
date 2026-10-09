@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Filter } from "lucide-react";
-import { selectorTabClass } from "@/components/ui/SelectorOpcionesSheet";
+import { FiltroRapidoChip } from "@/components/listado/FiltroRapidoChip";
 
 export type FiltroRapidoOpcion<T extends string> = {
   id: T;
   label: string;
+  /** Cantidad de registros que trae el filtro (se muestra al lado del label). */
+  count?: number;
 };
 
 type Props<T extends string> = {
@@ -58,20 +60,13 @@ export function FiltrosRapidos<T extends string>({
           {opciones.map((o) => {
             const active = value === o.id;
             return (
-              <button
+              <FiltroRapidoChip
                 key={o.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
+                label={o.label}
+                active={active}
+                count={o.count}
                 onClick={() => onChange(active ? "" : o.id)}
-                className={
-                  active
-                    ? "rounded border border-vialto-fire bg-vialto-fire px-4 py-2 text-sm font-[family-name:var(--font-ui)] uppercase tracking-wider text-white transition-colors"
-                    : selectorTabClass(false)
-                }
-              >
-                {o.label}
-              </button>
+              />
             );
           })}
         </div>
