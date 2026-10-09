@@ -19,6 +19,7 @@ import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { FiltrosRapidos } from "@/components/listado/FiltrosRapidos";
 import { ArcaEmisionIndicadores } from "@/components/liquidaciones/ArcaEmisionIndicadores";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import {
@@ -941,6 +942,17 @@ export function LiquidacionesTenantPage() {
         <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide text-vialto-charcoal">
           Liquidaciones
         </h1>
+        {/* Filtro rápido: solo si la empresa anula a mano (estado "pendiente de anulación"). */}
+        {hasArca && activeTenantId && metodoAnulacion === "manual" && (
+          <FiltrosRapidos
+            opciones={[
+              { id: "pendiente_anulacion", label: "Pendientes de anular" },
+            ]}
+            value={estadoFilter === "pendiente_anulacion" ? estadoFilter : ""}
+            onChange={(v) => aplicarFiltroEstado(v || "todos")}
+            ariaLabel="Filtros rápidos de liquidaciones"
+          />
+        )}
         {activeTenantId && anyFiltroActivo && (
           <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
         )}
