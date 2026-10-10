@@ -235,6 +235,8 @@ export function CamposEmpresaPage() {
   const [savingDashboardHabilitado, setSavingDashboardHabilitado] = useState(false);
   const [empresaRecomendacionCiudades, setEmpresaRecomendacionCiudades] = useState(true);
   const [savingRecomendacionCiudades, setSavingRecomendacionCiudades] = useState(false);
+  const [empresaMarcarCobrada, setEmpresaMarcarCobrada] = useState(false);
+  const [savingMarcarCobrada, setSavingMarcarCobrada] = useState(false);
   // Choferes/Vehículos/Productos no son flags del Tenant: son campos de Viajes
   // (tenant-field-config), ver SWITCHES_ENTIDAD_VIAJES. campo → visible.
   const [empresaSwitchEntidad, setEmpresaSwitchEntidad] = useState<
@@ -304,6 +306,7 @@ export function CamposEmpresaPage() {
           setEmpresaTipoFlota(tenant.tipoFlota ?? "mixta");
           setEmpresaDashboardHabilitado(tenant.dashboardHabilitado ?? true);
           setEmpresaRecomendacionCiudades(tenant.recomendacionCiudadesHabilitada ?? true);
+          setEmpresaMarcarCobrada(tenant.marcarCobradaHabilitada ?? false);
           setEmpresaTenant(tenant);
         }
       } catch (e) {
@@ -490,6 +493,27 @@ export function CamposEmpresaPage() {
       showToast(msg, "error");
     } finally {
       setSavingRecomendacionCiudades(false);
+    }
+  }
+
+  async function toggleMarcarCobrada() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaMarcarCobrada;
+    setSavingMarcarCobrada(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ marcarCobradaHabilitada: nuevoValor }),
+      });
+      setEmpresaMarcarCobrada(nuevoValor);
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingMarcarCobrada(false);
     }
   }
 
@@ -1342,6 +1366,28 @@ export function CamposEmpresaPage() {
                                 empresaRecomendacionCiudades
                                   ? "Deshabilitar recomendación de ciudades"
                                   : "Habilitar recomendación de ciudades"
+                              }
+                            />
+                          </td>
+                        </tr>
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            Marcar como cobrada (Facturas)
+                            <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                              Prendido: las facturas tienen la acción "Marcar como
+                              cobrada", que registra el pago del saldo pendiente.
+                              Apagado: la acción no se muestra.
+                            </p>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <ToggleSwitch
+                              checked={empresaMarcarCobrada}
+                              disabled={savingMarcarCobrada}
+                              onChange={() => void toggleMarcarCobrada()}
+                              label={
+                                empresaMarcarCobrada
+                                  ? "Deshabilitar marcar como cobrada"
+                                  : "Habilitar marcar como cobrada"
                               }
                             />
                           </td>

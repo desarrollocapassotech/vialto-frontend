@@ -321,6 +321,16 @@ export function FacturaViewModal({
             >
               {factura.vencida ? 'VENCIDA' : 'MARCAR COBRADA'}
             </button>
+          ) : puedeMarcarCobrada && factura.vencida ? (
+            // Acción deshabilitada para la empresa: VENCIDA queda como badge fijo.
+            <span
+              className={[
+                'text-xs font-medium border rounded px-2 py-0.5',
+                VENCIDA_BADGE_CLASS,
+              ].join(' ')}
+            >
+              VENCIDA
+            </span>
           ) : null}
           <AmbienteTestBadge ambiente={factura.ambiente} />
         </span>

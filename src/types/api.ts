@@ -392,6 +392,8 @@ export interface Tenant {
   dashboardHabilitado?: boolean;
   /** Default true. false = origen/destino de Viajes en texto libre, sin buscador de ciudades ni validación en el import. */
   recomendacionCiudadesHabilitada?: boolean;
+  /** Default false (se oculta "Marcar como cobrada" en Facturas). true = habilitada; solo lo cambia superadmin. */
+  marcarCobradaHabilitada?: boolean;
   /**
    * Unidad de cantidad de flete del tenant — 'TN' (default, toneladas) | 'UD' (unidades).
    * Afecta los PDFs de Factura A/B, Liquidación (CVLP) y Contrato de liquidación, y los

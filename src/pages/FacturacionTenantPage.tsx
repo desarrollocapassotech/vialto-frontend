@@ -159,6 +159,9 @@ export function FacturacionTenantPage({
   /** Adjunto manual solo para tenants sin integración ARCA (vista org, no plataforma). */
   const showComprobanteAdjunto = !platform && !hasArca;
   const tenantParaIdPropio2 = platform ? platformTenant : maestro.tenant;
+  /** `Tenant.marcarCobradaHabilitada` (default false), switch de superadmin. */
+  const marcarCobradaHabilitada =
+    (platform ? platformTenant : maestro.tenant)?.marcarCobradaHabilitada === true;
   const [clientesPlatform, setClientesPlatform] = useState<Cliente[]>([]);
   const clientes = platform ? clientesPlatform : maestro.clientes;
 
@@ -1637,7 +1640,9 @@ export function FacturacionTenantPage({
                 onOpenChange={(o) => setAccionesAbiertoFacturaId(o ? f.id : null)}
                 onVer={() => setViewingFactura(f)}
                 onEliminar={() => setFacturaDeleteConfirm(f)}
-                onMarcarCobrada={() => abrirMarcarCobrada(f)}
+                onMarcarCobrada={
+                  marcarCobradaHabilitada ? () => abrirMarcarCobrada(f) : undefined
+                }
                 onEmitirArca={hasArca ? () => abrirEmitirArca(f) : undefined}
                 onAnular={hasArca ? () => abrirAnularFactura(f) : undefined}
                 onVerComprobante={
@@ -1698,7 +1703,9 @@ export function FacturacionTenantPage({
                 onOpenChange={(o) => setAccionesAbiertoFacturaId(o ? f.id : null)}
                 onVer={() => setViewingFactura(f)}
                 onEliminar={() => setFacturaDeleteConfirm(f)}
-                onMarcarCobrada={() => abrirMarcarCobrada(f)}
+                onMarcarCobrada={
+                  marcarCobradaHabilitada ? () => abrirMarcarCobrada(f) : undefined
+                }
                 onEmitirArca={hasArca ? () => abrirEmitirArca(f) : undefined}
                 onAnular={hasArca ? () => abrirAnularFactura(f) : undefined}
                 onVerComprobante={
@@ -1802,7 +1809,11 @@ export function FacturacionTenantPage({
               ? () => verNotaCredito(viewingFactura)
               : undefined
           }
-          onMarcarCobrada={() => abrirMarcarCobrada(viewingFactura)}
+          onMarcarCobrada={
+            marcarCobradaHabilitada
+              ? () => abrirMarcarCobrada(viewingFactura)
+              : undefined
+          }
         />
       )}
 
