@@ -176,11 +176,24 @@ export function ViajeLiquidacionIndicador({
                 : undefined
           }
           onVerAnulacion={
-            liquidacionCompleta.estado === "anulado"
+            liquidacionCompleta.estado === "anulado" &&
+            liquidacionCompleta.anulacionMetodo !== "manual"
               ? () =>
                   void verPdf(
                     "pdf-anulacion",
                     "Error al generar el PDF de la anulación",
+                  )
+              : undefined
+          }
+          onVerComprobanteAnulacionManual={
+            liquidacionCompleta.estado === "anulado" &&
+            liquidacionCompleta.anulacionMetodo === "manual" &&
+            liquidacionCompleta.anulacionManualComprobanteUrl
+              ? () =>
+                  window.open(
+                    liquidacionCompleta.anulacionManualComprobanteUrl as string,
+                    "_blank",
+                    "noopener,noreferrer",
                   )
               : undefined
           }

@@ -182,8 +182,14 @@ function LiquidacionAccionesMenu({
     (liq.estado === "autorizado" ||
       liq.estado === "anulado" ||
       liq.estado === "pendiente_anulacion");
-  const tienePdfNc =
-    hasArca && liq.estado === "anulado" && Boolean(liq.anulacionCae);
+  // Anulación por NC/ND (PDF generado) o manual (comprobante subido al confirmarla).
+  const anulacionManual = liq.anulacionMetodo === "manual";
+  const tieneComprobanteAnulacion =
+    hasArca &&
+    liq.estado === "anulado" &&
+    (anulacionManual
+      ? Boolean(liq.anulacionManualComprobanteUrl?.trim())
+      : Boolean(liq.anulacionCae));
   const tieneComprobanteAdjunto =
     !hasArca && Boolean(liq.comprobanteUrl?.trim());
   // Con ARCA el comprobante es el PDF del CVLP: se abre en otra pestaña.
@@ -210,12 +216,14 @@ function LiquidacionAccionesMenu({
       onClick: onVerComprobante,
     });
   }
-  if (tienePdfNc) {
+  if (tieneComprobanteAnulacion) {
     // Igual que "Ver Nota de Crédito" de Facturas: se abre en otra pestaña, no se descarga.
     options.push({
       id: "ver-anulacion",
       label: "Ver anulación",
-      description: anulacionComprobanteLabel(liq.anulacionCbteTipo),
+      description: anulacionManual
+        ? "Comprobante de anulación manual"
+        : anulacionComprobanteLabel(liq.anulacionCbteTipo),
       icon: FileMinus,
       onClick: onVerAnulacion,
     });
@@ -789,7 +797,13 @@ export function LiquidacionesTenantPage() {
         })();
       },
       onEmitir: () => setPendingEmitir(liq),
-      onVerAnulacion: () => void verPdfAnulacion(liq),
+      onVerAnulacion: () => {
+        if (liq.anulacionMetodo === "manual" && liq.anulacionManualComprobanteUrl) {
+          window.open(liq.anulacionManualComprobanteUrl, "_blank", "noopener,noreferrer");
+        } else {
+          void verPdfAnulacion(liq);
+        }
+      },
       onAnular: () => setAnularConfirm(liq),
       onMarcarPendienteAnulacion: () => setPendienteAnulacionConfirm(liq),
       onConfirmarAnulacionManual: () => setConfirmarAnulacionManualTarget(liq),
