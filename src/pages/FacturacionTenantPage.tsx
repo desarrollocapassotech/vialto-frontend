@@ -1150,7 +1150,7 @@ export function FacturacionTenantPage({
       <option value="">Todas</option>
       <option value="facturado">FACTURADO</option>
       <option value="vencida">VENCIDA</option>
-      <option value="cobrado">COBRADA</option>
+      {marcarCobradaHabilitada && <option value="cobrado">COBRADA</option>}
       {hasArca && <option value="anulado">ANULADA</option>}
       {hasArca && <option value="borrador">BORRADOR</option>}
     </>
@@ -1314,12 +1314,17 @@ export function FacturacionTenantPage({
         )}
         <FiltrosRapidos
           opciones={[
-            {
-              id: "sin_cobrar",
-              label: "Sin cobrar",
-              count: resumenCobro?.sinCobrar,
-            },
-            { id: "vencida", label: "Vencidas", count: resumenCobro?.vencidas },
+            // Sin "Marcar como cobrada" habilitado, "Sin cobrar" no aporta.
+            ...(marcarCobradaHabilitada
+              ? [
+                  {
+                    id: "sin_cobrar" as const,
+                    label: "Sin cobrar",
+                    count: resumenCobro?.sinCobrar,
+                  },
+                ]
+              : []),
+            { id: "vencida" as const, label: "Vencidas", count: resumenCobro?.vencidas },
           ]}
           value={cobroFiltro}
           onChange={(v) => {
