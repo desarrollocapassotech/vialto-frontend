@@ -183,6 +183,8 @@ interface Props {
   idPropio2Habilitado?: boolean;
   /** Label configurable de "ID Propio 2". */
   idPropio2Label?: string;
+  /** Opciones configuradas de entidades/proveedores para el contrato PDF. */
+  opcionesProveedor?: string[];
 }
 
 export function CrearLiquidacionManualModal({
@@ -204,6 +206,7 @@ export function CrearLiquidacionManualModal({
   idPropio1Label = "ID personalizado",
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
+  opcionesProveedor = [],
 }: Props) {
   const showComprobante = !hasLiquidoProductoArca;
   const { showToast } = useToast();
@@ -213,6 +216,19 @@ export function CrearLiquidacionManualModal({
   const [resolvedConfig, setResolvedConfig] = useState<ArcaConfig | null>(
     configProp ?? null,
   );
+  const [proveedorContrato, setProveedorContrato] = useState<string>(
+    opcionesProveedor && opcionesProveedor.length > 0 ? opcionesProveedor[0] : "",
+  );
+
+  useEffect(() => {
+    if (!opcionesProveedor || opcionesProveedor.length === 0) {
+      if (proveedorContrato) setProveedorContrato("");
+      return;
+    }
+    if (!proveedorContrato || !opcionesProveedor.includes(proveedorContrato)) {
+      setProveedorContrato(opcionesProveedor[0]);
+    }
+  }, [opcionesProveedor, proveedorContrato]);
 
   const transportistaOpcionesViaje = useMemo(
     () =>
@@ -870,6 +886,7 @@ export function CrearLiquidacionManualModal({
       const lineasPayload = toConceptosLineasPayload(conceptosLineas);
       if (lineasPayload.length > 0) body.conceptosLineas = lineasPayload;
       if (comprobanteUrl) body.comprobanteUrl = comprobanteUrl;
+      if (proveedorContrato?.trim()) body.proveedorContrato = proveedorContrato.trim();
 
       let liq = await apiJson<Liquidacion>(
         "/api/integracion-arca/liquidaciones",
@@ -1307,6 +1324,30 @@ export function CrearLiquidacionManualModal({
                       />
                     </div>
                   </div>
+
+                  {/* Proveedor para contrato (opciones dinámicas configuradas por superadmin) */}
+                  {opcionesProveedor && opcionesProveedor.length > 0 && (
+                    <div>
+                      <label htmlFor="proveedorContrato" className={labelClass}>
+                        Proveedor para contrato
+                      </label>
+                      <select
+                        id="proveedorContrato"
+                        value={proveedorContrato}
+                        onChange={(e) => setProveedorContrato(e.target.value)}
+                        className={selectClass}
+                      >
+                        {opcionesProveedor.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-xs text-vialto-steel">
+                        Determina el nombre de la empresa que figurará en el título del contrato PDF.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Período */}
                   {(showFechaDesde || showFechaHasta) && (

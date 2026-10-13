@@ -237,6 +237,9 @@ export function CamposEmpresaPage() {
   const [savingRecomendacionCiudades, setSavingRecomendacionCiudades] = useState(false);
   const [empresaMarcarCobrada, setEmpresaMarcarCobrada] = useState(false);
   const [savingMarcarCobrada, setSavingMarcarCobrada] = useState(false);
+  const [empresaOpcionesProveedor, setEmpresaOpcionesProveedor] = useState<string[]>([]);
+  const [savingOpcionesProveedor, setSavingOpcionesProveedor] = useState(false);
+  const [nuevaOpcionProveedor, setNuevaOpcionProveedor] = useState("");
   // Choferes/Vehículos/Productos no son flags del Tenant: son campos de Viajes
   // (tenant-field-config), ver SWITCHES_ENTIDAD_VIAJES. campo → visible.
   const [empresaSwitchEntidad, setEmpresaSwitchEntidad] = useState<
@@ -307,6 +310,7 @@ export function CamposEmpresaPage() {
           setEmpresaDashboardHabilitado(tenant.dashboardHabilitado ?? true);
           setEmpresaRecomendacionCiudades(tenant.recomendacionCiudadesHabilitada ?? true);
           setEmpresaMarcarCobrada(tenant.marcarCobradaHabilitada ?? false);
+          setEmpresaOpcionesProveedor(tenant.opcionesProveedorLiquidacion ?? []);
           setEmpresaTenant(tenant);
         }
       } catch (e) {
@@ -515,6 +519,44 @@ export function CamposEmpresaPage() {
     } finally {
       setSavingMarcarCobrada(false);
     }
+  }
+
+  async function persistirOpcionesProveedor(nuevasOpciones: string[]) {
+    if (!filtroEmpresa) return;
+    setSavingOpcionesProveedor(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ opcionesProveedorLiquidacion: nuevasOpciones }),
+      });
+      setEmpresaOpcionesProveedor(nuevasOpciones);
+      showToast("Opciones de proveedor actualizadas", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingOpcionesProveedor(false);
+    }
+  }
+
+  async function agregarOpcionProveedor() {
+    const trimmed = nuevaOpcionProveedor.trim();
+    if (!filtroEmpresa || !trimmed) return;
+    if (empresaOpcionesProveedor.some((o) => o.toLowerCase() === trimmed.toLowerCase())) {
+      showToast("Esa opción ya existe", "error");
+      return;
+    }
+    const next = [...empresaOpcionesProveedor, trimmed];
+    await persistirOpcionesProveedor(next);
+    setNuevaOpcionProveedor("");
+  }
+
+  async function eliminarOpcionProveedor(opcion: string) {
+    if (!filtroEmpresa) return;
+    const next = empresaOpcionesProveedor.filter((o) => o !== opcion);
+    await persistirOpcionesProveedor(next);
   }
 
   async function toggleDashboardHabilitado() {
@@ -1438,6 +1480,63 @@ export function CamposEmpresaPage() {
                               <option value="propia">Solo flota propia</option>
                               <option value="externa">Solo transportistas externos</option>
                             </select>
+                          </td>
+                        </tr>
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            Opciones de proveedor para contrato (Liquidación PDF)
+                            <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                              Configurá las entidades contratantes disponibles (ej: EMPRESA LOGÍSTICA S.A. (ARGENTINA), EMPRESA LOGÍSTICA S.A. (URUGUAY)). Al liquidar, se podrá elegir cuál figura en el título del PDF.
+                            </p>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <div className="flex flex-col gap-2 max-w-sm ml-auto">
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  value={nuevaOpcionProveedor}
+                                  disabled={savingOpcionesProveedor}
+                                  onChange={(e) => setNuevaOpcionProveedor(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      void agregarOpcionProveedor();
+                                    }
+                                  }}
+                                  placeholder="Ej: EMPRESA LOGÍSTICA S.A. (PAÍS)"
+                                  className="h-9 flex-1 border border-black/15 bg-white px-2 text-xs text-vialto-charcoal focus:outline-none focus:border-vialto-fire"
+                                />
+                                <button
+                                  type="button"
+                                  disabled={savingOpcionesProveedor || !nuevaOpcionProveedor.trim()}
+                                  onClick={() => void agregarOpcionProveedor()}
+                                  className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50"
+                                >
+                                  Agregar
+                                </button>
+                              </div>
+                              {empresaOpcionesProveedor.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 justify-end">
+                                  {empresaOpcionesProveedor.map((opcion) => (
+                                    <span
+                                      key={opcion}
+                                      className="inline-flex items-center gap-1.5 rounded bg-vialto-mist border border-black/10 px-2 py-1 text-xs text-vialto-charcoal"
+                                    >
+                                      <span>{opcion}</span>
+                                      <button
+                                        type="button"
+                                        disabled={savingOpcionesProveedor}
+                                        onClick={() => void eliminarOpcionProveedor(opcion)}
+                                        className="text-vialto-steel hover:text-red-600 font-bold leading-none"
+                                        title="Eliminar opción"
+                                      >
+                                        ×
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       </>

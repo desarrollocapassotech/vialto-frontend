@@ -1340,6 +1340,7 @@ export function LiquidacionesTenantPage() {
           idPropio1Label={labelIdentificacionPersonalizadaViajes(empresaTenant)}
           idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
           idPropio2Label={idPropio2Label(empresaTenant)}
+          opcionesProveedor={empresaTenant?.opcionesProveedorLiquidacion}
           onDataSaved={() => {
             void refreshTransportistas();
             void refreshClientes();
@@ -1558,6 +1559,7 @@ export function LiquidacionesTenantPage() {
           idPropio1Label={labelIdentificacionPersonalizadaViajes(empresaTenant)}
           idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
           idPropio2Label={idPropio2Label(empresaTenant)}
+          opcionesProveedor={empresaTenant?.opcionesProveedorLiquidacion}
           onClose={() => setDetail({ mode: "view", liq: detail.liq })}
           onSaved={(updated) => {
             const withLineas = {

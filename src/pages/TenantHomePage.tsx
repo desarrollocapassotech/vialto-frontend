@@ -305,6 +305,7 @@ export function TenantHomePage() {
           idPropio1Label={labelIdentificacionPersonalizadaViajes(maestro.tenant)}
           idPropio2Habilitado={idPropio2Habilitado(maestro.tenant)}
           idPropio2Label={idPropio2Label(maestro.tenant)}
+          opcionesProveedor={maestro.tenant?.opcionesProveedorLiquidacion}
           onDataSaved={() => {
             void maestro.refreshTransportistas();
             void maestro.refreshClientes();
