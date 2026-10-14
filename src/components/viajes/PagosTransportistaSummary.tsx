@@ -1,3 +1,4 @@
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { formatViajeImporteForListado } from '@/lib/viajesFlota';
 import { calcularSaldoTransportista } from '@/lib/viajesTransportistaPagos';
 import type { Viaje } from '@/types/api';
@@ -75,11 +76,7 @@ export function PagosTransportistaSummary({ viaje, onRegistrarPago }: Props) {
               </span>
               <span className="text-vialto-steel">
                 {p.fecha
-                  ? new Date(p.fecha).toLocaleDateString('es-AR', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                    })
+                  ? fmtDateUtc(p.fecha)
                   : '—'}
               </span>
               {p.observaciones && (

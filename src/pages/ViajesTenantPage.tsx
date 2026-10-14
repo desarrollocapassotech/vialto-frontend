@@ -1,3 +1,4 @@
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { createPortal } from "react-dom";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { isOrgAdmin } from "@/lib/roleLabels";
@@ -3996,8 +3997,8 @@ export function ViajesTenantPage({
                   </span>
                   <span className="text-vialto-steel">
                     Período{" "}
-                    {new Date(l.periodoDesde).toLocaleDateString("es-AR")} –{" "}
-                    {new Date(l.periodoHasta).toLocaleDateString("es-AR")} ·
+                    {fmtDateUtc(l.periodoDesde)} –{" "}
+                    {fmtDateUtc(l.periodoHasta)} ·
                     estado: {l.estado}
                   </span>
                 </li>

@@ -1,3 +1,4 @@
+import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 import { useNavigate } from 'react-router-dom';
 import type { useTenantOwnerDashboard } from '@/hooks/useTenantOwnerDashboard';
 import { TableroCuentaCorriente } from './TableroCuentaCorriente';
@@ -9,11 +10,11 @@ function periodToDates(
   customTo: string,
 ): { from: string; to: string } | null {
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
+  const todayStr = hoyArgentinaIso(today);
   if (period === 'week') {
     const d = new Date(today);
     d.setDate(d.getDate() - 6);
-    return { from: d.toISOString().slice(0, 10), to: todayStr };
+    return { from: hoyArgentinaIso(d), to: todayStr };
   }
   if (period === 'month') {
     return {
@@ -24,7 +25,7 @@ function periodToDates(
   if (period === '3months') {
     const d = new Date(today);
     d.setMonth(d.getMonth() - 3);
-    return { from: d.toISOString().slice(0, 10), to: todayStr };
+    return { from: hoyArgentinaIso(d), to: todayStr };
   }
   if (period === 'custom' && customFrom && customTo) {
     return { from: customFrom, to: customTo };

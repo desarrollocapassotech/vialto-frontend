@@ -1,3 +1,4 @@
+import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Receipt, HelpCircle } from "lucide-react";
 import {
@@ -903,10 +904,10 @@ export function CrearLiquidacionManualModal({
     e.preventDefault();
     const effectivePeriodoDesde = showFechaDesde
       ? periodoDesde
-      : (periodoDesde || new Date().toISOString().slice(0, 10));
+      : (periodoDesde || hoyArgentinaIso());
     const effectivePeriodoHasta = showFechaHasta
       ? periodoHasta
-      : (periodoHasta || effectivePeriodoDesde || new Date().toISOString().slice(0, 10));
+      : (periodoHasta || effectivePeriodoDesde || hoyArgentinaIso());
 
     if (showFechaDesde && !periodoDesde) return;
     if (showFechaHasta && !periodoHasta) return;

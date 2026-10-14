@@ -1,3 +1,4 @@
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { FileDown } from 'lucide-react';
@@ -84,7 +85,7 @@ function ItemsTabla({
               <td className="py-2 font-medium text-vialto-charcoal">{it.contraparteNombre ?? '—'}</td>
               <td className="py-2 text-vialto-charcoal">
                 {it.fechaVencimiento
-                  ? new Date(it.fechaVencimiento).toLocaleDateString('es-AR')
+                  ? fmtDateUtc(it.fechaVencimiento)
                   : '—'}
               </td>
               <td className="py-2 text-right tabular-nums text-vialto-charcoal">

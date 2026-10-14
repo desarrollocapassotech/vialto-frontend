@@ -1,3 +1,4 @@
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -18,14 +19,7 @@ function textoMontoPorMoneda(
     : `USD ${n.toLocaleString('es-AR')}`;
 }
 
-function fmtFecha(iso: string) {
-  return new Intl.DateTimeFormat('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(iso));
-}
+const fmtFecha = fmtDateUtc;
 
 type TableroGeneralResponse = {
   deudores: Array<{

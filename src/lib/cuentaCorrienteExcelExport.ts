@@ -1,3 +1,4 @@
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import * as XLSX from 'xlsx';
 import {
   ESTADO_DISPONIBILIDAD_LABEL,
@@ -6,11 +7,7 @@ import {
   type TipoContraparte,
 } from '@/lib/cuentaCorriente';
 
-function fmtFecha(iso: string): string {
-  const s = iso.slice(0, 10);
-  const [y, m, d] = s.split('-');
-  return `${d}/${m}/${y}`;
-}
+const fmtFecha = fmtDateUtc;
 
 /** Genera y descarga el Excel del estado de cuenta de una contraparte, mismas columnas que el ledger en pantalla. */
 export function generarEstadoCuentaExcel(

@@ -1,3 +1,4 @@
+import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 import { useAuth, useOrganization } from '@clerk/clerk-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiJson } from '@/lib/api';
@@ -27,7 +28,7 @@ export function useTenantOwnerDashboard() {
 
   const [period, setPeriod] = useState<DashboardPeriodKind>('month');
   const [customFrom, setCustomFrom] = useState('2001-01-01');
-  const [customTo, setCustomTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [customTo, setCustomTo] = useState(() => hoyArgentinaIso());
   const [data, setData] = useState<OwnerDashboardResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

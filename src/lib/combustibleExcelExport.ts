@@ -1,15 +1,9 @@
+import { fechaDiaYmd, fmtDateUtc } from "@/lib/fmtDateUtc";
 import type { CargaCombustible } from "@/types/api";
 import { generarExcel, type ExcelColDef } from "./stockExcelExport";
 
-/** Fecha en formato DD/MM/YYYY (UTC), igual que el listado de combustible. */
-function fmtFechaExcel(iso: string): string {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(iso));
-}
+/** Fecha en formato DD/MM/YYYY, igual que el listado de combustible. */
+const fmtFechaExcel = fmtDateUtc;
 
 function upper(v: string | null | undefined): string {
   return (v ?? "").toUpperCase();
@@ -72,9 +66,9 @@ export function cargaCombustibleColumnas(): ExcelColDef<CargaCombustible>[] {
   ];
 }
 
-/** yyyy-mm-dd (UTC) de una fecha ISO. */
+/** yyyy-mm-dd de una fecha ISO (ver `fechaDiaYmd`). */
 function isoDate(iso: string): string {
-  return new Date(iso).toISOString().slice(0, 10);
+  return fechaDiaYmd(iso) ?? "";
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   viewModalGridClass,
 } from "@/components/ui/ViewModalShell";
 import { apiJson } from "@/lib/api";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { friendlyError } from "@/lib/friendlyError";
 import type { CargaCombustible } from "@/types/api";
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
@@ -160,8 +161,10 @@ export function CargaCombustibleViewModal({
 
   // La fecha de registro solo interesa cuando difiere de la fecha real de la carga
   // (carga tardía). Si coinciden, no aporta nada mostrarla.
+  // `fecha` es un día calendario guardado a medianoche UTC (se formatea en UTC);
+  // `createdAt` es un instante real (se formatea en hora local).
   const fechaRegistroDistinta =
-    !!carga && fmtDate(carga.fecha) !== fmtDate(carga.createdAt);
+    !!carga && fmtDateUtc(carga.fecha) !== fmtDate(carga.createdAt);
 
   // Si no se cargó precio por litro (0 histórico), lo derivamos de importe/litros.
   const precioPorLitroCalculado =
@@ -209,7 +212,7 @@ export function CargaCombustibleViewModal({
                 Fecha
               </p>
               <p className="mt-1 flex items-center gap-2 text-sm font-medium text-vialto-charcoal">
-                {fmtDate(carga.fecha)}
+                {fmtDateUtc(carga.fecha)}
                 {fechaRegistroDistinta && (
                   <button
                     type="button"
