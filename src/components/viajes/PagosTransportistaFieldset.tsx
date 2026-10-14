@@ -1,3 +1,4 @@
+import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 import { useMemo, useState } from "react";
 import {
   formatNumberForMoneda,
@@ -20,10 +21,10 @@ import type { PagoTransportista } from "@/types/api";
 
 function fechaPagoToInputValue(fecha: string | undefined | null): string {
   const t = fecha?.trim();
-  if (!t) return new Date().toISOString().slice(0, 10);
+  if (!t) return hoyArgentinaIso();
   if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
   const { fecha: local } = isoToFechaHora(t);
-  return local || new Date().toISOString().slice(0, 10);
+  return local || hoyArgentinaIso();
 }
 
 export interface PagoTransportistaDraft {
@@ -54,7 +55,7 @@ export function pagoTransportistaDraftToApi(
   const fechaRaw = d.fecha.trim();
   const fecha =
     (fechaRaw ? fechaPagoToInputValue(fechaRaw) : null) ??
-    new Date().toISOString().slice(0, 10);
+    hoyArgentinaIso();
 
   return {
     monto,
@@ -78,7 +79,7 @@ export function emptyPagoTransportista(
   return {
     montoStr: "",
     moneda,
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: hoyArgentinaIso(),
     observaciones: "",
   };
 }

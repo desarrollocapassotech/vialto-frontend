@@ -1,3 +1,4 @@
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -72,14 +73,7 @@ function fmtVehiculoLabel(v: {
   return detalle ? `${v.patente} — ${detalle}` : v.patente;
 }
 
-function fmtFecha(iso: string) {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(iso));
-}
+const fmtFecha = fmtDateUtc;
 
 function fmtNum(n: number) {
   return n.toLocaleString("es-AR");

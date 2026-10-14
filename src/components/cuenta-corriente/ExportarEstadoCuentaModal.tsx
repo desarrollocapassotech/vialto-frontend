@@ -1,3 +1,4 @@
+import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 import { useAuth } from '@clerk/clerk-react';
 import { useState, type FormEvent } from 'react';
 import {
@@ -17,13 +18,13 @@ const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
 
 function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return hoyArgentinaIso();
 }
 
 function hace90DiasISO(): string {
   const d = new Date();
   d.setDate(d.getDate() - 90);
-  return d.toISOString().slice(0, 10);
+  return hoyArgentinaIso(d);
 }
 
 type Props = {

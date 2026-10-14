@@ -1,3 +1,4 @@
+import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 import { useAuth } from '@clerk/clerk-react';
 import { useState, type FormEvent } from 'react';
 import {
@@ -36,7 +37,7 @@ export function MovimientoCcFormModal({
   const [concepto, setConcepto] = useState('');
   const [importeStr, setImporteStr] = useState('');
   const [moneda, setMoneda] = useState<ViajeMonedaCodigo>('ARS');
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => hoyArgentinaIso());
   const [fechaVencimiento, setFechaVencimiento] = useState('');
   const [numeroComprobante, setNumeroComprobante] = useState('');
   const [formaPago, setFormaPago] = useState('');

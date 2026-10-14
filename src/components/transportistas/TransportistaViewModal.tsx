@@ -1,3 +1,4 @@
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -62,7 +63,7 @@ export function TransportistaViewModal({
           { label: 'Condición tributaria', value: transportista.condicionTributaria, visible: isVisible("detalle_transportista", "condicionIvaTributaria") },
           { label: 'PAUT', value: transportista.paut, visible: isVisible("detalle_transportista", "paut") },
           { label: 'Permiso internacional', value: transportista.permisoInternacional, visible: isVisible("detalle_transportista", "permisoInternacional") },
-          { label: 'Vto. Permiso', value: transportista.fechaVencimientoPermiso ? fmtDate(transportista.fechaVencimientoPermiso) : null, visible: isVisible("detalle_transportista", "fechaVencimientoPermiso") },
+          { label: 'Vto. Permiso', value: transportista.fechaVencimientoPermiso ? fmtDateUtc(transportista.fechaVencimientoPermiso) : null, visible: isVisible("detalle_transportista", "fechaVencimientoPermiso") },
           { label: 'Alta', value: fmtDate(transportista.createdAt), visible: true },
         ].filter(c => c.visible && c.value != null && c.value !== '').map((c, i) => (
           <div key={i}>

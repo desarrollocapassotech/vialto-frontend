@@ -1,3 +1,4 @@
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Banknote, FileSpreadsheet, FileText } from 'lucide-react';
@@ -330,7 +331,7 @@ export function CuentaContraparteView({
             id: 'fecha',
             header: 'Fecha',
             primary: true,
-            cell: (m: MovimientoConSaldo) => new Date(m.fecha).toLocaleDateString('es-AR'),
+            cell: (m: MovimientoConSaldo) => fmtDateUtc(m.fecha),
             tdClassName: listadoTablaTdClass,
           },
           {
@@ -341,7 +342,7 @@ export function CuentaContraparteView({
                 {m.concepto}
                 {m.fechaVencimiento && (
                   <span className="block text-xs text-vialto-steel">
-                    vence {new Date(m.fechaVencimiento).toLocaleDateString('es-AR')}
+                    vence {fmtDateUtc(m.fechaVencimiento)}
                   </span>
                 )}
               </span>

@@ -1,3 +1,4 @@
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { History, Gauge, ListOrdered, Trash2, Truck } from "lucide-react";
@@ -87,14 +88,7 @@ function FilaAccionesMenu({
   );
 }
 
-function fmtFecha(iso: string) {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(iso));
-}
+const fmtFecha = fmtDateUtc;
 
 export function AsignacionVehiculoSection({
   tenantId,

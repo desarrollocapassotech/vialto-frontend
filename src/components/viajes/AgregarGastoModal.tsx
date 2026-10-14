@@ -1,3 +1,5 @@
+import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useState } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
@@ -31,7 +33,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
   const [descripcion, setDescripcion] = useState('');
   const [montoStr, setMontoStr] = useState('');
   const [moneda, setMoneda] = useState<ViajeMonedaCodigo>('ARS');
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => hoyArgentinaIso());
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -50,7 +52,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
     setDescripcion('');
     setMontoStr('');
     setMoneda('ARS');
-    setFecha(new Date().toISOString().slice(0, 10));
+    setFecha(hoyArgentinaIso());
     setFieldErrors({});
     setError(null);
     setShowGastosAnteriores(false);
@@ -165,11 +167,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
                   </span>
                   <span className="text-right text-vialto-steel tabular-nums">
                     {g.fecha
-                      ? new Date(g.fecha).toLocaleDateString('es-AR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                        })
+                      ? fmtDateUtc(g.fecha)
                       : '—'}
                   </span>
                   <OtroGastoAutorDisplay

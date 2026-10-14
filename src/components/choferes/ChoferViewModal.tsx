@@ -1,3 +1,4 @@
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -121,7 +122,7 @@ export function ChoferViewModal({
             { label: 'N.° Licencia', value: chofer.licencia },
             {
               label: 'Vto. Licencia',
-              value: chofer.licenciaVence ? fmtDate(chofer.licenciaVence) : null,
+              value: chofer.licenciaVence ? fmtDateUtc(chofer.licenciaVence) : null,
             },
             { label: 'Teléfono', value: chofer.telefono },
             {

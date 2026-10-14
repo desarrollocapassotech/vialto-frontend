@@ -1,3 +1,4 @@
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import {
   useLayoutEffect,
   useRef,
@@ -39,14 +40,7 @@ function fmtNum(n: number): string {
   return Math.round(n).toLocaleString("es-AR");
 }
 
-function fmtFecha(iso: string): string {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(iso));
-}
+const fmtFecha = fmtDateUtc;
 
 function SemaforoDot({ color }: { color: "verde" | "amarillo" | "rojo" }) {
   const cls =

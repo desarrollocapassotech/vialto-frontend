@@ -1,3 +1,4 @@
+import { fechaDiaYmd } from "@/lib/fmtDateUtc";
 import type {
   MetricCompare,
   OwnerDashboardResponse,
@@ -49,13 +50,10 @@ function formatMoneyUSD(n: number) {
 }
 
 function fmtFechaCorta(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-    timeZone: "UTC",
-  }).format(new Date(iso));
+  const ymd = fechaDiaYmd(iso);
+  if (!ymd) return null;
+  const [y, m, d] = ymd.split("-");
+  return `${d}/${m}/${y.slice(2)}`;
 }
 
 function MetricCard({

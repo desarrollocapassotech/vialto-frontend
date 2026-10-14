@@ -1,3 +1,5 @@
+import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
@@ -38,7 +40,7 @@ export function RegistrarPagoTransportistaModal({
   const { getToken } = useAuth();
   const [montoStr, setMontoStr] = useState("");
   const [fecha, setFecha] = useState(() =>
-    new Date().toISOString().slice(0, 10),
+    hoyArgentinaIso(),
   );
   const [observaciones, setObservaciones] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -57,7 +59,7 @@ export function RegistrarPagoTransportistaModal({
 
   function resetForm() {
     setMontoStr("");
-    setFecha(new Date().toISOString().slice(0, 10));
+    setFecha(hoyArgentinaIso());
     setObservaciones("");
     setFieldErrors({});
     setError(null);
@@ -213,11 +215,7 @@ export function RegistrarPagoTransportistaModal({
                   </div>
                   <span className="text-right text-vialto-steel tabular-nums">
                     {p.fecha
-                      ? new Date(p.fecha).toLocaleDateString("es-AR", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                        })
+                      ? fmtDateUtc(p.fecha)
                       : "—"}
                   </span>
                 </div>

@@ -1,3 +1,5 @@
+import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth } from '@clerk/clerk-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import {
@@ -38,7 +40,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
 
   // Modo "nuevo": cargar el cobro/pago ahí mismo y aplicarlo de una.
   const [nuevoImporteStr, setNuevoImporteStr] = useState(() => formatCurrencyArFromNumber(pendienteCargo));
-  const [nuevaFecha, setNuevaFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [nuevaFecha, setNuevaFecha] = useState(() => hoyArgentinaIso());
   const [nuevaFormaPago, setNuevaFormaPago] = useState('');
 
   const [saving, setSaving] = useState(false);
@@ -130,7 +132,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
           )}
           , vence{' '}
           {cargo.fechaVencimiento
-            ? new Date(cargo.fechaVencimiento).toLocaleDateString('es-AR')
+            ? fmtDateUtc(cargo.fechaVencimiento)
             : 'sin fecha configurada'}
           .
         </p>
@@ -176,7 +178,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
               >
                 {pagosDisponibles.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {new Date(p.fecha).toLocaleDateString('es-AR')} — {formatCurrencyArFromNumber(p.importe)}{' '}
+                    {fmtDateUtc(p.fecha)} — {formatCurrencyArFromNumber(p.importe)}{' '}
                     {p.moneda}
                     {p.concepto ? ` (${p.concepto})` : ''}
                   </option>

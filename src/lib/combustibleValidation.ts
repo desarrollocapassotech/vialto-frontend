@@ -1,3 +1,4 @@
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useState, useEffect, useMemo } from "react";
 import { apiJson } from "@/lib/api";
 
@@ -89,12 +90,7 @@ export function useCombustibleValidation(
 
     if (bounds && !isNaN(km) && km > 0) {
       if (bounds.prev && km < bounds.prev.km) {
-        const fechaFmt = new Intl.DateTimeFormat("es-AR", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-          timeZone: "UTC",
-        }).format(new Date(bounds.prev.fecha));
+        const fechaFmt = fmtDateUtc(bounds.prev.fecha);
         setKmError(
           `Inconsistencia: No puede ser inferior a la carga anterior el ${fechaFmt} (${bounds.prev.km.toLocaleString("es-AR")} km)`,
         );
@@ -102,12 +98,7 @@ export function useCombustibleValidation(
       }
 
       if (bounds.next && km > bounds.next.km) {
-        const fechaFmt = new Intl.DateTimeFormat("es-AR", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-          timeZone: "UTC",
-        }).format(new Date(bounds.next.fecha));
+        const fechaFmt = fmtDateUtc(bounds.next.fecha);
         setKmError(
           `Inconsistencia: No puede ser superior a la carga posterior el ${fechaFmt} (${bounds.next.km.toLocaleString("es-AR")} km)`,
         );
