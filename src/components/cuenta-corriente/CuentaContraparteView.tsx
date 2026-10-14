@@ -1,4 +1,4 @@
-import { fmtDateUtc } from "@/lib/fmtDateUtc";
+import { fechaDiaYmd, fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Banknote, FileSpreadsheet, FileText } from 'lucide-react';
@@ -40,6 +40,13 @@ type ModalState =
   | null;
 
 type MovimientoConSaldo = MovimientoCc & { saldoAcumulado: number };
+
+/** Orden de carga ascendente; `id` desempata movimientos creados en el mismo instante. */
+function compararPorCarga(a: MovimientoCc, b: MovimientoCc): number {
+  const porCarga = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  if (porCarga !== 0) return porCarga;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
 
 const badgeBase = 'inline-block rounded-full px-2 py-0.5 text-xs font-medium';
 
@@ -110,25 +117,23 @@ export function CuentaContraparteView({
     cargarDatos();
   }, [cargarDatos]);
 
-  // Saldo acumulado: se calcula acá (no lo trae el backend en este endpoint) recorriendo
-  // los movimientos en orden cronológico. Un cargo anulado (viaje reabierto/factura
-  // anulada) no suma, igual que en el cálculo de saldo del backend — ver Fase 3.
+  // Orden de carga (`createdAt`), no `fecha`: un cobro recién registrado aparece primero
+  // aunque su fecha sea anterior a otros movimientos (mismo criterio que Viajes). El saldo
+  // acumulado se calcula acá (no lo trae el backend en este endpoint) recorriendo ese mismo
+  // orden, para que cada fila sea coherente con lo que se ve. Un cargo anulado (viaje
+  // reabierto/factura anulada) no suma, igual que en el cálculo de saldo del backend.
   const movimientosConSaldo = useMemo<MovimientoConSaldo[] | null>(() => {
     if (!movimientos) return null;
-    const ascendente = [...movimientos].sort((a, b) => {
-      const porFecha = new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
-      if (porFecha !== 0) return porFecha;
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    });
+    const ascendente = [...movimientos].sort(compararPorCarga);
     let acumulado = 0;
-    const saldoPorId = new Map<string, number>();
+    const conSaldo: MovimientoConSaldo[] = [];
     for (const m of ascendente) {
       if (!(m.tipo === 'cargo' && m.estadoDisponibilidad === 'anulado')) {
         acumulado += m.tipo === 'cargo' ? m.importe : -m.importe;
       }
-      saldoPorId.set(m.id, acumulado);
+      conSaldo.push({ ...m, saldoAcumulado: acumulado });
     }
-    return movimientos.map((m) => ({ ...m, saldoAcumulado: saldoPorId.get(m.id) ?? 0 }));
+    return conSaldo.reverse();
   }, [movimientos]);
 
   const [estadoFiltro, setEstadoFiltro] = useState('');
@@ -157,7 +162,7 @@ export function CuentaContraparteView({
         const estadoActual = m.tipo === 'cargo' ? m.estadoDisponibilidad : m.estadoImputacion;
         if (estadoActual !== estadoFiltro) return false;
       }
-      const fecha = m.fecha.slice(0, 10);
+      const fecha = fechaDiaYmd(m.fecha) ?? '';
       if (desdeFiltro && fecha < desdeFiltro) return false;
       if (hastaFiltro && fecha > hastaFiltro) return false;
       if (conceptoFiltro.trim() && !m.concepto.toLowerCase().includes(conceptoFiltro.trim().toLowerCase()))

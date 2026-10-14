@@ -23,20 +23,39 @@ type Props = {
 
 type Modo = 'existente' | 'nuevo';
 
+const EPS = 0.005;
+
+/** Lo que le queda sin imputar a un cobro/pago (`pendiente` lo calcula el backend: importe − imputado). */
+function disponiblePago(p: MovimientoCc): number {
+  return p.pendiente ?? p.importe;
+}
+
 export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: Props) {
   const { getToken } = useAuth();
   const esCliente = !!cargo.clienteId;
   const pendienteCargo = cargo.pendiente ?? cargo.importe;
 
-  const [modo, setModo] = useState<Modo>(pagosDisponibles.length > 0 ? 'existente' : 'nuevo');
+  // Un cobro ya usado por completo no se ofrece, aunque llegue en la lista.
+  const pagos = useMemo(
+    () => pagosDisponibles.filter((p) => disponiblePago(p) > EPS),
+    [pagosDisponibles],
+  );
+  const sugeridoPara = (p: MovimientoCc | undefined) =>
+    p ? Math.min(pendienteCargo, disponiblePago(p)) : pendienteCargo;
+
+  const [modo, setModo] = useState<Modo>(pagos.length > 0 ? 'existente' : 'nuevo');
 
   // Modo "existente": elegir un pago ya cargado y cuánto imputarle.
-  const [pagoId, setPagoId] = useState(pagosDisponibles[0]?.id ?? '');
-  const [importeStr, setImporteStr] = useState(() => formatCurrencyArFromNumber(pendienteCargo));
-  const pagoSeleccionado = useMemo(
-    () => pagosDisponibles.find((p) => p.id === pagoId) ?? null,
-    [pagosDisponibles, pagoId],
-  );
+  const [pagoId, setPagoId] = useState(pagos[0]?.id ?? '');
+  const [importeStr, setImporteStr] = useState(() => formatCurrencyArFromNumber(sugeridoPara(pagos[0])));
+  const pagoSeleccionado = useMemo(() => pagos.find((p) => p.id === pagoId) ?? null, [pagos, pagoId]);
+  const disponibleSeleccionado = pagoSeleccionado ? disponiblePago(pagoSeleccionado) : 0;
+  const importeIngresado = parseCurrencyAr(importeStr) ?? 0;
+
+  function elegirPago(id: string) {
+    setPagoId(id);
+    setImporteStr(formatCurrencyArFromNumber(sugeridoPara(pagos.find((p) => p.id === id))));
+  }
 
   // Modo "nuevo": cargar el cobro/pago ahí mismo y aplicarlo de una.
   const [nuevoImporteStr, setNuevoImporteStr] = useState(() => formatCurrencyArFromNumber(pendienteCargo));
@@ -58,6 +77,18 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
       const importe = parseCurrencyAr(importeStr);
       if (!importe || importe <= 0) {
         setError('Ingresá un importe mayor a 0.');
+        return;
+      }
+      if (importe > disponibleSeleccionado + EPS) {
+        setError(
+          `El importe supera lo disponible ${esCliente ? 'del cobro' : 'del pago'} (${formatCurrencyArFromNumber(disponibleSeleccionado)} ${pagoSeleccionado?.moneda ?? cargo.moneda}).`,
+        );
+        return;
+      }
+      if (importe > pendienteCargo + EPS) {
+        setError(
+          `El importe supera lo que falta ${esCliente ? 'cobrar' : 'pagar'} (${formatCurrencyArFromNumber(pendienteCargo)} ${cargo.moneda}).`,
+        );
         return;
       }
       setSaving(true);
@@ -116,7 +147,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
             type="submit"
             form="imputar-pago-form"
             className={viewModalBtnPrimary}
-            disabled={saving || (modo === 'existente' && pagosDisponibles.length === 0)}
+            disabled={saving || (modo === 'existente' && pagos.length === 0)}
           >
             {saving ? 'Guardando…' : 'Imputar'}
           </button>
@@ -137,7 +168,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
           .
         </p>
 
-        {pagosDisponibles.length > 0 && (
+        {pagos.length > 0 && (
           <div className="flex gap-2">
             <button
               type="button"
@@ -174,15 +205,19 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
                 id="cc-pago-select"
                 className={inputClass}
                 value={pagoId}
-                onChange={(e) => setPagoId(e.target.value)}
+                onChange={(e) => elegirPago(e.target.value)}
               >
-                {pagosDisponibles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {fmtDateUtc(p.fecha)} — {formatCurrencyArFromNumber(p.importe)}{' '}
-                    {p.moneda}
-                    {p.concepto ? ` (${p.concepto})` : ''}
-                  </option>
-                ))}
+                {pagos.map((p) => {
+                  const disponible = disponiblePago(p);
+                  const usado = Math.abs(disponible - p.importe) > EPS;
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {fmtDateUtc(p.fecha)} — {formatCurrencyArFromNumber(disponible)} {p.moneda}
+                      {usado ? ` disponibles de ${formatCurrencyArFromNumber(p.importe)} ${p.moneda}` : ''}
+                      {p.concepto ? ` (${p.concepto})` : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -201,10 +236,16 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
               />
               {pagoSeleccionado && (
                 <p className="mt-1 text-xs text-vialto-steel">
-                  {esCliente ? 'El cobro es' : 'El pago es'} de{' '}
-                  {formatCurrencyArFromNumber(pagoSeleccionado.importe)} {pagoSeleccionado.moneda}
+                  {esCliente ? 'Al cobro' : 'Al pago'} le quedan{' '}
+                  {formatCurrencyArFromNumber(disponibleSeleccionado)} {pagoSeleccionado.moneda} disponibles
+                  {Math.abs(disponibleSeleccionado - pagoSeleccionado.importe) > EPS &&
+                    ` de ${formatCurrencyArFromNumber(pagoSeleccionado.importe)} ${pagoSeleccionado.moneda}`}
+                  .
+                  {importeIngresado > EPS &&
+                    importeIngresado < disponibleSeleccionado - EPS &&
+                    ` El sobrante (${formatCurrencyArFromNumber(disponibleSeleccionado - importeIngresado)} ${pagoSeleccionado.moneda}) queda a cuenta.`}
                   {pagoSeleccionado.moneda !== cargo.moneda &&
-                    ` — atención, distinta moneda que ${esCliente ? 'la venta' : 'la compra'}, el servidor lo va a rechazar.`}
+                    ` Atención: distinta moneda que ${esCliente ? 'la venta' : 'la compra'}, el servidor lo va a rechazar.`}
                 </p>
               )}
             </div>
@@ -242,7 +283,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
             </div>
             <div>
               <label className={labelClass} htmlFor="cc-nueva-forma-pago">
-                Medio de {esCliente ? 'cobro' : 'pago'} / referencia (opcional)
+                Medio de {esCliente ? 'cobro' : 'pago'} / referencia
               </label>
               <input
                 id="cc-nueva-forma-pago"
