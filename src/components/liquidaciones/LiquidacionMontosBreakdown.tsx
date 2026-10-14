@@ -158,12 +158,16 @@ export function LiquidacionMontosBreakdown({
       label: brutoLabel,
       value: fmtSignedLiquidacionMoney(bruto, "plus"),
     },
-    {
-      key: "comision",
-      label: comisionLabel,
-      value: fmtSignedLiquidacionMoney(comision, "minus"),
-      muted: true,
-    },
+    ...(Number(comision) > 0
+      ? [
+          {
+            key: "comision",
+            label: comisionLabel,
+            value: fmtSignedLiquidacionMoney(comision, "minus"),
+            muted: true,
+          },
+        ]
+      : []),
     ...conceptosLineas.map((l, idx) => {
       const row = l as ConceptoLineaDisplay & { nombre?: string };
       const linePct = coerceIvaPct(row.ivaPct);
