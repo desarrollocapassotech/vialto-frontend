@@ -11,19 +11,10 @@ import { formatCurrencyArFromNumber, maskCurrencyArInput, parseCurrencyAr } from
 import { friendlyError } from '@/lib/friendlyError';
 import { createMovimiento, type TipoContraparte, type TipoMovimientoCc } from '@/lib/cuentaCorriente';
 import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
+import { computeFacturaTotalesFromBases } from '@/lib/facturaTotales';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
-
-/** Alícuotas ofrecidas para ventas/compras manuales ('' = sin IVA). */
-const IVA_OPCIONES = [
-  { value: '', label: 'Sin IVA' },
-  { value: '21', label: '21%' },
-  { value: '10.5', label: '10,5%' },
-  { value: '27', label: '27%' },
-];
-
-const redondear = (n: number) => Math.round(n * 100) / 100;
 
 type Props = {
   tipoContraparte: TipoContraparte;
@@ -58,17 +49,25 @@ export function MovimientoCcFormModal({
   const esCargo = tipo === 'cargo';
   const esCliente = tipoContraparte === 'cliente';
 
-  // IVA solo en ventas/compras: el importe cargado es sin IVA y se registra por el total.
-  const ivaPct = esCargo && ivaPctStr ? Number(ivaPctStr) : null;
+  // IVA solo en ventas/compras, mismo campo que Facturas: vacío = sin IVA. El importe
+  // cargado es sin IVA y se registra por el total, calculado igual que una factura.
+  const ivaPctNum = ivaPctStr.trim() !== '' ? Number(ivaPctStr) : 0;
+  const ivaPct = esCargo && Number.isFinite(ivaPctNum) && ivaPctNum > 0 ? ivaPctNum : null;
   const importeNeto = parseCurrencyAr(importeStr) ?? 0;
-  const ivaMonto = ivaPct && importeNeto > 0 ? redondear((importeNeto * ivaPct) / 100) : null;
-  const total = ivaMonto != null ? redondear(importeNeto + ivaMonto) : null;
+  const totales =
+    ivaPct != null && importeNeto > 0
+      ? computeFacturaTotalesFromBases([{ importe: importeNeto, ivaPct }])
+      : null;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const importe = parseCurrencyAr(importeStr);
     if (!importe || importe <= 0) {
       setError('Ingresá un importe mayor a 0.');
+      return;
+    }
+    if (esCargo && (!Number.isFinite(ivaPctNum) || ivaPctNum < 0 || ivaPctNum > 100)) {
+      setError('El IVA tiene que ser un porcentaje entre 0 y 100.');
       return;
     }
     setSaving(true);
@@ -194,22 +193,21 @@ export function MovimientoCcFormModal({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelClass} htmlFor="cc-iva">
-                  IVA
+                  IVA (%)
                 </label>
-                <select
+                <input
                   id="cc-iva"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
                   className={inputClass}
                   value={ivaPctStr}
                   onChange={(e) => setIvaPctStr(e.target.value)}
-                >
-                  {IVA_OPCIONES.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="0"
+                />
               </div>
-              {total != null && (
+              {totales && (
                 <div>
                   <label className={labelClass} htmlFor="cc-total">
                     Total con IVA
@@ -218,18 +216,18 @@ export function MovimientoCcFormModal({
                     id="cc-total"
                     type="text"
                     className={`${inputClass} bg-vialto-mist tabular-nums`}
-                    value={`${formatCurrencyArFromNumber(total)} ${moneda}`}
+                    value={`${formatCurrencyArFromNumber(totales.total)} ${moneda}`}
                     readOnly
                     tabIndex={-1}
                   />
                 </div>
               )}
             </div>
-            {total != null && ivaMonto != null && (
+            {totales && (
               <p className="mt-1 text-xs text-vialto-steel tabular-nums">
-                {formatCurrencyArFromNumber(importeNeto)} + IVA{' '}
-                {IVA_OPCIONES.find((o) => o.value === ivaPctStr)?.label}{' '}
-                {formatCurrencyArFromNumber(ivaMonto)} = {formatCurrencyArFromNumber(total)} {moneda}. Se registra por el total.
+                {formatCurrencyArFromNumber(totales.neto)} + IVA{' '}
+                {formatCurrencyArFromNumber(totales.iva)} = {formatCurrencyArFromNumber(totales.total)}{' '}
+                {moneda}. Se registra por el total.
               </p>
             )}
           </div>
