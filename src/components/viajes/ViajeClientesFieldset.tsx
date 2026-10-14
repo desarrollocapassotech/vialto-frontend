@@ -314,7 +314,7 @@ export function ViajeClientesFieldset({
                 </div>
               )}
               {desgloseActivo ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[6rem_minmax(0,3fr)_minmax(0,2fr)]">
                   <div className="flex flex-col gap-1">
                     <span className={fieldLabelClass}>Cantidad</span>
                     <input
@@ -323,7 +323,7 @@ export function ViajeClientesFieldset({
                       value={row.cantidadStr}
                       onChange={(e) => update(i, { cantidadStr: e.target.value })}
                       disabled={bloqueado}
-                      placeholder="0.00"
+                      placeholder="0"
                       className={`${inputClass} text-right tabular-nums`}
                       aria-label={`Cantidad del cliente ${i + 1}`}
                     />
