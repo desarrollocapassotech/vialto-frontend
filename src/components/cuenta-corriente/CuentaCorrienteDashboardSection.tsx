@@ -18,7 +18,7 @@ function periodToDates(
   }
   if (period === 'month') {
     return {
-      from: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10),
+      from: `${todayStr.slice(0, 8)}01`,
       to: todayStr,
     };
   }
