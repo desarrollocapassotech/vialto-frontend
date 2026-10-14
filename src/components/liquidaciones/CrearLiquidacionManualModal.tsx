@@ -19,11 +19,11 @@ import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoF
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { EmisorArcaResumen } from "@/components/facturacion/EmisorArcaResumen";
 import { ParteFacturaResumen } from "@/components/facturacion/ParteFacturaResumen";
-import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
 import { useValidacionPadronRegistro } from "@/hooks/useValidacionPadronRegistro";
+import { useReceptorPadronBloqueado } from "@/hooks/useReceptorPadronBloqueado";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { PadronValidacionEstado } from "@/components/shared/PadronValidacionEstado";
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
@@ -185,7 +185,20 @@ interface Props {
   idPropio2Label?: string;
   /** Opciones configuradas de entidades/proveedores para el contrato PDF. */
   opcionesProveedor?: string[];
+  /**
+   * Liquidación ya guardada (borrador o con error de ARCA) para revisar y emitir: el modal
+   * se abre precargado con sus datos y "Emitir" guarda los cambios y la emite. Reemplaza al
+   * viejo modal intermedio "Emitir comprobante", así la emisión se ve siempre igual.
+   */
+  liquidacionExistente?: Liquidacion;
+  /** true = pantalla de superadmin con empresa elegida: usa las rutas /api/platform/... */
+  rutasPlataforma?: boolean;
 }
+
+type LiquidacionDetalleExistente = Liquidacion & {
+  transportista?: Partial<Transportista> | null;
+  viajes?: Array<{ viajeId?: string; viaje?: { id?: string } | null }>;
+};
 
 export function CrearLiquidacionManualModal({
   viajeInicial,
@@ -206,19 +219,44 @@ export function CrearLiquidacionManualModal({
   idPropio1Label = "ID personalizado",
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
-  opcionesProveedor = [],
+  opcionesProveedor: opcionesProveedorProp = [],
+  liquidacionExistente,
+  rutasPlataforma = false,
 }: Props) {
   const showComprobante = !hasLiquidoProductoArca;
   const { showToast } = useToast();
 
   const overlayRef = useRef<HTMLDivElement>(null);
 
+  const existente = liquidacionExistente ?? null;
+  // Una vez que la liquidación entró al circuito de emisión (error de ARCA), sus viajes ya
+  // se comunicaron: solo en borrador se pueden agregar/quitar (mismo criterio que la edición).
+  const puedeCambiarViajes = !existente || existente.estado === "borrador";
+  const plataforma = rutasPlataforma && Boolean(tenantId);
+  const arcaBase = plataforma ? "/api/platform/integracion-arca" : "/api/integracion-arca";
+  const qsTenant = plataforma ? `?tenantId=${encodeURIComponent(tenantId!)}` : "";
+
+  // El proveedor guardado en la liquidación se ofrece aunque ya no esté en la configuración.
+  const opcionesProveedor = useMemo(
+    () =>
+      existente?.proveedorContrato &&
+      !opcionesProveedorProp.includes(existente.proveedorContrato)
+        ? [existente.proveedorContrato, ...opcionesProveedorProp]
+        : opcionesProveedorProp,
+    [existente?.proveedorContrato, opcionesProveedorProp],
+  );
+
   const [resolvedConfig, setResolvedConfig] = useState<ArcaConfig | null>(
     configProp ?? null,
   );
   const [proveedorContrato, setProveedorContrato] = useState<string>(
-    opcionesProveedor && opcionesProveedor.length > 0 ? opcionesProveedor[0] : "",
+    existente?.proveedorContrato ??
+      (opcionesProveedor && opcionesProveedor.length > 0 ? opcionesProveedor[0] : ""),
   );
+
+  // Detalle completo de la liquidación existente (viajes, conceptos, transportista).
+  const [detalleExistente, setDetalleExistente] =
+    useState<LiquidacionDetalleExistente | null>(null);
 
   useEffect(() => {
     if (!opcionesProveedor || opcionesProveedor.length === 0) {
@@ -247,13 +285,17 @@ export function CrearLiquidacionManualModal({
   // — Campos del formulario —
   const [transportistaId, setTransportistaId] = useState(
     () =>
-      (viajeInicial
-        ? transportistaOpcionesViaje[0]?.id
-        : transportistaIdInicial) ?? "",
+      (existente
+        ? existente.transportistaId
+        : viajeInicial
+          ? transportistaOpcionesViaje[0]?.id
+          : transportistaIdInicial) ?? "",
   );
+  // Transportista cuyos viajes se preseleccionan al cargar la lista (grilla o liquidación existente).
+  const transportistaIdPreseleccion = existente?.transportistaId ?? transportistaIdInicial;
   /** Viajes a marcar apenas cargue la lista del transportista inicial (una sola vez). */
   const preseleccionPendiente = useRef<string[] | null>(
-    !viajeInicial && transportistaIdInicial && viajeIdsIniciales?.length
+    !existente && !viajeInicial && transportistaIdInicial && viajeIdsIniciales?.length
       ? viajeIdsIniciales
       : null,
   );
@@ -267,16 +309,20 @@ export function CrearLiquidacionManualModal({
 
   // Si viene de un viaje puntual, se precargan con su fecha de carga/descarga.
   const [periodoDesde, setPeriodoDesde] = useState(() =>
-    dateInputValueFromIso(viajeInicial?.fechaCarga),
+    dateInputValueFromIso(existente?.periodoDesde ?? viajeInicial?.fechaCarga),
   );
   const [periodoHasta, setPeriodoHasta] = useState(() =>
     dateInputValueFromIso(
-      viajeInicial?.fechaDescarga ?? viajeInicial?.fechaCarga,
+      existente?.periodoHasta ?? viajeInicial?.fechaDescarga ?? viajeInicial?.fechaCarga,
     ),
   );
-  const [comisionPct, setComisionPct] = useState("");
-  const comisionEditadaManualmente = useRef(false);
+  // Liquidación existente: comisión e IVA son los guardados (no se recalculan por defecto).
+  const [comisionPct, setComisionPct] = useState(() =>
+    existente?.comisionPct != null ? String(existente.comisionPct) : "",
+  );
+  const comisionEditadaManualmente = useRef(Boolean(existente));
   const [ivaPct, setIvaPct] = useState(() => {
+    if (existente?.ivaPct != null) return String(existente.ivaPct);
     const fromViaje = uniqueIvaPctFromViajes(
       viajeInicial ? [viajeInicial] : [],
     );
@@ -285,7 +331,7 @@ export function CrearLiquidacionManualModal({
       ? String(configProp.ivaGastosAdmin)
       : "";
   });
-  const ivaEditadaManualmente = useRef(false);
+  const ivaEditadaManualmente = useRef(Boolean(existente));
   const [ptoVenta, setPtoVenta] = useState(
     configProp?.ptoVentaCvlp != null ? String(configProp.ptoVentaCvlp) : "",
   );
@@ -316,9 +362,6 @@ export function CrearLiquidacionManualModal({
   >(null);
   const submitting = submitAction !== null;
   const [error, setError] = useState<string | null>(null);
-  const [emitirPendiente, setEmitirPendiente] = useState<Liquidacion | null>(
-    null,
-  );
 
   // Cargar config ARCA si no vino por props
   useEffect(() => {
@@ -331,7 +374,7 @@ export function CrearLiquidacionManualModal({
     void (async () => {
       try {
         const cfg = await apiJson<ArcaConfig>(
-          "/api/integracion-arca/config",
+          `${arcaBase}/config${qsTenant}`,
           () => getToken(),
         );
         if (!cancelled) setResolvedConfig(cfg);
@@ -342,7 +385,53 @@ export function CrearLiquidacionManualModal({
     return () => {
       cancelled = true;
     };
-  }, [configProp, hasLiquidoProductoArca, getToken]);
+  }, [configProp, hasLiquidoProductoArca, getToken, arcaBase, qsTenant]);
+
+  // Liquidación existente: trae el detalle (viajes y conceptos) para precargar el formulario.
+  const existenteId = existente?.id;
+  useEffect(() => {
+    if (!existenteId) return;
+    let cancelled = false;
+    void (async () => {
+      let det: LiquidacionDetalleExistente | null = null;
+      try {
+        det = await apiJson<LiquidacionDetalleExistente>(
+          `${arcaBase}/liquidaciones/${encodeURIComponent(existenteId)}${qsTenant}`,
+          () => getToken(),
+        );
+      } catch {
+        // Sin detalle se sigue con lo que vino del listado.
+      }
+      if (cancelled) return;
+      const base = (det ?? liquidacionExistente) as LiquidacionDetalleExistente;
+      const viajeIds = (base.viajes ?? [])
+        .map((lv) => lv.viaje?.id ?? lv.viajeId)
+        .filter((id): id is string => Boolean(id));
+      preseleccionPendiente.current = viajeIds;
+      setConceptosLineas(
+        (base.conceptosLineas ?? [])
+          .filter((l) => l.conceptoLiquidacionId)
+          .map((l) => ({
+            conceptoLiquidacionId: l.conceptoLiquidacionId as string,
+            monto: l.monto,
+            cantidad: l.cantidad ?? 1,
+            montoUnitario: l.montoUnitario ?? undefined,
+            nombre: l.nombreSnapshot,
+            signo: l.signo,
+            ivaPct: l.ivaPct ?? undefined,
+            modoAplicacion: l.modoAplicacion ?? "GENERAL",
+            viajeId: l.viajeId ?? null,
+          })),
+      );
+      if (base.ivaPct != null) setIvaPct(String(base.ivaPct));
+      setDetalleExistente(base);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // `liquidacionExistente` solo se usa como respaldo si falla el detalle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existenteId, arcaBase, qsTenant, getToken]);
 
   useEffect(() => {
     if (
@@ -402,8 +491,12 @@ export function CrearLiquidacionManualModal({
     ) {
       return viajeInicial.transportistaEfectivo as Partial<Transportista>;
     }
+    // Liquidación existente abierta desde una pantalla sin la lista de transportistas.
+    if (detalleExistente?.transportista && detalleExistente.transportistaId === transportistaId) {
+      return { id: transportistaId, ...detalleExistente.transportista } as Partial<Transportista>;
+    }
     return null;
-  }, [viajeInicial, transportistas, transportistaId, transportistaActualizado]);
+  }, [viajeInicial, transportistas, transportistaId, transportistaActualizado, detalleExistente]);
 
   const condicionIva = transportistaSeleccionado?.condicionIva ?? null;
   const cvlpClaseBAlerta =
@@ -414,21 +507,42 @@ export function CrearLiquidacionManualModal({
       setViajes([]);
       return;
     }
+    // Liquidación existente: se espera su detalle para saber qué viajes preseleccionar.
+    if (existente && !detalleExistente) {
+      setViajesLoading(true);
+      return;
+    }
     let cancelled = false;
     setViajesLoading(true);
     setSelectedViajeIds(new Set());
     void (async () => {
       try {
+        // En una liquidación existente sus propios viajes ya tienen liquidación activa (esta):
+        // se traen todos y se dejan los suyos + los que no tengan otra activa.
+        const qs = `transportistaId=${encodeURIComponent(transportistaId)}&pageSize=100&page=1${
+          existente ? "" : "&sinLiquidacionActiva=1"
+        }`;
         const res = await apiJson<{ items: ViajeItem[] }>(
-          `/api/viajes/paginated?transportistaId=${encodeURIComponent(transportistaId)}&pageSize=100&page=1&sinLiquidacionActiva=1`,
+          plataforma
+            ? `/api/platform/viajes/paginated?${qs}&tenantId=${encodeURIComponent(tenantId!)}`
+            : `/api/viajes/paginated?${qs}`,
           () => getToken(),
         );
         if (!cancelled) {
-          const items = res.items ?? [];
-          setViajes(items);
           const preseleccion = preseleccionPendiente.current;
           preseleccionPendiente.current = null;
-          if (preseleccion && transportistaId === transportistaIdInicial) {
+          let items = res.items ?? [];
+          if (existente) {
+            const propios = new Set(preseleccion ?? []);
+            items = items.filter((v) =>
+              puedeCambiarViajes
+                ? propios.has(v.id) ||
+                  !viajeTieneLiquidacionActivaParaTransportista(v, transportistaId)
+                : propios.has(v.id),
+            );
+          }
+          setViajes(items);
+          if (preseleccion && transportistaId === transportistaIdPreseleccion) {
             const elegidos = items.filter((v) => preseleccion.includes(v.id));
             setSelectedViajeIds(new Set(elegidos.map((v) => v.id)));
             if (elegidos.length < preseleccion.length) {
@@ -459,7 +573,18 @@ export function CrearLiquidacionManualModal({
     return () => {
       cancelled = true;
     };
-  }, [transportistaId, transportistaIdInicial, viajeInicial, getToken, showToast]);
+    // `existente`/`puedeCambiarViajes` son fijos durante la vida del modal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    transportistaId,
+    transportistaIdPreseleccion,
+    viajeInicial,
+    getToken,
+    showToast,
+    detalleExistente,
+    plataforma,
+    tenantId,
+  ]);
 
   const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
 
@@ -613,6 +738,18 @@ export function CrearLiquidacionManualModal({
       ? padronCliente.resultado
       : null;
 
+  // CUIT del transportista (receptor del CVLP) dado de baja / apócrifo en ARCA: no se
+  // puede emitir. Se avisa en el pie, igual que los datos faltantes.
+  const receptorTransportista = useReceptorPadronBloqueado({
+    entidad: "transportistas",
+    id: transportistaSeleccionadoId,
+    habilitado: hasLiquidoProductoArca,
+    tenantId,
+    getToken,
+    datosKey: transportistaSeleccionado?.idFiscal ?? null,
+  });
+  const emisionBloqueada = datosEmitIncompletos || receptorTransportista.bloqueado;
+
   // Hay algo para mostrar en cada modal (si no, el modal ni se renderiza).
   const modalTransportistaDisponible = Boolean(
     transportistaSeleccionadoId &&
@@ -683,6 +820,7 @@ export function CrearLiquidacionManualModal({
   );
 
   function toggleViaje(id: string) {
+    if (!puedeCambiarViajes) return;
     setSelectedViajeIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -861,6 +999,10 @@ export function CrearLiquidacionManualModal({
       setError(MSG_EMITIR_MONTO_CERO);
       return;
     }
+    if (action === "emitir" && receptorTransportista.bloqueado) {
+      zumbidoAviso.disparar();
+      return;
+    }
 
     setConceptosIncomplete([]);
     setError(null);
@@ -876,46 +1018,57 @@ export function CrearLiquidacionManualModal({
         );
       }
       const body: Record<string, unknown> = {
-        transportistaId,
         periodoDesde: effectivePeriodoDesde,
         periodoHasta: effectivePeriodoHasta,
-        viajeIds,
       };
+      if (!existente) body.transportistaId = transportistaId;
+      if (puedeCambiarViajes) body.viajeIds = viajeIds;
       if (comisionPct.trim() !== "") body.comisionPct = Number(comisionPct);
       body.ivaPct = ivaResolved;
       const lineasPayload = toConceptosLineasPayload(conceptosLineas);
-      if (lineasPayload.length > 0) body.conceptosLineas = lineasPayload;
+      // En una existente se manda siempre (vacío = se quitaron todos los conceptos).
+      if (existente || lineasPayload.length > 0) body.conceptosLineas = lineasPayload;
       if (comprobanteUrl) body.comprobanteUrl = comprobanteUrl;
-      if (proveedorContrato?.trim()) body.proveedorContrato = proveedorContrato.trim();
+      if (existente) body.proveedorContrato = proveedorContrato?.trim() || null;
+      else if (proveedorContrato?.trim()) body.proveedorContrato = proveedorContrato.trim();
 
+      // Existente: se guardan los cambios sobre la misma liquidación (no se crea otra).
       let liq = await apiJson<Liquidacion>(
-        "/api/integracion-arca/liquidaciones",
+        existente
+          ? `${arcaBase}/liquidaciones/${encodeURIComponent(existente.id)}${qsTenant}`
+          : `${arcaBase}/liquidaciones${qsTenant}`,
         () => getToken(),
-        { method: "POST", body: JSON.stringify(body) },
+        { method: existente ? "PATCH" : "POST", body: JSON.stringify(body) },
       );
 
       let emitFailed = false;
       if (action === "emitir") {
         try {
           liq = await apiJson<Liquidacion>(
-            `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/emitir`,
+            `${arcaBase}/liquidaciones/${encodeURIComponent(liq.id)}/emitir${qsTenant}`,
             () => getToken(),
             {
               method: "POST",
               body: JSON.stringify({ ptoVenta: ptoVentaNum }),
             },
           );
-        } catch {
+        } catch (emitErr) {
+          // Sin modal intermedio: la liquidación ya quedó guardada (en borrador o con el
+          // error de ARCA, que se ve completo desde la grilla); se cierra y se avisa.
           emitFailed = true;
           try {
             liq = await apiJson<Liquidacion>(
-              `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
+              `${arcaBase}/liquidaciones/${encodeURIComponent(liq.id)}${qsTenant}`,
               () => getToken(),
             );
           } catch {
             /* si falla el refresh, se usa el borrador ya creado */
           }
-          setEmitirPendiente(liq);
+          showToast(
+            `La liquidación quedó guardada, pero no se pudo emitir: ${friendlyError(emitErr, "arca")}`,
+            "error",
+          );
+          onSuccess(liq);
         }
       }
 
@@ -933,9 +1086,11 @@ export function CrearLiquidacionManualModal({
         }
       } else if (action === "borrador") {
         showToast(
-          hasLiquidoProductoArca
-            ? "Liquidación guardada en borrador."
-            : "Liquidación creada en borrador.",
+          existente
+            ? "Liquidación guardada."
+            : hasLiquidoProductoArca
+              ? "Liquidación guardada en borrador."
+              : "Liquidación creada en borrador.",
         );
         onSuccess(liq);
       }
@@ -1049,31 +1204,6 @@ export function CrearLiquidacionManualModal({
     !ptoVenta.trim() ||
     !Number.isInteger(ptoVentaNumPreview) ||
     ptoVentaNumPreview < 1;
-
-  if (emitirPendiente) {
-    return (
-      <EmitirLiquidacionModal
-        liq={emitirPendiente}
-        getToken={getToken}
-        tenantId={tenantId}
-        arcaConfig={resolvedConfig}
-        ivaPct={emitirPendiente.ivaPct ?? resolvedConfig?.ivaGastosAdmin}
-        onSuccess={(updated) => {
-          setEmitirPendiente(null);
-          showToast(
-            updated.cae
-              ? `Comprobante emitido correctamente. CAE: ${updated.cae}`
-              : "Comprobante emitido correctamente.",
-          );
-          onSuccess(updated);
-        }}
-        onClose={() => {
-          setEmitirPendiente(null);
-          onSuccess(emitirPendiente);
-        }}
-      />
-    );
-  }
 
   return (
     <div
@@ -1209,7 +1339,7 @@ export function CrearLiquidacionManualModal({
             <div className="flex shrink-0 items-center justify-between border-b border-black/10 px-6 py-3.5">
               <div className="flex items-center gap-2">
                 <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
-                  Nueva liquidación
+                  {existente ? "Emitir liquidación" : "Nueva liquidación"}
                 </h2>
                 {hasLiquidoProductoArca && (
                   <AmbienteTestBadge ambiente={resolvedConfig?.ambiente} />
@@ -1243,7 +1373,7 @@ export function CrearLiquidacionManualModal({
                       <label className={labelClass}>
                         Transportista <span className="text-red-500">*</span>
                       </label>
-                      {viajeInicial && !elegirTransportistaEnViaje ? (
+                      {existente || (viajeInicial && !elegirTransportistaEnViaje) ? (
                         <div className="rounded border border-black/10 bg-vialto-mist px-3 py-2 text-sm text-vialto-charcoal">
                           {transportistaNombre}
                         </div>
@@ -1760,7 +1890,7 @@ export function CrearLiquidacionManualModal({
             </form>
 
             <div className="flex flex-wrap items-center justify-end gap-3 border-t border-black/10 px-6 py-4 shrink-0">
-              {datosEmitIncompletos && (
+              {datosEmitIncompletos ? (
                 <AvisoFaltantesEmision
                   mensaje={mensajeFaltantes}
                   hayOcultos={missingHiddenFields.length > 0}
@@ -1768,6 +1898,16 @@ export function CrearLiquidacionManualModal({
                   zumbando={zumbidoAviso.zumbando}
                   onZumbidoEnd={zumbidoAviso.terminar}
                 />
+              ) : (
+                receptorTransportista.mensaje && (
+                  <AvisoFaltantesEmision
+                    mensaje={receptorTransportista.mensaje}
+                    hayOcultos={false}
+                    bloqueante
+                    zumbando={zumbidoAviso.zumbando}
+                    onZumbidoEnd={zumbidoAviso.terminar}
+                  />
+                )
               )}
               <button
                 type="button"
@@ -1793,10 +1933,13 @@ export function CrearLiquidacionManualModal({
                     {submitAction === "borrador" && <Spinner />}
                     {submitAction === "borrador"
                       ? "Guardando…"
-                      : "Guardar borrador"}
+                      : existente
+                        ? "Guardar cambios"
+                        : "Guardar borrador"}
                   </button>
-                  {/* Con datos faltantes no se usa `disabled` (no dispararía el click): se ve
-                      deshabilitado y el click hace zumbar el aviso del pie. */}
+                  {/* Con datos faltantes o CUIT dado de baja no se usa `disabled` (no
+                      dispararía el click): se ve deshabilitado y el click hace zumbar el aviso
+                      del pie. Mientras se verifica el CUIT en ARCA, sí queda deshabilitado. */}
                   <button
                     type="button"
                     disabled={
@@ -1804,12 +1947,13 @@ export function CrearLiquidacionManualModal({
                       !canSubmitBase ||
                       ptoVentaInvalidoPreview ||
                       cvlpClaseBAlerta ||
-                      montoCero
+                      montoCero ||
+                      receptorTransportista.verificando
                     }
                     title={montoCero ? MSG_EMITIR_MONTO_CERO : undefined}
-                    aria-disabled={datosEmitIncompletos || undefined}
+                    aria-disabled={emisionBloqueada || undefined}
                     onClick={(e) => {
-                      if (datosEmitIncompletos) {
+                      if (emisionBloqueada) {
                         zumbidoAviso.disparar();
                         return;
                       }
@@ -1819,7 +1963,7 @@ export function CrearLiquidacionManualModal({
                       );
                     }}
                     className={`inline-flex items-center gap-2 h-9 px-5 rounded bg-vialto-charcoal font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-white disabled:opacity-50 ${
-                      datosEmitIncompletos
+                      emisionBloqueada
                         ? "cursor-not-allowed opacity-50"
                         : "hover:bg-vialto-charcoal/90"
                     }`}
