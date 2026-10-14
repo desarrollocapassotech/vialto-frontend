@@ -4,6 +4,7 @@ import {
   ESTADO_DISPONIBILIDAD_LABEL,
   ESTADO_IMPUTACION_LABEL,
   ESTADO_MOVIMIENTO_EXTRA_LABEL,
+  esDebeCc,
   type ExportarMovimientosResponse,
   type TipoContraparte,
 } from '@/lib/cuentaCorriente';
@@ -24,8 +25,8 @@ export function generarEstadoCuentaExcel(
     if (tipoContraparte === 'cliente') {
       row.Comprobante = m.numeroComprobante ?? '';
     }
-    row.Debe = m.tipo === 'cargo' ? m.importe : '';
-    row.Haber = m.tipo === 'pago' ? m.importe : '';
+    row.Debe = esDebeCc(m) ? m.importe : '';
+    row.Haber = !esDebeCc(m) ? m.importe : '';
     row['Saldo acumulado'] = m.saldoAcumulado;
     row.Moneda = m.moneda;
     // Mismo criterio que `estadoMovimientoCc` en pantalla.

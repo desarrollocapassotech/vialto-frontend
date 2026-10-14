@@ -25,6 +25,7 @@ import {
   ESTADO_IMPUTACION_LABEL,
   ESTADO_MOVIMIENTO_EXTRA_LABEL,
   cuentaEnHistorialCc,
+  esDebeCc,
   estadoMovimientoCc,
   estadoMovimientoCcLabel,
   type MovimientoCc,
@@ -121,7 +122,7 @@ export function CuentaContraparteView({
   // aunque su fecha sea anterior a otros movimientos (mismo criterio que Viajes). El saldo
   // acumulado se calcula acá (no lo trae el backend en este endpoint) recorriendo ese mismo
   // orden, para que cada fila sea coherente con lo que se ve. Un movimiento anulado suma
-  // junto con su negativo (el par se cancela, VTO-431); un anulado sin negativo no suma.
+  // junto con su crédito de anulación en el Haber (el par se cancela, VTO-431); un anulado sin crédito no suma.
   const movimientosConSaldo = useMemo<MovimientoConSaldo[] | null>(() => {
     if (!movimientos) return null;
     const ascendente = [...movimientos].sort(compararPorCarga);
@@ -129,7 +130,7 @@ export function CuentaContraparteView({
     const conSaldo: MovimientoConSaldo[] = [];
     for (const m of ascendente) {
       if (cuentaEnHistorialCc(m)) {
-        acumulado += m.tipo === 'cargo' ? m.importe : -m.importe;
+        acumulado += esDebeCc(m) ? m.importe : -m.importe;
       }
       conSaldo.push({ ...m, saldoAcumulado: acumulado });
     }
@@ -393,18 +394,16 @@ export function CuentaContraparteView({
           {
             id: 'debe',
             header: 'Debe',
-            // Una anulación es una venta/compra en negativo: va en Debe con signo menos.
             cell: (m: MovimientoConSaldo) =>
-              m.tipo === 'cargo'
-                ? `${m.importe < 0 ? '−' : ''}${formatCurrencyArFromNumber(Math.abs(m.importe))} ${m.moneda}`
-                : '—',
+              esDebeCc(m) ? `${formatCurrencyArFromNumber(m.importe)} ${m.moneda}` : '—',
             tdClassName: `${listadoTablaTdClass} tabular-nums`,
           },
           {
             id: 'haber',
             header: 'Haber',
+            // Cobros/pagos y créditos de anulación (nota de crédito) van al Haber.
             cell: (m: MovimientoConSaldo) =>
-              m.tipo === 'pago' ? `${formatCurrencyArFromNumber(m.importe)} ${m.moneda}` : '—',
+              !esDebeCc(m) ? `${formatCurrencyArFromNumber(m.importe)} ${m.moneda}` : '—',
             tdClassName: `${listadoTablaTdClass} tabular-nums`,
           },
           {

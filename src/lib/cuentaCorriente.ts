@@ -2,7 +2,13 @@ import { apiFetch, apiJson, ApiError, extractApiErrorMessage } from '@/lib/api';
 import { filenameFromContentDisposition } from '@/lib/downloadFilename';
 import { roundMoney2 } from '@/lib/facturaTotales';
 
+/** Lo que se carga a mano: venta/compra (cargo) o cobro/pago. */
 export type TipoMovimientoCc = 'cargo' | 'pago';
+/**
+ * Tipo de un movimiento guardado. `credito` = anulación (nota de crédito): va en el Haber
+ * como un cobro pero no es cobranza ni se imputa — ya está aplicada al movimiento que anula.
+ */
+export type TipoMovimientoCcRegistrado = TipoMovimientoCc | 'credito';
 export type TipoContraparte = 'cliente' | 'proveedor';
 
 export type MovimientoCc = {
@@ -12,7 +18,7 @@ export type MovimientoCc = {
   contraparteId: string;
   viajeId: string | null;
   facturaId: string | null;
-  tipo: TipoMovimientoCc;
+  tipo: TipoMovimientoCcRegistrado;
   origen: string;
   concepto: string;
   /** Total del movimiento (con IVA incluido, si se cargó con IVA). Es lo que suma al saldo. */
@@ -32,10 +38,10 @@ export type MovimientoCc = {
   liquidacionId?: string | null;
   /** Fecha original del movimiento de viaje antes de transformarse en el de la factura/liquidación. */
   fechaOrigen?: string | null;
-  /** Solo anulaciones (origen `anulacion`, importe negativo): el movimiento que compensan. */
+  /** Solo anulaciones (origen `anulacion`, `tipo: credito`, en el Haber): el movimiento que compensan. */
   anulaMovimientoId?: string | null;
   anulaMovimiento?: { id: string; fecha: string; concepto: string } | null;
-  /** Movimiento anulado con su negativo (VTO-431). */
+  /** Movimiento anulado con su crédito de anulación (VTO-431). */
   anuladoPor?: { id: string; fecha: string } | null;
   /**
    * Cuánto de ESTE movimiento puntual sigue sin resolverse (cargo: sin cobrar/pagar;
@@ -137,7 +143,7 @@ export function fetchSaldoProveedor(getToken: GetToken, proveedorId: string) {
 export type MovimientoExport = {
   id: string;
   fecha: string;
-  tipo: TipoMovimientoCc;
+  tipo: TipoMovimientoCcRegistrado;
   origen: string;
   concepto: string;
   referencia: string | null;
@@ -275,7 +281,7 @@ export const ESTADO_MOVIMIENTO_EXTRA_LABEL: Record<string, string> = {
 /**
  * Estado a mostrar (y filtrar) de un movimiento. Un movimiento de viaje vigente todavía
  * no se facturó (cliente) o liquidó (proveedor): al facturarlo/liquidarlo se transforma en
- * el del comprobante. Una anulación (negativo) tiene su propio estado. El resto usa el
+ * el del comprobante. Una anulación (crédito en el Haber) tiene su propio estado. El resto usa el
  * estado de cobro/imputación de siempre.
  */
 export function estadoMovimientoCc(m: MovimientoCc): string {
@@ -301,12 +307,17 @@ export function estadoMovimientoCcLabel(m: MovimientoCc): string {
 
 /**
  * ¿El movimiento suma en el saldo acumulado del historial? Todo suma salvo un cargo
- * anulado SIN su negativo (anulaciones previas a VTO-431, o movimientos de viaje
+ * anulado SIN su crédito (anulaciones previas a VTO-431, o movimientos de viaje
  * unificados en una factura/liquidación). Espejo de `cuentaEnHistorialCc` del backend.
  */
 export function cuentaEnHistorialCc(m: MovimientoCc): boolean {
   if (m.tipo !== 'cargo' || m.estadoDisponibilidad !== 'anulado') return true;
   return !!m.anulaMovimientoId || !!m.anuladoPor;
+}
+
+/** Va en el Debe (suma al saldo) o en el Haber (resta: cobro/pago o crédito de anulación). */
+export function esDebeCc(m: { tipo: TipoMovimientoCcRegistrado }): boolean {
+  return m.tipo === 'cargo';
 }
 
 export const ESTADO_IMPUTACION_LABEL: Record<string, string> = {
