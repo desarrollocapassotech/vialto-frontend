@@ -36,6 +36,11 @@ type Props = {
   onLiquidar?: () => void;
   /** `icono`: ícono compacto de una sola línea (columna "Liquidación" de la grilla). */
   variante?: "badge" | "icono";
+  /**
+   * Si se pasa, el detalle de una liquidación en borrador / con error ofrece "Emitir": se
+   * cierra el detalle y el host abre el modal de "Nueva liquidación" sobre esa liquidación.
+   */
+  onEmitir?: (liq: LiquidacionConTransportista) => void;
 };
 
 const badgeClass =
@@ -62,6 +67,7 @@ export function ViajeLiquidacionIndicador({
   onRegistrarPago,
   onLiquidar,
   variante = "badge",
+  onEmitir,
 }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -155,6 +161,14 @@ export function ViajeLiquidacionIndicador({
             liquidacionCompleta.estado,
           )}
           onClose={() => setLiquidacionCompleta(null)}
+          onEmitir={
+            onEmitir
+              ? () => {
+                  setLiquidacionCompleta(null);
+                  onEmitir(liquidacionCompleta);
+                }
+              : undefined
+          }
           contratoPdfUrl={liquidacionContratoPdfUrl(
             liquidacionCompleta.id,
             tenantId ? { platform: true, tenantId } : undefined,

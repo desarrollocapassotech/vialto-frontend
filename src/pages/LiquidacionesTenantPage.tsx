@@ -16,7 +16,6 @@ import {
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
-import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 import { FiltrosRapidos } from "@/components/listado/FiltrosRapidos";
@@ -563,16 +562,21 @@ export function LiquidacionesTenantPage() {
     );
   }, [searchParams, setSearchParams]);
 
+  /** Al cerrar el modal de emisión (emitida, guardada o con error de ARCA): refresca la fila. */
   function onEmitirSuccess(updated: LiquidacionConTransportista) {
     setRows(
-      (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
+      (prev) =>
+        prev?.map((r) =>
+          r.id === updated.id
+            ? {
+                ...updated,
+                transportista: updated.transportista ?? r.transportista,
+                conceptosLineas: updated.conceptosLineas ?? r.conceptosLineas,
+              }
+            : r,
+        ) ?? prev,
     );
     setPendingEmitir(null);
-    showToast(
-      updated.cae
-        ? `Comprobante emitido correctamente. CAE: ${updated.cae}`
-        : "Comprobante emitido correctamente.",
-    );
   }
 
   async function confirmEliminar() {
@@ -1312,19 +1316,27 @@ export function LiquidacionesTenantPage() {
         </div>
       )}
 
+      {/* Emitir una liquidación guardada (borrador o con error): mismo modal que "Nueva liquidación". */}
       {pendingEmitir && hasArca && activeTenantId && (
-        <EmitirLiquidacionModal
-          liq={pendingEmitir}
+        <CrearLiquidacionManualModal
+          liquidacionExistente={pendingEmitir}
+          transportistas={transportistas}
+          config={config}
+          hasLiquidoProductoArca={hasArca}
           getToken={getToken}
-          onSuccess={onEmitirSuccess}
-          onClose={() => setPendingEmitir(null)}
-          ivaPct={pendingEmitir.ivaPct ?? config?.ivaGastosAdmin}
-          arcaConfig={config}
           tenantId={isSuperAdmin ? activeTenantId : undefined}
+          idSistemaHabilitado={idSistemaHabilitado(empresaTenant)}
+          idPropio1Habilitado={idPropio1Habilitado(empresaTenant)}
+          idPropio1Label={labelIdentificacionPersonalizadaViajes(empresaTenant)}
+          idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
+          idPropio2Label={idPropio2Label(empresaTenant)}
+          opcionesProveedor={empresaTenant?.opcionesProveedorLiquidacion}
           onDataSaved={() => {
             void refreshTransportistas();
             void refreshClientes();
           }}
+          onSuccess={(liq) => onEmitirSuccess(liq as LiquidacionConTransportista)}
+          onClose={() => setPendingEmitir(null)}
         />
       )}
       {showCrear && activeTenantId && (
@@ -1340,6 +1352,7 @@ export function LiquidacionesTenantPage() {
           idPropio1Label={labelIdentificacionPersonalizadaViajes(empresaTenant)}
           idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
           idPropio2Label={idPropio2Label(empresaTenant)}
+          opcionesProveedor={empresaTenant?.opcionesProveedorLiquidacion}
           onDataSaved={() => {
             void refreshTransportistas();
             void refreshClientes();
@@ -1558,6 +1571,7 @@ export function LiquidacionesTenantPage() {
           idPropio1Label={labelIdentificacionPersonalizadaViajes(empresaTenant)}
           idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
           idPropio2Label={idPropio2Label(empresaTenant)}
+          opcionesProveedor={empresaTenant?.opcionesProveedorLiquidacion}
           onClose={() => setDetail({ mode: "view", liq: detail.liq })}
           onSaved={(updated) => {
             const withLineas = {

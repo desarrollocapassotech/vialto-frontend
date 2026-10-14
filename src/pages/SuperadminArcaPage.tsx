@@ -4,7 +4,7 @@ import { Receipt } from "lucide-react";
 import { useToast } from "@/lib/toast";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
-import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
+import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import { AnularLiquidacionModal } from "@/components/liquidaciones/AnularLiquidacionModal";
 import { ConfirmarAnulacionManualModal } from "@/components/liquidaciones/ConfirmarAnulacionManualModal";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
@@ -159,16 +159,10 @@ function LiquidacionesTab({
     load();
   }, [tenantId]);
 
-  function onEmitirSuccess(updated: Liquidacion) {
-    setItems(
-      (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
-    );
+  /** Al cerrar el modal de emisión (emitida, guardada o con error de ARCA): recarga el listado. */
+  function onEmitirSuccess() {
     setPendingEmitir(null);
-    showToast(
-      updated.cae
-        ? `Comprobante emitido correctamente. CAE: ${updated.cae}`
-        : "Comprobante emitido correctamente.",
-    );
+    load();
   }
 
   async function descargarPdf(id: string) {
@@ -696,18 +690,18 @@ function LiquidacionesTab({
         }}
       />
 
+      {/* Mismo modal que "Nueva liquidación", sobre la liquidación guardada y con rutas de plataforma. */}
       {pendingEmitir && (
-        <EmitirLiquidacionModal
-          liq={pendingEmitir}
+        <CrearLiquidacionManualModal
+          liquidacionExistente={pendingEmitir}
+          rutasPlataforma
+          transportistas={[]}
+          config={arcaConfig}
+          hasLiquidoProductoArca
           getToken={getToken}
+          tenantId={tenantId}
           onSuccess={onEmitirSuccess}
           onClose={() => setPendingEmitir(null)}
-          emitirUrl={`/api/platform/arca/liquidaciones/${encodeURIComponent(pendingEmitir.id)}/emitir?tenantId=${encodeURIComponent(tenantId)}`}
-          detalleUrl={`/api/platform/arca/liquidaciones/${encodeURIComponent(pendingEmitir.id)}?tenantId=${encodeURIComponent(tenantId)}`}
-          configUrl={`/api/platform/arca/config?tenantId=${encodeURIComponent(tenantId)}`}
-          arcaConfig={arcaConfig}
-          ivaPct={pendingEmitir.ivaPct ?? arcaConfig?.ivaGastosAdmin}
-          tenantId={tenantId}
         />
       )}
 

@@ -67,6 +67,7 @@ import {
 } from "@/lib/facturaFechaEmision";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useToast } from "@/lib/toast";
+import { ConfirmarEmisionArcaDialog } from "@/components/shared/ConfirmarEmisionArcaDialog";
 import {
   clientesConViajesPendientesFactura,
   monedaUnicaDeViajes,
@@ -238,6 +239,8 @@ export function FacturaCreateModal({
     "borrador" | "emitir" | null
   >(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  /** Diálogo "¿Emitir la factura en ARCA?" antes de emitir. */
+  const [confirmarEmision, setConfirmarEmision] = useState(false);
   const [step, setStep] = useState<"form" | "autorizada">("form");
   const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
 
@@ -1483,7 +1486,7 @@ export function FacturaCreateModal({
                         zumbidoAviso.disparar();
                         return;
                       }
-                      void handleUnifiedSubmit("emitir");
+                      setConfirmarEmision(true);
                     }}
                     className={`inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white disabled:opacity-60 ${
                       datosEmitIncompletos
@@ -1569,6 +1572,16 @@ export function FacturaCreateModal({
             onClose={() => setDatosClienteModalOpen(false)}
           />
         )}
+      <ConfirmarEmisionArcaDialog
+        open={confirmarEmision}
+        comprobante="factura"
+        ambiente={arcaConfig?.ambiente}
+        onCancel={() => setConfirmarEmision(false)}
+        onConfirm={() => {
+          setConfirmarEmision(false);
+          void handleUnifiedSubmit("emitir");
+        }}
+      />
     </>
   );
 }

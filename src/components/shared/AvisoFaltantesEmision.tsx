@@ -7,6 +7,7 @@ import { AlertTriangle } from "lucide-react";
 export function AvisoFaltantesEmision({
   mensaje,
   hayOcultos,
+  bloqueante,
   onCompletar,
   zumbando,
   onZumbidoEnd,
@@ -14,6 +15,8 @@ export function AvisoFaltantesEmision({
   mensaje: string;
   /** true = falta algún campo oculto para la empresa: aviso en rojo y sin botón. */
   hayOcultos: boolean;
+  /** true = no hay nada que completar (ej. CUIT del receptor dado de baja en ARCA): rojo, sin botón. */
+  bloqueante?: boolean;
   /** Abre el modal para completar los datos. Sin él no se muestra el botón. */
   onCompletar?: () => void;
   zumbando: boolean;
@@ -24,7 +27,7 @@ export function AvisoFaltantesEmision({
       role="alert"
       onAnimationEnd={onZumbidoEnd}
       className={`${zumbando ? "aviso-zumbido " : ""}mr-auto flex min-w-0 flex-1 basis-full items-center gap-2 rounded border px-3 py-1.5 text-xs sm:basis-0 ${
-        hayOcultos
+        hayOcultos || bloqueante
           ? "border-red-500/40 bg-red-50 text-red-900"
           : "border-amber-400/50 bg-amber-50 text-amber-900"
       }`}
@@ -35,7 +38,7 @@ export function AvisoFaltantesEmision({
         {hayOcultos &&
           " Hay campos ocultos: contactá al administrador para habilitarlos."}
       </p>
-      {onCompletar && !hayOcultos && (
+      {onCompletar && !hayOcultos && !bloqueante && (
         <button
           type="button"
           onClick={onCompletar}

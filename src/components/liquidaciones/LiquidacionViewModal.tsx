@@ -597,6 +597,9 @@ export function LiquidacionViewModal({
               />
             )}
             <Campo label="Creada" value={fmtDate(source.createdAt)} />
+            {source.proveedorContrato && (
+              <Campo label="Proveedor contrato" value={source.proveedorContrato} />
+            )}
           </div>
 
           {source.estado === "pendiente_anulacion" && (

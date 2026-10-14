@@ -120,6 +120,7 @@ import type {
   Chofer,
   Cliente,
   Factura,
+  Liquidacion,
   PaginatedMeta,
   Producto,
   Transportista,
@@ -340,6 +341,7 @@ export function ViajesTenantPage({
   useFieldConfig("liquidaciones");
 
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
+  const [emitirLiquidacion, setEmitirLiquidacion] = useState<Liquidacion | null>(null);
   const [viewingLiquidacion, setViewingLiquidacion] = useState<any | null>(
     null,
   );
@@ -3178,6 +3180,11 @@ export function ViajesTenantPage({
                               onLiquidar={
                                 hasLiquidaciones ? () => liquidarViaje(v) : undefined
                               }
+                              onEmitir={
+                                hasLiquidoProductoArcaResuelto
+                                  ? (liq) => setEmitirLiquidacion(liq)
+                                  : undefined
+                              }
                               variante="icono"
                             />
                           ) : (
@@ -3372,6 +3379,11 @@ export function ViajesTenantPage({
                         onRegistrarPago={() => setRegistrarPagoViaje(v)}
                         onLiquidar={
                           hasLiquidaciones ? () => liquidarViaje(v) : undefined
+                        }
+                        onEmitir={
+                          hasLiquidoProductoArcaResuelto
+                            ? (liq) => setEmitirLiquidacion(liq)
+                            : undefined
                         }
                       />
                     ) : (
@@ -3848,6 +3860,7 @@ export function ViajesTenantPage({
             idPropio1Label={labelIdentificacionPersonalizadaViajes(currentTenant)}
             idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
             idPropio2Label={idPropio2Label(currentTenant)}
+            opcionesProveedor={currentTenant?.opcionesProveedorLiquidacion}
             onDataSaved={() => {
               void maestro.refreshTransportistas();
               void maestro.refreshClientes();
@@ -3865,6 +3878,39 @@ export function ViajesTenantPage({
           />
         )}
 
+        {/* Emitir una liquidación guardada (borrador / con error) desde el detalle del viaje:
+            mismo modal que "Nueva liquidación", precargado con esa liquidación. */}
+        {emitirLiquidacion && (
+          <CrearLiquidacionManualModal
+            liquidacionExistente={emitirLiquidacion}
+            rutasPlataforma={platform}
+            tenantId={platform ? tid : undefined}
+            transportistas={maestro.transportistas}
+            hasLiquidoProductoArca={hasLiquidoProductoArca}
+            getToken={getToken}
+            idSistemaHabilitado={idSistemaHabilitado(currentTenant)}
+            idPropio1Habilitado={idPropio1Habilitado(currentTenant)}
+            idPropio1Label={labelIdentificacionPersonalizadaViajes(currentTenant)}
+            idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+            idPropio2Label={idPropio2Label(currentTenant)}
+            opcionesProveedor={currentTenant?.opcionesProveedorLiquidacion}
+            onDataSaved={() => {
+              void maestro.refreshTransportistas();
+              void maestro.refreshClientes();
+            }}
+            onLiquidacionEmitida={() => {
+              setListadoQueryVersion((v) => v + 1);
+              refrescarResumen();
+            }}
+            onSuccess={() => {
+              setEmitirLiquidacion(null);
+              setListadoQueryVersion((v) => v + 1);
+              refrescarResumen();
+            }}
+            onClose={() => setEmitirLiquidacion(null)}
+          />
+        )}
+
         {liquidarLote && (
           <CrearLiquidacionManualModal
             transportistaIdInicial={liquidarLote.transportistaId}
@@ -3877,6 +3923,7 @@ export function ViajesTenantPage({
             idPropio1Label={labelIdentificacionPersonalizadaViajes(currentTenant)}
             idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
             idPropio2Label={idPropio2Label(currentTenant)}
+            opcionesProveedor={currentTenant?.opcionesProveedorLiquidacion}
             onDataSaved={() => {
               void maestro.refreshTransportistas();
               void maestro.refreshClientes();
@@ -4103,6 +4150,14 @@ export function ViajesTenantPage({
               navigate(`/liquidaciones?${params.toString()}`);
             }}
             onClose={() => setViewingLiquidacion(null)}
+            onEmitir={
+              hasLiquidoProductoArca
+                ? () => {
+                    setEmitirLiquidacion(viewingLiquidacion);
+                    setViewingLiquidacion(null);
+                  }
+                : undefined
+            }
             contratoPdfUrl={liquidacionContratoPdfUrl(
               viewingLiquidacion.id,
               platform && tid ? { platform: true, tenantId: tid } : undefined,
