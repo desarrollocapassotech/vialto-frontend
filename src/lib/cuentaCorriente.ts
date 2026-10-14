@@ -29,6 +29,14 @@ export type MovimientoCc = {
   estadoDisponibilidad: string;
   estadoImputacion: string;
   createdAt: string;
+  liquidacionId?: string | null;
+  /** Fecha original del movimiento de viaje antes de transformarse en el de la factura/liquidación. */
+  fechaOrigen?: string | null;
+  /** Solo anulaciones (origen `anulacion`, importe negativo): el movimiento que compensan. */
+  anulaMovimientoId?: string | null;
+  anulaMovimiento?: { id: string; fecha: string; concepto: string } | null;
+  /** Movimiento anulado con su negativo (VTO-431). */
+  anuladoPor?: { id: string; fecha: string } | null;
   /**
    * Cuánto de ESTE movimiento puntual sigue sin resolverse (cargo: sin cobrar/pagar;
    * pago: sin imputar). Solo viene poblado en `fetchMovimientos` (`GET .../movimientos`).
@@ -256,6 +264,16 @@ export const ESTADO_DISPONIBILIDAD_LABEL: Record<string, string> = {
   cancelado: 'Cancelado',
   anulado: 'Anulado',
 };
+
+/**
+ * ¿El movimiento suma en el saldo acumulado del historial? Todo suma salvo un cargo
+ * anulado SIN su negativo (anulaciones previas a VTO-431, o movimientos de viaje
+ * unificados en una factura/liquidación). Espejo de `cuentaEnHistorialCc` del backend.
+ */
+export function cuentaEnHistorialCc(m: MovimientoCc): boolean {
+  if (m.tipo !== 'cargo' || m.estadoDisponibilidad !== 'anulado') return true;
+  return !!m.anulaMovimientoId || !!m.anuladoPor;
+}
 
 export const ESTADO_IMPUTACION_LABEL: Record<string, string> = {
   no_imputado: 'A cuenta',

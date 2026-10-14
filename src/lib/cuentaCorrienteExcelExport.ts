@@ -28,7 +28,9 @@ export function generarEstadoCuentaExcel(
     row['Saldo acumulado'] = m.saldoAcumulado;
     row.Moneda = m.moneda;
     row.Estado =
-      m.tipo === 'cargo'
+      m.origen === 'anulacion'
+        ? 'Anulación'
+        : m.tipo === 'cargo'
         ? (ESTADO_DISPONIBILIDAD_LABEL[m.estadoDisponibilidad] ?? m.estadoDisponibilidad)
         : (ESTADO_IMPUTACION_LABEL[m.estadoImputacion] ?? m.estadoImputacion);
     return row;

@@ -23,6 +23,7 @@ import {
   fetchSaldoProveedor,
   ESTADO_DISPONIBILIDAD_LABEL,
   ESTADO_IMPUTACION_LABEL,
+  cuentaEnHistorialCc,
   type MovimientoCc,
   type SaldoPorMoneda,
   type TipoContraparte,
@@ -51,6 +52,9 @@ function compararPorCarga(a: MovimientoCc, b: MovimientoCc): number {
 const badgeBase = 'inline-block rounded-full px-2 py-0.5 text-xs font-medium';
 
 function EstadoBadge({ movimiento }: { movimiento: MovimientoCc }) {
+  if (movimiento.origen === 'anulacion') {
+    return <span className={`${badgeBase} bg-gray-200 text-gray-600`}>Anulación</span>;
+  }
   if (movimiento.tipo === 'cargo') {
     const estado = movimiento.estadoDisponibilidad;
     const cls =
@@ -120,15 +124,15 @@ export function CuentaContraparteView({
   // Orden de carga (`createdAt`), no `fecha`: un cobro recién registrado aparece primero
   // aunque su fecha sea anterior a otros movimientos (mismo criterio que Viajes). El saldo
   // acumulado se calcula acá (no lo trae el backend en este endpoint) recorriendo ese mismo
-  // orden, para que cada fila sea coherente con lo que se ve. Un cargo anulado (viaje
-  // reabierto/factura anulada) no suma, igual que en el cálculo de saldo del backend.
+  // orden, para que cada fila sea coherente con lo que se ve. Un movimiento anulado suma
+  // junto con su negativo (el par se cancela, VTO-431); un anulado sin negativo no suma.
   const movimientosConSaldo = useMemo<MovimientoConSaldo[] | null>(() => {
     if (!movimientos) return null;
     const ascendente = [...movimientos].sort(compararPorCarga);
     let acumulado = 0;
     const conSaldo: MovimientoConSaldo[] = [];
     for (const m of ascendente) {
-      if (!(m.tipo === 'cargo' && m.estadoDisponibilidad === 'anulado')) {
+      if (cuentaEnHistorialCc(m)) {
         acumulado += m.tipo === 'cargo' ? m.importe : -m.importe;
       }
       conSaldo.push({ ...m, saldoAcumulado: acumulado });
@@ -351,9 +355,24 @@ export function CuentaContraparteView({
                     {String(m.ivaPct).replace('.', ',')}% {formatCurrencyArFromNumber(m.ivaMonto)}
                   </span>
                 )}
-                {m.fechaVencimiento && (
+                {m.fechaVencimiento && m.estadoDisponibilidad !== 'anulado' && (
                   <span className="block text-xs text-vialto-steel">
                     vence {fmtDateUtc(m.fechaVencimiento)}
+                  </span>
+                )}
+                {m.fechaOrigen && (
+                  <span className="block text-xs text-vialto-steel">
+                    viaje cargado el {fmtDateUtc(m.fechaOrigen)}
+                  </span>
+                )}
+                {m.anuladoPor && (
+                  <span className="block text-xs text-vialto-steel">
+                    anulado el {fmtDateUtc(m.anuladoPor.fecha)}
+                  </span>
+                )}
+                {m.anulaMovimiento && (
+                  <span className="block text-xs text-vialto-steel">
+                    compensa el movimiento del {fmtDateUtc(m.anulaMovimiento.fecha)}
                   </span>
                 )}
               </span>
@@ -373,8 +392,11 @@ export function CuentaContraparteView({
           {
             id: 'debe',
             header: 'Debe',
+            // Una anulación es una venta/compra en negativo: va en Debe con signo menos.
             cell: (m: MovimientoConSaldo) =>
-              m.tipo === 'cargo' ? `${formatCurrencyArFromNumber(m.importe)} ${m.moneda}` : '—',
+              m.tipo === 'cargo'
+                ? `${m.importe < 0 ? '−' : ''}${formatCurrencyArFromNumber(Math.abs(m.importe))} ${m.moneda}`
+                : '—',
             tdClassName: `${listadoTablaTdClass} tabular-nums`,
           },
           {
