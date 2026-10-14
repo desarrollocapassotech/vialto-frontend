@@ -400,6 +400,8 @@ export interface Tenant {
    * formularios de alta/edición de Viajes.
    */
   unidadCantidadViajes?: string;
+  /** Opciones configuradas de entidades/proveedores para el contrato comercial PDF. */
+  opcionesProveedorLiquidacion?: string[];
   createdAt: string;
 }
 
@@ -1028,6 +1030,8 @@ export interface Liquidacion {
   anulacionManualComprobanteUrl?: string | null;
   createdAt: string;
   createdBy: string;
+  /** Opción de proveedor seleccionada para el encabezado del contrato comercial PDF. */
+  proveedorContrato?: string | null;
   conceptosLineas?: LiquidacionConceptoLinea[];
   /** Presente en GET detalle; no siempre en el listado. */
   viajes?: LiquidacionViajeItem[];

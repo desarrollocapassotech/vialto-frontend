@@ -125,6 +125,7 @@ export function LiquidacionEditModal({
   idPropio1Label = "ID personalizado",
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
+  opcionesProveedor = [],
 }: {
   liq: LiquidacionConTransportista;
   hasArca: boolean;
@@ -142,6 +143,8 @@ export function LiquidacionEditModal({
   idPropio2Habilitado?: boolean;
   /** Label configurable de la columna "ID Propio 2". */
   idPropio2Label?: string;
+  /** Opciones configuradas de entidades/proveedores para el contrato PDF. */
+  opcionesProveedor?: string[];
 }) {
   const { showToast } = useToast();
   const canEditDatos =
@@ -166,6 +169,17 @@ export function LiquidacionEditModal({
   const [comisionPct, setComisionPct] = useState(String(liq.comisionPct ?? ""));
   const [ivaPct, setIvaPct] = useState(
     liq.ivaPct != null ? String(liq.ivaPct) : "",
+  );
+
+  const opcionesSelect = useMemo(() => {
+    if (liq.proveedorContrato && !opcionesProveedor.includes(liq.proveedorContrato)) {
+      return [liq.proveedorContrato, ...opcionesProveedor];
+    }
+    return opcionesProveedor;
+  }, [liq.proveedorContrato, opcionesProveedor]);
+
+  const [proveedorContrato, setProveedorContrato] = useState(
+    liq.proveedorContrato ?? (opcionesSelect?.[0] ?? ""),
   );
 
   const [viajesDisponibles, setViajesDisponibles] = useState<
@@ -429,6 +443,7 @@ export function LiquidacionEditModal({
         body.ivaPct =
           ivaPct.trim() !== "" ? Number(ivaPct) : (liq.ivaPct ?? 21);
         body.conceptosLineas = toConceptosLineasPayload(conceptosLineas);
+        body.proveedorContrato = proveedorContrato?.trim() || null;
       }
       if (canEditViajes) {
         body.viajeIds = Array.from(selectedViajeIds);
@@ -559,6 +574,27 @@ export function LiquidacionEditModal({
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {opcionesSelect && opcionesSelect.length > 0 && (
+              <div>
+                <label htmlFor="liq-proveedor-contrato" className={LABEL}>
+                  Proveedor para contrato
+                </label>
+                <select
+                  id="liq-proveedor-contrato"
+                  value={proveedorContrato}
+                  onChange={(e) => setProveedorContrato(e.target.value)}
+                  disabled={saving}
+                  className={INPUT}
+                >
+                  {opcionesSelect.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 

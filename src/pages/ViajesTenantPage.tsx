@@ -3848,6 +3848,7 @@ export function ViajesTenantPage({
             idPropio1Label={labelIdentificacionPersonalizadaViajes(currentTenant)}
             idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
             idPropio2Label={idPropio2Label(currentTenant)}
+            opcionesProveedor={currentTenant?.opcionesProveedorLiquidacion}
             onDataSaved={() => {
               void maestro.refreshTransportistas();
               void maestro.refreshClientes();
@@ -3877,6 +3878,7 @@ export function ViajesTenantPage({
             idPropio1Label={labelIdentificacionPersonalizadaViajes(currentTenant)}
             idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
             idPropio2Label={idPropio2Label(currentTenant)}
+            opcionesProveedor={currentTenant?.opcionesProveedorLiquidacion}
             onDataSaved={() => {
               void maestro.refreshTransportistas();
               void maestro.refreshClientes();
