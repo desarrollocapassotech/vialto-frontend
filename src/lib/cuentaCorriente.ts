@@ -1,5 +1,6 @@
 import { apiFetch, apiJson, ApiError, extractApiErrorMessage } from '@/lib/api';
 import { filenameFromContentDisposition } from '@/lib/downloadFilename';
+import { roundMoney2 } from '@/lib/facturaTotales';
 
 export type TipoMovimientoCc = 'cargo' | 'pago';
 export type TipoContraparte = 'cliente' | 'proveedor';
@@ -202,6 +203,42 @@ export function crearImputacion(
   return apiJson<{ id: string }>('/api/cuenta-corriente/imputaciones', getToken, {
     method: 'POST',
     body: JSON.stringify(input),
+  });
+}
+
+/** Imputa un cargo con dos cobros/pagos a la vez; el reparto lo decide el servidor (`repartirImputacion`). */
+export function crearImputacionMultiple(
+  getToken: GetToken,
+  input: { cargoId: string; pagoIds: string[] },
+) {
+  return apiJson<{ imputaciones: Array<{ id: string; pagoId: string; importe: number }> }>(
+    '/api/cuenta-corriente/imputaciones/multiple',
+    getToken,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+}
+
+/**
+ * Reparto de una imputación con varios cobros/pagos: primero se consume el de menor
+ * disponible (desempate: más antiguo por fecha y luego por carga) y el siguiente cubre
+ * solo lo que falta. Espejo de `repartirImputacion` del backend
+ * (`cuenta-corriente/imputacion-reparto.util.ts`) — mantener ambas iguales.
+ */
+export function repartirImputacion(
+  pendienteCargo: number,
+  pagos: Array<{ id: string; disponible: number; fecha: string; createdAt: string }>,
+): Array<{ pagoId: string; importe: number }> {
+  const ordenados = [...pagos].sort(
+    (a, b) =>
+      a.disponible - b.disponible ||
+      new Date(a.fecha).getTime() - new Date(b.fecha).getTime() ||
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+  let restante = roundMoney2(Math.max(0, pendienteCargo));
+  return ordenados.map((p) => {
+    const importe = roundMoney2(Math.max(0, Math.min(p.disponible, restante)));
+    restante = roundMoney2(restante - importe);
+    return { pagoId: p.id, importe };
   });
 }
 

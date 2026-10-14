@@ -9,7 +9,13 @@ import {
 } from '@/components/ui/ViewModalShell';
 import { formatCurrencyArFromNumber, maskCurrencyArInput, parseCurrencyAr } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
-import { crearImputacion, createMovimiento, type MovimientoCc } from '@/lib/cuentaCorriente';
+import {
+  crearImputacion,
+  crearImputacionMultiple,
+  createMovimiento,
+  repartirImputacion,
+  type MovimientoCc,
+} from '@/lib/cuentaCorriente';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
@@ -28,6 +34,16 @@ const EPS = 0.005;
 /** Lo que le queda sin imputar a un cobro/pago (`pendiente` lo calcula el backend: importe − imputado). */
 function disponiblePago(p: MovimientoCc): number {
   return p.pendiente ?? p.importe;
+}
+
+function etiquetaPago(p: MovimientoCc): string {
+  const disponible = disponiblePago(p);
+  const usado = Math.abs(disponible - p.importe) > EPS;
+  return (
+    `${fmtDateUtc(p.fecha)} — ${formatCurrencyArFromNumber(disponible)} ${p.moneda}` +
+    (usado ? ` disponibles de ${formatCurrencyArFromNumber(p.importe)} ${p.moneda}` : '') +
+    (p.concepto ? ` (${p.concepto})` : '')
+  );
 }
 
 export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: Props) {
@@ -52,8 +68,34 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
   const disponibleSeleccionado = pagoSeleccionado ? disponiblePago(pagoSeleccionado) : 0;
   const importeIngresado = parseCurrencyAr(importeStr) ?? 0;
 
+  // Segundo cobro opcional ('' = ninguno). Con dos, el reparto sigue la regla fija
+  // (primero el de menor disponible) y no se ingresa importe a mano.
+  const [pagoId2, setPagoId2] = useState('');
+  const pagoSeleccionado2 = useMemo(
+    () => (pagoId2 ? (pagos.find((p) => p.id === pagoId2) ?? null) : null),
+    [pagos, pagoId2],
+  );
+  const reparto = useMemo(() => {
+    if (!pagoSeleccionado || !pagoSeleccionado2) return null;
+    const elegidos = [pagoSeleccionado, pagoSeleccionado2];
+    return repartirImputacion(
+      pendienteCargo,
+      elegidos.map((p) => ({
+        id: p.id,
+        disponible: disponiblePago(p),
+        fecha: p.fecha,
+        createdAt: p.createdAt,
+      })),
+    ).map((r) => {
+      const pago = elegidos.find((p) => p.id === r.pagoId)!;
+      return { ...r, pago, queda: Math.max(0, disponiblePago(pago) - r.importe) };
+    });
+  }, [pagoSeleccionado, pagoSeleccionado2, pendienteCargo]);
+  const totalReparto = reparto ? reparto.reduce((s, r) => s + r.importe, 0) : 0;
+
   function elegirPago(id: string) {
     setPagoId(id);
+    if (id === pagoId2) setPagoId2('');
     setImporteStr(formatCurrencyArFromNumber(sugeridoPara(pagos.find((p) => p.id === id))));
   }
 
@@ -72,6 +114,26 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
     if (modo === 'existente') {
       if (!pagoId) {
         setError(`Elegí ${esCliente ? 'un cobro' : 'un pago'} para imputar.`);
+        return;
+      }
+      if (pagoId2) {
+        if (pagoId2 === pagoId) {
+          setError(`No se puede elegir el mismo ${esCliente ? 'cobro' : 'pago'} dos veces.`);
+          return;
+        }
+        setSaving(true);
+        try {
+          await crearImputacionMultiple(() => getToken(), {
+            cargoId: cargo.id,
+            pagoIds: [pagoId, pagoId2],
+          });
+          onDone();
+          onClose();
+        } catch (err) {
+          setError(friendlyError(err, 'cuentaCorriente'));
+        } finally {
+          setSaving(false);
+        }
         return;
       }
       const importe = parseCurrencyAr(importeStr);
@@ -199,7 +261,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
           <>
             <div>
               <label className={labelClass} htmlFor="cc-pago-select">
-                {esCliente ? 'Cobro' : 'Pago'} a imputar
+                {esCliente ? 'Cobro' : 'Pago'} a imputar <span className="text-red-500">*</span>
               </label>
               <select
                 id="cc-pago-select"
@@ -207,20 +269,87 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
                 value={pagoId}
                 onChange={(e) => elegirPago(e.target.value)}
               >
-                {pagos.map((p) => {
-                  const disponible = disponiblePago(p);
-                  const usado = Math.abs(disponible - p.importe) > EPS;
-                  return (
-                    <option key={p.id} value={p.id}>
-                      {fmtDateUtc(p.fecha)} — {formatCurrencyArFromNumber(disponible)} {p.moneda}
-                      {usado ? ` disponibles de ${formatCurrencyArFromNumber(p.importe)} ${p.moneda}` : ''}
-                      {p.concepto ? ` (${p.concepto})` : ''}
-                    </option>
-                  );
-                })}
+                {pagos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {etiquetaPago(p)}
+                  </option>
+                ))}
               </select>
             </div>
 
+            {pagos.length > 1 && (
+              <div>
+                <label className={labelClass} htmlFor="cc-pago-select-2">
+                  Segundo {esCliente ? 'cobro' : 'pago'}
+                </label>
+                <select
+                  id="cc-pago-select-2"
+                  className={inputClass}
+                  value={pagoId2}
+                  onChange={(e) => setPagoId2(e.target.value)}
+                >
+                  <option value="">Ninguno</option>
+                  {pagos
+                    .filter((p) => p.id !== pagoId)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {etiquetaPago(p)}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+
+            {reparto ? (
+              <div className="border border-black/10 bg-vialto-mist/50 p-3 text-sm">
+                <p className="mb-2 text-xs uppercase tracking-wider text-vialto-steel">
+                  Resumen de la imputación
+                </p>
+                <table className="w-full text-xs tabular-nums">
+                  <thead>
+                    <tr className="text-left text-vialto-steel">
+                      <th className="pb-1 font-normal">{esCliente ? 'Cobro' : 'Pago'}</th>
+                      <th className="pb-1 text-right font-normal">Disponible</th>
+                      <th className="pb-1 text-right font-normal">Se toma</th>
+                      <th className="pb-1 text-right font-normal">Queda disponible</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reparto.map((r) => (
+                      <tr key={r.pagoId}>
+                        <td className="py-0.5">
+                          {fmtDateUtc(r.pago.fecha)}
+                          {r.pago.concepto ? ` (${r.pago.concepto})` : ''}
+                        </td>
+                        <td className="py-0.5 text-right">
+                          {formatCurrencyArFromNumber(disponiblePago(r.pago))}
+                        </td>
+                        <td className="py-0.5 text-right font-medium">
+                          {formatCurrencyArFromNumber(r.importe)}
+                        </td>
+                        <td className="py-0.5 text-right">{formatCurrencyArFromNumber(r.queda)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="mt-2 text-xs text-vialto-charcoal">
+                  Se imputan {formatCurrencyArFromNumber(totalReparto)} {cargo.moneda}. Queda pendiente{' '}
+                  {esCliente ? 'de cobrar' : 'de pagar'}:{' '}
+                  <strong>
+                    {formatCurrencyArFromNumber(Math.max(0, pendienteCargo - totalReparto))} {cargo.moneda}
+                  </strong>
+                  .
+                </p>
+                {reparto.some((r) => r.importe <= EPS) && (
+                  <p className="mt-1 text-xs text-amber-800/90">
+                    Con el {esCliente ? 'cobro' : 'pago'} de menor disponible ya alcanza: el otro no se usa.
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-vialto-steel">
+                  Se usa primero el de menor disponible; lo que sobra del otro queda a cuenta.
+                </p>
+              </div>
+            ) : (
             <div>
               <label className={labelClass} htmlFor="cc-imputar-importe">
                 Importe a imputar
@@ -249,6 +378,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
                 </p>
               )}
             </div>
+            )}
           </>
         ) : (
           <>
