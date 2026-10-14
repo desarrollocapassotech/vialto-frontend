@@ -1,7 +1,14 @@
 import { apiFetch, apiJson, ApiError, extractApiErrorMessage } from '@/lib/api';
 import { filenameFromContentDisposition } from '@/lib/downloadFilename';
+import { roundMoney2 } from '@/lib/facturaTotales';
 
+/** Lo que se carga a mano: venta/compra (cargo) o cobro/pago. */
 export type TipoMovimientoCc = 'cargo' | 'pago';
+/**
+ * Tipo de un movimiento guardado. `credito` = anulación (nota de crédito): va en el Haber
+ * como un cobro pero no es cobranza ni se imputa — ya está aplicada al movimiento que anula.
+ */
+export type TipoMovimientoCcRegistrado = TipoMovimientoCc | 'credito';
 export type TipoContraparte = 'cliente' | 'proveedor';
 
 export type MovimientoCc = {
@@ -11,10 +18,15 @@ export type MovimientoCc = {
   contraparteId: string;
   viajeId: string | null;
   facturaId: string | null;
-  tipo: TipoMovimientoCc;
+  tipo: TipoMovimientoCcRegistrado;
   origen: string;
   concepto: string;
+  /** Total del movimiento (con IVA incluido, si se cargó con IVA). Es lo que suma al saldo. */
   importe: number;
+  /** Solo ventas/compras manuales cargadas con IVA: importe sin IVA, % y monto de IVA. */
+  importeNeto?: number | null;
+  ivaPct?: number | null;
+  ivaMonto?: number | null;
   moneda: string;
   fecha: string;
   fechaVencimiento: string | null;
@@ -23,6 +35,12 @@ export type MovimientoCc = {
   estadoDisponibilidad: string;
   estadoImputacion: string;
   createdAt: string;
+  liquidacionId?: string | null;
+  /** Solo anulaciones (origen `anulacion`, `tipo: credito`, en el Haber): el movimiento que compensan. */
+  anulaMovimientoId?: string | null;
+  anulaMovimiento?: { id: string; fecha: string; concepto: string } | null;
+  /** Movimiento anulado con su crédito de anulación (VTO-431). */
+  anuladoPor?: { id: string; fecha: string } | null;
   /**
    * Cuánto de ESTE movimiento puntual sigue sin resolverse (cargo: sin cobrar/pagar;
    * pago: sin imputar). Solo viene poblado en `fetchMovimientos` (`GET .../movimientos`).
@@ -123,7 +141,7 @@ export function fetchSaldoProveedor(getToken: GetToken, proveedorId: string) {
 export type MovimientoExport = {
   id: string;
   fecha: string;
-  tipo: TipoMovimientoCc;
+  tipo: TipoMovimientoCcRegistrado;
   origen: string;
   concepto: string;
   referencia: string | null;
@@ -165,7 +183,10 @@ export type CreateMovimientoCcInput = {
   proveedorId?: string;
   tipo: TipoMovimientoCc;
   concepto?: string;
+  /** Con `ivaPct`, es el importe SIN IVA: el backend registra el total (neto + IVA). */
   importe: number;
+  /** % de IVA, solo ventas/compras. Omitido = sin IVA. */
+  ivaPct?: number;
   moneda?: string;
   fecha: string;
   fechaVencimiento?: string;
@@ -197,6 +218,42 @@ export function crearImputacion(
   });
 }
 
+/** Imputa un cargo con dos cobros/pagos a la vez; el reparto lo decide el servidor (`repartirImputacion`). */
+export function crearImputacionMultiple(
+  getToken: GetToken,
+  input: { cargoId: string; pagoIds: string[] },
+) {
+  return apiJson<{ imputaciones: Array<{ id: string; pagoId: string; importe: number }> }>(
+    '/api/cuenta-corriente/imputaciones/multiple',
+    getToken,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+}
+
+/**
+ * Reparto de una imputación con varios cobros/pagos: primero se consume el de menor
+ * disponible (desempate: más antiguo por fecha y luego por carga) y el siguiente cubre
+ * solo lo que falta. Espejo de `repartirImputacion` del backend
+ * (`cuenta-corriente/imputacion-reparto.util.ts`) — mantener ambas iguales.
+ */
+export function repartirImputacion(
+  pendienteCargo: number,
+  pagos: Array<{ id: string; disponible: number; fecha: string; createdAt: string }>,
+): Array<{ pagoId: string; importe: number }> {
+  const ordenados = [...pagos].sort(
+    (a, b) =>
+      a.disponible - b.disponible ||
+      new Date(a.fecha).getTime() - new Date(b.fecha).getTime() ||
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+  let restante = roundMoney2(Math.max(0, pendienteCargo));
+  return ordenados.map((p) => {
+    const importe = roundMoney2(Math.max(0, Math.min(p.disponible, restante)));
+    restante = roundMoney2(restante - importe);
+    return { pagoId: p.id, importe };
+  });
+}
+
 export function eliminarImputacion(getToken: GetToken, id: string) {
   return apiJson<{ id: string }>(
     `/api/cuenta-corriente/imputaciones/${encodeURIComponent(id)}`,
@@ -211,6 +268,45 @@ export const ESTADO_DISPONIBILIDAD_LABEL: Record<string, string> = {
   cancelado: 'Cancelado',
   anulado: 'Anulado',
 };
+
+/** Estados que se muestran además de los de `estadoDisponibilidad`/`estadoImputacion`. */
+export const ESTADO_MOVIMIENTO_EXTRA_LABEL: Record<string, string> = {
+  anulacion: 'Anulación',
+};
+
+/**
+ * Estado a mostrar (y filtrar) de un movimiento. Una anulación (crédito en el Haber)
+ * tiene su propio estado; el resto usa el estado de cobro/imputación de siempre.
+ */
+export function estadoMovimientoCc(m: MovimientoCc): string {
+  if (m.origen === 'anulacion') return 'anulacion';
+  return m.tipo === 'cargo' ? m.estadoDisponibilidad : m.estadoImputacion;
+}
+
+export function estadoMovimientoCcLabel(m: MovimientoCc): string {
+  const estado = estadoMovimientoCc(m);
+  return (
+    ESTADO_MOVIMIENTO_EXTRA_LABEL[estado] ??
+    ESTADO_DISPONIBILIDAD_LABEL[estado] ??
+    ESTADO_IMPUTACION_LABEL[estado] ??
+    estado
+  );
+}
+
+/**
+ * ¿El movimiento suma en el saldo acumulado del historial? Todo suma salvo un cargo
+ * anulado SIN su crédito (anulaciones previas a VTO-431, o movimientos de viaje
+ * unificados en una factura/liquidación). Espejo de `cuentaEnHistorialCc` del backend.
+ */
+export function cuentaEnHistorialCc(m: MovimientoCc): boolean {
+  if (m.tipo !== 'cargo' || m.estadoDisponibilidad !== 'anulado') return true;
+  return !!m.anulaMovimientoId || !!m.anuladoPor;
+}
+
+/** Va en el Debe (suma al saldo) o en el Haber (resta: cobro/pago o crédito de anulación). */
+export function esDebeCc(m: { tipo: TipoMovimientoCcRegistrado }): boolean {
+  return m.tipo === 'cargo';
+}
 
 export const ESTADO_IMPUTACION_LABEL: Record<string, string> = {
   no_imputado: 'A cuenta',

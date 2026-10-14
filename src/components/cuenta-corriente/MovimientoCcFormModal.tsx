@@ -7,10 +7,11 @@ import {
   viewModalBtnPrimary,
 } from '@/components/ui/ViewModalShell';
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
-import { maskCurrencyArInput, parseCurrencyAr } from '@/lib/currencyMask';
+import { formatCurrencyArFromNumber, maskCurrencyArInput, parseCurrencyAr } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
 import { createMovimiento, type TipoContraparte, type TipoMovimientoCc } from '@/lib/cuentaCorriente';
 import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
+import { computeFacturaTotalesFromBases } from '@/lib/facturaTotales';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
@@ -36,6 +37,7 @@ export function MovimientoCcFormModal({
   const [tipo, setTipo] = useState<TipoMovimientoCc>(tipoInicial);
   const [concepto, setConcepto] = useState('');
   const [importeStr, setImporteStr] = useState('');
+  const [ivaPctStr, setIvaPctStr] = useState('');
   const [moneda, setMoneda] = useState<ViajeMonedaCodigo>('ARS');
   const [fecha, setFecha] = useState(() => hoyArgentinaIso());
   const [fechaVencimiento, setFechaVencimiento] = useState('');
@@ -44,11 +46,28 @@ export function MovimientoCcFormModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const esCargo = tipo === 'cargo';
+  const esCliente = tipoContraparte === 'cliente';
+
+  // IVA solo en ventas/compras, mismo campo que Facturas: vacío = sin IVA. El importe
+  // cargado es sin IVA y se registra por el total, calculado igual que una factura.
+  const ivaPctNum = ivaPctStr.trim() !== '' ? Number(ivaPctStr) : 0;
+  const ivaPct = esCargo && Number.isFinite(ivaPctNum) && ivaPctNum > 0 ? ivaPctNum : null;
+  const importeNeto = parseCurrencyAr(importeStr) ?? 0;
+  const totales =
+    ivaPct != null && importeNeto > 0
+      ? computeFacturaTotalesFromBases([{ importe: importeNeto, ivaPct }])
+      : null;
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const importe = parseCurrencyAr(importeStr);
     if (!importe || importe <= 0) {
       setError('Ingresá un importe mayor a 0.');
+      return;
+    }
+    if (esCargo && (!Number.isFinite(ivaPctNum) || ivaPctNum < 0 || ivaPctNum > 100)) {
+      setError('El IVA tiene que ser un porcentaje entre 0 y 100.');
       return;
     }
     setSaving(true);
@@ -61,6 +80,7 @@ export function MovimientoCcFormModal({
         tipo,
         concepto: concepto.trim() || undefined,
         importe,
+        ivaPct: ivaPct ?? undefined,
         moneda,
         fecha,
         fechaVencimiento: fechaVencimiento || undefined,
@@ -75,9 +95,6 @@ export function MovimientoCcFormModal({
       setSaving(false);
     }
   }
-
-  const esCargo = tipo === 'cargo';
-  const esCliente = tipoContraparte === 'cliente';
 
   return (
     <ViewModalShell
@@ -171,6 +188,51 @@ export function MovimientoCcFormModal({
           </div>
         </div>
 
+        {esCargo && (
+          <div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass} htmlFor="cc-iva">
+                  IVA (%)
+                </label>
+                <input
+                  id="cc-iva"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  className={inputClass}
+                  value={ivaPctStr}
+                  onChange={(e) => setIvaPctStr(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              {totales && (
+                <div>
+                  <label className={labelClass} htmlFor="cc-total">
+                    Total con IVA
+                  </label>
+                  <input
+                    id="cc-total"
+                    type="text"
+                    className={`${inputClass} bg-vialto-mist tabular-nums`}
+                    value={`${formatCurrencyArFromNumber(totales.total)} ${moneda}`}
+                    readOnly
+                    tabIndex={-1}
+                  />
+                </div>
+              )}
+            </div>
+            {totales && (
+              <p className="mt-1 text-xs text-vialto-steel tabular-nums">
+                {formatCurrencyArFromNumber(totales.neto)} + IVA{' '}
+                {formatCurrencyArFromNumber(totales.iva)} = {formatCurrencyArFromNumber(totales.total)}{' '}
+                {moneda}. Se registra por el total.
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelClass} htmlFor="cc-fecha">
@@ -188,7 +250,7 @@ export function MovimientoCcFormModal({
           {esCargo && (
             <div>
               <label className={labelClass} htmlFor="cc-vencimiento">
-                Vencimiento (opcional)
+                Vencimiento
               </label>
               <input
                 id="cc-vencimiento"
@@ -204,7 +266,7 @@ export function MovimientoCcFormModal({
         {esCargo ? (
           <div>
             <label className={labelClass} htmlFor="cc-comprobante">
-              Número de comprobante (opcional)
+              Número de comprobante
             </label>
             <input
               id="cc-comprobante"
@@ -218,7 +280,7 @@ export function MovimientoCcFormModal({
         ) : (
           <div>
             <label className={labelClass} htmlFor="cc-forma-pago">
-              Medio de {esCliente ? 'cobro' : 'pago'} / referencia (opcional)
+              Medio de {esCliente ? 'cobro' : 'pago'} / referencia
             </label>
             <input
               id="cc-forma-pago"

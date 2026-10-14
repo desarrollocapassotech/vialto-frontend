@@ -23,6 +23,11 @@ import {
   fetchSaldoProveedor,
   ESTADO_DISPONIBILIDAD_LABEL,
   ESTADO_IMPUTACION_LABEL,
+  ESTADO_MOVIMIENTO_EXTRA_LABEL,
+  cuentaEnHistorialCc,
+  esDebeCc,
+  estadoMovimientoCc,
+  estadoMovimientoCcLabel,
   type MovimientoCc,
   type SaldoPorMoneda,
   type TipoContraparte,
@@ -50,27 +55,21 @@ function compararPorCarga(a: MovimientoCc, b: MovimientoCc): number {
 
 const badgeBase = 'inline-block rounded-full px-2 py-0.5 text-xs font-medium';
 
+const ESTADO_BADGE_CLASS: Record<string, string> = {
+  cancelado: 'bg-green-100 text-green-800',
+  imputado: 'bg-green-100 text-green-800',
+  parcial: 'bg-amber-100 text-amber-800',
+  imputado_parcial: 'bg-amber-100 text-amber-800',
+  anulado: 'bg-gray-200 text-gray-600',
+  anulacion: 'bg-gray-200 text-gray-600',
+  no_imputado: 'bg-vialto-mist text-vialto-steel',
+  pendiente: 'bg-red-100 text-red-800',
+};
+
 function EstadoBadge({ movimiento }: { movimiento: MovimientoCc }) {
-  if (movimiento.tipo === 'cargo') {
-    const estado = movimiento.estadoDisponibilidad;
-    const cls =
-      estado === 'cancelado'
-        ? 'bg-green-100 text-green-800'
-        : estado === 'parcial'
-          ? 'bg-amber-100 text-amber-800'
-          : estado === 'anulado'
-            ? 'bg-gray-200 text-gray-600'
-            : 'bg-red-100 text-red-800';
-    return <span className={`${badgeBase} ${cls}`}>{ESTADO_DISPONIBILIDAD_LABEL[estado] ?? estado}</span>;
-  }
-  const estado = movimiento.estadoImputacion;
-  const cls =
-    estado === 'imputado'
-      ? 'bg-green-100 text-green-800'
-      : estado === 'imputado_parcial'
-        ? 'bg-amber-100 text-amber-800'
-        : 'bg-vialto-mist text-vialto-steel';
-  return <span className={`${badgeBase} ${cls}`}>{ESTADO_IMPUTACION_LABEL[estado] ?? estado}</span>;
+  const estado = estadoMovimientoCc(movimiento);
+  const cls = ESTADO_BADGE_CLASS[estado] ?? 'bg-red-100 text-red-800';
+  return <span className={`${badgeBase} ${cls}`}>{estadoMovimientoCcLabel(movimiento)}</span>;
 }
 
 type Props = {
@@ -120,16 +119,16 @@ export function CuentaContraparteView({
   // Orden de carga (`createdAt`), no `fecha`: un cobro recién registrado aparece primero
   // aunque su fecha sea anterior a otros movimientos (mismo criterio que Viajes). El saldo
   // acumulado se calcula acá (no lo trae el backend en este endpoint) recorriendo ese mismo
-  // orden, para que cada fila sea coherente con lo que se ve. Un cargo anulado (viaje
-  // reabierto/factura anulada) no suma, igual que en el cálculo de saldo del backend.
+  // orden, para que cada fila sea coherente con lo que se ve. Un movimiento anulado suma
+  // junto con su crédito de anulación en el Haber (el par se cancela, VTO-431); un anulado sin crédito no suma.
   const movimientosConSaldo = useMemo<MovimientoConSaldo[] | null>(() => {
     if (!movimientos) return null;
     const ascendente = [...movimientos].sort(compararPorCarga);
     let acumulado = 0;
     const conSaldo: MovimientoConSaldo[] = [];
     for (const m of ascendente) {
-      if (!(m.tipo === 'cargo' && m.estadoDisponibilidad === 'anulado')) {
-        acumulado += m.tipo === 'cargo' ? m.importe : -m.importe;
+      if (cuentaEnHistorialCc(m)) {
+        acumulado += esDebeCc(m) ? m.importe : -m.importe;
       }
       conSaldo.push({ ...m, saldoAcumulado: acumulado });
     }
@@ -159,8 +158,7 @@ export function CuentaContraparteView({
     if (!movimientosConSaldo) return null;
     return movimientosConSaldo.filter((m) => {
       if (estadoFiltro) {
-        const estadoActual = m.tipo === 'cargo' ? m.estadoDisponibilidad : m.estadoImputacion;
-        if (estadoActual !== estadoFiltro) return false;
+        if (estadoMovimientoCc(m) !== estadoFiltro) return false;
       }
       const fecha = fechaDiaYmd(m.fecha) ?? '';
       if (desdeFiltro && fecha < desdeFiltro) return false;
@@ -206,6 +204,7 @@ export function CuentaContraparteView({
             {label}
           </option>
         ))}
+        <option value="anulacion">{ESTADO_MOVIMIENTO_EXTRA_LABEL.anulacion}</option>
       </optgroup>
       <optgroup label={tipoContraparte === 'cliente' ? 'Cobros' : 'Pagos'}>
         {Object.entries(ESTADO_IMPUTACION_LABEL).map(([value, label]) => (
@@ -345,9 +344,25 @@ export function CuentaContraparteView({
             cell: (m: MovimientoConSaldo) => (
               <span>
                 {m.concepto}
-                {m.fechaVencimiento && (
+                {m.ivaPct != null && m.importeNeto != null && m.ivaMonto != null && (
+                  <span className="block text-xs text-vialto-steel tabular-nums">
+                    {formatCurrencyArFromNumber(m.importeNeto)} + IVA{' '}
+                    {String(m.ivaPct).replace('.', ',')}% {formatCurrencyArFromNumber(m.ivaMonto)}
+                  </span>
+                )}
+                {m.fechaVencimiento && m.estadoDisponibilidad !== 'anulado' && (
                   <span className="block text-xs text-vialto-steel">
                     vence {fmtDateUtc(m.fechaVencimiento)}
+                  </span>
+                )}
+                {m.anuladoPor && (
+                  <span className="block text-xs text-vialto-steel">
+                    anulado el {fmtDateUtc(m.anuladoPor.fecha)}
+                  </span>
+                )}
+                {m.anulaMovimiento && (
+                  <span className="block text-xs text-vialto-steel">
+                    compensa el movimiento del {fmtDateUtc(m.anulaMovimiento.fecha)}
                   </span>
                 )}
               </span>
@@ -368,14 +383,15 @@ export function CuentaContraparteView({
             id: 'debe',
             header: 'Debe',
             cell: (m: MovimientoConSaldo) =>
-              m.tipo === 'cargo' ? `${formatCurrencyArFromNumber(m.importe)} ${m.moneda}` : '—',
+              esDebeCc(m) ? `${formatCurrencyArFromNumber(m.importe)} ${m.moneda}` : '—',
             tdClassName: `${listadoTablaTdClass} tabular-nums`,
           },
           {
             id: 'haber',
             header: 'Haber',
+            // Cobros/pagos y créditos de anulación (nota de crédito) van al Haber.
             cell: (m: MovimientoConSaldo) =>
-              m.tipo === 'pago' ? `${formatCurrencyArFromNumber(m.importe)} ${m.moneda}` : '—',
+              !esDebeCc(m) ? `${formatCurrencyArFromNumber(m.importe)} ${m.moneda}` : '—',
             tdClassName: `${listadoTablaTdClass} tabular-nums`,
           },
           {
