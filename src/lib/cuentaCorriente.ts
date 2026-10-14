@@ -265,6 +265,40 @@ export const ESTADO_DISPONIBILIDAD_LABEL: Record<string, string> = {
   anulado: 'Anulado',
 };
 
+/** Estados que se muestran además de los de `estadoDisponibilidad`/`estadoImputacion`. */
+export const ESTADO_MOVIMIENTO_EXTRA_LABEL: Record<string, string> = {
+  sin_facturar: 'Sin facturar',
+  sin_liquidar: 'Sin liquidar',
+  anulacion: 'Anulación',
+};
+
+/**
+ * Estado a mostrar (y filtrar) de un movimiento. Un movimiento de viaje vigente todavía
+ * no se facturó (cliente) o liquidó (proveedor): al facturarlo/liquidarlo se transforma en
+ * el del comprobante. Una anulación (negativo) tiene su propio estado. El resto usa el
+ * estado de cobro/imputación de siempre.
+ */
+export function estadoMovimientoCc(m: MovimientoCc): string {
+  if (m.origen === 'anulacion') return 'anulacion';
+  if (m.tipo === 'cargo') {
+    if (m.origen === 'viaje' && m.estadoDisponibilidad !== 'anulado') {
+      return m.clienteId ? 'sin_facturar' : 'sin_liquidar';
+    }
+    return m.estadoDisponibilidad;
+  }
+  return m.estadoImputacion;
+}
+
+export function estadoMovimientoCcLabel(m: MovimientoCc): string {
+  const estado = estadoMovimientoCc(m);
+  return (
+    ESTADO_MOVIMIENTO_EXTRA_LABEL[estado] ??
+    ESTADO_DISPONIBILIDAD_LABEL[estado] ??
+    ESTADO_IMPUTACION_LABEL[estado] ??
+    estado
+  );
+}
+
 /**
  * ¿El movimiento suma en el saldo acumulado del historial? Todo suma salvo un cargo
  * anulado SIN su negativo (anulaciones previas a VTO-431, o movimientos de viaje

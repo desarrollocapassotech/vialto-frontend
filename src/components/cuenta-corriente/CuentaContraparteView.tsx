@@ -23,7 +23,10 @@ import {
   fetchSaldoProveedor,
   ESTADO_DISPONIBILIDAD_LABEL,
   ESTADO_IMPUTACION_LABEL,
+  ESTADO_MOVIMIENTO_EXTRA_LABEL,
   cuentaEnHistorialCc,
+  estadoMovimientoCc,
+  estadoMovimientoCcLabel,
   type MovimientoCc,
   type SaldoPorMoneda,
   type TipoContraparte,
@@ -51,30 +54,23 @@ function compararPorCarga(a: MovimientoCc, b: MovimientoCc): number {
 
 const badgeBase = 'inline-block rounded-full px-2 py-0.5 text-xs font-medium';
 
+const ESTADO_BADGE_CLASS: Record<string, string> = {
+  cancelado: 'bg-green-100 text-green-800',
+  imputado: 'bg-green-100 text-green-800',
+  parcial: 'bg-amber-100 text-amber-800',
+  imputado_parcial: 'bg-amber-100 text-amber-800',
+  anulado: 'bg-gray-200 text-gray-600',
+  anulacion: 'bg-gray-200 text-gray-600',
+  sin_facturar: 'bg-sky-100 text-sky-800',
+  sin_liquidar: 'bg-sky-100 text-sky-800',
+  no_imputado: 'bg-vialto-mist text-vialto-steel',
+  pendiente: 'bg-red-100 text-red-800',
+};
+
 function EstadoBadge({ movimiento }: { movimiento: MovimientoCc }) {
-  if (movimiento.origen === 'anulacion') {
-    return <span className={`${badgeBase} bg-gray-200 text-gray-600`}>Anulación</span>;
-  }
-  if (movimiento.tipo === 'cargo') {
-    const estado = movimiento.estadoDisponibilidad;
-    const cls =
-      estado === 'cancelado'
-        ? 'bg-green-100 text-green-800'
-        : estado === 'parcial'
-          ? 'bg-amber-100 text-amber-800'
-          : estado === 'anulado'
-            ? 'bg-gray-200 text-gray-600'
-            : 'bg-red-100 text-red-800';
-    return <span className={`${badgeBase} ${cls}`}>{ESTADO_DISPONIBILIDAD_LABEL[estado] ?? estado}</span>;
-  }
-  const estado = movimiento.estadoImputacion;
-  const cls =
-    estado === 'imputado'
-      ? 'bg-green-100 text-green-800'
-      : estado === 'imputado_parcial'
-        ? 'bg-amber-100 text-amber-800'
-        : 'bg-vialto-mist text-vialto-steel';
-  return <span className={`${badgeBase} ${cls}`}>{ESTADO_IMPUTACION_LABEL[estado] ?? estado}</span>;
+  const estado = estadoMovimientoCc(movimiento);
+  const cls = ESTADO_BADGE_CLASS[estado] ?? 'bg-red-100 text-red-800';
+  return <span className={`${badgeBase} ${cls}`}>{estadoMovimientoCcLabel(movimiento)}</span>;
 }
 
 type Props = {
@@ -163,8 +159,7 @@ export function CuentaContraparteView({
     if (!movimientosConSaldo) return null;
     return movimientosConSaldo.filter((m) => {
       if (estadoFiltro) {
-        const estadoActual = m.tipo === 'cargo' ? m.estadoDisponibilidad : m.estadoImputacion;
-        if (estadoActual !== estadoFiltro) return false;
+        if (estadoMovimientoCc(m) !== estadoFiltro) return false;
       }
       const fecha = fechaDiaYmd(m.fecha) ?? '';
       if (desdeFiltro && fecha < desdeFiltro) return false;
@@ -205,11 +200,17 @@ export function CuentaContraparteView({
     >
       <option value="">Todos</option>
       <optgroup label={tipoContraparte === 'cliente' ? 'Ventas' : 'Compras'}>
+        <option value={tipoContraparte === 'cliente' ? 'sin_facturar' : 'sin_liquidar'}>
+          {tipoContraparte === 'cliente'
+            ? ESTADO_MOVIMIENTO_EXTRA_LABEL.sin_facturar
+            : ESTADO_MOVIMIENTO_EXTRA_LABEL.sin_liquidar}
+        </option>
         {Object.entries(ESTADO_DISPONIBILIDAD_LABEL).map(([value, label]) => (
           <option key={value} value={value}>
             {label}
           </option>
         ))}
+        <option value="anulacion">{ESTADO_MOVIMIENTO_EXTRA_LABEL.anulacion}</option>
       </optgroup>
       <optgroup label={tipoContraparte === 'cliente' ? 'Cobros' : 'Pagos'}>
         {Object.entries(ESTADO_IMPUTACION_LABEL).map(([value, label]) => (

@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import {
   ESTADO_DISPONIBILIDAD_LABEL,
   ESTADO_IMPUTACION_LABEL,
+  ESTADO_MOVIMIENTO_EXTRA_LABEL,
   type ExportarMovimientosResponse,
   type TipoContraparte,
 } from '@/lib/cuentaCorriente';
@@ -27,12 +28,15 @@ export function generarEstadoCuentaExcel(
     row.Haber = m.tipo === 'pago' ? m.importe : '';
     row['Saldo acumulado'] = m.saldoAcumulado;
     row.Moneda = m.moneda;
+    // Mismo criterio que `estadoMovimientoCc` en pantalla.
     row.Estado =
       m.origen === 'anulacion'
-        ? 'Anulación'
-        : m.tipo === 'cargo'
-        ? (ESTADO_DISPONIBILIDAD_LABEL[m.estadoDisponibilidad] ?? m.estadoDisponibilidad)
-        : (ESTADO_IMPUTACION_LABEL[m.estadoImputacion] ?? m.estadoImputacion);
+        ? ESTADO_MOVIMIENTO_EXTRA_LABEL.anulacion
+        : m.tipo === 'cargo' && m.origen === 'viaje' && m.estadoDisponibilidad !== 'anulado'
+          ? ESTADO_MOVIMIENTO_EXTRA_LABEL[tipoContraparte === 'cliente' ? 'sin_facturar' : 'sin_liquidar']
+          : m.tipo === 'cargo'
+            ? (ESTADO_DISPONIBILIDAD_LABEL[m.estadoDisponibilidad] ?? m.estadoDisponibilidad)
+            : (ESTADO_IMPUTACION_LABEL[m.estadoImputacion] ?? m.estadoImputacion);
     return row;
   });
 
