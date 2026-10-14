@@ -14,7 +14,12 @@ export type MovimientoCc = {
   tipo: TipoMovimientoCc;
   origen: string;
   concepto: string;
+  /** Total del movimiento (con IVA incluido, si se cargó con IVA). Es lo que suma al saldo. */
   importe: number;
+  /** Solo ventas/compras manuales cargadas con IVA: importe sin IVA, % y monto de IVA. */
+  importeNeto?: number | null;
+  ivaPct?: number | null;
+  ivaMonto?: number | null;
   moneda: string;
   fecha: string;
   fechaVencimiento: string | null;
@@ -165,7 +170,10 @@ export type CreateMovimientoCcInput = {
   proveedorId?: string;
   tipo: TipoMovimientoCc;
   concepto?: string;
+  /** Con `ivaPct`, es el importe SIN IVA: el backend registra el total (neto + IVA). */
   importe: number;
+  /** % de IVA, solo ventas/compras. Omitido = sin IVA. */
+  ivaPct?: number;
   moneda?: string;
   fecha: string;
   fechaVencimiento?: string;

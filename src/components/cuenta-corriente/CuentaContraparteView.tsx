@@ -345,6 +345,12 @@ export function CuentaContraparteView({
             cell: (m: MovimientoConSaldo) => (
               <span>
                 {m.concepto}
+                {m.ivaPct != null && m.importeNeto != null && m.ivaMonto != null && (
+                  <span className="block text-xs text-vialto-steel tabular-nums">
+                    {formatCurrencyArFromNumber(m.importeNeto)} + IVA{' '}
+                    {String(m.ivaPct).replace('.', ',')}% {formatCurrencyArFromNumber(m.ivaMonto)}
+                  </span>
+                )}
                 {m.fechaVencimiento && (
                   <span className="block text-xs text-vialto-steel">
                     vence {fmtDateUtc(m.fechaVencimiento)}
