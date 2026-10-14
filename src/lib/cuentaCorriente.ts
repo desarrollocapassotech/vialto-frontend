@@ -36,8 +36,6 @@ export type MovimientoCc = {
   estadoImputacion: string;
   createdAt: string;
   liquidacionId?: string | null;
-  /** Fecha original del movimiento de viaje antes de transformarse en el de la factura/liquidación. */
-  fechaOrigen?: string | null;
   /** Solo anulaciones (origen `anulacion`, `tipo: credito`, en el Haber): el movimiento que compensan. */
   anulaMovimientoId?: string | null;
   anulaMovimiento?: { id: string; fecha: string; concepto: string } | null;
@@ -273,26 +271,16 @@ export const ESTADO_DISPONIBILIDAD_LABEL: Record<string, string> = {
 
 /** Estados que se muestran además de los de `estadoDisponibilidad`/`estadoImputacion`. */
 export const ESTADO_MOVIMIENTO_EXTRA_LABEL: Record<string, string> = {
-  sin_facturar: 'Sin facturar',
-  sin_liquidar: 'Sin liquidar',
   anulacion: 'Anulación',
 };
 
 /**
- * Estado a mostrar (y filtrar) de un movimiento. Un movimiento de viaje vigente todavía
- * no se facturó (cliente) o liquidó (proveedor): al facturarlo/liquidarlo se transforma en
- * el del comprobante. Una anulación (crédito en el Haber) tiene su propio estado. El resto usa el
- * estado de cobro/imputación de siempre.
+ * Estado a mostrar (y filtrar) de un movimiento. Una anulación (crédito en el Haber)
+ * tiene su propio estado; el resto usa el estado de cobro/imputación de siempre.
  */
 export function estadoMovimientoCc(m: MovimientoCc): string {
   if (m.origen === 'anulacion') return 'anulacion';
-  if (m.tipo === 'cargo') {
-    if (m.origen === 'viaje' && m.estadoDisponibilidad !== 'anulado') {
-      return m.clienteId ? 'sin_facturar' : 'sin_liquidar';
-    }
-    return m.estadoDisponibilidad;
-  }
-  return m.estadoImputacion;
+  return m.tipo === 'cargo' ? m.estadoDisponibilidad : m.estadoImputacion;
 }
 
 export function estadoMovimientoCcLabel(m: MovimientoCc): string {

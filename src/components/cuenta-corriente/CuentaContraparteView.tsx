@@ -62,8 +62,6 @@ const ESTADO_BADGE_CLASS: Record<string, string> = {
   imputado_parcial: 'bg-amber-100 text-amber-800',
   anulado: 'bg-gray-200 text-gray-600',
   anulacion: 'bg-gray-200 text-gray-600',
-  sin_facturar: 'bg-sky-100 text-sky-800',
-  sin_liquidar: 'bg-sky-100 text-sky-800',
   no_imputado: 'bg-vialto-mist text-vialto-steel',
   pendiente: 'bg-red-100 text-red-800',
 };
@@ -201,11 +199,6 @@ export function CuentaContraparteView({
     >
       <option value="">Todos</option>
       <optgroup label={tipoContraparte === 'cliente' ? 'Ventas' : 'Compras'}>
-        <option value={tipoContraparte === 'cliente' ? 'sin_facturar' : 'sin_liquidar'}>
-          {tipoContraparte === 'cliente'
-            ? ESTADO_MOVIMIENTO_EXTRA_LABEL.sin_facturar
-            : ESTADO_MOVIMIENTO_EXTRA_LABEL.sin_liquidar}
-        </option>
         {Object.entries(ESTADO_DISPONIBILIDAD_LABEL).map(([value, label]) => (
           <option key={value} value={value}>
             {label}
@@ -360,11 +353,6 @@ export function CuentaContraparteView({
                 {m.fechaVencimiento && m.estadoDisponibilidad !== 'anulado' && (
                   <span className="block text-xs text-vialto-steel">
                     vence {fmtDateUtc(m.fechaVencimiento)}
-                  </span>
-                )}
-                {m.fechaOrigen && (
-                  <span className="block text-xs text-vialto-steel">
-                    viaje cargado el {fmtDateUtc(m.fechaOrigen)}
                   </span>
                 )}
                 {m.anuladoPor && (

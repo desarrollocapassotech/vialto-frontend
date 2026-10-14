@@ -33,11 +33,9 @@ export function generarEstadoCuentaExcel(
     row.Estado =
       m.origen === 'anulacion'
         ? ESTADO_MOVIMIENTO_EXTRA_LABEL.anulacion
-        : m.tipo === 'cargo' && m.origen === 'viaje' && m.estadoDisponibilidad !== 'anulado'
-          ? ESTADO_MOVIMIENTO_EXTRA_LABEL[tipoContraparte === 'cliente' ? 'sin_facturar' : 'sin_liquidar']
-          : m.tipo === 'cargo'
-            ? (ESTADO_DISPONIBILIDAD_LABEL[m.estadoDisponibilidad] ?? m.estadoDisponibilidad)
-            : (ESTADO_IMPUTACION_LABEL[m.estadoImputacion] ?? m.estadoImputacion);
+        : m.tipo === 'cargo'
+          ? (ESTADO_DISPONIBILIDAD_LABEL[m.estadoDisponibilidad] ?? m.estadoDisponibilidad)
+          : (ESTADO_IMPUTACION_LABEL[m.estadoImputacion] ?? m.estadoImputacion);
     return row;
   });
 
