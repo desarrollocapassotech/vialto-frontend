@@ -45,6 +45,7 @@ import {
 import { useToast } from "@/lib/toast";
 import { CompletarDatosFiscalesInline } from "@/components/shared/CompletarDatosFiscalesInline";
 import type { ArcaConfig, Cliente, Factura, Viaje } from "@/types/api";
+import { ConfirmarEmisionArcaDialog } from "@/components/shared/ConfirmarEmisionArcaDialog";
 
 interface Props {
   factura: Factura;
@@ -225,6 +226,9 @@ export function EmitirFacturaModal({
   function fmtDate(iso: string) {
     return fmtDateUtc(iso);
   }
+
+  /** Diálogo "¿Emitir la factura en ARCA?" antes de emitir. */
+  const [confirmarEmision, setConfirmarEmision] = useState(false);
 
   async function handleEmitirArca() {
     if (busyArca) return;
@@ -646,7 +650,7 @@ export function EmitirFacturaModal({
                 <button
                   type="button"
                   disabled={busyArca}
-                  onClick={() => void handleEmitirArca()}
+                  onClick={() => setConfirmarEmision(true)}
                   className="inline-flex items-center gap-2 h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {!busyArca && (
@@ -667,6 +671,16 @@ export function EmitirFacturaModal({
           </div>
         </div>,
       )}
+      <ConfirmarEmisionArcaDialog
+        open={confirmarEmision}
+        comprobante="factura"
+        ambiente={arcaConfig?.ambiente}
+        onCancel={() => setConfirmarEmision(false)}
+        onConfirm={() => {
+          setConfirmarEmision(false);
+          void handleEmitirArca();
+        }}
+      />
     </>
   );
 }

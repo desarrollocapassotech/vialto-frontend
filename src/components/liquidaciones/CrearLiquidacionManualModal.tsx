@@ -21,6 +21,7 @@ import { EmisorArcaResumen } from "@/components/facturacion/EmisorArcaResumen";
 import { ParteFacturaResumen } from "@/components/facturacion/ParteFacturaResumen";
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
+import { ConfirmarEmisionArcaDialog } from "@/components/shared/ConfirmarEmisionArcaDialog";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
 import { useValidacionPadronRegistro } from "@/hooks/useValidacionPadronRegistro";
 import { useReceptorPadronBloqueado } from "@/hooks/useReceptorPadronBloqueado";
@@ -362,6 +363,8 @@ export function CrearLiquidacionManualModal({
   >(null);
   const submitting = submitAction !== null;
   const [error, setError] = useState<string | null>(null);
+  /** Diálogo "¿Emitir la liquidación en ARCA?" antes de emitir. */
+  const [confirmarEmision, setConfirmarEmision] = useState(false);
 
   // Cargar config ARCA si no vino por props
   useEffect(() => {
@@ -1952,15 +1955,12 @@ export function CrearLiquidacionManualModal({
                     }
                     title={montoCero ? MSG_EMITIR_MONTO_CERO : undefined}
                     aria-disabled={emisionBloqueada || undefined}
-                    onClick={(e) => {
+                    onClick={() => {
                       if (emisionBloqueada) {
                         zumbidoAviso.disparar();
                         return;
                       }
-                      void handleSubmit(
-                        e as unknown as React.FormEvent,
-                        "emitir",
-                      );
+                      setConfirmarEmision(true);
                     }}
                     className={`inline-flex items-center gap-2 h-9 px-5 rounded bg-vialto-charcoal font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-white disabled:opacity-50 ${
                       emisionBloqueada
@@ -2002,6 +2002,17 @@ export function CrearLiquidacionManualModal({
           </>
         )}
       </div>
+
+      <ConfirmarEmisionArcaDialog
+        open={confirmarEmision}
+        comprobante="liquidación"
+        ambiente={resolvedConfig?.ambiente}
+        onCancel={() => setConfirmarEmision(false)}
+        onConfirm={() => {
+          setConfirmarEmision(false);
+          void handleSubmit({ preventDefault() {} } as React.FormEvent, "emitir");
+        }}
+      />
 
       {transportistaSeleccionadoId &&
         (missingTransportistaFields.length > 0 || padronTransportistaAviso) && (
