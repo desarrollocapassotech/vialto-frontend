@@ -14,7 +14,7 @@ const fmtFecha = fmtDateUtc;
 /** Genera y descarga el Excel del estado de cuenta de una contraparte, mismas columnas que el ledger en pantalla. */
 export function generarEstadoCuentaExcel(
   data: ExportarMovimientosResponse,
-  tipoContraparte: TipoContraparte,
+  _tipoContraparte: TipoContraparte,
   contraparteNombre: string,
 ) {
   const rows = data.movimientos.map((m) => {
@@ -22,9 +22,7 @@ export function generarEstadoCuentaExcel(
       Fecha: fmtFecha(m.fecha),
       Concepto: m.concepto,
     };
-    if (tipoContraparte === 'cliente') {
-      row.Comprobante = m.numeroComprobante ?? '';
-    }
+    row.Comprobante = m.numeroComprobante ?? '';
     row.Debe = esDebeCc(m) ? m.importe : '';
     row.Haber = !esDebeCc(m) ? m.importe : '';
     row['Saldo acumulado'] = m.saldoAcumulado;

@@ -369,16 +369,13 @@ export function CuentaContraparteView({
             ),
             tdClassName: listadoTablaTdClass,
           },
-          ...(tipoContraparte === 'cliente'
-            ? [
-                {
-                  id: 'numeroFactura',
-                  header: 'Comprobante',
-                  cell: (m: MovimientoConSaldo) => m.numeroComprobante ?? '—',
-                  tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-                },
-              ]
-            : []),
+          // Número de factura o liquidación (o de la nota de crédito/débito en una anulación).
+          {
+            id: 'numeroFactura',
+            header: 'Comprobante',
+            cell: (m: MovimientoConSaldo) => m.numeroComprobante ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
           {
             id: 'debe',
             header: 'Debe',
@@ -436,11 +433,9 @@ export function CuentaContraparteView({
             <ListadoFiltroCampo label="Concepto" active={!!conceptoFiltro.trim()}>
               {conceptoFiltroInput}
             </ListadoFiltroCampo>
-            {tipoContraparte === 'cliente' && (
-              <ListadoFiltroCampo label="Comprobante" active={!!comprobanteFiltro.trim()}>
-                {comprobanteFiltroInput}
-              </ListadoFiltroCampo>
-            )}
+            <ListadoFiltroCampo label="Comprobante" active={!!comprobanteFiltro.trim()}>
+              {comprobanteFiltroInput}
+            </ListadoFiltroCampo>
             <ListadoFiltroCampo label="Estado" active={!!estadoFiltro}>
               {estadoFiltroSelect}
             </ListadoFiltroCampo>
@@ -471,18 +466,16 @@ export function CuentaContraparteView({
                 {conceptoFiltroInput}
               </ViajesListadoHeaderFiltro>
             </th>
-            {tipoContraparte === 'cliente' && (
-              <th scope="col" className={`${listadoTablaThClass} align-top`}>
-                <ViajesListadoHeaderFiltro
-                  title="Comprobante"
-                  filterActive={!!comprobanteFiltro.trim()}
-                  filterSignature={comprobanteFiltro}
-                  onClear={() => setComprobanteFiltro('')}
-                >
-                  {comprobanteFiltroInput}
-                </ViajesListadoHeaderFiltro>
-              </th>
-            )}
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Comprobante"
+                filterActive={!!comprobanteFiltro.trim()}
+                filterSignature={comprobanteFiltro}
+                onClear={() => setComprobanteFiltro('')}
+              >
+                {comprobanteFiltroInput}
+              </ViajesListadoHeaderFiltro>
+            </th>
             <th scope="col" className={listadoTablaThClass}>
               Debe
             </th>
@@ -510,7 +503,7 @@ export function CuentaContraparteView({
             </th>
           </tr>
         }
-        tableColSpan={tipoContraparte === 'cliente' ? 9 : 8}
+        tableColSpan={9}
         renderActions={(m: MovimientoConSaldo) =>
           m.tipo === 'cargo' &&
           (m.estadoDisponibilidad === 'pendiente' || m.estadoDisponibilidad === 'parcial') ? (
