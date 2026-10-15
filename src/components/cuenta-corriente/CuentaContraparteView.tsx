@@ -1,7 +1,7 @@
 import { fechaDiaYmd, fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Banknote, FileSpreadsheet, FileText } from 'lucide-react';
+import { Banknote, FileSpreadsheet, FileText, Hash } from 'lucide-react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
@@ -35,12 +35,16 @@ import {
 } from '@/lib/cuentaCorriente';
 import { MovimientoCcFormModal } from './MovimientoCcFormModal';
 import { ImputarPagoModal } from './ImputarPagoModal';
+import { ComprobanteCcModal } from './ComprobanteCcModal';
+import { useCurrentTenant } from '@/hooks/useCurrentTenant';
+import { comprasNacenDeLiquidaciones, ventasNacenDeFacturas } from '@/lib/tenantModules';
 import { ExportarEstadoCuentaModal } from './ExportarEstadoCuentaModal';
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 
 type ModalState =
   | { kind: 'nuevo'; tipoInicial: TipoMovimientoCc }
   | { kind: 'imputar'; cargo: MovimientoCc }
+  | { kind: 'comprobante'; movimiento: MovimientoCc }
   | { kind: 'exportar'; formato: 'pdf' | 'excel' }
   | null;
 
@@ -84,6 +88,15 @@ export function CuentaContraparteView({
   contraparteNombre,
 }: Props) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { tenant } = useCurrentTenant();
+  // Venta/compra manual solo si la empresa no tiene el módulo que la genera (con
+  // Facturación las ventas salen de las facturas; con Liquidaciones, las compras de las
+  // liquidaciones). Hasta saber los módulos no se ofrece, para no mostrarla de más.
+  const permiteCargoManual =
+    tenant != null &&
+    (tipoContraparte === 'cliente'
+      ? !ventasNacenDeFacturas(tenant.modules ?? [])
+      : !comprasNacenDeLiquidaciones(tenant.modules ?? []));
   const [movimientos, setMovimientos] = useState<MovimientoCc[] | null>(null);
   const [saldos, setSaldos] = useState<SaldoPorMoneda[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -306,13 +319,15 @@ export function CuentaContraparteView({
               />
             </svg>
           </button>
-          <button
-            type="button"
-            onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'cargo' })}
-            className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-          >
-            {tipoContraparte === 'cliente' ? 'Nueva venta' : 'Nueva compra'}
-          </button>
+          {permiteCargoManual && (
+            <button
+              type="button"
+              onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'cargo' })}
+              className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+            >
+              {tipoContraparte === 'cliente' ? 'Nueva venta' : 'Nueva compra'}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'pago' })}
@@ -504,23 +519,41 @@ export function CuentaContraparteView({
           </tr>
         }
         tableColSpan={9}
-        renderActions={(m: MovimientoConSaldo) =>
-          m.tipo === 'cargo' &&
-          (m.estadoDisponibilidad === 'pendiente' || m.estadoDisponibilidad === 'parcial') ? (
+        renderActions={(m: MovimientoConSaldo) => {
+          const puedeImputar =
+            m.tipo === 'cargo' &&
+            (m.estadoDisponibilidad === 'pendiente' || m.estadoDisponibilidad === 'parcial');
+          const opciones = [
+            ...(puedeImputar
+              ? [
+                  {
+                    id: 'imputar',
+                    label: m.clienteId ? 'Imputar cobro' : 'Imputar pago',
+                    icon: Banknote,
+                    onClick: () => setModal({ kind: 'imputar', cargo: m }),
+                  },
+                ]
+              : []),
+            ...(m.comprobanteEditable
+              ? [
+                  {
+                    id: 'comprobante',
+                    label: m.numeroComprobante ? 'Editar comprobante' : 'Cargar comprobante',
+                    icon: Hash,
+                    onClick: () => setModal({ kind: 'comprobante', movimiento: m }),
+                  },
+                ]
+              : []),
+          ];
+          if (opciones.length === 0) return null;
+          return (
             <AccionesFila
-              options={[
-                {
-                  id: 'imputar',
-                  label: m.clienteId ? 'Imputar cobro' : 'Imputar pago',
-                  icon: Banknote,
-                  onClick: () => setModal({ kind: 'imputar', cargo: m }),
-                },
-              ]}
-              destacadas={['imputar']}
+              options={opciones}
+              destacadas={opciones.map((o) => o.id)}
               subtitle={m.concepto}
             />
-          ) : null
-        }
+          );
+        }}
       />
 
       {modal?.kind === 'nuevo' && (
@@ -529,6 +562,7 @@ export function CuentaContraparteView({
           contraparteId={contraparteId}
           contraparteNombre={contraparteNombre}
           tipoInicial={modal.tipoInicial}
+          permiteCargo={permiteCargoManual}
           onClose={() => setModal(null)}
           onCreated={cargarDatos}
         />
@@ -537,6 +571,13 @@ export function CuentaContraparteView({
         <ImputarPagoModal
           cargo={modal.cargo}
           pagosDisponibles={pagosDisponiblesPara(modal.cargo)}
+          onClose={() => setModal(null)}
+          onDone={cargarDatos}
+        />
+      )}
+      {modal?.kind === 'comprobante' && (
+        <ComprobanteCcModal
+          movimiento={modal.movimiento}
           onClose={() => setModal(null)}
           onDone={cargarDatos}
         />

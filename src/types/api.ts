@@ -1032,6 +1032,8 @@ export interface Liquidacion {
   createdBy: string;
   /** Opción de proveedor seleccionada para el encabezado del contrato comercial PDF. */
   proveedorContrato?: string | null;
+  /** N° de la factura que emitió el proveedor (liquidaciones sin ARCA); se ve en Cuenta corriente. */
+  numeroComprobanteProveedor?: string | null;
   conceptosLineas?: LiquidacionConceptoLinea[];
   /** Presente en GET detalle; no siempre en el listado. */
   viajes?: LiquidacionViajeItem[];

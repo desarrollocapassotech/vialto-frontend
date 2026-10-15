@@ -41,6 +41,8 @@ export type MovimientoCc = {
   anulaMovimiento?: { id: string; fecha: string; concepto: string } | null;
   /** Movimiento anulado con su crédito de anulación (VTO-431). */
   anuladoPor?: { id: string; fecha: string } | null;
+  /** Se puede cargar/corregir el N° de comprobante desde Cuenta corriente (liquidación sin ARCA o manual). */
+  comprobanteEditable?: boolean;
   /**
    * Cuánto de ESTE movimiento puntual sigue sin resolverse (cargo: sin cobrar/pagar;
    * pago: sin imputar). Solo viene poblado en `fetchMovimientos` (`GET .../movimientos`).
@@ -252,6 +254,19 @@ export function repartirImputacion(
     restante = roundMoney2(restante - importe);
     return { pagoId: p.id, importe };
   });
+}
+
+/** Carga/corrige el N° de comprobante (factura del proveedor en una liquidación sin ARCA, o movimiento manual). */
+export function actualizarComprobanteMovimiento(
+  getToken: GetToken,
+  id: string,
+  numeroComprobante: string | null,
+) {
+  return apiJson<MovimientoCc>(
+    `/api/cuenta-corriente/movimientos/${encodeURIComponent(id)}/comprobante`,
+    getToken,
+    { method: 'PATCH', body: JSON.stringify({ numeroComprobante }) },
+  );
 }
 
 export function eliminarImputacion(getToken: GetToken, id: string) {

@@ -528,6 +528,18 @@ Historia: sep 2026 — vencimiento de póliza un día antes (`VehiculoViewModal`
 
 ---
 
+## Cuenta corriente: de dónde salen los movimientos (oct 2026)
+
+**La cuenta corriente depende solo de facturas y liquidaciones** (reglas completas en `vialto-backend/CLAUDE.md`, sección `cuenta-corriente`). Lo que importa de este lado (`components/cuenta-corriente/`):
+
+- **Viajes no generan movimientos.** No agregar nada en Viajes que cree o muestre movimientos de cuenta corriente.
+- **"Nueva venta" / "Nueva compra" solo si la empresa no tiene el módulo que las genera**: se ocultan con `ventasNacenDeFacturas` (Facturación manual o ARCA) y `comprasNacenDeLiquidaciones` (Liquidaciones manual o ARCA) de `lib/tenantModules.ts`. En ese caso `MovimientoCcFormModal` recibe `permiteCargo={false}` y queda solo para cobros/pagos. El backend también lo rechaza. "Registrar cobro/pago" va siempre.
+- **Debe / Haber**: `esDebeCc` (`lib/cuentaCorriente.ts`) — cargo en Debe; cobro/pago y crédito de anulación (`tipo: 'credito'`) en Haber. Una anulación nunca se muestra como negativo.
+- **Estado**: siempre con `estadoMovimientoCc`/`estadoMovimientoCcLabel` (incluye "Anulación"), no leyendo `estadoDisponibilidad` a mano. **Saldo acumulado** con `cuentaEnHistorialCc` (un anulado cuenta solo si tiene su crédito).
+- **Columna Comprobante** para clientes y proveedores: el número nunca va en el concepto. Si el movimiento trae `comprobanteEditable` (liquidación sin ARCA o venta/compra manual), la fila ofrece "Cargar/Editar comprobante" (`ComprobanteCcModal`). En una liquidación el número se guarda en la liquidación (`numeroComprobanteProveedor`, también editable en `CrearLiquidacionManualModal`/`LiquidacionEditModal`), así que se ve igual en ambos lados.
+
+---
+
 ## "Limpiar filtros": al lado del título, sutil (oct 2026)
 
 **Regla global para toda tabla con filtros por columna.** El botón va **junto al `<h1>`/`<h2>`** de la pantalla (no entre las acciones de la derecha, no arriba de la tabla), con el estilo sutil de Viajes: `× Limpiar filtros` en texto gris chico, subrayado al hover. Usar `LimpiarFiltrosButton` (`components/listado/LimpiarFiltrosButton.tsx`) con `soloDesktop` (en mobile se limpia desde `ListadoFiltrosSheet`); `cantidad` opcional muestra "(n)".
