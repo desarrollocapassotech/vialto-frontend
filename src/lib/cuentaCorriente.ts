@@ -43,6 +43,8 @@ export type MovimientoCc = {
   anuladoPor?: { id: string; fecha: string } | null;
   /** Se puede cargar/corregir el N° de comprobante desde Cuenta corriente (liquidación sin ARCA o manual). */
   comprobanteEditable?: boolean;
+  /** Se puede cargar/corregir el vencimiento desde Cuenta corriente (compra de liquidación o manual). */
+  vencimientoEditable?: boolean;
   /**
    * Cuánto de ESTE movimiento puntual sigue sin resolverse (cargo: sin cobrar/pagar;
    * pago: sin imputar). Solo viene poblado en `fetchMovimientos` (`GET .../movimientos`).
@@ -256,16 +258,19 @@ export function repartirImputacion(
   });
 }
 
-/** Carga/corrige el N° de comprobante (factura del proveedor en una liquidación sin ARCA, o movimiento manual). */
+/**
+ * Carga/corrige el N° de comprobante y/o el vencimiento de un movimiento. Cada campo solo
+ * se toca si viene (`null` lo borra). Fecha en `YYYY-MM-DD`.
+ */
 export function actualizarComprobanteMovimiento(
   getToken: GetToken,
   id: string,
-  numeroComprobante: string | null,
+  datos: { numeroComprobante?: string | null; fechaVencimiento?: string | null },
 ) {
   return apiJson<MovimientoCc>(
     `/api/cuenta-corriente/movimientos/${encodeURIComponent(id)}/comprobante`,
     getToken,
-    { method: 'PATCH', body: JSON.stringify({ numeroComprobante }) },
+    { method: 'PATCH', body: JSON.stringify(datos) },
   );
 }
 
