@@ -352,6 +352,10 @@ export function CrearLiquidacionManualModal({
 
   // — Comprobante adjunto (tenants sin ARCA) —
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
+  // N° de la factura que emitió el proveedor (sin ARCA): es el que muestra Cuenta corriente.
+  const [numeroComprobanteProveedor, setNumeroComprobanteProveedor] = useState(
+    existente?.numeroComprobanteProveedor ?? "",
+  );
 
   // — Estado del submit / éxito —
   const [step, setStep] = useState<"form" | "autorizada">("form");
@@ -1035,6 +1039,11 @@ export function CrearLiquidacionManualModal({
       if (comprobanteUrl) body.comprobanteUrl = comprobanteUrl;
       if (existente) body.proveedorContrato = proveedorContrato?.trim() || null;
       else if (proveedorContrato?.trim()) body.proveedorContrato = proveedorContrato.trim();
+      if (showComprobante) {
+        const nro = numeroComprobanteProveedor.trim();
+        if (existente) body.numeroComprobanteProveedor = nro || null;
+        else if (nro) body.numeroComprobanteProveedor = nro;
+      }
 
       // Existente: se guardan los cambios sobre la misma liquidación (no se crea otra).
       let liq = await apiJson<Liquidacion>(
@@ -1685,6 +1694,28 @@ export function CrearLiquidacionManualModal({
                     >
                       {MSG_ARCA_NO_LIQUIDA_USD}
                     </p>
+                  )}
+
+                  {showComprobante && (
+                    <div>
+                      <label htmlFor="numeroComprobanteProveedor" className={labelClass}>
+                        N° de factura del proveedor
+                      </label>
+                      <input
+                        id="numeroComprobanteProveedor"
+                        type="text"
+                        maxLength={64}
+                        value={numeroComprobanteProveedor}
+                        onChange={(e) => setNumeroComprobanteProveedor(e.target.value)}
+                        placeholder="Ej. 0001-00001234"
+                        className={inputClass}
+                        disabled={submitting}
+                      />
+                      <p className="mt-1 text-xs text-vialto-steel">
+                        Se muestra en la cuenta corriente del proveedor. Si todavía no la tenés, la
+                        podés cargar después.
+                      </p>
+                    </div>
                   )}
 
                   {showComprobante && (

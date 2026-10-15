@@ -181,6 +181,10 @@ export function LiquidacionEditModal({
   const [proveedorContrato, setProveedorContrato] = useState(
     liq.proveedorContrato ?? (opcionesSelect?.[0] ?? ""),
   );
+  // N° de la factura que emitió el proveedor (sin ARCA): es el que muestra Cuenta corriente.
+  const [numeroComprobanteProveedor, setNumeroComprobanteProveedor] = useState(
+    liq.numeroComprobanteProveedor ?? "",
+  );
 
   const [viajesDisponibles, setViajesDisponibles] = useState<
     ViajeOpcionDraft[]
@@ -450,6 +454,7 @@ export function LiquidacionEditModal({
       }
       if (showComprobante) {
         body.comprobanteUrl = nextComprobanteUrl ?? null;
+        body.numeroComprobanteProveedor = numeroComprobanteProveedor.trim() || null;
       }
 
       const updated = await apiJson<LiquidacionConTransportista>(
@@ -726,6 +731,27 @@ export function LiquidacionEditModal({
             Los montos y el período de una liquidación emitida no se pueden
             modificar. Podés actualizar el comprobante adjunto.
           </p>
+        )}
+
+        {showComprobante && (
+          <div>
+            <label htmlFor="liq-numero-comprobante-proveedor" className={LABEL}>
+              N° de factura del proveedor
+            </label>
+            <input
+              id="liq-numero-comprobante-proveedor"
+              type="text"
+              maxLength={64}
+              value={numeroComprobanteProveedor}
+              onChange={(e) => setNumeroComprobanteProveedor(e.target.value)}
+              placeholder="Ej. 0001-00001234"
+              disabled={saving}
+              className={INPUT}
+            />
+            <p className="mt-1 text-xs text-vialto-steel">
+              Se muestra en la cuenta corriente del proveedor.
+            </p>
+          </div>
         )}
 
         {showComprobante && (

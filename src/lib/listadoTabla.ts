@@ -39,7 +39,14 @@ export const listadoTablaBodyRowClass = 'hover:bg-vialto-mist';
 
 export const listadoTablaThClass = 'px-3 py-2.5';
 
-export const listadoTablaTdClass = 'px-3 py-2 text-vialto-charcoal';
+/** Filas compactas: el alto mínimo (h-8) es el mismo que el de los botones de acciones. */
+export const listadoTablaTdClass = 'h-8 px-3 py-1 text-vialto-charcoal';
+
+/**
+ * Celda de acciones (botones h-8): sin padding vertical, así una fila con acciones no
+ * queda más alta que una sin acciones. Sumar `text-right` si corresponde.
+ */
+export const listadoTablaAccionesTdClass = 'px-3 py-0 align-middle';
 
 export const listadoTablaEmptyCellClass = 'px-4 py-8 text-vialto-steel';
 

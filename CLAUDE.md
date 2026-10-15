@@ -528,11 +528,29 @@ Historia: sep 2026 — vencimiento de póliza un día antes (`VehiculoViewModal`
 
 ---
 
+## Cuenta corriente: de dónde salen los movimientos (oct 2026)
+
+**La cuenta corriente depende solo de facturas y liquidaciones** (reglas completas en `vialto-backend/CLAUDE.md`, sección `cuenta-corriente`). Lo que importa de este lado (`components/cuenta-corriente/`):
+
+- **Viajes no generan movimientos.** No agregar nada en Viajes que cree o muestre movimientos de cuenta corriente.
+- **"Nueva venta" / "Nueva compra" solo si la empresa no tiene el módulo que las genera**: se ocultan con `ventasNacenDeFacturas` (Facturación manual o ARCA) y `comprasNacenDeLiquidaciones` (Liquidaciones manual o ARCA) de `lib/tenantModules.ts`. En ese caso `MovimientoCcFormModal` recibe `permiteCargo={false}` y queda solo para cobros/pagos. El backend también lo rechaza. "Registrar cobro/pago" va siempre.
+- **Debe / Haber**: `esDebeCc` (`lib/cuentaCorriente.ts`) — cargo en Debe; cobro/pago y crédito de anulación (`tipo: 'credito'`) en Haber. Una anulación nunca se muestra como negativo.
+- **Estado**: siempre con `estadoMovimientoCc`/`estadoMovimientoCcLabel` (incluye "Anulación"), no leyendo `estadoDisponibilidad` a mano. La grilla de la cuenta (`CuentaContraparteView`) no muestra columna ni filtro de estado (oct 2026, a pedido); el estado sigue en la exportación Excel.
+- **Saldo en tarjetas chicas**, una por moneda, en la misma fila que Clientes/Proveedores y el selector de cuenta: `CuentaCorrienteTenantPage` deja un contenedor (`saldosSlot`) y `CuentaContraparteView` dibuja ahí las tarjetas con `createPortal` (sin el slot, van arriba de la grilla). El nombre de la cuenta ya no se repite como título (está en el selector). Si la cuenta tiene más de una moneda, tocar una tarjeta filtra la grilla por esa moneda (cuenta como filtro activo; "Limpiar filtros" lo saca). El saldo acumulado de la grilla se calcula **por moneda** (nunca suma pesos con dólares).
+- **Click en la fila**: con una sola acción la ejecuta directo; con varias abre `AccionesOpcionesSheet` con las mismas opciones del botón (`accionesDe`, única lista).
+- **"Ver factura" / "Ver liquidación"** en Acciones (`ComprobanteOrigenCcModal`): solo si la empresa tiene el módulo (`ventasNacenDeFacturas` / `comprasNacenDeLiquidaciones`, los mismos slugs que exige el `GET` del backend). Trae el registro y abre `FacturaViewModal`/`LiquidacionViewModal`, igual que los indicadores de Viajes. Una anulación no guarda `facturaId`/`liquidacionId`: el vínculo se toma del movimiento que compensa (`anulaMovimientoId`). **Saldo acumulado** con `cuentaEnHistorialCc` (un anulado cuenta solo si tiene su crédito).
+- **Columna Comprobante** para clientes y proveedores: el número nunca va en el concepto. Si el movimiento trae `comprobanteEditable` (factura de cliente sin ARCA, liquidación sin ARCA o venta/compra manual), la fila ofrece "Cargar/Editar comprobante" (`ComprobanteCcModal`). El mismo modal edita el **vencimiento** si viene `vencimientoEditable` (factura de cliente o compra de liquidación —también con ARCA, ahí la acción es "Editar vencimiento"— o venta/compra manual). En una factura, número y vencimiento se guardan en la factura (se ven igual en Facturas); el número es obligatorio. El vencimiento tiene **columna propia** en clientes y proveedores. En una liquidación el número se guarda en la liquidación (`numeroComprobanteProveedor`, también editable en `CrearLiquidacionManualModal`/`LiquidacionEditModal`), así que se ve igual en ambos lados.
+
+---
+
 ## "Limpiar filtros": al lado del título, sutil (oct 2026)
 
 **Regla global para toda tabla con filtros por columna.** El botón va **junto al `<h1>`/`<h2>`** de la pantalla (no entre las acciones de la derecha, no arriba de la tabla), con el estilo sutil de Viajes: `× Limpiar filtros` en texto gris chico, subrayado al hover. Usar `LimpiarFiltrosButton` (`components/listado/LimpiarFiltrosButton.tsx`) con `soloDesktop` (en mobile se limpia desde `ListadoFiltrosSheet`); `cantidad` opcional muestra "(n)".
 
 - Si los filtros viven en un componente hijo (pestañas: Mantenimiento, Asignación de vehículos de Combustible, `TenantsTable`), la página deja `<div ref={setSlot} className="empty:hidden" />` junto al título y le pasa el elemento al hijo, que usa `LimpiarFiltrosPortal`.
+  Cuenta corriente hace lo mismo (`limpiarFiltrosSlot` de `CuentaContraparteView`).
+- **Filas compactas en todas las tablas (oct 2026)**: `listadoTablaTdClass` = `h-8 px-3 py-1` y la celda de acciones usa `listadoTablaAccionesTdClass` (`py-0 align-middle`, sumar `text-right`), así una fila con botones de acción (h-8) mide lo mismo que una sin acciones. `ListadoDatos` ya lo usa por defecto; las filas armadas a mano (Viajes, Facturas) usan las mismas medidas. No volver a `py-2` en celdas de grilla.
+- **Columnas de ID: truncar por el principio** (se ven los últimos caracteres, "…01406"), con `TruncarInicio` (`components/ui/TruncarInicio.tsx`). Hoy: ID sistema, ID propio 1 y 2 de Viajes. Toda columna de ID nueva usa ese componente, no `truncate` a secas.
 - Indicadores de pantalla tipo "Emisión electrónica vía ARCA" / "Ambiente de pruebas" no van junto al título sino en la línea del breadcrumb, a la derecha: `BreadcrumbExtras` (`hooks/useBreadcrumbOverride.tsx`), ver `ArcaEmisionIndicadores`.
 
 ---

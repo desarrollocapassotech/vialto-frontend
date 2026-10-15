@@ -10,7 +10,7 @@ import { useToast } from "@/lib/toast";
 import {
   listadoTablaAccionClass,
   listadoTablaHeadRowClass,
-  listadoTablaTdClass,
+  listadoTablaAccionesTdClass, listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import type { Producto, PaginatedMeta } from "@/types/api";
@@ -463,7 +463,7 @@ export function ProductosSuperadminPage() {
                 )}
               </>
             )}
-            actionsTdClassName={`${listadoTablaTdClass} text-right`}
+            actionsTdClassName={`${listadoTablaAccionesTdClass} text-right`}
           />
 
           {meta && (rows?.length ?? 0) > 0 && (

@@ -21,6 +21,11 @@ type Props = {
   contraparteId: string;
   contraparteNombre: string;
   tipoInicial?: TipoMovimientoCc;
+  /**
+   * Si se puede cargar una venta/compra a mano. `false` cuando la empresa tiene el módulo
+   * que la genera (Facturación / Liquidaciones): el modal queda solo para cobros/pagos.
+   */
+  permiteCargo?: boolean;
   onClose: () => void;
   onCreated: () => void;
 };
@@ -30,11 +35,12 @@ export function MovimientoCcFormModal({
   contraparteId,
   contraparteNombre,
   tipoInicial = 'cargo',
+  permiteCargo = true,
   onClose,
   onCreated,
 }: Props) {
   const { getToken } = useAuth();
-  const [tipo, setTipo] = useState<TipoMovimientoCc>(tipoInicial);
+  const [tipo, setTipo] = useState<TipoMovimientoCc>(permiteCargo ? tipoInicial : 'pago');
   const [concepto, setConcepto] = useState('');
   const [importeStr, setImporteStr] = useState('');
   const [ivaPctStr, setIvaPctStr] = useState('');
@@ -125,6 +131,7 @@ export function MovimientoCcFormModal({
       }
     >
       <form id="movimiento-cc-form" onSubmit={handleSubmit} className="space-y-4">
+        {permiteCargo && (
         <div className="flex gap-2">
           <button
             type="button"
@@ -149,6 +156,7 @@ export function MovimientoCcFormModal({
             {esCliente ? 'Cobro' : 'Pago'}
           </button>
         </div>
+        )}
 
         <div>
           <label className={labelClass} htmlFor="cc-concepto">

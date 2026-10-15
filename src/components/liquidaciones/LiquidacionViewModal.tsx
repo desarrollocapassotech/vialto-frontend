@@ -600,6 +600,9 @@ export function LiquidacionViewModal({
             {source.proveedorContrato && (
               <Campo label="Proveedor contrato" value={source.proveedorContrato} />
             )}
+            {!hasArca && source.numeroComprobanteProveedor && (
+              <Campo label="N° de factura del proveedor" value={source.numeroComprobanteProveedor} />
+            )}
           </div>
 
           {source.estado === "pendiente_anulacion" && (

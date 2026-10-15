@@ -14,7 +14,7 @@ import { EstadoOrdenBadge } from "@/components/mantenimiento/MantenimientoBadges
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
-import { listadoTablaHeadRowClass, listadoTablaTdClass, listadoTablaThClass } from "@/lib/listadoTabla";
+import { listadoTablaHeadRowClass, listadoTablaAccionesTdClass, listadoTablaThClass } from "@/lib/listadoTabla";
 import { mantUrl } from "@/lib/mantenimientoApi";
 import { fmtFecha, fmtKm, fmtMoneda, fmtTipoOrden, TIPO_ORDEN_LABELS } from "@/lib/mantenimientoLabels";
 import { useToast } from "@/lib/toast";
@@ -269,7 +269,7 @@ export function OrdenesTrabajoSection({
               : "Todavía no hay órdenes de trabajo registradas."
         }
         loadingMessage="Cargando…"
-        actionsTdClassName={listadoTablaTdClass}
+        actionsTdClassName={listadoTablaAccionesTdClass}
         renderActions={(o) => {
           const opciones: AccionOpcion[] = [{ id: "ver", label: "Ver", icon: Eye, onClick: () => onVer(o.id) }];
           if (!soloLectura && o.estado !== "anulada") {

@@ -11,7 +11,7 @@ import { EstadoVencimientoBadge } from "@/components/mantenimiento/Mantenimiento
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
-import { listadoTablaHeadRowClass, listadoTablaTdClass, listadoTablaThClass } from "@/lib/listadoTabla";
+import { listadoTablaHeadRowClass, listadoTablaAccionesTdClass, listadoTablaThClass } from "@/lib/listadoTabla";
 import { mantUrl } from "@/lib/mantenimientoApi";
 import {
   CATEGORIA_PLAN_LABELS,
@@ -273,7 +273,7 @@ export function VencimientosSection({
               : "Todavía no hay planes asignados a los vehículos."
         }
         loadingMessage="Calculando vencimientos…"
-        actionsTdClassName={listadoTablaTdClass}
+        actionsTdClassName={listadoTablaAccionesTdClass}
         renderActions={
           soloLectura
             ? undefined

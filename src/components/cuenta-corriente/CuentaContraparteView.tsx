@@ -1,12 +1,13 @@
 import { fechaDiaYmd, fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Banknote, FileSpreadsheet, FileText } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Banknote, Eye, FileSpreadsheet, FileText, Filter, Hash, X } from 'lucide-react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { AccionesFila } from '@/components/ui/AccionesFila';
-import { AccionesOpcionesSheet } from '@/components/ui/AccionesOpcionesSheet';
+import { AccionesOpcionesSheet, type AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import { listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
 
 /**
@@ -14,20 +15,15 @@ import { listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabl
  * cuenta suele tener decenas/cientos de filas — con el padding default del resto
  * de los listados quedaba con demasiado espacio en blanco entre fila y fila.
  */
-const listadoTablaTdClass = 'px-3 py-1.5 text-vialto-charcoal md:px-4';
+const listadoTablaTdClass = 'h-8 px-3 py-1 text-vialto-charcoal md:px-4';
 import { formatCurrencyArFromNumber } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   fetchMovimientos,
   fetchSaldoCliente,
   fetchSaldoProveedor,
-  ESTADO_DISPONIBILIDAD_LABEL,
-  ESTADO_IMPUTACION_LABEL,
-  ESTADO_MOVIMIENTO_EXTRA_LABEL,
   cuentaEnHistorialCc,
   esDebeCc,
-  estadoMovimientoCc,
-  estadoMovimientoCcLabel,
   type MovimientoCc,
   type SaldoPorMoneda,
   type TipoContraparte,
@@ -35,16 +31,33 @@ import {
 } from '@/lib/cuentaCorriente';
 import { MovimientoCcFormModal } from './MovimientoCcFormModal';
 import { ImputarPagoModal } from './ImputarPagoModal';
+import { ComprobanteCcModal } from './ComprobanteCcModal';
+import { ComprobanteOrigenCcModal, type ComprobanteOrigenCc } from './ComprobanteOrigenCcModal';
+import { useCurrentTenant } from '@/hooks/useCurrentTenant';
+import {
+  canAccessEmisionLiquidoProductoArca,
+  comprasNacenDeLiquidaciones,
+  ventasNacenDeFacturas,
+} from '@/lib/tenantModules';
 import { ExportarEstadoCuentaModal } from './ExportarEstadoCuentaModal';
-import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 
 type ModalState =
   | { kind: 'nuevo'; tipoInicial: TipoMovimientoCc }
   | { kind: 'imputar'; cargo: MovimientoCc }
+  | { kind: 'comprobante'; movimiento: MovimientoCc }
+  | { kind: 'origen'; comprobante: ComprobanteOrigenCc }
   | { kind: 'exportar'; formato: 'pdf' | 'excel' }
   | null;
 
 type MovimientoConSaldo = MovimientoCc & { saldoAcumulado: number };
+
+/** Saldo con signo pesos adelante: "$ 1.234,00" / "-$ 1.234,00". */
+function fmtSaldo(valor: number): string {
+  return valor < 0
+    ? `-$ ${formatCurrencyArFromNumber(-valor)}`
+    : `$ ${formatCurrencyArFromNumber(valor)}`;
+}
 
 /** Orden de carga ascendente; `id` desempata movimientos creados en el mismo instante. */
 function compararPorCarga(a: MovimientoCc, b: MovimientoCc): number {
@@ -53,42 +66,46 @@ function compararPorCarga(a: MovimientoCc, b: MovimientoCc): number {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
-const badgeBase = 'inline-block rounded-full px-2 py-0.5 text-xs font-medium';
-
-const ESTADO_BADGE_CLASS: Record<string, string> = {
-  cancelado: 'bg-green-100 text-green-800',
-  imputado: 'bg-green-100 text-green-800',
-  parcial: 'bg-amber-100 text-amber-800',
-  imputado_parcial: 'bg-amber-100 text-amber-800',
-  anulado: 'bg-gray-200 text-gray-600',
-  anulacion: 'bg-gray-200 text-gray-600',
-  no_imputado: 'bg-vialto-mist text-vialto-steel',
-  pendiente: 'bg-red-100 text-red-800',
-};
-
-function EstadoBadge({ movimiento }: { movimiento: MovimientoCc }) {
-  const estado = estadoMovimientoCc(movimiento);
-  const cls = ESTADO_BADGE_CLASS[estado] ?? 'bg-red-100 text-red-800';
-  return <span className={`${badgeBase} ${cls}`}>{estadoMovimientoCcLabel(movimiento)}</span>;
-}
-
 type Props = {
   tipoContraparte: TipoContraparte;
   contraparteId: string;
   contraparteNombre: string;
+  /**
+   * Lugar de la página donde dibujar las tarjetas de saldo (en la fila del selector de
+   * cuenta, para aprovechar el espacio). Sin él, van arriba de la grilla.
+   */
+  saldosSlot?: HTMLElement | null;
+  /** Junto al título de la página: ahí va "Limpiar filtros" (regla global). */
+  limpiarFiltrosSlot?: HTMLElement | null;
 };
 
 export function CuentaContraparteView({
   tipoContraparte,
   contraparteId,
   contraparteNombre,
+  saldosSlot,
+  limpiarFiltrosSlot,
 }: Props) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { tenant } = useCurrentTenant();
+  // Venta/compra manual solo si la empresa no tiene el módulo que la genera (con
+  // Facturación las ventas salen de las facturas; con Liquidaciones, las compras de las
+  // liquidaciones). Hasta saber los módulos no se ofrece, para no mostrarla de más.
+  const modulos = tenant?.modules ?? [];
+  const permiteCargoManual =
+    tenant != null &&
+    (tipoContraparte === 'cliente'
+      ? !ventasNacenDeFacturas(modulos)
+      : !comprasNacenDeLiquidaciones(modulos));
+  // "Ver factura/liquidación" solo si la empresa tiene el módulo (si no, no puede abrirla).
+  const puedeVerFacturas = ventasNacenDeFacturas(modulos);
+  const puedeVerLiquidaciones = comprasNacenDeLiquidaciones(modulos);
   const [movimientos, setMovimientos] = useState<MovimientoCc[] | null>(null);
   const [saldos, setSaldos] = useState<SaldoPorMoneda[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [accionesDeFila, setAccionesDeFila] = useState<MovimientoCc | null>(null);
 
   const cargarDatos = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return;
@@ -121,34 +138,40 @@ export function CuentaContraparteView({
   // acumulado se calcula acá (no lo trae el backend en este endpoint) recorriendo ese mismo
   // orden, para que cada fila sea coherente con lo que se ve. Un movimiento anulado suma
   // junto con su crédito de anulación en el Haber (el par se cancela, VTO-431); un anulado sin crédito no suma.
+  // Se acumula por moneda (nunca se mezclan pesos con dólares), así cada fila muestra el
+  // saldo de su moneda y el filtro por moneda sigue siendo coherente.
   const movimientosConSaldo = useMemo<MovimientoConSaldo[] | null>(() => {
     if (!movimientos) return null;
     const ascendente = [...movimientos].sort(compararPorCarga);
-    let acumulado = 0;
+    const acumuladoPorMoneda = new Map<string, number>();
     const conSaldo: MovimientoConSaldo[] = [];
     for (const m of ascendente) {
+      let acumulado = acumuladoPorMoneda.get(m.moneda) ?? 0;
       if (cuentaEnHistorialCc(m)) {
         acumulado += esDebeCc(m) ? m.importe : -m.importe;
+        acumuladoPorMoneda.set(m.moneda, acumulado);
       }
       conSaldo.push({ ...m, saldoAcumulado: acumulado });
     }
     return conSaldo.reverse();
   }, [movimientos]);
 
-  const [estadoFiltro, setEstadoFiltro] = useState('');
   const [desdeFiltro, setDesdeFiltro] = useState('');
   const [hastaFiltro, setHastaFiltro] = useState('');
   const [conceptoFiltro, setConceptoFiltro] = useState('');
   const [comprobanteFiltro, setComprobanteFiltro] = useState('');
+  // Se elige tocando la tarjeta de saldo de esa moneda (solo si la cuenta tiene más de una).
+  const [monedaFiltro, setMonedaFiltro] = useState('');
+  const multimoneda = (saldos?.length ?? 0) > 1;
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
-    if (estadoFiltro) n += 1;
     if (desdeFiltro || hastaFiltro) n += 1;
     if (conceptoFiltro.trim()) n += 1;
     if (comprobanteFiltro.trim()) n += 1;
+    if (monedaFiltro) n += 1;
     return n;
-  }, [estadoFiltro, desdeFiltro, hastaFiltro, conceptoFiltro, comprobanteFiltro]);
+  }, [desdeFiltro, hastaFiltro, conceptoFiltro, comprobanteFiltro, monedaFiltro]);
   const anyFiltroActivo = activeFilterCount > 0;
 
   // Filtro solo de despliegue: se aplica sobre `movimientosConSaldo` (ya calculado con
@@ -157,9 +180,7 @@ export function CuentaContraparteView({
   const movimientosFiltrados = useMemo<MovimientoConSaldo[] | null>(() => {
     if (!movimientosConSaldo) return null;
     return movimientosConSaldo.filter((m) => {
-      if (estadoFiltro) {
-        if (estadoMovimientoCc(m) !== estadoFiltro) return false;
-      }
+      if (monedaFiltro && m.moneda !== monedaFiltro) return false;
       const fecha = fechaDiaYmd(m.fecha) ?? '';
       if (desdeFiltro && fecha < desdeFiltro) return false;
       if (hastaFiltro && fecha > hastaFiltro) return false;
@@ -172,14 +193,69 @@ export function CuentaContraparteView({
         return false;
       return true;
     });
-  }, [movimientosConSaldo, estadoFiltro, desdeFiltro, hastaFiltro, conceptoFiltro, comprobanteFiltro]);
+  }, [movimientosConSaldo, monedaFiltro, desdeFiltro, hastaFiltro, conceptoFiltro, comprobanteFiltro]);
 
   function limpiarFiltros() {
-    setEstadoFiltro('');
+    setMonedaFiltro('');
     setDesdeFiltro('');
     setHastaFiltro('');
     setConceptoFiltro('');
     setComprobanteFiltro('');
+  }
+
+  /**
+   * Factura o liquidación de la que nace el movimiento. Una anulación no guarda el vínculo:
+   * se toma del movimiento que compensa (misma cuenta, ya está en la lista).
+   */
+  function comprobanteOrigenDe(m: MovimientoCc): ComprobanteOrigenCc | null {
+    const base = m.anulaMovimientoId
+      ? (movimientos ?? []).find((x) => x.id === m.anulaMovimientoId) ?? null
+      : m;
+    if (!base) return null;
+    if (base.facturaId && puedeVerFacturas) return { tipo: 'factura', id: base.facturaId };
+    if (base.liquidacionId && puedeVerLiquidaciones) {
+      return { tipo: 'liquidacion', id: base.liquidacionId };
+    }
+    return null;
+  }
+
+  /** Acciones de una fila: las usan el botón de Acciones y el click en la fila. */
+  function accionesDe(m: MovimientoCc): AccionOpcion[] {
+    const opciones: AccionOpcion[] = [];
+    const puedeImputar =
+      m.tipo === 'cargo' &&
+      (m.estadoDisponibilidad === 'pendiente' || m.estadoDisponibilidad === 'parcial');
+    if (puedeImputar) {
+      opciones.push({
+        id: 'imputar',
+        label: m.clienteId ? 'Imputar cobro' : 'Imputar pago',
+        icon: Banknote,
+        onClick: () => setModal({ kind: 'imputar', cargo: m }),
+      });
+    }
+    if (m.comprobanteEditable || m.vencimientoEditable) {
+      opciones.push({
+        id: 'comprobante',
+        // Con ARCA el número no se toca: la acción queda solo para el vencimiento.
+        label: !m.comprobanteEditable
+          ? 'Editar vencimiento'
+          : m.numeroComprobante
+            ? 'Editar comprobante'
+            : 'Cargar comprobante',
+        icon: Hash,
+        onClick: () => setModal({ kind: 'comprobante', movimiento: m }),
+      });
+    }
+    const origen = comprobanteOrigenDe(m);
+    if (origen) {
+      opciones.push({
+        id: 'ver-origen',
+        label: origen.tipo === 'factura' ? 'Ver factura' : 'Ver liquidación',
+        icon: Eye,
+        onClick: () => setModal({ kind: 'origen', comprobante: origen }),
+      });
+    }
+    return opciones;
   }
 
   function pagosDisponiblesPara(cargo: MovimientoCc) {
@@ -189,32 +265,6 @@ export function CuentaContraparteView({
   }
 
   const filtroInputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
-
-  const estadoFiltroSelect = (
-    <select
-      value={estadoFiltro}
-      onChange={(e) => setEstadoFiltro(e.target.value)}
-      className={`${filtroInputClass} ${estadoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'}`}
-      aria-label="Filtrar por estado"
-    >
-      <option value="">Todos</option>
-      <optgroup label={tipoContraparte === 'cliente' ? 'Ventas' : 'Compras'}>
-        {Object.entries(ESTADO_DISPONIBILIDAD_LABEL).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-        <option value="anulacion">{ESTADO_MOVIMIENTO_EXTRA_LABEL.anulacion}</option>
-      </optgroup>
-      <optgroup label={tipoContraparte === 'cliente' ? 'Cobros' : 'Pagos'}>
-        {Object.entries(ESTADO_IMPUTACION_LABEL).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </optgroup>
-    </select>
-  );
 
   const fechaFiltroCampos = (
     <div className="flex flex-col gap-1.5">
@@ -261,34 +311,75 @@ export function CuentaContraparteView({
     />
   );
 
+  // Una tarjeta chica por moneda. Con más de una moneda, tocarla filtra la grilla.
+  const saldosNode =
+    saldos && saldos.length > 0 ? (
+      <div className="flex flex-wrap gap-2">
+        {saldos.map((s) => {
+          const activa = monedaFiltro === s.moneda;
+          const monto = (
+            <span
+              className={`font-[family-name:var(--font-display)] text-lg tracking-wide tabular-nums ${
+                s.saldo > 0.005 ? 'text-vialto-bright' : 'text-white'
+              }`}
+            >
+              {fmtSaldo(s.saldo)}
+            </span>
+          );
+          // Mismo alto que el select de la cuenta (h-9), alineadas abajo con él.
+          const cardClass = `flex h-9 min-w-[9.5rem] items-center px-3 text-left ${
+            activa ? 'bg-vialto-charcoal ring-2 ring-vialto-fire' : 'bg-vialto-graphite'
+          }`;
+          return (
+            <div key={s.moneda} className="flex flex-col">
+              <span className="mb-1 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel">
+                Saldo {s.moneda}
+              </span>
+              {/* Con una sola moneda no hay nada que filtrar: la tarjeta es solo informativa. */}
+              {multimoneda ? (
+                <button
+                  type="button"
+                  onClick={() => setMonedaFiltro(activa ? '' : s.moneda)}
+                  aria-pressed={activa}
+                  title={activa ? 'Ver todas las monedas' : `Ver solo movimientos en ${s.moneda}`}
+                  className={`${cardClass} group cursor-pointer justify-between gap-3 transition hover:brightness-110`}
+                >
+                  {monto}
+                  {/* Pista de que filtra: embudo; activa, una ✕ para volver a todas. */}
+                  {activa ? (
+                    <X className="h-3.5 w-3.5 shrink-0 text-white" aria-hidden />
+                  ) : (
+                    <Filter
+                      className="h-3.5 w-3.5 shrink-0 text-white/50 transition group-hover:text-white"
+                      aria-hidden
+                    />
+                  )}
+                </button>
+              ) : (
+                <div className={cardClass}>{monto}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    ) : saldos ? (
+      <p className="text-sm text-vialto-steel">Sin movimientos todavía.</p>
+    ) : null;
+
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-x-4">
-            <h2 className="font-[family-name:var(--font-display)] text-2xl tracking-wide">
-              {contraparteNombre}
-            </h2>
-            {anyFiltroActivo && (
-              <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
-            )}
-          </div>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-            {saldos && saldos.length > 0 ? (
-              saldos.map((s) => (
-                <span
-                  key={s.moneda}
-                  className={`font-medium ${s.saldo > 0.005 ? 'text-vialto-fire' : 'text-vialto-steel'}`}
-                >
-                  Saldo {s.moneda}: {formatCurrencyArFromNumber(s.saldo)}
-                </span>
-              ))
-            ) : (
-              <span className="text-vialto-steel">Sin movimientos todavía.</span>
-            )}
-          </div>
+      {saldosSlot ? createPortal(saldosNode, saldosSlot) : null}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {!saldosSlot && saldosNode}
+          <LimpiarFiltrosPortal
+            slot={limpiarFiltrosSlot}
+            visible={anyFiltroActivo}
+            onClick={limpiarFiltros}
+            soloDesktop
+          />
         </div>
-        <div className="flex gap-2">
+        <div className="ml-auto flex gap-2">
           <button
             type="button"
             onClick={() => setExportMenuOpen(true)}
@@ -306,13 +397,15 @@ export function CuentaContraparteView({
               />
             </svg>
           </button>
-          <button
-            type="button"
-            onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'cargo' })}
-            className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-          >
-            {tipoContraparte === 'cliente' ? 'Nueva venta' : 'Nueva compra'}
-          </button>
+          {permiteCargoManual && (
+            <button
+              type="button"
+              onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'cargo' })}
+              className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+            >
+              {tipoContraparte === 'cliente' ? 'Nueva venta' : 'Nueva compra'}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'pago' })}
@@ -339,6 +432,15 @@ export function CuentaContraparteView({
             tdClassName: listadoTablaTdClass,
           },
           {
+            id: 'vencimiento',
+            header: 'Vencimiento',
+            cell: (m: MovimientoConSaldo) =>
+              m.fechaVencimiento && m.estadoDisponibilidad !== 'anulado'
+                ? fmtDateUtc(m.fechaVencimiento)
+                : '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
             id: 'concepto',
             header: 'Concepto',
             cell: (m: MovimientoConSaldo) => (
@@ -348,11 +450,6 @@ export function CuentaContraparteView({
                   <span className="block text-xs text-vialto-steel tabular-nums">
                     {formatCurrencyArFromNumber(m.importeNeto)} + IVA{' '}
                     {String(m.ivaPct).replace('.', ',')}% {formatCurrencyArFromNumber(m.ivaMonto)}
-                  </span>
-                )}
-                {m.fechaVencimiento && m.estadoDisponibilidad !== 'anulado' && (
-                  <span className="block text-xs text-vialto-steel">
-                    vence {fmtDateUtc(m.fechaVencimiento)}
                   </span>
                 )}
                 {m.anuladoPor && (
@@ -396,21 +493,15 @@ export function CuentaContraparteView({
             header: 'Saldo',
             cell: (m: MovimientoConSaldo) =>
               m.pendiente != null && m.pendiente > 0.005
-                ? `${formatCurrencyArFromNumber(m.pendiente)} ${m.moneda}`
+                ? `${fmtSaldo(m.pendiente)} ${m.moneda}`
                 : '—',
             tdClassName: `${listadoTablaTdClass} tabular-nums text-vialto-steel`,
           },
           {
             id: 'saldoAcumulado',
             header: 'Saldo acumulado',
-            cell: (m: MovimientoConSaldo) => `${formatCurrencyArFromNumber(m.saldoAcumulado)} ${m.moneda}`,
+            cell: (m: MovimientoConSaldo) => `${fmtSaldo(m.saldoAcumulado)} ${m.moneda}`,
             tdClassName: `${listadoTablaTdClass} tabular-nums font-medium`,
-          },
-          {
-            id: 'estado',
-            header: 'Estado',
-            cell: (m: MovimientoConSaldo) => <EstadoBadge movimiento={m} />,
-            tdClassName: listadoTablaTdClass,
           },
         ]}
         rows={error ? [] : movimientosFiltrados}
@@ -436,9 +527,6 @@ export function CuentaContraparteView({
             <ListadoFiltroCampo label="Comprobante" active={!!comprobanteFiltro.trim()}>
               {comprobanteFiltroInput}
             </ListadoFiltroCampo>
-            <ListadoFiltroCampo label="Estado" active={!!estadoFiltro}>
-              {estadoFiltroSelect}
-            </ListadoFiltroCampo>
           </>
         }
         tableHead={
@@ -455,6 +543,9 @@ export function CuentaContraparteView({
               >
                 {fechaFiltroCampos}
               </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Vencimiento
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
@@ -488,39 +579,32 @@ export function CuentaContraparteView({
             <th scope="col" className={listadoTablaThClass}>
               Saldo acumulado
             </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="Estado"
-                filterActive={!!estadoFiltro}
-                filterSignature={estadoFiltro}
-                onClear={() => setEstadoFiltro('')}
-              >
-                {estadoFiltroSelect}
-              </ViajesListadoHeaderFiltro>
-            </th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Acciones
             </th>
           </tr>
         }
         tableColSpan={9}
-        renderActions={(m: MovimientoConSaldo) =>
-          m.tipo === 'cargo' &&
-          (m.estadoDisponibilidad === 'pendiente' || m.estadoDisponibilidad === 'parcial') ? (
+        // Sin padding vertical: los botones (h-8) ya dan el alto, así una fila con acciones
+        // no queda más alta que una sin acciones.
+        actionsTdClassName="px-3 py-0 text-right align-middle md:px-4"
+        // Click en la fila: con una sola acción la ejecuta directo; con varias, abre el menú.
+        onRowClick={(m: MovimientoConSaldo) => {
+          const acciones = accionesDe(m);
+          if (acciones.length === 1) acciones[0].onClick();
+          else if (acciones.length > 1) setAccionesDeFila(m);
+        }}
+        renderActions={(m: MovimientoConSaldo) => {
+          const opciones = accionesDe(m);
+          if (opciones.length === 0) return null;
+          return (
             <AccionesFila
-              options={[
-                {
-                  id: 'imputar',
-                  label: m.clienteId ? 'Imputar cobro' : 'Imputar pago',
-                  icon: Banknote,
-                  onClick: () => setModal({ kind: 'imputar', cargo: m }),
-                },
-              ]}
-              destacadas={['imputar']}
+              options={opciones}
+              destacadas={opciones.map((o) => o.id)}
               subtitle={m.concepto}
             />
-          ) : null
-        }
+          );
+        }}
       />
 
       {modal?.kind === 'nuevo' && (
@@ -529,6 +613,7 @@ export function CuentaContraparteView({
           contraparteId={contraparteId}
           contraparteNombre={contraparteNombre}
           tipoInicial={modal.tipoInicial}
+          permiteCargo={permiteCargoManual}
           onClose={() => setModal(null)}
           onCreated={cargarDatos}
         />
@@ -541,6 +626,21 @@ export function CuentaContraparteView({
           onDone={cargarDatos}
         />
       )}
+      {modal?.kind === 'comprobante' && (
+        <ComprobanteCcModal
+          movimiento={modal.movimiento}
+          onClose={() => setModal(null)}
+          onDone={cargarDatos}
+        />
+      )}
+      {modal?.kind === 'origen' && (
+        <ComprobanteOrigenCcModal
+          comprobante={modal.comprobante}
+          contraparteNombre={contraparteNombre}
+          hasArcaLiquidaciones={canAccessEmisionLiquidoProductoArca(modulos)}
+          onClose={() => setModal(null)}
+        />
+      )}
       {modal?.kind === 'exportar' && (
         <ExportarEstadoCuentaModal
           tipoContraparte={tipoContraparte}
@@ -550,6 +650,14 @@ export function CuentaContraparteView({
           onClose={() => setModal(null)}
         />
       )}
+
+      <AccionesOpcionesSheet
+        open={accionesDeFila != null}
+        onClose={() => setAccionesDeFila(null)}
+        title="Acciones"
+        subtitle={accionesDeFila?.concepto}
+        options={accionesDeFila ? accionesDe(accionesDeFila) : []}
+      />
 
       <AccionesOpcionesSheet
         open={exportMenuOpen}

@@ -61,6 +61,19 @@ export function canAccessEmisionLiquidoProductoArca(modules: string[]): boolean 
   return modules.some((m) => m.toLowerCase() === 'emision-liquido-producto-arca');
 }
 
+/**
+ * Cuenta corriente: con Facturación (manual o ARCA) las ventas nacen solo de las facturas,
+ * así que no se ofrece "Nueva venta". Espejo de `assertCargoManualPermitido` del backend.
+ */
+export function ventasNacenDeFacturas(modules: string[]): boolean {
+  return canAccessFacturacion(modules) || canAccessEmisionFacturasArca(modules);
+}
+
+/** Cuenta corriente: con Liquidaciones (manual o ARCA) las compras nacen solo de las liquidaciones. */
+export function comprasNacenDeLiquidaciones(modules: string[]): boolean {
+  return canAccessLiquidaciones(modules) || canAccessEmisionLiquidoProductoArca(modules);
+}
+
 export function canAccessCombustible(modules: string[]): boolean {
   return modules.some((m) => m.toLowerCase() === 'combustible');
 }
