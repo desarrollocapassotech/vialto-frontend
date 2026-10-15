@@ -1,7 +1,8 @@
 import { fechaDiaYmd, fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Banknote, Eye, FileSpreadsheet, FileText, Hash } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Banknote, Eye, FileSpreadsheet, FileText, Filter, Hash, X } from 'lucide-react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
@@ -14,7 +15,7 @@ import { listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabl
  * cuenta suele tener decenas/cientos de filas — con el padding default del resto
  * de los listados quedaba con demasiado espacio en blanco entre fila y fila.
  */
-const listadoTablaTdClass = 'px-3 py-1.5 text-vialto-charcoal md:px-4';
+const listadoTablaTdClass = 'h-8 px-3 py-1 text-vialto-charcoal md:px-4';
 import { formatCurrencyArFromNumber } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
 import {
@@ -39,7 +40,7 @@ import {
   ventasNacenDeFacturas,
 } from '@/lib/tenantModules';
 import { ExportarEstadoCuentaModal } from './ExportarEstadoCuentaModal';
-import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 
 type ModalState =
   | { kind: 'nuevo'; tipoInicial: TipoMovimientoCc }
@@ -69,12 +70,21 @@ type Props = {
   tipoContraparte: TipoContraparte;
   contraparteId: string;
   contraparteNombre: string;
+  /**
+   * Lugar de la página donde dibujar las tarjetas de saldo (en la fila del selector de
+   * cuenta, para aprovechar el espacio). Sin él, van arriba de la grilla.
+   */
+  saldosSlot?: HTMLElement | null;
+  /** Junto al título de la página: ahí va "Limpiar filtros" (regla global). */
+  limpiarFiltrosSlot?: HTMLElement | null;
 };
 
 export function CuentaContraparteView({
   tipoContraparte,
   contraparteId,
   contraparteNombre,
+  saldosSlot,
+  limpiarFiltrosSlot,
 }: Props) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const { tenant } = useCurrentTenant();
@@ -301,63 +311,75 @@ export function CuentaContraparteView({
     />
   );
 
+  // Una tarjeta chica por moneda. Con más de una moneda, tocarla filtra la grilla.
+  const saldosNode =
+    saldos && saldos.length > 0 ? (
+      <div className="flex flex-wrap gap-2">
+        {saldos.map((s) => {
+          const activa = monedaFiltro === s.moneda;
+          const monto = (
+            <span
+              className={`font-[family-name:var(--font-display)] text-lg tracking-wide tabular-nums ${
+                s.saldo > 0.005 ? 'text-vialto-bright' : 'text-white'
+              }`}
+            >
+              {fmtSaldo(s.saldo)}
+            </span>
+          );
+          // Mismo alto que el select de la cuenta (h-9), alineadas abajo con él.
+          const cardClass = `flex h-9 min-w-[9.5rem] items-center px-3 text-left ${
+            activa ? 'bg-vialto-charcoal ring-2 ring-vialto-fire' : 'bg-vialto-graphite'
+          }`;
+          return (
+            <div key={s.moneda} className="flex flex-col">
+              <span className="mb-1 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel">
+                Saldo {s.moneda}
+              </span>
+              {/* Con una sola moneda no hay nada que filtrar: la tarjeta es solo informativa. */}
+              {multimoneda ? (
+                <button
+                  type="button"
+                  onClick={() => setMonedaFiltro(activa ? '' : s.moneda)}
+                  aria-pressed={activa}
+                  title={activa ? 'Ver todas las monedas' : `Ver solo movimientos en ${s.moneda}`}
+                  className={`${cardClass} group cursor-pointer justify-between gap-3 transition hover:brightness-110`}
+                >
+                  {monto}
+                  {/* Pista de que filtra: embudo; activa, una ✕ para volver a todas. */}
+                  {activa ? (
+                    <X className="h-3.5 w-3.5 shrink-0 text-white" aria-hidden />
+                  ) : (
+                    <Filter
+                      className="h-3.5 w-3.5 shrink-0 text-white/50 transition group-hover:text-white"
+                      aria-hidden
+                    />
+                  )}
+                </button>
+              ) : (
+                <div className={cardClass}>{monto}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    ) : saldos ? (
+      <p className="text-sm text-vialto-steel">Sin movimientos todavía.</p>
+    ) : null;
+
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-x-4">
-            <h2 className="font-[family-name:var(--font-display)] text-2xl tracking-wide">
-              {contraparteNombre}
-            </h2>
-            {anyFiltroActivo && (
-              <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
-            )}
-          </div>
-          {saldos && saldos.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {saldos.map((s) => {
-                const activa = monedaFiltro === s.moneda;
-                const contenido = (
-                  <>
-                    <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-white/70">
-                      Saldo {s.moneda}
-                    </span>
-                    <span
-                      className={`font-[family-name:var(--font-display)] text-xl tracking-wide tabular-nums ${
-                        s.saldo > 0.005 ? 'text-vialto-bright' : 'text-white'
-                      }`}
-                    >
-                      {fmtSaldo(s.saldo)}
-                    </span>
-                  </>
-                );
-                const cardClass = `flex min-w-[9.5rem] flex-col items-start gap-1 px-3 py-2 text-left ${
-                  activa ? 'bg-vialto-charcoal ring-2 ring-vialto-fire' : 'bg-vialto-graphite'
-                }`;
-                // Con una sola moneda no hay nada que filtrar: la tarjeta es solo informativa.
-                return multimoneda ? (
-                  <button
-                    key={s.moneda}
-                    type="button"
-                    onClick={() => setMonedaFiltro(activa ? '' : s.moneda)}
-                    aria-pressed={activa}
-                    title={activa ? 'Ver todas las monedas' : `Ver solo movimientos en ${s.moneda}`}
-                    className={`${cardClass} cursor-pointer transition hover:brightness-110`}
-                  >
-                    {contenido}
-                  </button>
-                ) : (
-                  <div key={s.moneda} className={cardClass}>
-                    {contenido}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="mt-1 text-sm text-vialto-steel">Sin movimientos todavía.</p>
-          )}
+      {saldosSlot ? createPortal(saldosNode, saldosSlot) : null}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {!saldosSlot && saldosNode}
+          <LimpiarFiltrosPortal
+            slot={limpiarFiltrosSlot}
+            visible={anyFiltroActivo}
+            onClick={limpiarFiltros}
+            soloDesktop
+          />
         </div>
-        <div className="flex gap-2">
+        <div className="ml-auto flex gap-2">
           <button
             type="button"
             onClick={() => setExportMenuOpen(true)}
@@ -563,6 +585,9 @@ export function CuentaContraparteView({
           </tr>
         }
         tableColSpan={9}
+        // Sin padding vertical: los botones (h-8) ya dan el alto, así una fila con acciones
+        // no queda más alta que una sin acciones.
+        actionsTdClassName="px-3 py-0 text-right align-middle md:px-4"
         // Click en la fila: con una sola acción la ejecuta directo; con varias, abre el menú.
         onRowClick={(m: MovimientoConSaldo) => {
           const acciones = accionesDe(m);

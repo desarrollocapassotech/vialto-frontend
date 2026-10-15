@@ -4,7 +4,7 @@ import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton"
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import {
   listadoTablaAccionClass,
-  listadoTablaTdClass,
+  listadoTablaAccionesTdClass, listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
@@ -230,7 +230,7 @@ export function TenantsTable({
             : "No encontramos empresas para este criterio."
         }
         loadingMessage="Cargando empresas…"
-        actionsTdClassName={listadoTablaTdClass}
+        actionsTdClassName={listadoTablaAccionesTdClass}
         renderActions={(tenant) => (
           <div className="flex items-center justify-end gap-3">
             <button

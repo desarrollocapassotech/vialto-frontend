@@ -10,6 +10,7 @@ import {
   listadoCardListClass,
   listadoCardPrimaryClass,
   listadoDatosWrapperClass,
+  listadoTablaAccionesTdClass,
   listadoTablaBodyRowClass,
   listadoTablaClass,
   listadoTablaEmptyCellClass,
@@ -101,7 +102,7 @@ export function ListadoDatos<T>({
   renderActions,
   actionsHeader = 'Acciones',
   actionsThClassName = `${listadoTablaThClass} text-right`,
-  actionsTdClassName = `${listadoTablaTdClass} text-right`,
+  actionsTdClassName = `${listadoTablaAccionesTdClass} text-right`,
   tableColSpan,
 }: ListadoDatosProps<T>) {
   const contenedorRef = useRef<HTMLDivElement>(null);

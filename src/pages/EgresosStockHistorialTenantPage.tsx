@@ -13,7 +13,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { buildQs } from "@/lib/queryString";
 import {
   listadoTablaAccionClass,
-  listadoTablaTdClass,
+  listadoTablaAccionesTdClass, listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import {
@@ -444,7 +444,7 @@ export function EgresosStockHistorialTenantPage({
           </div>
         )}
         actionsThClassName={`${listadoTablaThClass} align-top text-right`}
-        actionsTdClassName={`${listadoTablaTdClass} text-right whitespace-nowrap`}
+        actionsTdClassName={`${listadoTablaAccionesTdClass} text-right whitespace-nowrap`}
       />
 
       {meta && (

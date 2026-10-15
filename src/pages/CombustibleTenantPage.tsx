@@ -26,7 +26,7 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
 import {
-  listadoTablaTdClass,
+  listadoTablaAccionesTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
@@ -983,7 +983,7 @@ export function CombustibleTenantPage({
                   : "Sin cargas registradas para esta empresa."
             }
             loadingMessage="Cargando…"
-            actionsTdClassName={listadoTablaTdClass}
+            actionsTdClassName={listadoTablaAccionesTdClass}
           />
 
           {activeTenantId && (!error || !embeddedInSuperadmin) && total > 0 && (

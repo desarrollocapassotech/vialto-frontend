@@ -16,7 +16,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { paginatedItems } from "@/lib/paginatedItems";
 import {
   listadoTablaAccionClass,
-  listadoTablaTdClass,
+  listadoTablaAccionesTdClass, listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import {
@@ -806,7 +806,7 @@ export function StockMovimientosTenantPage({
           </div>
         )}
         actionsThClassName={`${listadoTablaThClass} align-top text-right`}
-        actionsTdClassName={`${listadoTablaTdClass} text-right whitespace-nowrap`}
+        actionsTdClassName={`${listadoTablaAccionesTdClass} text-right whitespace-nowrap`}
       />
 
       {meta && (

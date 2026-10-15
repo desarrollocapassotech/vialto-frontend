@@ -59,6 +59,7 @@ import { ViajeOrigenDestinoLinea } from "@/components/viajes/ViajeOrigenDestinoL
 import { ViajeEditModal } from "@/components/viajes/ViajeEditModal";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { ViajeAccionesMenu } from "@/components/viajes/ViajeAccionesMenu";
+import { TruncarInicio } from "@/components/ui/TruncarInicio";
 import { ViajesResumenFiltros } from "@/components/viajes/ViajesResumenFiltros";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner } from "@/components/ui/Spinner";
@@ -3066,7 +3067,7 @@ export function ViajesTenantPage({
             >
               {mostrarColumnaSeleccionLote && (
                 <td
-                  className="px-2 py-2 align-middle text-center"
+                  className="h-8 px-2 py-1 align-middle text-center"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {esElegibleLote(v) ? (
@@ -3081,36 +3082,31 @@ export function ViajesTenantPage({
                 </td>
               )}
               {mostrarColumnaIdSistema && (
-                <td className="px-3 py-2 text-vialto-steel tabular-nums">
-                  <span
-                    className="block max-w-[5rem] truncate"
-                    title={`#${v.numero}`}
-                  >
+                <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
+                  {/* IDs: se truncan por el principio, lo que distingue es el final. */}
+                  <TruncarInicio className="max-w-[5rem]" title={`#${v.numero}`}>
                     #{v.numero}
-                  </span>
+                  </TruncarInicio>
                 </td>
               )}
               {mostrarColumnaIdPropio1 && (
-                <td className="px-3 py-2 text-vialto-steel tabular-nums">
-                  <span
-                    className="block max-w-[5rem] truncate"
+                <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
+                  <TruncarInicio
+                    className="max-w-[5rem]"
                     title={v.numeroIdentificacionPersonalizado?.trim() || undefined}
                   >
                     {v.numeroIdentificacionPersonalizado?.trim() || "—"}
-                  </span>
+                  </TruncarInicio>
                 </td>
               )}
               {mostrarColumnaIdPropio2 && (
-                <td className="px-3 py-2 text-vialto-steel tabular-nums">
-                  <span
-                    className="block max-w-[5rem] truncate"
-                    title={v.idPropio2?.trim() || undefined}
-                  >
+                <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
+                  <TruncarInicio className="max-w-[5rem]" title={v.idPropio2?.trim() || undefined}>
                     {v.idPropio2?.trim() || "—"}
-                  </span>
+                  </TruncarInicio>
                 </td>
               )}
-              <td className="px-3 py-2 text-vialto-charcoal">
+              <td className="h-8 px-3 py-1 text-vialto-charcoal">
                 <div
                   className="flex min-w-0 max-w-[9rem] items-center gap-1"
                   title={clientesRuta.map((c) => c.nombre).join(", ")}
@@ -3124,7 +3120,7 @@ export function ViajesTenantPage({
                 </div>
               </td>
               {mostrarColumnaTransporte && (
-              <td className="px-3 py-2 text-vialto-steel">
+              <td className="h-8 px-3 py-1 text-vialto-steel">
                 <div className="flex min-w-0 max-w-[9rem] items-center gap-1">
                   <span className="truncate" title={nombreTransp}>
                     {nombreTransp}
@@ -3142,14 +3138,14 @@ export function ViajesTenantPage({
               </td>
               )}
               {mostrarColumnaChofer && (
-                <td className="px-3 py-2 text-vialto-steel">
+                <td className="h-8 px-3 py-1 text-vialto-steel">
                   <span className="block max-w-[6rem] truncate" title={nombreChofer}>
                     {nombreChofer}
                   </span>
                 </td>
               )}
               {mostrarColumnaEstado && (
-                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                <td className="h-8 px-3 py-1" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1.5">
                     {mostrarColumnaEtapa && <ViajeEtapaIcono etapa={v.etapa} />}
                     {v.etapa?.toLowerCase() !== "cancelado" && (
@@ -3200,7 +3196,7 @@ export function ViajesTenantPage({
                   </div>
                 </td>
               )}
-              <td className="px-3 py-2">
+              <td className="h-8 px-3 py-1">
                 <ViajeOrigenDestinoLinea
                   origen={v.origen}
                   destino={v.destino}
@@ -3209,7 +3205,7 @@ export function ViajesTenantPage({
                   className="max-w-[11rem]"
                 />
               </td>
-              <td className="px-3 py-2 text-vialto-steel tabular-nums">
+              <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
                 <div
                   className="max-w-[6.5rem] truncate"
                   title={
@@ -3244,7 +3240,7 @@ export function ViajesTenantPage({
                 </div>
               </td>
               <td
-                className="px-3 py-2 text-right"
+                className="px-3 py-0 align-middle text-right"
                 onClick={(e) => e.stopPropagation()}
               >
                 <ViajeAccionesMenu

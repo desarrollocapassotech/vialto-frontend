@@ -18,7 +18,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import {
   listadoTablaAccionClass,
-  listadoTablaTdClass,
+  listadoTablaAccionesTdClass, listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { ArcaConfigTenantPage } from "@/pages/ArcaConfigTenantPage";
@@ -534,7 +534,7 @@ function LiquidacionesTab({
           );
         }}
         actionsHeader="Acciones"
-        actionsTdClassName={`${listadoTablaTdClass} text-right`}
+        actionsTdClassName={`${listadoTablaAccionesTdClass} text-right`}
         renderMobileCard={(liq) => {
           const isProc = rowProcessing[liq.id];
           return (

@@ -56,7 +56,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { modalOverlayClass } from "@/lib/modalLayers";
-import { listadoTablaHeadRowClass, listadoTablaTdClass, listadoTablaThClass } from "@/lib/listadoTabla";
+import { listadoTablaHeadRowClass, listadoTablaAccionesTdClass, listadoTablaTdClass, listadoTablaThClass } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { anulacionComprobanteLabel } from "@/lib/arcaCbteTipo";
@@ -1214,7 +1214,7 @@ export function LiquidacionesTenantPage() {
         renderActions={(liq) => (
           <LiquidacionAccionesMenu {...accionesProps(liq)} />
         )}
-        actionsTdClassName={`${listadoTablaTdClass} text-right`}
+        actionsTdClassName={`${listadoTablaAccionesTdClass} text-right`}
         renderMobileCard={(liq) => (
           <ListadoCard
             onClick={() => setAccionesAbiertoLiqId(liq.id)}

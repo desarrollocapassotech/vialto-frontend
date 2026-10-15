@@ -7,6 +7,8 @@ import {
   type LiquidacionConTransportista,
 } from '@/components/liquidaciones/LiquidacionViewModal';
 import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
+import { ViewModalShell } from '@/components/ui/ViewModalShell';
+import { Loader2 } from 'lucide-react';
 import { apiFetch, apiJson } from '@/lib/api';
 import { liquidacionContratoPdfUrl } from '@/lib/liquidacionContratoPdf';
 import { friendlyError } from '@/lib/friendlyError';
@@ -161,5 +163,14 @@ export function ComprobanteOrigenCcModal({
     );
   }
 
-  return null;
+  // Mientras se trae el registro: el modal abre enseguida con un loader, no queda en blanco.
+  const nombre = comprobante.tipo === 'factura' ? 'factura' : 'liquidación';
+  return (
+    <ViewModalShell title={comprobante.tipo === 'factura' ? 'Factura' : 'Liquidación'} onClose={onClose}>
+      <div className="flex items-center justify-center gap-2 py-10 text-sm text-vialto-steel" role="status">
+        <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+        Cargando {nombre}…
+      </div>
+    </ViewModalShell>
+  );
 }

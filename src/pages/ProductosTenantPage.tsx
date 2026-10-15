@@ -7,7 +7,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaHeadRowClass,
-  listadoTablaTdClass,
+  listadoTablaAccionesTdClass, listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import type { Producto, PaginatedMeta } from "@/types/api";
@@ -435,7 +435,7 @@ export function ProductosTenantPage() {
             )}
           </>
         )}
-        actionsTdClassName={`${listadoTablaTdClass} text-right`}
+        actionsTdClassName={`${listadoTablaAccionesTdClass} text-right`}
       />
 
       {meta && rows !== null && (

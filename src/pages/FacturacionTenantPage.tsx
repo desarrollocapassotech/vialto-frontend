@@ -1585,7 +1585,7 @@ export function FacturacionTenantPage({
             className={`${listadoTablaBodyRowClass} cursor-pointer`}
             onClick={() => setAccionesAbiertoFacturaId(f.id)}
           >
-            <td className="px-3 py-2 font-medium tabular-nums">
+            <td className="h-8 px-3 py-1 font-medium tabular-nums">
               <span
                 className="block max-w-[8rem] truncate"
                 title={f.numero || undefined}
@@ -1593,7 +1593,7 @@ export function FacturacionTenantPage({
                 {f.numero || "—"}
               </span>
             </td>
-            <td className="px-3 py-2">
+            <td className="h-8 px-3 py-1">
               <span
                 className="block max-w-[12rem] truncate"
                 title={nombreContraparte(f)}
@@ -1601,18 +1601,18 @@ export function FacturacionTenantPage({
                 {nombreContraparte(f)}
               </span>
             </td>
-            <td className="px-3 py-2 text-vialto-steel tabular-nums whitespace-nowrap">
+            <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums whitespace-nowrap">
               {fmtFecha(f.fechaEmision)}
             </td>
             <td
-              className={`px-3 py-2 tabular-nums whitespace-nowrap ${
+              className={`h-8 px-3 py-1 tabular-nums whitespace-nowrap ${
                 f.vencida && !f.cobrado ? "text-red-700" : "text-vialto-steel"
               }`}
             >
               {fmtFecha(f.fechaVencimiento)}
             </td>
-            <td className="px-3 py-2">{renderEstadoBadges(f)}</td>
-            <td className="px-3 py-2 text-right tabular-nums font-medium whitespace-nowrap">
+            <td className="h-8 px-3 py-1">{renderEstadoBadges(f)}</td>
+            <td className="h-8 px-3 py-1 text-right tabular-nums font-medium whitespace-nowrap">
               <div className="flex items-center justify-end gap-1.5">
                 {/* Saldo pendiente (por tramo, sin ARCA, cobro parcial): ícono con
                     tooltip para que la fila no crezca a dos líneas. */}
@@ -1634,7 +1634,7 @@ export function FacturacionTenantPage({
               </div>
             </td>
             <td
-              className="px-3 py-2 text-right"
+              className="px-3 py-0 align-middle text-right"
               onClick={(e) => e.stopPropagation()}
             >
               <FacturaAccionesMenu

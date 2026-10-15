@@ -53,6 +53,8 @@ export function CuentaCorrienteTenantPage() {
   }, [maestro.transportistas, sessionTransportistas]);
 
   const [quickCreate, setQuickCreate] = useState<QuickCreate>(null);
+  const [saldosSlot, setSaldosSlot] = useState<HTMLDivElement | null>(null);
+  const [limpiarSlot, setLimpiarSlot] = useState<HTMLDivElement | null>(null);
 
   async function handleDescargarListado() {
     setDescargando(true);
@@ -103,7 +105,10 @@ export function CuentaCorrienteTenantPage() {
   return (
     <div className="w-full">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={pageTitleClass}>Cuenta corriente</h1>
+        <div className="flex flex-wrap items-center gap-x-4">
+          <h1 className={pageTitleClass}>Cuenta corriente</h1>
+          <div ref={setLimpiarSlot} className="empty:hidden" />
+        </div>
         <button
           type="button"
           onClick={handleDescargarListado}
@@ -122,6 +127,7 @@ export function CuentaCorrienteTenantPage() {
       )}
 
       <div className="mt-6">
+        {/* items-end: las tarjetas de saldo (con su título arriba) quedan a la altura del select. */}
         <div className="mb-6 flex flex-wrap items-end gap-3">
           {hayProveedores && (
             <div className="flex gap-2">
@@ -159,6 +165,8 @@ export function CuentaCorrienteTenantPage() {
               />
             )}
           </div>
+          {/* Las tarjetas de saldo de la cuenta elegida se dibujan acá (portal desde CuentaContraparteView). */}
+          <div ref={setSaldosSlot} className="flex flex-wrap gap-2" />
         </div>
 
         {contraparteId && contraparteNombre ? (
@@ -167,6 +175,8 @@ export function CuentaCorrienteTenantPage() {
             tipoContraparte={tipoContraparte}
             contraparteId={contraparteId}
             contraparteNombre={contraparteNombre}
+            saldosSlot={saldosSlot}
+            limpiarFiltrosSlot={limpiarSlot}
           />
         ) : (
           <p className="text-vialto-steel">
