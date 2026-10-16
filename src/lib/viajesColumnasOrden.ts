@@ -1,4 +1,9 @@
 import type { Tenant } from "@/types/api";
+import {
+  idPropio1Habilitado,
+  idPropio2Habilitado,
+  idSistemaHabilitado,
+} from "@/lib/viajesFlota";
 
 /**
  * Columnas reordenables de la grilla de Viajes, en su orden estándar.
@@ -46,6 +51,39 @@ export function normalizarOrdenColumnasViajes(
 /** `Tenant.viajesColumnasOrden` normalizado ([] o sin tenant = orden estándar). */
 export function ordenColumnasViajes(tenant: Tenant | null | undefined): ViajeColumnaId[] {
   return normalizarOrdenColumnasViajes(tenant?.viajesColumnasOrden);
+}
+
+/**
+ * Columnas que la empresa ve en la grilla de Viajes. Mismas reglas que
+ * `mostrarColumna*` en `ViajesTenantPage.tsx` (si se cambia una, cambiar la
+ * otra). `campoVisible` = visibilidad de un campo de Viajes en la config de
+ * campos del tenant (como `useFieldConfig("viajes").isVisible`).
+ */
+export function columnasViajesHabilitadas(
+  tenant:
+    | Pick<
+        Tenant,
+        "idSistemaHabilitado" | "idPropio1Habilitado" | "idPropio2Habilitado" | "tipoFlota"
+      >
+    | null
+    | undefined,
+  campoVisible: (campo: string) => boolean,
+): Set<ViajeColumnaId> {
+  const habilitada: Record<ViajeColumnaId, boolean> = {
+    idSistema: idSistemaHabilitado(tenant),
+    idPropio1: idPropio1Habilitado(tenant),
+    idPropio2: idPropio2Habilitado(tenant),
+    cliente: true,
+    transporte: (tenant?.tipoFlota ?? "mixta") !== "propia",
+    chofer: campoVisible("choferId") || campoVisible("choferExternoId"),
+    etapa:
+      campoVisible("etapa") ||
+      campoVisible("facturacionEstado") ||
+      campoVisible("liquidacionEstado"),
+    origenDestino: true,
+    cargaDescarga: true,
+  };
+  return new Set(IDS_ESTANDAR.filter((id) => habilitada[id]));
 }
 
 export function esOrdenEstandarColumnasViajes(orden: readonly ViajeColumnaId[]): boolean {

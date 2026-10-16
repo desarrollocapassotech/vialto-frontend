@@ -2122,6 +2122,9 @@ export function ViajesTenantPage({
   }
 
   const mostrarColumnaSeleccionLote = loteFacturarActivo || loteLiquidarActivo;
+  // Las reglas de visibilidad de columnas de abajo están espejadas en
+  // `columnasViajesHabilitadas` (lib/viajesColumnasOrden.ts), que usa el modal
+  // de orden de columnas del superadmin: si se cambia una, cambiar la otra.
   // Si el tenant tiene ocultos tanto "Chofer (flota propia)" como "Chofer
   // (externo)" en Configuración por empresa, no tiene sentido mostrar la
   // columna (quedaría siempre vacía).

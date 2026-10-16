@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { ImportTemplatesConfig } from "@/components/importacion/ImportTemplatesConfig";
@@ -258,6 +258,22 @@ export function CamposEmpresaPage() {
   // Tenant completo (nombre + módulos contratados) — lo necesita la sección
   // de templates de importación de abajo (`ImportTemplatesConfig`).
   const [empresaTenant, setEmpresaTenant] = useState<Tenant | null>(null);
+  // Flags que definen qué columnas de Viajes ve la empresa, con los valores
+  // actuales de la pestaña General (pueden haber cambiado desde el fetch).
+  const empresaFlagsColumnasViajes = useMemo(
+    () => ({
+      idSistemaHabilitado: empresaIdSistemaHabilitado,
+      idPropio1Habilitado: empresaIdPropio1Habilitado,
+      idPropio2Habilitado: empresaIdPropio2Habilitado,
+      tipoFlota: empresaTipoFlota,
+    }),
+    [
+      empresaIdSistemaHabilitado,
+      empresaIdPropio1Habilitado,
+      empresaIdPropio2Habilitado,
+      empresaTipoFlota,
+    ],
+  );
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn || !filtroEmpresa) return;
@@ -1313,35 +1329,6 @@ export function CamposEmpresaPage() {
                             </td>
                           </tr>
                         )}
-                        {!!empresaTenant &&
-                          canAccessViajes(empresaTenant.modules) && (
-                          <tr className="border-t border-black/10">
-                            <td className="px-4 py-2.5 align-top">
-                              Orden de columnas (grilla de Viajes)
-                              <p className="mt-0.5 text-xs font-normal text-vialto-steel">
-                                Orden en que la empresa ve las columnas del listado
-                                de Viajes. Las columnas ocultas por otra
-                                configuración (IDs, chofer, transporte, etapa) no se
-                                muestran, pero conservan su lugar.
-                              </p>
-                            </td>
-                            <td className="px-4 py-2.5 text-right">
-                              <ViajesColumnasOrdenConfig
-                                tenantId={filtroEmpresa}
-                                ordenInicial={empresaTenant.viajesColumnasOrden}
-                                labels={{
-                                  idPropio1: empresaLabelGuardado,
-                                  idPropio2: empresaIdPropio2LabelGuardado,
-                                }}
-                                onGuardado={(viajesColumnasOrden) =>
-                                  setEmpresaTenant((t) =>
-                                    t ? { ...t, viajesColumnasOrden } : t,
-                                  )
-                                }
-                              />
-                            </td>
-                          </tr>
-                        )}
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
                             Mostrar importación masiva de Excel para el admin
@@ -1647,6 +1634,33 @@ export function CamposEmpresaPage() {
                       Habilitar campos (Creación y Edición)
                     </button>
                   </div>
+                </div>
+              )}
+
+              {modulo === "viajes" && empresaTenant && (
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded border border-black/10 bg-vialto-mist/60 p-3.5">
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-[0.10em] text-vialto-charcoal">
+                      Orden de columnas (grilla de Viajes)
+                    </span>
+                    <p className="mt-1 text-xs text-vialto-steel">
+                      Orden en que la empresa ve las columnas del listado de Viajes.
+                    </p>
+                  </div>
+                  <ViajesColumnasOrdenConfig
+                    tenantId={filtroEmpresa}
+                    ordenInicial={empresaTenant.viajesColumnasOrden}
+                    tenant={empresaFlagsColumnasViajes}
+                    labels={{
+                      idPropio1: empresaLabelGuardado,
+                      idPropio2: empresaIdPropio2LabelGuardado,
+                    }}
+                    onGuardado={(viajesColumnasOrden) =>
+                      setEmpresaTenant((t) =>
+                        t ? { ...t, viajesColumnasOrden } : t,
+                      )
+                    }
+                  />
                 </div>
               )}
 
