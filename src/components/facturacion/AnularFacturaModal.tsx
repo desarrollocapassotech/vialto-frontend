@@ -230,19 +230,27 @@ export function AnularFacturaModal({
     }
   }
 
-  async function descargarPdfNc() {
+  /**
+   * "Ver comprobante" de la NC, en pestaña nueva (regla del sistema): el PDF subido si
+   * existe; si no, el que genera el backend con los datos de la NC.
+   */
+  async function verComprobanteNc(notaCreditoUrl?: string | null) {
+    if (notaCreditoUrl) {
+      setPreviewUrl(notaCreditoUrl);
+      return;
+    }
+    // La pestaña se abre en el click (si no, el navegador la bloquea como popup).
+    const ventana = window.open("", "_blank");
     setDownloading(true);
     try {
       const res = await apiFetch(pdfAnulacionUrl, () => getToken());
       if (!res.ok) throw new Error("Error al generar el PDF de la NC");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `nc-${factura.numero}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const url = URL.createObjectURL(await res.blob());
+      if (ventana) ventana.location.href = url;
+      else window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {
+      ventana?.close();
       setError(friendlyError(err, "arca"));
     } finally {
       setDownloading(false);
@@ -281,16 +289,11 @@ export function AnularFacturaModal({
                 {(factura.notaCreditoUrl || factura.anulacionCae) && (
                   <button
                     type="button"
-                    onClick={() => {
-                      if (factura.notaCreditoUrl) {
-                        setPreviewUrl(factura.notaCreditoUrl);
-                      } else {
-                        void descargarPdfNc();
-                      }
-                    }}
-                    className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+                    disabled={downloading}
+                    onClick={() => void verComprobanteNc(factura.notaCreditoUrl)}
+                    className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50"
                   >
-                    Ver NC
+                    {downloading ? "Generando…" : "Ver comprobante"}
                   </button>
                 )}
                 <button
@@ -559,28 +562,15 @@ export function AnularFacturaModal({
                   {error && <ArcaEmitErrorAlert error={error} />}
 
                   <div className="flex flex-wrap justify-end gap-3">
-                    {facturaResultado.anulacionCae && (
-                      <>
-                        <button
-                          type="button"
-                          disabled={downloading}
-                          onClick={() => void descargarPdfNc()}
-                          className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50"
-                        >
-                          {downloading ? "Generando…" : "Descargar PDF NC"}
-                        </button>
-                        {facturaResultado.notaCreditoUrl && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPreviewUrl(facturaResultado.notaCreditoUrl!)
-                            }
-                            className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-                          >
-                            Ver NC
-                          </button>
-                        )}
-                      </>
+                    {(facturaResultado.anulacionCae || facturaResultado.notaCreditoUrl) && (
+                      <button
+                        type="button"
+                        disabled={downloading}
+                        onClick={() => void verComprobanteNc(facturaResultado.notaCreditoUrl)}
+                        className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50"
+                      >
+                        {downloading ? "Generando…" : "Ver comprobante"}
+                      </button>
                     )}
                     <button
                       type="button"
