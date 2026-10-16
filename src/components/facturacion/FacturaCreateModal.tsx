@@ -66,6 +66,7 @@ import {
   rangoFechaEmisionArca,
 } from "@/lib/facturaFechaEmision";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
+import { unidadCantidadViajes } from "@/lib/pdfDetalleViaje";
 import { useToast } from "@/lib/toast";
 import { ConfirmarEmisionArcaDialog } from "@/components/shared/ConfirmarEmisionArcaDialog";
 import {
@@ -957,6 +958,7 @@ export function FacturaCreateModal({
             idPropio1Label={idPropio1Label}
             idPropio2Habilitado={idPropio2Habilitado}
             idPropio2Label={idPropio2Label}
+            unidadCantidad={unidadCantidadViajes(tenantEfectivo)}
           />
         </div>
       </div>
@@ -1090,6 +1092,7 @@ export function FacturaCreateModal({
             idPropio1Label={idPropio1Label}
             idPropio2Habilitado={idPropio2Habilitado}
             idPropio2Label={idPropio2Label}
+            unidadCantidad={unidadCantidadViajes(tenantEfectivo)}
           />
         </div>
         {draft.viajeIds.length > 0 && (

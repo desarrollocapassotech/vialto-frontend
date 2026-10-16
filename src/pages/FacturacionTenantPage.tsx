@@ -48,6 +48,7 @@ import {
   idPropio2Label,
   labelIdentificacionPersonalizadaViajes,
 } from "@/lib/viajesFlota";
+import { unidadCantidadViajes } from "@/lib/pdfDetalleViaje";
 import {
   metaPaginacionCliente,
   pageSizeListadoValido,
@@ -1871,6 +1872,7 @@ export function FacturacionTenantPage({
           idPropio1Label={labelIdentificacionPersonalizadaViajes(tenantParaIdPropio2)}
           idPropio2Habilitado={idPropio2Habilitado(tenantParaIdPropio2)}
           idPropio2Label={idPropio2Label(tenantParaIdPropio2)}
+          unidadCantidad={unidadCantidadViajes(tenantParaIdPropio2)}
         />
       )}
 

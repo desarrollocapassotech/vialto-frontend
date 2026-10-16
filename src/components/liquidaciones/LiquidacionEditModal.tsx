@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import { unidadCantidadViajes } from "@/lib/pdfDetalleViaje";
 import {
   ConceptosLiquidacionLineasEditor,
   toConceptosLineasPayload,
@@ -43,6 +45,8 @@ type ViajeItem = Pick<
   | "destino"
   | "precioTransportistaExterno"
   | "monedaPrecioTransportistaExterno"
+  | "cantidadTransportista"
+  | "precioUnitarioTransportista"
   | "liquidacionesViaje"
   | "liquidacionEstado"
   | "choferId"
@@ -120,6 +124,7 @@ export function LiquidacionEditModal({
   getToken,
   onClose,
   onSaved,
+  tenantId,
   idSistemaHabilitado = true,
   idPropio1Habilitado = true,
   idPropio1Label = "ID personalizado",
@@ -147,6 +152,7 @@ export function LiquidacionEditModal({
   opcionesProveedor?: string[];
 }) {
   const { showToast } = useToast();
+  const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
   const canEditDatos =
     liq.estado === "borrador" ||
     liq.estado === "error" ||
@@ -630,6 +636,16 @@ export function LiquidacionEditModal({
                       conMoneda,
                     )
                   }
+                  cantidadTarifa={{
+                    unidad: unidadCantidadViajes(tenantEfectivo),
+                    cantidadDe: (v) => v.cantidadTransportista,
+                    renderTarifa: (v, conMoneda) =>
+                      fmtMontoViaje(
+                        v.precioUnitarioTransportista ?? null,
+                        v.monedaPrecioTransportistaExterno,
+                        conMoneda,
+                      ),
+                  }}
                   monedaDe={monedaDeViaje}
                   montoSinIva
                   disabledCheck={(v) => {

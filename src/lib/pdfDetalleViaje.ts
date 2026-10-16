@@ -30,7 +30,10 @@ export function fmtNumPdf(n: number | null | undefined): string {
   });
 }
 
-function unidad(tenant: TenantPdfDetalle): "TN" | "UD" {
+/** Unidad de cantidad de flete del tenant ("TN" por defecto), igual que en los PDFs. */
+export function unidadCantidadViajes(
+  tenant: Pick<Tenant, "unidadCantidadViajes"> | null | undefined,
+): "TN" | "UD" {
   return tenant?.unidadCantidadViajes === "UD" ? "UD" : "TN";
 }
 
@@ -84,7 +87,7 @@ export function filasPdfFactura(
   const cantidad =
     linea.cantidad != null
       ? linea.viaje
-        ? `${fmtNumPdf(linea.cantidad)} ${unidad(tenant)}`
+        ? `${fmtNumPdf(linea.cantidad)} ${unidadCantidadViajes(tenant)}`
         : fmtNumPdf(linea.cantidad)
       : "1,00";
   return [
@@ -149,7 +152,7 @@ export function filasPdfLiquidacion(
       : [[usaIdPropio ? labelIdPropio : "ID de Viaje", idTexto] as [string, string]]),
     [productoLabels(tenant).singular, "SERVICIOS LOGISTICOS"],
     ["Descripción", desc.join("\n").toUpperCase()],
-    ["Cantidad", cantidad != null ? `${fmtNumPdf(cantidad)} ${unidad(tenant)}` : "1,00"],
+    ["Cantidad", cantidad != null ? `${fmtNumPdf(cantidad)} ${unidadCantidadViajes(tenant)}` : "1,00"],
     ["Precio", fmtNumPdf(tarifa ?? base)],
     ["SubTotal", fmtNumPdf(base)],
     ["IVA %", fmtNumPdf(ivaPct)],

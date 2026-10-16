@@ -27,6 +27,7 @@ import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
 import { useValidacionPadronRegistro } from "@/hooks/useValidacionPadronRegistro";
 import { useReceptorPadronBloqueado } from "@/hooks/useReceptorPadronBloqueado";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import { unidadCantidadViajes } from "@/lib/pdfDetalleViaje";
 import { PadronValidacionEstado } from "@/components/shared/PadronValidacionEstado";
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
@@ -1668,6 +1669,16 @@ export function CrearLiquidacionManualModal({
                             conMoneda,
                           )
                         }
+                        cantidadTarifa={{
+                          unidad: unidadCantidadViajes(tenantEfectivo),
+                          cantidadDe: (v) => v.cantidadTransportista,
+                          renderTarifa: (v, conMoneda) =>
+                            fmtMoney(
+                              v.precioUnitarioTransportista ?? null,
+                              v.monedaPrecioTransportistaExterno,
+                              conMoneda,
+                            ),
+                        }}
                         disabledCheck={(v) => {
                           const moneda = monedaViaje(v);
                           const disabled =

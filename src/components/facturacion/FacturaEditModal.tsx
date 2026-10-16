@@ -17,10 +17,14 @@ import {
   type FacturaTramoDraft,
 } from "@/components/facturacion/FacturaTramosEditor";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
-import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
+import {
+  ViajesSeleccionTabla,
+  type CantidadTarifaColumnas,
+} from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import {
+  formatViajeImporteForListado,
   monedaUnicaDeViajes,
   textoImporteFacturaSeleccion,
   textoMontoFacturarListado,
@@ -291,6 +295,7 @@ export function ViajesVinculadosEditor({
   idPropio1Label = "ID personalizado",
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
+  unidadCantidad = "TN",
 }: {
   viajes: Viaje[];
   disponibles: Viaje[];
@@ -308,8 +313,18 @@ export function ViajesVinculadosEditor({
   idPropio2Habilitado?: boolean;
   /** Label configurable de la columna "ID Propio 2". */
   idPropio2Label?: string;
+  /** Encabezado de la columna de cantidad ("TN"/"UD", ver `unidadCantidadViajes`). */
+  unidadCantidad?: string;
 }) {
   const showContraparteHint = !clienteId.trim();
+  const cantidadTarifa: CantidadTarifaColumnas<Viaje> = {
+    unidad: unidadCantidad,
+    cantidadDe: (v) => v.cantidadFactura,
+    renderTarifa: (v, conMoneda) =>
+      v.precioUnitarioFactura == null
+        ? "—"
+        : formatViajeImporteForListado(v.precioUnitarioFactura, v.monedaMonto, conMoneda),
+  };
 
   // Candidatos filtrados + los ya seleccionados que hayan quedado fuera del filtro actual.
   const pool = useMemo(() => {
@@ -350,6 +365,7 @@ export function ViajesVinculadosEditor({
           montoSinIva
           renderMonto={(v, conMoneda) => textoMontoFacturarListado(v, conMoneda)}
           monedaDe={(v) => normalizeViajeMoneda(v.monedaMonto)}
+          cantidadTarifa={cantidadTarifa}
           loading={loading}
           fillHeight
           emptyMessage="No hay viajes disponibles para vincular."
@@ -371,6 +387,7 @@ export function ViajesVinculadosEditor({
       montoSinIva
       renderMonto={(v, conMoneda) => textoMontoFacturarListado(v, conMoneda)}
       monedaDe={(v) => normalizeViajeMoneda(v.monedaMonto)}
+      cantidadTarifa={cantidadTarifa}
       loading={loading}
       maxHeightClass="max-h-72"
       emptyMessage="No hay viajes disponibles para vincular."
@@ -432,6 +449,8 @@ export type FacturaEditModalProps = {
   idPropio2Habilitado?: boolean;
   /** Label configurable de la columna "ID Propio 2". */
   idPropio2Label?: string;
+  /** Encabezado de la columna de cantidad ("TN"/"UD", ver `unidadCantidadViajes`). */
+  unidadCantidad?: string;
   /** Tenant con ARCA: el número lo asigna AFIP al emitir, no se edita a mano. */
   hasArca?: boolean;
 };
@@ -456,6 +475,7 @@ export function FacturaEditModal({
   idPropio1Label = "ID personalizado",
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
+  unidadCantidad = "TN",
 }: FacturaEditModalProps) {
   useEscapeKey(open, saving, onClose);
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
@@ -747,6 +767,7 @@ export function FacturaEditModal({
                 idPropio1Label={idPropio1Label}
                 idPropio2Habilitado={idPropio2Habilitado}
                 idPropio2Label={idPropio2Label}
+                unidadCantidad={unidadCantidad}
               />
             </div>
 
