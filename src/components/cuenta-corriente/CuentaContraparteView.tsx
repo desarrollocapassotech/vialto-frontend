@@ -624,6 +624,12 @@ export function CuentaContraparteView({
           contraparteNombre={contraparteNombre}
           tipoInicial={modal.tipoInicial}
           permiteCargo={permiteCargoManual}
+          cargosPendientes={(movimientos ?? []).filter(
+            (m) =>
+              m.tipo === 'cargo' &&
+              (m.estadoDisponibilidad === 'pendiente' || m.estadoDisponibilidad === 'parcial') &&
+              (m.pendiente ?? m.importe) > 0.005,
+          )}
           onClose={() => setModal(null)}
           onCreated={cargarDatos}
         />

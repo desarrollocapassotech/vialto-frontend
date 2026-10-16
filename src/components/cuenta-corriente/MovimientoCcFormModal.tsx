@@ -9,7 +9,13 @@ import {
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { formatCurrencyArFromNumber, maskCurrencyArInput, parseCurrencyAr } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
-import { createMovimiento, type TipoContraparte, type TipoMovimientoCc } from '@/lib/cuentaCorriente';
+import {
+  createMovimiento,
+  type MovimientoCc,
+  type TipoContraparte,
+  type TipoMovimientoCc,
+} from '@/lib/cuentaCorriente';
+import { fmtDateUtc } from '@/lib/fmtDateUtc';
 import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
 import { computeFacturaTotalesFromBases } from '@/lib/facturaTotales';
 
@@ -26,9 +32,17 @@ type Props = {
    * que la genera (Facturación / Liquidaciones): el modal queda solo para cobros/pagos.
    */
   permiteCargo?: boolean;
+  /** Facturas/liquidaciones con saldo pendiente de la cuenta: opciones para imputar el cobro/pago. */
+  cargosPendientes?: MovimientoCc[];
   onClose: () => void;
   onCreated: () => void;
 };
+
+/** Ordena del más viejo al más nuevo: mismo orden en que el backend reparte el importe. */
+function porAntiguedad(a: MovimientoCc, b: MovimientoCc): number {
+  const porFecha = new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
+  return porFecha !== 0 ? porFecha : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+}
 
 export function MovimientoCcFormModal({
   tipoContraparte,
@@ -36,6 +50,7 @@ export function MovimientoCcFormModal({
   contraparteNombre,
   tipoInicial = 'cargo',
   permiteCargo = true,
+  cargosPendientes = [],
   onClose,
   onCreated,
 }: Props) {
@@ -54,6 +69,27 @@ export function MovimientoCcFormModal({
 
   const esCargo = tipo === 'cargo';
   const esCliente = tipoContraparte === 'cliente';
+
+  // Cobro/pago: a qué facturas/liquidaciones imputarlo. Vacío = "No imputar" (queda a cuenta).
+  const [imputarA, setImputarA] = useState<string[]>([]);
+  const opcionesImputar = [...cargosPendientes].sort(porAntiguedad);
+  const elegidos = opcionesImputar.filter((c) => imputarA.includes(c.id));
+  const totalElegido = elegidos.reduce((s, c) => s + (c.pendiente ?? c.importe), 0);
+
+  /** Recalcula el importe a cobrar con la suma de lo elegido (después se puede editar). */
+  function cambiarImputacion(ids: string[]) {
+    setImputarA(ids);
+    const nuevos = opcionesImputar.filter((c) => ids.includes(c.id));
+    if (nuevos.length === 0) return;
+    // Las facturas elegidas fijan la moneda del cobro (no se mezclan monedas).
+    setMoneda(nuevos[0].moneda as ViajeMonedaCodigo);
+    const suma = nuevos.reduce((s, c) => s + (c.pendiente ?? c.importe), 0);
+    setImporteStr(formatCurrencyArFromNumber(suma));
+  }
+
+  function toggleCargo(id: string) {
+    cambiarImputacion(imputarA.includes(id) ? imputarA.filter((x) => x !== id) : [...imputarA, id]);
+  }
 
   // IVA solo en ventas/compras, mismo campo que Facturas: vacío = sin IVA. El importe
   // cargado es sin IVA y se registra por el total, calculado igual que una factura.
@@ -84,7 +120,9 @@ export function MovimientoCcFormModal({
           ? { clienteId: contraparteId }
           : { proveedorId: contraparteId }),
         tipo,
-        concepto: concepto.trim() || undefined,
+        // El cobro/pago no lleva concepto libre: el backend pone "COBRO"/"PAGO".
+        concepto: esCargo ? concepto.trim() || undefined : undefined,
+        imputarACargoIds: !esCargo && imputarA.length > 0 ? imputarA : undefined,
         importe,
         ivaPct: ivaPct ?? undefined,
         moneda,
@@ -158,19 +196,88 @@ export function MovimientoCcFormModal({
         </div>
         )}
 
-        <div>
-          <label className={labelClass} htmlFor="cc-concepto">
-            Concepto
-          </label>
-          <input
-            id="cc-concepto"
-            type="text"
-            className={inputClass}
-            value={concepto}
-            onChange={(e) => setConcepto(e.target.value)}
-            placeholder={esCargo ? 'Ej. Factura 0001-00001234' : 'Ej. Transferencia recibida'}
-          />
-        </div>
+        {esCargo ? (
+          <div>
+            <label className={labelClass} htmlFor="cc-concepto">
+              Concepto
+            </label>
+            <input
+              id="cc-concepto"
+              type="text"
+              className={inputClass}
+              value={concepto}
+              onChange={(e) => setConcepto(e.target.value)}
+              placeholder="Ej. Factura 0001-00001234"
+            />
+          </div>
+        ) : (
+          <fieldset>
+            <legend className={labelClass}>
+              {esCliente ? 'Facturas que cobra' : 'Liquidaciones que paga'}
+            </legend>
+            <div className="max-h-56 overflow-y-auto border border-black/15 bg-white text-sm">
+              <label className="flex cursor-pointer items-center gap-2 border-b border-black/10 px-2 py-1.5 hover:bg-vialto-mist">
+                <input
+                  type="checkbox"
+                  checked={imputarA.length === 0}
+                  onChange={() => cambiarImputacion([])}
+                />
+                <span className="font-medium uppercase tracking-wide">No imputar</span>
+                <span className="text-xs text-vialto-steel">(queda a cuenta)</span>
+              </label>
+              {opcionesImputar.length === 0 ? (
+                <p className="px-2 py-1.5 text-xs text-vialto-steel">
+                  No hay {esCliente ? 'facturas' : 'liquidaciones'} con saldo pendiente.
+                </p>
+              ) : (
+                opcionesImputar.map((c) => {
+                  const checked = imputarA.includes(c.id);
+                  // Una vez elegida una, solo se ofrecen las de su misma moneda.
+                  const otraMoneda = elegidos.length > 0 && c.moneda !== elegidos[0].moneda;
+                  const pendiente = c.pendiente ?? c.importe;
+                  return (
+                    <label
+                      key={c.id}
+                      className={`flex items-center gap-2 px-2 py-1.5 ${
+                        otraMoneda ? 'cursor-not-allowed opacity-40' : 'cursor-pointer hover:bg-vialto-mist'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={otraMoneda}
+                        onChange={() => toggleCargo(c.id)}
+                      />
+                      <span className="min-w-0 flex-1 truncate">
+                        {c.concepto}
+                        {c.numeroComprobante ? ` ${c.numeroComprobante}` : ''}
+                        <span className="ml-1 text-xs text-vialto-steel">{fmtDateUtc(c.fecha)}</span>
+                      </span>
+                      <span className="shrink-0 text-right tabular-nums">
+                        $ {formatCurrencyArFromNumber(pendiente)} {c.moneda}
+                        {pendiente < c.importe - 0.005 && (
+                          <span className="block text-[11px] text-vialto-steel">
+                            de $ {formatCurrencyArFromNumber(c.importe)}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+            {elegidos.length > 0 && (
+              <p className="mt-1 text-xs text-vialto-steel tabular-nums">
+                Total elegido: $ {formatCurrencyArFromNumber(totalElegido)} {elegidos[0].moneda}.
+                {(parseCurrencyAr(importeStr) ?? 0) < totalElegido - 0.005
+                  ? ' Se imputa de la más vieja a la más nueva; la última puede quedar parcial.'
+                  : (parseCurrencyAr(importeStr) ?? 0) > totalElegido + 0.005
+                    ? ' Lo que sobra queda a cuenta.'
+                    : ''}
+              </p>
+            )}
+          </fieldset>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -192,7 +299,14 @@ export function MovimientoCcFormModal({
             <label className={labelClass} htmlFor="cc-moneda">
               Moneda
             </label>
-            <MonedaSelect id="cc-moneda" value={moneda} onChange={setMoneda} className={inputClass} />
+            {/* Con facturas elegidas, la moneda es la de ellas. */}
+            <MonedaSelect
+              id="cc-moneda"
+              value={moneda}
+              onChange={setMoneda}
+              className={inputClass}
+              disabled={!esCargo && elegidos.length > 0}
+            />
           </div>
         </div>
 

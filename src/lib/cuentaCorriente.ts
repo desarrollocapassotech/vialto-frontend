@@ -199,6 +199,8 @@ export type CreateMovimientoCcInput = {
   numeroComprobante?: string;
   formaPago?: string;
   referencia?: string;
+  /** Cobro/pago: facturas/liquidaciones a imputar (el backend reparte del más viejo al más nuevo). */
+  imputarACargoIds?: string[];
 };
 
 export function createMovimiento(getToken: GetToken, input: CreateMovimientoCcInput) {

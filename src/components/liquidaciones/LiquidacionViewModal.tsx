@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Ban, Download, Receipt, RotateCw, Trash2 } from "lucide-react";
+import { usuarioLabel } from "@/lib/usuarioLabel";
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -636,7 +637,7 @@ export function LiquidacionViewModal({
                   />
                   <Campo
                     label="Anulada por"
-                    value={source.anuladoPorNombre ?? source.anuladoPor}
+                    value={usuarioLabel(source.anuladoPorNombre, source.anuladoPor)}
                   />
                 </div>
                 {source.anulacionMetodo === "manual"

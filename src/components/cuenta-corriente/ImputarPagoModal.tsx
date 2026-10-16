@@ -424,9 +424,6 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
                 placeholder="Ej. Transferencia, efectivo"
               />
             </div>
-            <p className="text-xs text-vialto-steel">
-              Se registra en {cargo.moneda} y se imputa a esta {esCliente ? 'venta' : 'compra'} automáticamente.
-            </p>
           </>
         )}
 

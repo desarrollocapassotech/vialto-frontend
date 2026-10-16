@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Ban, Banknote, Receipt } from 'lucide-react';
 import { apiJson } from '@/lib/api';
+import { usuarioLabel } from '@/lib/usuarioLabel';
 import { friendlyError } from '@/lib/friendlyError';
 import { useToast } from '@/lib/toast';
 import { Spinner } from '@/components/ui/Spinner';
@@ -536,7 +537,7 @@ export function FacturaViewModal({
                   Anulada por
                 </p>
                 <p className="mt-1 text-sm">
-                  {factura.anuladoPorNombre ?? factura.anuladoPor}
+                  {usuarioLabel(factura.anuladoPorNombre, factura.anuladoPor)}
                 </p>
               </div>
             )}
