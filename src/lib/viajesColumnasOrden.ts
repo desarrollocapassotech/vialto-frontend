@@ -19,12 +19,13 @@ export const VIAJES_COLUMNAS = [
   { id: "cliente", label: "Cliente" },
   { id: "transporte", label: "Transporte" },
   { id: "chofer", label: "Chofer" },
-  { id: "etapa", label: "Etapa" },
   { id: "origenDestino", label: "Origen — Destino" },
   { id: "cargaDescarga", label: "Fecha" },
   // Opcional (Tenant.viajesColumnaProductosHabilitada); el label real es el
   // plural de "Producto" de la empresa (`useProductoLabels`).
   { id: "productos", label: "Productos" },
+  // Última por defecto, al lado de Acciones (oct 2026, a pedido).
+  { id: "etapa", label: "Etapa" },
 ] as const;
 
 export type ViajeColumnaId = (typeof VIAJES_COLUMNAS)[number]["id"];

@@ -227,6 +227,7 @@ export function ViajeAccionesMenu({
     <AccionesFila
       options={options}
       destacadas={VIAJE_ACCIONES_DESTACADAS}
+      maxIconos={1}
       subtitle={`Viaje #${numeroVisibleViaje(viaje)}`}
       open={open}
       onOpenChange={setOpen}
