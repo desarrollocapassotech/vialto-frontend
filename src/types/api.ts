@@ -402,6 +402,8 @@ export interface Tenant {
   unidadCantidadViajes?: string;
   /** Opciones configuradas de entidades/proveedores para el contrato comercial PDF. */
   opcionesProveedorLiquidacion?: string[];
+  /** Orden de columnas de la grilla de Viajes ([] = estándar). Leer con `ordenColumnasViajes` (`lib/viajesColumnasOrden.ts`). */
+  viajesColumnasOrden?: string[];
   createdAt: string;
 }
 

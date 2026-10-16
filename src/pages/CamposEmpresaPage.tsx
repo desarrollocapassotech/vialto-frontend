@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { ImportTemplatesConfig } from "@/components/importacion/ImportTemplatesConfig";
+import { ViajesColumnasOrdenConfig } from "@/components/superadmin/ViajesColumnasOrdenConfig";
 import { PaisModal } from "@/components/viajes/PaisModal";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
@@ -1309,6 +1310,35 @@ export function CamposEmpresaPage() {
                                 <option value="TN">Toneladas (TN)</option>
                                 <option value="UD">Unidades (Ud)</option>
                               </select>
+                            </td>
+                          </tr>
+                        )}
+                        {!!empresaTenant &&
+                          canAccessViajes(empresaTenant.modules) && (
+                          <tr className="border-t border-black/10">
+                            <td className="px-4 py-2.5 align-top">
+                              Orden de columnas (grilla de Viajes)
+                              <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                                Orden en que la empresa ve las columnas del listado
+                                de Viajes. Las columnas ocultas por otra
+                                configuración (IDs, chofer, transporte, etapa) no se
+                                muestran, pero conservan su lugar.
+                              </p>
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              <ViajesColumnasOrdenConfig
+                                tenantId={filtroEmpresa}
+                                ordenInicial={empresaTenant.viajesColumnasOrden}
+                                labels={{
+                                  idPropio1: empresaLabelGuardado,
+                                  idPropio2: empresaIdPropio2LabelGuardado,
+                                }}
+                                onGuardado={(viajesColumnasOrden) =>
+                                  setEmpresaTenant((t) =>
+                                    t ? { ...t, viajesColumnasOrden } : t,
+                                  )
+                                }
+                              />
                             </td>
                           </tr>
                         )}

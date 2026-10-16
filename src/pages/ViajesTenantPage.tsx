@@ -7,7 +7,16 @@ import { useViajeEditor } from "@/hooks/useViajeEditor";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   Link,
   useLocation,
@@ -55,6 +64,10 @@ import {
   viajesFiltradosParaFactura,
   type MaestroListasViaje,
 } from "@/lib/viajesFlota";
+import {
+  ordenColumnasViajes,
+  type ViajeColumnaId,
+} from "@/lib/viajesColumnasOrden";
 import { ViajeOrigenDestinoLinea } from "@/components/viajes/ViajeOrigenDestinoLinea";
 import { ViajeEditModal } from "@/components/viajes/ViajeEditModal";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
@@ -149,6 +162,9 @@ import { LiquidacionViewModal } from "@/components/liquidaciones/LiquidacionView
 // Importaciones para el nuevo flujo de Facturación Inline
 import { FacturaCreateModal } from "@/components/facturacion/FacturaCreateModal";
 import type { FacturaDraft } from "@/components/facturacion/FacturaEditModal";
+
+/** Un campo de `ListadoCard` (tarjeta mobile de la grilla). */
+type ListadoCardCampo = { label: ReactNode; value: ReactNode };
 
 // ─── COMPONENTE DE BUSCADOR CON COMBOBOX (AUTOCOMPLETE) ────────────────────
 function AutocompleteInput({
@@ -403,6 +419,9 @@ export function ViajesTenantPage({
   // la columna "Transporte" diría siempre "Flota propia".
   const { transportistaExternoVisible: mostrarColumnaTransporte } =
     useTipoFlotaVisible(tid || undefined);
+  // Tenant efectivo (propio u override de superadmin): el superadmin ve la
+  // grilla con el orden de columnas de la empresa elegida.
+  const { tenant: tenantEfectivo } = useTenantPaisFijo(tid || undefined);
 
   // "Nueva factura" desde Viajes: el modal necesita TODOS los viajes del cliente, no
   // la página visible de la grilla (`rows`, paginada y con los filtros del listado).
@@ -2227,6 +2246,377 @@ export function ViajesTenantPage({
     elegiblesEnPagina.length > 0 &&
     elegiblesEnPagina.every((v) => idsSeleccionLote.includes(v.id));
 
+  // Columnas de la grilla en el orden configurado por superadmin
+  // (`Tenant.viajesColumnasOrden`); cada una sigue con su propia visibilidad.
+  const ordenColumnas = ordenColumnasViajes(tenantEfectivo);
+  const viajesHeaderColumnas: Record<ViajeColumnaId, ReactNode> = {
+    idSistema: mostrarColumnaIdSistema && (
+      <th scope="col" className={`${listadoTablaThClass} align-top`}>
+        <ViajesListadoHeaderFiltro
+          title="ID"
+          filterActive={!!numeroFiltroActivo.trim()}
+          filterSignature={numeroFiltroActivo}
+          onClear={() => aplicarFiltroColumnaNumero("")}
+          minWidthClass="min-w-0"
+        >
+          <AutocompleteInput
+            value={numeroFiltroActivo}
+            onChange={(val) => aplicarFiltroColumnaNumero(val)}
+            onSearch={searchNumero}
+            disabled={listadoRefetching}
+            placeholder="Buscar ID..."
+            prefix="#"
+          />
+        </ViajesListadoHeaderFiltro>
+      </th>
+    ),
+    idPropio1: mostrarColumnaIdPropio1 && (
+      <th scope="col" className={`${listadoTablaThClass} align-top`}>
+        <ViajesListadoHeaderFiltro
+          title={
+            labelIdentificacionPersonalizadaViajes(currentTenant) ?? "CTG"
+          }
+          filterActive={!!ctgFiltroActivo.trim()}
+          filterSignature={ctgFiltroActivo}
+          onClear={() => aplicarFiltroColumnaCTG("")}
+          minWidthClass="min-w-0"
+        >
+          <AutocompleteInput
+            value={ctgFiltroActivo}
+            onChange={(val) => aplicarFiltroColumnaCTG(val)}
+            onSearch={searchCtg}
+            disabled={listadoRefetching}
+            placeholder="Buscar valor..."
+          />
+        </ViajesListadoHeaderFiltro>
+      </th>
+    ),
+    idPropio2: mostrarColumnaIdPropio2 && (
+      <th scope="col" className={`${listadoTablaThClass} align-top`}>
+        <ViajesListadoHeaderFiltro
+          title={idPropio2Label(currentTenant)}
+          filterActive={!!idPropio2FiltroActivo.trim()}
+          filterSignature={idPropio2FiltroActivo}
+          onClear={() => aplicarFiltroColumnaIdPropio2("")}
+          minWidthClass="min-w-0"
+        >
+          <AutocompleteInput
+            value={idPropio2FiltroActivo}
+            onChange={(val) => aplicarFiltroColumnaIdPropio2(val)}
+            onSearch={searchIdPropio2}
+            disabled={listadoRefetching}
+            placeholder="Buscar valor..."
+          />
+        </ViajesListadoHeaderFiltro>
+      </th>
+    ),
+    cliente: (
+      <th scope="col" className={`${listadoTablaThClass} align-top`}>
+        <ViajesListadoHeaderFiltro
+          title="Cliente"
+          filterActive={!!clienteIdFiltroActivo.trim()}
+          filterSignature={clienteIdFiltroActivo}
+          onClear={() => aplicarFiltroColumnaCliente("")}
+        >
+          <ClienteSearchSelect
+            id="viajes-col-filtro-cliente"
+            clientes={clientes}
+            value={clienteIdFiltroActivo}
+            onChange={(id) => aplicarFiltroColumnaCliente(id)}
+            allowEmptyValue
+            emptyListChoiceLabel="Todos"
+            placeholderCerrado="Todos"
+            disabled={listadoRefetching}
+            aria-label="Filtrar listado por cliente"
+            inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+              clienteIdFiltroActivo.trim()
+                ? "text-vialto-fire"
+                : "text-vialto-charcoal"
+            }`}
+          />
+        </ViajesListadoHeaderFiltro>
+      </th>
+    ),
+    transporte: mostrarColumnaTransporte && (
+    <th scope="col" className={`${listadoTablaThClass} align-top`}>
+      <ViajesListadoHeaderFiltro
+        title="Transporte"
+        filterActive={!!transportistaIdFiltroActivo.trim()}
+        filterSignature={transportistaIdFiltroActivo}
+        onClear={() => aplicarFiltroColumnaTransportista("")}
+      >
+        <TransportistaSearchSelect
+          id="viajes-col-filtro-transporte"
+          transportistas={transportistas}
+          value={transportistaIdFiltroActivo}
+          onChange={(id) => aplicarFiltroColumnaTransportista(id)}
+          placeholderCerrado="Todos"
+          emptyListChoiceLabel="Todos"
+          disabled={listadoRefetching}
+          aria-label="Filtrar listado por transporte"
+          inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+            transportistaIdFiltroActivo.trim()
+              ? "text-vialto-fire"
+              : "text-vialto-charcoal"
+          }`}
+        />
+      </ViajesListadoHeaderFiltro>
+    </th>
+    ),
+    chofer: mostrarColumnaChofer && (
+      <th scope="col" className={`${listadoTablaThClass} align-top`}>
+        <ViajesListadoHeaderFiltro
+          title="Chofer"
+          filterActive={!!choferIdFiltroActivo.trim()}
+          filterSignature={choferIdFiltroActivo}
+          onClear={() => aplicarFiltroColumnaChofer("")}
+          minWidthClass="min-w-0"
+        >
+          <ChoferSearchSelect
+            id="viajes-col-filtro-chofer"
+            choferes={choferes}
+            value={choferIdFiltroActivo}
+            onChange={(id) => aplicarFiltroColumnaChofer(id)}
+            allowEmptyValue
+            emptyListChoiceLabel="Todos"
+            placeholderCerrado="Todos"
+            disabled={listadoRefetching}
+            aria-label="Filtrar listado por chofer"
+            inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+              choferIdFiltroActivo.trim()
+                ? "text-vialto-fire"
+                : "text-vialto-charcoal"
+            }`}
+          />
+        </ViajesListadoHeaderFiltro>
+      </th>
+    ),
+    etapa: mostrarColumnaEstado && (
+      <th scope="col" className={`${listadoTablaThClass} align-top`}>
+        <ViajesListadoHeaderFiltro
+          title="Etapa"
+          filterActive={
+            !!estadoFiltro.trim() ||
+            !!facturacionFiltro.trim() ||
+            !!liquidacionFiltro.trim()
+          }
+          filterSignature={`${estadoFiltro}|${facturacionFiltro}|${liquidacionFiltro}`}
+          onClear={quitarFiltroEtapa}
+          minWidthClass="min-w-0"
+          titleNoWrap
+        >
+          <div className="flex flex-col gap-2">
+            {mostrarColumnaEtapa && (
+              <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                Etapa
+                <select
+                  value={estadoFiltro}
+                  onChange={(e) => aplicarFiltroEstado(e.target.value)}
+                  disabled={listadoRefetching}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm normal-case tracking-normal ${
+                    estadoFiltro.trim()
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
+                  }`}
+                >
+                  <option value="">Todas</option>
+                  {VIAJE_ETAPAS_TODAS.map((est) => (
+                    <option
+                      key={est}
+                      value={est}
+                      title={tooltipEtapaViaje(est)}
+                    >
+                      {etapaViajeLabel[est] ?? est}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {mostrarColumnaFactura && (
+              <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                Factura
+                <select
+                  value={facturacionFiltro}
+                  onChange={(e) =>
+                    aplicarFiltroFacturacion(e.target.value)
+                  }
+                  disabled={listadoRefetching}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm normal-case tracking-normal ${
+                    facturacionFiltro.trim()
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
+                  }`}
+                >
+                  {opcionesFiltroFacturacion.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {mostrarColumnaLiquidacion && (
+              <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                Liquidación
+                <select
+                  value={liquidacionFiltro}
+                  onChange={(e) =>
+                    aplicarFiltroLiquidacion(e.target.value)
+                  }
+                  disabled={listadoRefetching}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm normal-case tracking-normal ${
+                    liquidacionFiltro.trim()
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
+                  }`}
+                >
+                  {opcionesFiltroLiquidacion.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+        </ViajesListadoHeaderFiltro>
+      </th>
+    ),
+    origenDestino: (
+      <th scope="col" className={`${listadoTablaThClass} align-top`}>
+        <ViajesListadoHeaderFiltro
+          title="Origen — Destino"
+          filterActive={!!ubicacionFiltro.trim()}
+          filterSignature={`${tipoUbicacionFiltro}|${paisUbicacionFiltro}|${ubicacionFiltro}`}
+          onClear={() => aplicarTipoUbicacionFiltro("")}
+          minWidthClass="min-w-0"
+        >
+          <div className="flex flex-col gap-2">
+            <select
+              value={tipoUbicacionFiltro}
+              onChange={(e) => {
+                const v = e.target.value;
+                aplicarTipoUbicacionFiltro(
+                  v === "origen" || v === "destino" ? v : "",
+                );
+              }}
+              disabled={listadoRefetching}
+              className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                tipoUbicacionFiltro && ubicacionFiltro.trim()
+                  ? "text-vialto-fire"
+                  : "text-vialto-charcoal"
+              }`}
+              aria-label="Filtrar por ciudad en origen o en destino"
+            >
+              <option value="">Sin filtro por ubicación</option>
+              <option value="origen">Origen</option>
+              <option value="destino">Destino</option>
+            </select>
+            {tipoUbicacionFiltro ? (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                  País
+                </span>
+                <PaisUbicacionSelect
+                  value={paisUbicacionFiltro}
+                  onChange={(p) => aplicarPaisUbicacionFiltro(p)}
+                  className="h-8 w-full border border-black/15 bg-white px-2 text-xs text-vialto-charcoal"
+                  aria-label="País para buscar la ciudad del filtro"
+                />
+                <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                  Ciudad
+                </span>
+                <CiudadCombobox
+                  pais={paisUbicacionFiltro}
+                  value={ubicacionFiltro}
+                  onChange={(next) =>
+                    aplicarUbicacionCiudadSeleccion(next)
+                  }
+                  inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    ubicacionFiltro.trim()
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
+                  }`}
+                  disableBrowserAutocomplete
+                  aria-label={
+                    tipoUbicacionFiltro === "origen"
+                      ? "Ciudad de origen (elegir de la lista)"
+                      : "Ciudad de destino (elegir de la lista)"
+                  }
+                />
+              </div>
+            ) : null}
+          </div>
+        </ViajesListadoHeaderFiltro>
+      </th>
+    ),
+    cargaDescarga: (
+      <th scope="col" className={`${listadoTablaThClass} align-top`}>
+        <ViajesListadoHeaderFiltro
+          title="Carga — Descarga"
+          filterActive={
+            !!fechaDesdeFiltro.trim() || !!fechaHastaFiltro.trim()
+          }
+          filterSignature={`${tipoFechaFiltro}|${fechaDesdeFiltro}|${fechaHastaFiltro}`}
+          onClear={() => aplicarTipoFechaFiltro("")}
+          minWidthClass="min-w-0"
+        >
+          <div className="flex flex-col gap-2">
+            <select
+              value={tipoFechaFiltro}
+              onChange={(e) => {
+                const v = e.target.value;
+                aplicarTipoFechaFiltro(
+                  v === "carga" || v === "descarga" ? v : "",
+                );
+              }}
+              disabled={listadoRefetching}
+              className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                tipoFechaFiltro &&
+                (fechaDesdeFiltro.trim() || fechaHastaFiltro.trim())
+                  ? "text-vialto-fire"
+                  : "text-vialto-charcoal"
+              }`}
+              aria-label="Filtrar por fecha de carga o de descarga"
+            >
+              <option value="">Sin filtro por fecha</option>
+              <option value="carga">Fecha de carga</option>
+              <option value="descarga">Fecha de descarga</option>
+            </select>
+            {tipoFechaFiltro ? (
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                  Desde
+                  <input
+                    type="date"
+                    value={fechaDesdeFiltro}
+                    onChange={(e) =>
+                      aplicarFechaDesdeFiltro(e.target.value)
+                    }
+                    disabled={listadoRefetching}
+                    className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                  />
+                </label>
+                <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                  Hasta
+                  <input
+                    type="date"
+                    value={fechaHastaFiltro}
+                    onChange={(e) =>
+                      aplicarFechaHastaFiltro(e.target.value)
+                    }
+                    disabled={listadoRefetching}
+                    className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                  />
+                </label>
+              </div>
+            ) : null}
+          </div>
+        </ViajesListadoHeaderFiltro>
+      </th>
+    ),
+  };
+
   // ─── RENDER DE LA BARRA DE FILTROS ─────────────────────────────────────────
   const viajesListadoFiltros = (
     <>
@@ -2683,365 +3073,9 @@ export function ViajesTenantPage({
                 ) : null}
               </th>
             )}
-            {mostrarColumnaIdSistema && (
-              <th scope="col" className={`${listadoTablaThClass} align-top`}>
-                <ViajesListadoHeaderFiltro
-                  title="ID"
-                  filterActive={!!numeroFiltroActivo.trim()}
-                  filterSignature={numeroFiltroActivo}
-                  onClear={() => aplicarFiltroColumnaNumero("")}
-                  minWidthClass="min-w-0"
-                >
-                  <AutocompleteInput
-                    value={numeroFiltroActivo}
-                    onChange={(val) => aplicarFiltroColumnaNumero(val)}
-                    onSearch={searchNumero}
-                    disabled={listadoRefetching}
-                    placeholder="Buscar ID..."
-                    prefix="#"
-                  />
-                </ViajesListadoHeaderFiltro>
-              </th>
-            )}
-            {mostrarColumnaIdPropio1 && (
-              <th scope="col" className={`${listadoTablaThClass} align-top`}>
-                <ViajesListadoHeaderFiltro
-                  title={
-                    labelIdentificacionPersonalizadaViajes(currentTenant) ?? "CTG"
-                  }
-                  filterActive={!!ctgFiltroActivo.trim()}
-                  filterSignature={ctgFiltroActivo}
-                  onClear={() => aplicarFiltroColumnaCTG("")}
-                  minWidthClass="min-w-0"
-                >
-                  <AutocompleteInput
-                    value={ctgFiltroActivo}
-                    onChange={(val) => aplicarFiltroColumnaCTG(val)}
-                    onSearch={searchCtg}
-                    disabled={listadoRefetching}
-                    placeholder="Buscar valor..."
-                  />
-                </ViajesListadoHeaderFiltro>
-              </th>
-            )}
-            {mostrarColumnaIdPropio2 && (
-              <th scope="col" className={`${listadoTablaThClass} align-top`}>
-                <ViajesListadoHeaderFiltro
-                  title={idPropio2Label(currentTenant)}
-                  filterActive={!!idPropio2FiltroActivo.trim()}
-                  filterSignature={idPropio2FiltroActivo}
-                  onClear={() => aplicarFiltroColumnaIdPropio2("")}
-                  minWidthClass="min-w-0"
-                >
-                  <AutocompleteInput
-                    value={idPropio2FiltroActivo}
-                    onChange={(val) => aplicarFiltroColumnaIdPropio2(val)}
-                    onSearch={searchIdPropio2}
-                    disabled={listadoRefetching}
-                    placeholder="Buscar valor..."
-                  />
-                </ViajesListadoHeaderFiltro>
-              </th>
-            )}
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="Cliente"
-                filterActive={!!clienteIdFiltroActivo.trim()}
-                filterSignature={clienteIdFiltroActivo}
-                onClear={() => aplicarFiltroColumnaCliente("")}
-              >
-                <ClienteSearchSelect
-                  id="viajes-col-filtro-cliente"
-                  clientes={clientes}
-                  value={clienteIdFiltroActivo}
-                  onChange={(id) => aplicarFiltroColumnaCliente(id)}
-                  allowEmptyValue
-                  emptyListChoiceLabel="Todos"
-                  placeholderCerrado="Todos"
-                  disabled={listadoRefetching}
-                  aria-label="Filtrar listado por cliente"
-                  inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    clienteIdFiltroActivo.trim()
-                      ? "text-vialto-fire"
-                      : "text-vialto-charcoal"
-                  }`}
-                />
-              </ViajesListadoHeaderFiltro>
-            </th>
-            {mostrarColumnaTransporte && (
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="Transporte"
-                filterActive={!!transportistaIdFiltroActivo.trim()}
-                filterSignature={transportistaIdFiltroActivo}
-                onClear={() => aplicarFiltroColumnaTransportista("")}
-              >
-                <TransportistaSearchSelect
-                  id="viajes-col-filtro-transporte"
-                  transportistas={transportistas}
-                  value={transportistaIdFiltroActivo}
-                  onChange={(id) => aplicarFiltroColumnaTransportista(id)}
-                  placeholderCerrado="Todos"
-                  emptyListChoiceLabel="Todos"
-                  disabled={listadoRefetching}
-                  aria-label="Filtrar listado por transporte"
-                  inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    transportistaIdFiltroActivo.trim()
-                      ? "text-vialto-fire"
-                      : "text-vialto-charcoal"
-                  }`}
-                />
-              </ViajesListadoHeaderFiltro>
-            </th>
-            )}
-            {mostrarColumnaChofer && (
-              <th scope="col" className={`${listadoTablaThClass} align-top`}>
-                <ViajesListadoHeaderFiltro
-                  title="Chofer"
-                  filterActive={!!choferIdFiltroActivo.trim()}
-                  filterSignature={choferIdFiltroActivo}
-                  onClear={() => aplicarFiltroColumnaChofer("")}
-                  minWidthClass="min-w-0"
-                >
-                  <ChoferSearchSelect
-                    id="viajes-col-filtro-chofer"
-                    choferes={choferes}
-                    value={choferIdFiltroActivo}
-                    onChange={(id) => aplicarFiltroColumnaChofer(id)}
-                    allowEmptyValue
-                    emptyListChoiceLabel="Todos"
-                    placeholderCerrado="Todos"
-                    disabled={listadoRefetching}
-                    aria-label="Filtrar listado por chofer"
-                    inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                      choferIdFiltroActivo.trim()
-                        ? "text-vialto-fire"
-                        : "text-vialto-charcoal"
-                    }`}
-                  />
-                </ViajesListadoHeaderFiltro>
-              </th>
-            )}
-            {mostrarColumnaEstado && (
-              <th scope="col" className={`${listadoTablaThClass} align-top`}>
-                <ViajesListadoHeaderFiltro
-                  title="Etapa"
-                  filterActive={
-                    !!estadoFiltro.trim() ||
-                    !!facturacionFiltro.trim() ||
-                    !!liquidacionFiltro.trim()
-                  }
-                  filterSignature={`${estadoFiltro}|${facturacionFiltro}|${liquidacionFiltro}`}
-                  onClear={quitarFiltroEtapa}
-                  minWidthClass="min-w-0"
-                  titleNoWrap
-                >
-                  <div className="flex flex-col gap-2">
-                    {mostrarColumnaEtapa && (
-                      <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
-                        Etapa
-                        <select
-                          value={estadoFiltro}
-                          onChange={(e) => aplicarFiltroEstado(e.target.value)}
-                          disabled={listadoRefetching}
-                          className={`h-9 w-full border border-black/15 bg-white px-2 text-sm normal-case tracking-normal ${
-                            estadoFiltro.trim()
-                              ? "text-vialto-fire"
-                              : "text-vialto-charcoal"
-                          }`}
-                        >
-                          <option value="">Todas</option>
-                          {VIAJE_ETAPAS_TODAS.map((est) => (
-                            <option
-                              key={est}
-                              value={est}
-                              title={tooltipEtapaViaje(est)}
-                            >
-                              {etapaViajeLabel[est] ?? est}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    {mostrarColumnaFactura && (
-                      <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
-                        Factura
-                        <select
-                          value={facturacionFiltro}
-                          onChange={(e) =>
-                            aplicarFiltroFacturacion(e.target.value)
-                          }
-                          disabled={listadoRefetching}
-                          className={`h-9 w-full border border-black/15 bg-white px-2 text-sm normal-case tracking-normal ${
-                            facturacionFiltro.trim()
-                              ? "text-vialto-fire"
-                              : "text-vialto-charcoal"
-                          }`}
-                        >
-                          {opcionesFiltroFacturacion.map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    {mostrarColumnaLiquidacion && (
-                      <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
-                        Liquidación
-                        <select
-                          value={liquidacionFiltro}
-                          onChange={(e) =>
-                            aplicarFiltroLiquidacion(e.target.value)
-                          }
-                          disabled={listadoRefetching}
-                          className={`h-9 w-full border border-black/15 bg-white px-2 text-sm normal-case tracking-normal ${
-                            liquidacionFiltro.trim()
-                              ? "text-vialto-fire"
-                              : "text-vialto-charcoal"
-                          }`}
-                        >
-                          {opcionesFiltroLiquidacion.map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                  </div>
-                </ViajesListadoHeaderFiltro>
-              </th>
-            )}
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="Origen — Destino"
-                filterActive={!!ubicacionFiltro.trim()}
-                filterSignature={`${tipoUbicacionFiltro}|${paisUbicacionFiltro}|${ubicacionFiltro}`}
-                onClear={() => aplicarTipoUbicacionFiltro("")}
-                minWidthClass="min-w-0"
-              >
-                <div className="flex flex-col gap-2">
-                  <select
-                    value={tipoUbicacionFiltro}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      aplicarTipoUbicacionFiltro(
-                        v === "origen" || v === "destino" ? v : "",
-                      );
-                    }}
-                    disabled={listadoRefetching}
-                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                      tipoUbicacionFiltro && ubicacionFiltro.trim()
-                        ? "text-vialto-fire"
-                        : "text-vialto-charcoal"
-                    }`}
-                    aria-label="Filtrar por ciudad en origen o en destino"
-                  >
-                    <option value="">Sin filtro por ubicación</option>
-                    <option value="origen">Origen</option>
-                    <option value="destino">Destino</option>
-                  </select>
-                  {tipoUbicacionFiltro ? (
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                        País
-                      </span>
-                      <PaisUbicacionSelect
-                        value={paisUbicacionFiltro}
-                        onChange={(p) => aplicarPaisUbicacionFiltro(p)}
-                        className="h-8 w-full border border-black/15 bg-white px-2 text-xs text-vialto-charcoal"
-                        aria-label="País para buscar la ciudad del filtro"
-                      />
-                      <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                        Ciudad
-                      </span>
-                      <CiudadCombobox
-                        pais={paisUbicacionFiltro}
-                        value={ubicacionFiltro}
-                        onChange={(next) =>
-                          aplicarUbicacionCiudadSeleccion(next)
-                        }
-                        inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                          ubicacionFiltro.trim()
-                            ? "text-vialto-fire"
-                            : "text-vialto-charcoal"
-                        }`}
-                        disableBrowserAutocomplete
-                        aria-label={
-                          tipoUbicacionFiltro === "origen"
-                            ? "Ciudad de origen (elegir de la lista)"
-                            : "Ciudad de destino (elegir de la lista)"
-                        }
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              </ViajesListadoHeaderFiltro>
-            </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="Carga — Descarga"
-                filterActive={
-                  !!fechaDesdeFiltro.trim() || !!fechaHastaFiltro.trim()
-                }
-                filterSignature={`${tipoFechaFiltro}|${fechaDesdeFiltro}|${fechaHastaFiltro}`}
-                onClear={() => aplicarTipoFechaFiltro("")}
-                minWidthClass="min-w-0"
-              >
-                <div className="flex flex-col gap-2">
-                  <select
-                    value={tipoFechaFiltro}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      aplicarTipoFechaFiltro(
-                        v === "carga" || v === "descarga" ? v : "",
-                      );
-                    }}
-                    disabled={listadoRefetching}
-                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                      tipoFechaFiltro &&
-                      (fechaDesdeFiltro.trim() || fechaHastaFiltro.trim())
-                        ? "text-vialto-fire"
-                        : "text-vialto-charcoal"
-                    }`}
-                    aria-label="Filtrar por fecha de carga o de descarga"
-                  >
-                    <option value="">Sin filtro por fecha</option>
-                    <option value="carga">Fecha de carga</option>
-                    <option value="descarga">Fecha de descarga</option>
-                  </select>
-                  {tipoFechaFiltro ? (
-                    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                      <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-                        Desde
-                        <input
-                          type="date"
-                          value={fechaDesdeFiltro}
-                          onChange={(e) =>
-                            aplicarFechaDesdeFiltro(e.target.value)
-                          }
-                          disabled={listadoRefetching}
-                          className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                        />
-                      </label>
-                      <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-                        Hasta
-                        <input
-                          type="date"
-                          value={fechaHastaFiltro}
-                          onChange={(e) =>
-                            aplicarFechaHastaFiltro(e.target.value)
-                          }
-                          disabled={listadoRefetching}
-                          className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                        />
-                      </label>
-                    </div>
-                  ) : null}
-                </div>
-              </ViajesListadoHeaderFiltro>
-            </th>
+            {ordenColumnas.map((id) => (
+              <Fragment key={id}>{viajesHeaderColumnas[id]}</Fragment>
+            ))}
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Acciones
             </th>
@@ -3059,53 +3093,33 @@ export function ViajesTenantPage({
             transportistas,
           );
           const nombreChofer = nombreChoferListadoViaje(v, choferes);
-          return (
-            <tr
-              key={v.id}
-              className={`${listadoTablaBodyRowClass} cursor-pointer`}
-              onClick={() => setAccionesAbiertoViajeId(v.id)}
-            >
-              {mostrarColumnaSeleccionLote && (
-                <td
-                  className="h-8 px-2 py-1 align-middle text-center"
-                  onClick={(e) => e.stopPropagation()}
+          const celdas: Record<ViajeColumnaId, ReactNode> = {
+            idSistema: mostrarColumnaIdSistema && (
+              <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
+                {/* IDs: se truncan por el principio, lo que distingue es el final. */}
+                <TruncarInicio className="max-w-[5rem]" title={`#${v.numero}`}>
+                  #{v.numero}
+                </TruncarInicio>
+              </td>
+            ),
+            idPropio1: mostrarColumnaIdPropio1 && (
+              <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
+                <TruncarInicio
+                  className="max-w-[5rem]"
+                  title={v.numeroIdentificacionPersonalizado?.trim() || undefined}
                 >
-                  {esElegibleLote(v) ? (
-                    <input
-                      type="checkbox"
-                      checked={idsSeleccionLote.includes(v.id)}
-                      onChange={() => toggleSeleccionLote(v)}
-                      className="accent-vialto-charcoal"
-                      aria-label={`Incluir viaje ${numeroVisibleViaje(v)} en la selección en lote`}
-                    />
-                  ) : null}
-                </td>
-              )}
-              {mostrarColumnaIdSistema && (
-                <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
-                  {/* IDs: se truncan por el principio, lo que distingue es el final. */}
-                  <TruncarInicio className="max-w-[5rem]" title={`#${v.numero}`}>
-                    #{v.numero}
-                  </TruncarInicio>
-                </td>
-              )}
-              {mostrarColumnaIdPropio1 && (
-                <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
-                  <TruncarInicio
-                    className="max-w-[5rem]"
-                    title={v.numeroIdentificacionPersonalizado?.trim() || undefined}
-                  >
-                    {v.numeroIdentificacionPersonalizado?.trim() || "—"}
-                  </TruncarInicio>
-                </td>
-              )}
-              {mostrarColumnaIdPropio2 && (
-                <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
-                  <TruncarInicio className="max-w-[5rem]" title={v.idPropio2?.trim() || undefined}>
-                    {v.idPropio2?.trim() || "—"}
-                  </TruncarInicio>
-                </td>
-              )}
+                  {v.numeroIdentificacionPersonalizado?.trim() || "—"}
+                </TruncarInicio>
+              </td>
+            ),
+            idPropio2: mostrarColumnaIdPropio2 && (
+              <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
+                <TruncarInicio className="max-w-[5rem]" title={v.idPropio2?.trim() || undefined}>
+                  {v.idPropio2?.trim() || "—"}
+                </TruncarInicio>
+              </td>
+            ),
+            cliente: (
               <td className="h-8 px-3 py-1 text-vialto-charcoal">
                 <div
                   className="flex min-w-0 max-w-[9rem] items-center gap-1"
@@ -3119,83 +3133,85 @@ export function ViajesTenantPage({
                   )}
                 </div>
               </td>
-              {mostrarColumnaTransporte && (
-              <td className="h-8 px-3 py-1 text-vialto-steel">
-                <div className="flex min-w-0 max-w-[9rem] items-center gap-1">
-                  <span className="truncate" title={nombreTransp}>
-                    {nombreTransp}
+            ),
+            transporte: mostrarColumnaTransporte && (
+            <td className="h-8 px-3 py-1 text-vialto-steel">
+              <div className="flex min-w-0 max-w-[9rem] items-center gap-1">
+                <span className="truncate" title={nombreTransp}>
+                  {nombreTransp}
+                </span>
+                {nombreTranspEfectivo && (
+                  <span
+                    className="shrink-0 text-vialto-steel/70"
+                    title={`Ejecuta: ${nombreTranspEfectivo}`}
+                    aria-label={`Ejecuta: ${nombreTranspEfectivo}`}
+                  >
+                    <CornerDownRight className="h-3.5 w-3.5" aria-hidden />
                   </span>
-                  {nombreTranspEfectivo && (
-                    <span
-                      className="shrink-0 text-vialto-steel/70"
-                      title={`Ejecuta: ${nombreTranspEfectivo}`}
-                      aria-label={`Ejecuta: ${nombreTranspEfectivo}`}
-                    >
-                      <CornerDownRight className="h-3.5 w-3.5" aria-hidden />
-                    </span>
+                )}
+              </div>
+            </td>
+            ),
+            chofer: mostrarColumnaChofer && (
+              <td className="h-8 px-3 py-1 text-vialto-steel">
+                <span className="block max-w-[6rem] truncate" title={nombreChofer}>
+                  {nombreChofer}
+                </span>
+              </td>
+            ),
+            etapa: mostrarColumnaEstado && (
+              <td className="h-8 px-3 py-1" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-1.5">
+                  {mostrarColumnaEtapa && <ViajeEtapaIcono etapa={v.etapa} />}
+                  {v.etapa?.toLowerCase() !== "cancelado" && (
+                    <>
+                      {mostrarColumnaFactura && (
+                        <ViajeFacturacionIndicador
+                          viaje={v}
+                          tenantId={platform ? tid : undefined}
+                          variante="icono"
+                          onClickOverride={
+                            (v.clientesViaje ?? []).length > 0
+                              ? () => openVerFacturaFlow(v)
+                              : undefined
+                          }
+                          onFacturar={
+                            puedeFacturarDesdeGrilla
+                              ? () => facturarViaje(v, undefined)
+                              : undefined
+                          }
+                        />
+                      )}
+                      {mostrarColumnaLiquidacion &&
+                        (hasLiquidacionesResuelto ? (
+                          <ViajeLiquidacionIndicador
+                            viaje={v}
+                            tenantId={platform ? tid : undefined}
+                            hasArca={hasLiquidoProductoArcaResuelto}
+                            onRegistrarPago={() => setRegistrarPagoViaje(v)}
+                            onLiquidar={
+                              hasLiquidaciones ? () => liquidarViaje(v) : undefined
+                            }
+                            onEmitir={
+                              hasLiquidoProductoArcaResuelto
+                                ? (liq) => setEmitirLiquidacion(liq)
+                                : undefined
+                            }
+                            variante="icono"
+                          />
+                        ) : (
+                          <ViajePagoTransportistaIndicador
+                            viaje={v}
+                            onClick={() => setRegistrarPagoViaje(v)}
+                            variante="icono"
+                          />
+                        ))}
+                    </>
                   )}
                 </div>
               </td>
-              )}
-              {mostrarColumnaChofer && (
-                <td className="h-8 px-3 py-1 text-vialto-steel">
-                  <span className="block max-w-[6rem] truncate" title={nombreChofer}>
-                    {nombreChofer}
-                  </span>
-                </td>
-              )}
-              {mostrarColumnaEstado && (
-                <td className="h-8 px-3 py-1" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center gap-1.5">
-                    {mostrarColumnaEtapa && <ViajeEtapaIcono etapa={v.etapa} />}
-                    {v.etapa?.toLowerCase() !== "cancelado" && (
-                      <>
-                        {mostrarColumnaFactura && (
-                          <ViajeFacturacionIndicador
-                            viaje={v}
-                            tenantId={platform ? tid : undefined}
-                            variante="icono"
-                            onClickOverride={
-                              (v.clientesViaje ?? []).length > 0
-                                ? () => openVerFacturaFlow(v)
-                                : undefined
-                            }
-                            onFacturar={
-                              puedeFacturarDesdeGrilla
-                                ? () => facturarViaje(v, undefined)
-                                : undefined
-                            }
-                          />
-                        )}
-                        {mostrarColumnaLiquidacion &&
-                          (hasLiquidacionesResuelto ? (
-                            <ViajeLiquidacionIndicador
-                              viaje={v}
-                              tenantId={platform ? tid : undefined}
-                              hasArca={hasLiquidoProductoArcaResuelto}
-                              onRegistrarPago={() => setRegistrarPagoViaje(v)}
-                              onLiquidar={
-                                hasLiquidaciones ? () => liquidarViaje(v) : undefined
-                              }
-                              onEmitir={
-                                hasLiquidoProductoArcaResuelto
-                                  ? (liq) => setEmitirLiquidacion(liq)
-                                  : undefined
-                              }
-                              variante="icono"
-                            />
-                          ) : (
-                            <ViajePagoTransportistaIndicador
-                              viaje={v}
-                              onClick={() => setRegistrarPagoViaje(v)}
-                              variante="icono"
-                            />
-                          ))}
-                      </>
-                    )}
-                  </div>
-                </td>
-              )}
+            ),
+            origenDestino: (
               <td className="h-8 px-3 py-1">
                 <ViajeOrigenDestinoLinea
                   origen={v.origen}
@@ -3205,6 +3221,8 @@ export function ViajesTenantPage({
                   className="max-w-[11rem]"
                 />
               </td>
+            ),
+            cargaDescarga: (
               <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
                 <div
                   className="max-w-[6.5rem] truncate"
@@ -3239,6 +3257,33 @@ export function ViajesTenantPage({
                   )}
                 </div>
               </td>
+            ),
+          };
+          return (
+            <tr
+              key={v.id}
+              className={`${listadoTablaBodyRowClass} cursor-pointer`}
+              onClick={() => setAccionesAbiertoViajeId(v.id)}
+            >
+              {mostrarColumnaSeleccionLote && (
+                <td
+                  className="h-8 px-2 py-1 align-middle text-center"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {esElegibleLote(v) ? (
+                    <input
+                      type="checkbox"
+                      checked={idsSeleccionLote.includes(v.id)}
+                      onChange={() => toggleSeleccionLote(v)}
+                      className="accent-vialto-charcoal"
+                      aria-label={`Incluir viaje ${numeroVisibleViaje(v)} en la selección en lote`}
+                    />
+                  ) : null}
+                </td>
+              )}
+              {ordenColumnas.map((id) => (
+                <Fragment key={id}>{celdas[id]}</Fragment>
+              ))}
               <td
                 className="px-3 py-0 align-middle text-right"
                 onClick={(e) => e.stopPropagation()}
@@ -3394,6 +3439,81 @@ export function ViajesTenantPage({
               )}
             </div>
           );
+          const camposMobile: Record<ViajeColumnaId, ListadoCardCampo[]> = {
+            cliente: [], // va como `primary` de la tarjeta
+            idSistema: mostrarColumnaIdSistema
+              ? [{ label: "ID sistema", value: `#${v.numero}` }]
+              : [],
+            idPropio1: mostrarColumnaIdPropio1
+              ? [
+                  {
+                    label: labelIdentificacionPersonalizadaViajes(currentTenant),
+                    value: v.numeroIdentificacionPersonalizado?.trim() || "—",
+                  },
+                ]
+              : [],
+            idPropio2: mostrarColumnaIdPropio2
+              ? [
+                  {
+                    label: idPropio2Label(currentTenant),
+                    value: v.idPropio2?.trim() || "—",
+                  },
+                ]
+              : [],
+            transporte: mostrarColumnaTransporte
+              ? [{ label: "Transporte", value: transporteValue }]
+              : [],
+            chofer: mostrarColumnaChofer
+              ? [{ label: "Chofer", value: nombreChofer }]
+              : [],
+            etapa: mostrarColumnaEstado
+              ? [{ label: "Etapa", value: estadoValue }]
+              : [],
+            origenDestino: [{
+              label: "Origen — Destino",
+              value: (
+                <>
+                  <ViajeOrigenDestinoLinea
+                    origen={v.origen}
+                    destino={v.destino}
+                    destinosViaje={v.destinosViaje}
+                  />
+                  {clientesRuta.length > 1 && (
+                    <span className="mt-0.5 block text-[11px] text-vialto-fire">
+                      +{clientesRuta.length - 1} más
+                    </span>
+                  )}
+                </>
+              ),
+            }],
+            cargaDescarga: [{
+              label: "Carga — Descarga",
+              value: (
+                <div className="flex flex-col gap-0.5 tabular-nums">
+                  <span
+                    className={
+                      ordenResaltaFechaCarga
+                        ? "font-medium text-vialto-charcoal"
+                        : undefined
+                    }
+                    title={v.fechaCarga ?? undefined}
+                  >
+                    {formatIsoFechaHoraListadoEsAr(v.fechaCarga)}
+                  </span>
+                  <span
+                    className={
+                      ordenResaltaFechaDescarga
+                        ? "text-xs font-medium text-vialto-charcoal"
+                        : "text-xs text-vialto-steel/90"
+                    }
+                    title={v.fechaDescarga ?? undefined}
+                  >
+                    {formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}
+                  </span>
+                </div>
+              ),
+            }],
+          };
           return (
             <ListadoCard
               onClick={() => setAccionesAbiertoViajeId(v.id)}
@@ -3424,80 +3544,7 @@ export function ViajesTenantPage({
                   </span>
                 </div>
               }
-              fields={[
-                ...(mostrarColumnaIdSistema
-                  ? [{ label: "ID sistema", value: `#${v.numero}` }]
-                  : []),
-                ...(mostrarColumnaIdPropio1
-                  ? [
-                      {
-                        label: labelIdentificacionPersonalizadaViajes(currentTenant),
-                        value: v.numeroIdentificacionPersonalizado?.trim() || "—",
-                      },
-                    ]
-                  : []),
-                ...(mostrarColumnaIdPropio2
-                  ? [
-                      {
-                        label: idPropio2Label(currentTenant),
-                        value: v.idPropio2?.trim() || "—",
-                      },
-                    ]
-                  : []),
-                ...(mostrarColumnaTransporte
-                  ? [{ label: "Transporte", value: transporteValue }]
-                  : []),
-                ...(mostrarColumnaChofer
-                  ? [{ label: "Chofer", value: nombreChofer }]
-                  : []),
-                ...(mostrarColumnaEstado
-                  ? [{ label: "Etapa", value: estadoValue }]
-                  : []),
-                {
-                  label: "Origen — Destino",
-                  value: (
-                    <>
-                      <ViajeOrigenDestinoLinea
-                        origen={v.origen}
-                        destino={v.destino}
-                        destinosViaje={v.destinosViaje}
-                      />
-                      {clientesRuta.length > 1 && (
-                        <span className="mt-0.5 block text-[11px] text-vialto-fire">
-                          +{clientesRuta.length - 1} más
-                        </span>
-                      )}
-                    </>
-                  ),
-                },
-                {
-                  label: "Carga — Descarga",
-                  value: (
-                    <div className="flex flex-col gap-0.5 tabular-nums">
-                      <span
-                        className={
-                          ordenResaltaFechaCarga
-                            ? "font-medium text-vialto-charcoal"
-                            : undefined
-                        }
-                        title={v.fechaCarga ?? undefined}
-                      >
-                        {formatIsoFechaHoraListadoEsAr(v.fechaCarga)}
-                      </span>
-                      <span
-                        className={
-                          ordenResaltaFechaDescarga
-                            ? "text-xs font-medium text-vialto-charcoal"
-                            : "text-xs text-vialto-steel/90"
-                        }
-                        title={v.fechaDescarga ?? undefined}
-                      >
-                        {formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}
-                      </span>
-                    </div>
-                  ),
-                },
-              ]}
+              fields={ordenColumnas.flatMap((id) => camposMobile[id])}
               actions={
                 <ViajeAccionesMenu
                   viaje={v}
