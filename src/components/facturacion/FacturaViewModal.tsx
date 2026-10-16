@@ -523,8 +523,9 @@ export function FacturaViewModal({
                 <p className="mt-1 text-sm">{fmtDate(factura.anulacionCaeFechaVto)}</p>
               </div>
             )}
+            {/* Motivo y "Anulada por" en la misma fila (sin motivo, "Anulada por" va solo). */}
             {factura.motivoAnulacion && (
-              <div className="sm:col-span-2">
+              <div>
                 <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
                   Motivo
                 </p>
