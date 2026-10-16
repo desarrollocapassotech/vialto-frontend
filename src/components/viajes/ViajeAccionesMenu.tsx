@@ -235,19 +235,21 @@ export function ViajeAccionesMenu({
 }
 
 /**
- * Orden de prioridad de las acciones que se muestran como ícono en la grilla.
- * "Ver" no se lista: `AccionesFila` lo agrega como ícono solo si sobra lugar.
+ * Orden de prioridad de las acciones que se muestran como ícono en la grilla
+ * (oct 2026, a pedido): primero las de consulta (ver viaje, factura y
+ * liquidación) y al final las que generan un comprobante (Facturar, Liquidar).
  */
 const VIAJE_ACCIONES_DESTACADAS = [
+  'ver',
+  'ver-factura',
+  'ver-liquidacion',
   'reintentar-factura',
   'reintentar-liquidacion',
   'continuar-factura',
   'continuar-liquidacion',
-  'facturar',
-  'liquidar',
   'gasto',
   'pago',
-  'ver-factura',
-  'ver-liquidacion',
   'exportar',
+  'facturar',
+  'liquidar',
 ];

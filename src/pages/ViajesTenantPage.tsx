@@ -3152,7 +3152,7 @@ export function ViajesTenantPage({
             ),
             transporte: mostrarColumnaTransporte && (
             <td className="h-8 px-3 py-1 text-vialto-steel">
-              <div className="flex min-w-0 max-w-[9rem] items-center gap-1">
+              <div className="flex min-w-0 max-w-[12rem] items-center gap-1">
                 <span className="truncate" title={nombreTransp}>
                   {nombreTransp}
                 </span>
@@ -3170,7 +3170,7 @@ export function ViajesTenantPage({
             ),
             chofer: mostrarColumnaChofer && (
               <td className="h-8 px-3 py-1 text-vialto-steel">
-                <span className="block max-w-[6rem] truncate" title={nombreChofer}>
+                <span className="block max-w-[9rem] truncate" title={nombreChofer}>
                   {nombreChofer}
                 </span>
               </td>
