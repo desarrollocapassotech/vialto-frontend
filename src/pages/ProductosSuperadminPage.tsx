@@ -18,6 +18,8 @@ import { ProductoModal } from "@/components/stock/ProductoModal";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import { PRODUCTO_LABELS_DEFAULT, labelEnFrase, productoLabels } from "@/lib/productoLabel";
 
 type Paginated = { items: Producto[]; meta: PaginatedMeta };
 
@@ -46,6 +48,12 @@ export function ProductosSuperadminPage() {
     "todos" | "activos" | "inactivos"
   >("todos");
   const [modal, setModal] = useState<ModalState>({ mode: "closed" });
+  // Label de "Producto" de la empresa elegida (ej. "Grano").
+  const { tenant: empresaTenant } = useTenantPaisFijo(filtroEmpresa || undefined);
+  const labels = productoLabels(filtroEmpresa ? empresaTenant : null);
+  const labelPropio = labels.singular !== PRODUCTO_LABELS_DEFAULT.singular;
+  const singularFrase = labelEnFrase(labels.singular);
+  const pluralFrase = labelEnFrase(labels.plural);
 
   const empresaModules = useMemo(
     () => tenants?.find((t) => t.clerkOrgId === filtroEmpresa)?.modules,
@@ -126,7 +134,7 @@ export function ProductosSuperadminPage() {
       await load();
     } catch (e) {
       setError(friendlyError(e, "plataforma"));
-      showToast("No se pudo cambiar el estado del producto", "error");
+      showToast(`No se pudo cambiar el estado de ${singularFrase}`, "error");
     }
   }
 
@@ -161,7 +169,7 @@ export function ProductosSuperadminPage() {
             className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 font-mono text-sm ${
               codigoFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
             }`}
-            aria-label="Filtrar por código de producto"
+            aria-label={`Filtrar por código de ${singularFrase}`}
           />
           <button
             type="button"
@@ -185,7 +193,7 @@ export function ProductosSuperadminPage() {
             className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
               nombreFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
             }`}
-            aria-label="Filtrar por nombre de producto"
+            aria-label={`Filtrar por nombre de ${singularFrase}`}
           />
           <button
             type="button"
@@ -207,7 +215,7 @@ export function ProductosSuperadminPage() {
               ? "text-vialto-fire"
               : "text-vialto-charcoal"
           }`}
-          aria-label="Filtrar por estado del producto"
+          aria-label={`Filtrar por estado de ${singularFrase}`}
         >
           <option value="todos">Todos</option>
           <option value="activos">Solo activos</option>
@@ -240,7 +248,7 @@ export function ProductosSuperadminPage() {
               onClick={() => setModal({ mode: "create" })}
               className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
             >
-              Nuevo producto
+              {labelPropio ? `Crear ${singularFrase}` : "Nuevo producto"}
             </button>
           </div>
         )}
@@ -297,7 +305,7 @@ export function ProductosSuperadminPage() {
                             ? "text-vialto-fire"
                             : "text-vialto-charcoal"
                         }`}
-                        aria-label="Filtrar por código de producto"
+                        aria-label={`Filtrar por código de ${singularFrase}`}
                       />
                       <button
                         type="button"
@@ -336,7 +344,7 @@ export function ProductosSuperadminPage() {
                             ? "text-vialto-fire"
                             : "text-vialto-charcoal"
                         }`}
-                        aria-label="Filtrar por nombre de producto"
+                        aria-label={`Filtrar por nombre de ${singularFrase}`}
                       />
                       <button
                         type="button"
@@ -369,7 +377,7 @@ export function ProductosSuperadminPage() {
                           ? "text-vialto-fire"
                           : "text-vialto-charcoal"
                       }`}
-                      aria-label="Filtrar por estado del producto"
+                      aria-label={`Filtrar por estado de ${singularFrase}`}
                     >
                       <option value="todos">Todos</option>
                       <option value="activos">Solo activos</option>
@@ -431,8 +439,8 @@ export function ProductosSuperadminPage() {
             rowKey={(r) => r.id}
             emptyMessage={
               error
-                ? "No se pudieron cargar los productos."
-                : "No hay productos que coincidan."
+                ? `No se pudieron cargar los ${pluralFrase}.`
+                : `No hay ${pluralFrase} que coincidan.`
             }
             loadingMessage="Cargando…"
             renderActions={(r) => (
@@ -490,6 +498,7 @@ export function ProductosSuperadminPage() {
 
       {modal.mode === "view" && filtroEmpresa && (
         <ProductoModal
+          labels={labels}
           modo="view"
           productoInicial={modal.producto}
           baseUrl="/api/platform/stock/productos"
@@ -503,6 +512,7 @@ export function ProductosSuperadminPage() {
       )}
       {modal.mode === "create" && filtroEmpresa && (
         <ProductoModal
+          labels={labels}
           modo="create"
           baseUrl="/api/platform/stock/productos"
           tenantId={filtroEmpresa}
@@ -517,6 +527,7 @@ export function ProductosSuperadminPage() {
       )}
       {modal.mode === "edit" && filtroEmpresa && (
         <ProductoModal
+          labels={labels}
           modo="edit"
           productoInicial={modal.producto}
           baseUrl="/api/platform/stock/productos"

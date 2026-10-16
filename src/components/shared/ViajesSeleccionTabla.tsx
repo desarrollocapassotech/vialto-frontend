@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { CalendarDays, Filter, Search, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { numeroVisibleViaje } from "@/lib/viajesFlota";
+import { nombresProductosViaje } from "@/lib/productosViaje";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 
 export type ViajeSeleccionable = {
@@ -30,9 +31,7 @@ function nombreChoferSeleccion(v: ViajeSeleccionable): string {
 }
 
 function nombresProductosSeleccion(v: ViajeSeleccionable): string {
-  const nombres = (v.productosViaje ?? [])
-    .map((p) => p.producto?.nombre?.trim())
-    .filter((n): n is string => Boolean(n));
+  const nombres = nombresProductosViaje(v);
   return nombres.length ? nombres.join(", ") : "—";
 }
 

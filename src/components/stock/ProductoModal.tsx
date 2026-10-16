@@ -9,6 +9,11 @@ import { useMaestroData } from "@/hooks/useMaestroData";
 import { canAccessStock } from "@/lib/tenantModules";
 import { useToast } from "@/lib/toast";
 import type { Presentacion, Producto } from "@/types/api";
+import {
+  PRODUCTO_LABELS_DEFAULT,
+  labelEnFrase,
+  type ProductoLabels,
+} from "@/lib/productoLabel";
 
 const INPUT_CLASS = "h-9 w-full border border-black/15 bg-white px-2 text-sm";
 const LABEL_CLASS = "text-xs uppercase tracking-[0.08em] text-vialto-steel";
@@ -38,7 +43,13 @@ export function ProductoModal({
   baseUrl = "/api/stock/productos",
   tenantId,
   tenantModules,
+  labels = PRODUCTO_LABELS_DEFAULT,
 }: {
+  /**
+   * Label de "Producto" del tenant (`useProductoLabels`). Se pasa explícito desde
+   * Viajes/Base de datos; Stock no lo pasa y sigue diciendo "Producto".
+   */
+  labels?: ProductoLabels;
   modo: "create" | "edit" | "view";
   productoInicial?: Producto;
   getToken: () => Promise<string | null>;
@@ -50,6 +61,9 @@ export function ProductoModal({
   /** Módulos del tenant objetivo (p. ej. superadmin). Si no se pasa, se usa el tenant actual. */
   tenantModules?: string[];
 }) {
+  // Con un label propio, frases neutras (el label puede ser femenino); sin él, los
+  // textos de siempre (así Stock no cambia).
+  const labelPropio = labels.singular !== PRODUCTO_LABELS_DEFAULT.singular;
   const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
   const presentacionesUrl = tenantId
     ? `/api/platform/stock/presentaciones?tenantId=${encodeURIComponent(tenantId)}&activo=1`
@@ -199,7 +213,10 @@ export function ProductoModal({
           { method: "PATCH", body: JSON.stringify(body) },
         );
       }
-      showToast("Producto guardado exitosamente", "success");
+      showToast(
+        labelPropio ? `${labels.singular}: cambios guardados` : "Producto guardado exitosamente",
+        "success",
+      );
       onSaved(result);
     } catch (e) {
       setError(
@@ -207,7 +224,12 @@ export function ProductoModal({
           ? e.message
           : friendlyError(e, "stock"),
       );
-      showToast("No se pudo guardar el producto", "error");
+      showToast(
+        labelPropio
+          ? `No se pudieron guardar los cambios de ${labelEnFrase(labels.singular)}`
+          : "No se pudo guardar el producto",
+        "error",
+      );
     } finally {
       setSaving(false);
     }
@@ -226,8 +248,10 @@ export function ProductoModal({
           <div className="flex items-center justify-between border-b border-black/10 px-5 pt-5 pb-4">
             <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">
               {modo === "create"
-                ? "Nuevo producto"
-                : (productoInicial?.nombre ?? "Producto")}
+                ? labelPropio
+                  ? `Crear ${labelEnFrase(labels.singular)}`
+                  : "Nuevo producto"
+                : (productoInicial?.nombre ?? labels.singular)}
             </h2>
             <button
               type="button"

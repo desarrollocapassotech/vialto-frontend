@@ -241,6 +241,14 @@ export function CamposEmpresaPage() {
   const [empresaOpcionesProveedor, setEmpresaOpcionesProveedor] = useState<string[]>([]);
   const [savingOpcionesProveedor, setSavingOpcionesProveedor] = useState(false);
   const [nuevaOpcionProveedor, setNuevaOpcionProveedor] = useState("");
+  const [empresaColumnaProductos, setEmpresaColumnaProductos] = useState(false);
+  const [savingColumnaProductos, setSavingColumnaProductos] = useState(false);
+  // Label de "Producto" (singular/plural). El plural lo genera la IA al guardar el singular.
+  const [empresaProductoLabel, setEmpresaProductoLabel] = useState("");
+  const [empresaProductoLabelGuardado, setEmpresaProductoLabelGuardado] = useState("");
+  const [empresaProductoPlural, setEmpresaProductoPlural] = useState("");
+  const [empresaProductoPluralGuardado, setEmpresaProductoPluralGuardado] = useState("");
+  const [savingProductoLabel, setSavingProductoLabel] = useState(false);
   // Choferes/Vehículos/Productos no son flags del Tenant: son campos de Viajes
   // (tenant-field-config), ver SWITCHES_ENTIDAD_VIAJES. campo → visible.
   const [empresaSwitchEntidad, setEmpresaSwitchEntidad] = useState<
@@ -266,12 +274,14 @@ export function CamposEmpresaPage() {
       idPropio1Habilitado: empresaIdPropio1Habilitado,
       idPropio2Habilitado: empresaIdPropio2Habilitado,
       tipoFlota: empresaTipoFlota,
+      viajesColumnaProductosHabilitada: empresaColumnaProductos,
     }),
     [
       empresaIdSistemaHabilitado,
       empresaIdPropio1Habilitado,
       empresaIdPropio2Habilitado,
       empresaTipoFlota,
+      empresaColumnaProductos,
     ],
   );
 
@@ -328,6 +338,11 @@ export function CamposEmpresaPage() {
           setEmpresaRecomendacionCiudades(tenant.recomendacionCiudadesHabilitada ?? true);
           setEmpresaMarcarCobrada(tenant.marcarCobradaHabilitada ?? false);
           setEmpresaOpcionesProveedor(tenant.opcionesProveedorLiquidacion ?? []);
+          setEmpresaColumnaProductos(tenant.viajesColumnaProductosHabilitada ?? false);
+          setEmpresaProductoLabel(tenant.productoLabel ?? "");
+          setEmpresaProductoLabelGuardado(tenant.productoLabel ?? "");
+          setEmpresaProductoPlural(tenant.productoLabelPlural ?? "");
+          setEmpresaProductoPluralGuardado(tenant.productoLabelPlural ?? "");
           setEmpresaTenant(tenant);
         }
       } catch (e) {
@@ -574,6 +589,78 @@ export function CamposEmpresaPage() {
     if (!filtroEmpresa) return;
     const next = empresaOpcionesProveedor.filter((o) => o !== opcion);
     await persistirOpcionesProveedor(next);
+  }
+
+  function aplicarProductoLabelGuardado(
+    t: Pick<Tenant, "productoLabel" | "productoLabelPlural">,
+  ) {
+    const singular = t.productoLabel ?? "";
+    const plural = t.productoLabelPlural ?? "";
+    setEmpresaProductoLabel(singular);
+    setEmpresaProductoLabelGuardado(singular);
+    setEmpresaProductoPlural(plural);
+    setEmpresaProductoPluralGuardado(plural);
+  }
+
+  /** Guarda el singular (el backend genera el plural con IA) o una corrección del plural. */
+  async function guardarProductoLabel(campo: "singular" | "plural") {
+    if (!filtroEmpresa) return;
+    const body =
+      campo === "singular"
+        ? empresaProductoLabel.trim() === empresaProductoLabelGuardado
+          ? null
+          : { productoLabel: empresaProductoLabel.trim() || null }
+        : empresaProductoPlural.trim() === empresaProductoPluralGuardado
+          ? null
+          : { productoLabelPlural: empresaProductoPlural.trim() || null };
+    if (!body) return;
+    setSavingProductoLabel(true);
+    setEmpresaConfigError(null);
+    try {
+      const actualizado = await apiJson<Tenant>(
+        `/api/tenants/${encodeURIComponent(filtroEmpresa)}`,
+        () => getToken(),
+        { method: "PATCH", body: JSON.stringify(body) },
+      );
+      aplicarProductoLabelGuardado(actualizado);
+      setEmpresaTenant((t) =>
+        t
+          ? {
+              ...t,
+              productoLabel: actualizado.productoLabel,
+              productoLabelPlural: actualizado.productoLabelPlural,
+            }
+          : t,
+      );
+      showToast("Label actualizado", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingProductoLabel(false);
+    }
+  }
+
+  async function toggleColumnaProductos() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaColumnaProductos;
+    setSavingColumnaProductos(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ viajesColumnaProductosHabilitada: nuevoValor }),
+      });
+      setEmpresaColumnaProductos(nuevoValor);
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingColumnaProductos(false);
+    }
   }
 
   async function toggleDashboardHabilitado() {
@@ -1331,6 +1418,48 @@ export function CamposEmpresaPage() {
                         )}
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
+                            Nombre de "Producto"
+                            <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                              Reemplaza a "Producto" en todo el sistema (Viajes,
+                              Base de datos, importación y PDFs de Factura y
+                              Liquidación), salvo Stock. El plural se completa
+                              solo; corregilo si hace falta. Vacío = "Producto".
+                            </p>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <div className="ml-auto flex max-w-xs flex-col gap-2">
+                              <input
+                                value={empresaProductoLabel}
+                                onChange={(e) => setEmpresaProductoLabel(e.target.value)}
+                                onBlur={() => void guardarProductoLabel("singular")}
+                                disabled={savingProductoLabel}
+                                maxLength={40}
+                                placeholder="Producto"
+                                aria-label="Nombre de Producto en singular"
+                                className="h-9 w-full border border-black/15 bg-white px-3 text-sm text-left disabled:opacity-50"
+                              />
+                              {empresaProductoLabelGuardado && (
+                                <label className="flex items-center gap-2 text-xs text-vialto-steel">
+                                  Plural
+                                  <input
+                                    value={empresaProductoPlural}
+                                    onChange={(e) => setEmpresaProductoPlural(e.target.value)}
+                                    onBlur={() => void guardarProductoLabel("plural")}
+                                    disabled={savingProductoLabel}
+                                    maxLength={40}
+                                    placeholder="Productos"
+                                    className="h-9 min-w-0 flex-1 border border-black/15 bg-white px-3 text-sm text-left text-vialto-charcoal disabled:opacity-50"
+                                  />
+                                </label>
+                              )}
+                              {savingProductoLabel && (
+                                <span className="text-xs text-vialto-steel">Guardando…</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
                             Mostrar importación masiva de Excel para el admin
                           </td>
                           <td className="px-4 py-2.5 text-right">
@@ -1654,6 +1783,9 @@ export function CamposEmpresaPage() {
                     labels={{
                       idPropio1: empresaLabelGuardado,
                       idPropio2: empresaIdPropio2LabelGuardado,
+                      productos: empresaProductoLabelGuardado
+                        ? empresaProductoPluralGuardado || empresaProductoLabelGuardado
+                        : undefined,
                     }}
                     onGuardado={(viajesColumnasOrden) =>
                       setEmpresaTenant((t) =>
@@ -1661,6 +1793,29 @@ export function CamposEmpresaPage() {
                       )
                     }
                   />
+                  <div className="flex w-full items-center justify-between gap-4 border-t border-black/10 pt-3">
+                    <div>
+                      <span className="text-xs font-semibold uppercase tracking-[0.10em] text-vialto-charcoal">
+                        Columna de {empresaProductoPluralGuardado || "productos"}
+                      </span>
+                      <p className="mt-1 text-xs text-vialto-steel">
+                        Muestra en la grilla de Viajes los{" "}
+                        {(empresaProductoPluralGuardado || "productos").toLowerCase()} de
+                        cada viaje. Requiere que el campo esté visible en los
+                        formularios de Viajes.
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      checked={empresaColumnaProductos}
+                      disabled={savingColumnaProductos}
+                      onChange={() => void toggleColumnaProductos()}
+                      label={
+                        empresaColumnaProductos
+                          ? "Ocultar columna de productos"
+                          : "Mostrar columna de productos"
+                      }
+                    />
+                  </div>
                 </div>
               )}
 

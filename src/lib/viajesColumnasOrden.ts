@@ -22,6 +22,9 @@ export const VIAJES_COLUMNAS = [
   { id: "etapa", label: "Etapa" },
   { id: "origenDestino", label: "Origen — Destino" },
   { id: "cargaDescarga", label: "Fecha" },
+  // Opcional (Tenant.viajesColumnaProductosHabilitada); el label real es el
+  // plural de "Producto" de la empresa (`useProductoLabels`).
+  { id: "productos", label: "Productos" },
 ] as const;
 
 export type ViajeColumnaId = (typeof VIAJES_COLUMNAS)[number]["id"];
@@ -63,7 +66,11 @@ export function columnasViajesHabilitadas(
   tenant:
     | Pick<
         Tenant,
-        "idSistemaHabilitado" | "idPropio1Habilitado" | "idPropio2Habilitado" | "tipoFlota"
+        | "idSistemaHabilitado"
+        | "idPropio1Habilitado"
+        | "idPropio2Habilitado"
+        | "tipoFlota"
+        | "viajesColumnaProductosHabilitada"
       >
     | null
     | undefined,
@@ -82,6 +89,10 @@ export function columnasViajesHabilitadas(
       campoVisible("liquidacionEstado"),
     origenDestino: true,
     cargaDescarga: true,
+    // Switch propio + el campo Productos de Viajes visible (sin productos, la
+    // columna quedaría siempre vacía).
+    productos:
+      Boolean(tenant?.viajesColumnaProductosHabilitada) && campoVisible("productoItems"),
   };
   return new Set(IDS_ESTANDAR.filter((id) => habilitada[id]));
 }

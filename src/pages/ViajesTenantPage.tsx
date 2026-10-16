@@ -8,6 +8,9 @@ import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import { ProductoLabelsProvider } from "@/hooks/useProductoLabels";
+import { productoLabels } from "@/lib/productoLabel";
+import { nombresProductosViaje } from "@/lib/productosViaje";
 import {
   Fragment,
   useCallback,
@@ -2191,6 +2194,11 @@ export function ViajesTenantPage({
   const mostrarColumnaIdSistema = idSistemaHabilitado(currentTenant);
   const mostrarColumnaIdPropio1 = idPropio1Habilitado(currentTenant);
   const mostrarColumnaIdPropio2 = idPropio2Habilitado(currentTenant);
+  // Columna opcional (switch de superadmin) y solo si la empresa carga productos.
+  const mostrarColumnaProductos =
+    Boolean(tenantEfectivo?.viajesColumnaProductosHabilitada) &&
+    isViajeFieldVisible("edicion_viaje", "productoItems");
+  const productoLabelsTenant = productoLabels(tenantEfectivo);
   // Mismo criterio que la columna/badge de la grilla: si el tenant tiene el
   // campo oculto, tampoco se ofrece como columna en la exportación a Excel.
   const viajesExportColumnsDisponibles = VIAJES_EXPORT_COLUMNS.filter((c) => {
@@ -2207,6 +2215,7 @@ export function ViajesTenantPage({
     cantidadColumnasEstado +
     (mostrarColumnaTransporte ? 0 : -1) +
     (mostrarColumnaIdPropio2 ? 1 : 0) +
+    (mostrarColumnaProductos ? 1 : 0) +
     (mostrarColumnaIdSistema ? 0 : -1) +
     (mostrarColumnaIdPropio1 ? 0 : -1);
   const tableColSpan = mostrarColumnaSeleccionLote
@@ -2618,6 +2627,11 @@ export function ViajesTenantPage({
         </ViajesListadoHeaderFiltro>
       </th>
     ),
+    productos: mostrarColumnaProductos && (
+      <th scope="col" className={`${listadoTablaThClass} align-top`}>
+        {productoLabelsTenant.plural}
+      </th>
+    ),
   };
 
   // ─── RENDER DE LA BARRA DE FILTROS ─────────────────────────────────────────
@@ -2940,6 +2954,8 @@ export function ViajesTenantPage({
   );
 
   return (
+    // Label de "Producto" de la empresa (también la elegida por superadmin) para los modales de abajo.
+    <ProductoLabelsProvider tenant={tenantEfectivo}>
     <div className="w-full">
       {filtroRapidoPortalTarget
         ? createPortal(filtroRapidoContent, filtroRapidoPortalTarget)
@@ -3258,6 +3274,16 @@ export function ViajesTenantPage({
                 </div>
               </td>
             ),
+            productos: mostrarColumnaProductos && (
+              <td className="h-8 px-3 py-1 text-vialto-steel">
+                <span
+                  className="block max-w-[12rem] truncate"
+                  title={nombresProductosViaje(v).join(", ") || undefined}
+                >
+                  {nombresProductosViaje(v).join(", ") || "—"}
+                </span>
+              </td>
+            ),
           };
           return (
             <tr
@@ -3513,6 +3539,14 @@ export function ViajesTenantPage({
                 </div>
               ),
             }],
+            productos: mostrarColumnaProductos
+              ? [
+                  {
+                    label: productoLabelsTenant.plural,
+                    value: nombresProductosViaje(v).join(", ") || "—",
+                  },
+                ]
+              : [],
           };
           return (
             <ListadoCard
@@ -4284,5 +4318,6 @@ export function ViajesTenantPage({
         )}
       </div>
     </div>
+    </ProductoLabelsProvider>
   );
 }

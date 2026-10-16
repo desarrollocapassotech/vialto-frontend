@@ -16,6 +16,8 @@ import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { puedeGestionarComoAdminEmpresa } from "@/lib/roleLabels";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { useProductoLabels } from "@/hooks/useProductoLabels";
+import { PRODUCTO_LABELS_DEFAULT, labelEnFrase } from "@/lib/productoLabel";
 
 type Paginated = { items: Producto[]; meta: PaginatedMeta };
 
@@ -32,6 +34,10 @@ export function ProductosTenantPage() {
     orgRole,
     user?.publicMetadata,
   );
+  const labels = useProductoLabels();
+  const labelPropio = labels.singular !== PRODUCTO_LABELS_DEFAULT.singular;
+  const singularFrase = labelEnFrase(labels.singular);
+  const pluralFrase = labelEnFrase(labels.plural);
 
   const [rows, setRows] = useState<Producto[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
@@ -147,7 +153,7 @@ export function ProductosTenantPage() {
             className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 font-mono text-sm ${
               codigoFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
             }`}
-            aria-label="Filtrar por código de producto"
+            aria-label={`Filtrar por código de ${singularFrase}`}
           />
           <button
             type="button"
@@ -171,7 +177,7 @@ export function ProductosTenantPage() {
             className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
               nombreFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
             }`}
-            aria-label="Filtrar por nombre de producto"
+            aria-label={`Filtrar por nombre de ${singularFrase}`}
           />
           <button
             type="button"
@@ -193,7 +199,7 @@ export function ProductosTenantPage() {
               ? "text-vialto-fire"
               : "text-vialto-charcoal"
           }`}
-          aria-label="Filtrar por estado del producto"
+          aria-label={`Filtrar por estado de ${singularFrase}`}
         >
           <option value="todos">Todos</option>
           <option value="activos">Solo activos</option>
@@ -209,10 +215,10 @@ export function ProductosTenantPage() {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <div className="min-w-0">
           <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
-            Productos
+            {labels.plural}
           </h1>
           <p className="mt-2 text-vialto-steel max-w-2xl">
-            {"Los productos que manipulás."}
+            {labelPropio ? `Catálogo de ${pluralFrase}.` : "Los productos que manipulás."}
           </p>
         </div>
         {activeFilterCount > 0 && (
@@ -225,7 +231,7 @@ export function ProductosTenantPage() {
               onClick={() => setModal({ mode: "create" })}
               className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
             >
-              Nuevo producto
+              {labelPropio ? `Crear ${singularFrase}` : "Nuevo producto"}
             </button>
           )}
         </div>
@@ -269,7 +275,7 @@ export function ProductosTenantPage() {
                         ? "text-vialto-fire"
                         : "text-vialto-charcoal"
                     }`}
-                    aria-label="Filtrar por código de producto"
+                    aria-label={`Filtrar por código de ${singularFrase}`}
                   />
                   <button
                     type="button"
@@ -306,7 +312,7 @@ export function ProductosTenantPage() {
                         ? "text-vialto-fire"
                         : "text-vialto-charcoal"
                     }`}
-                    aria-label="Filtrar por nombre de producto"
+                    aria-label={`Filtrar por nombre de ${singularFrase}`}
                   />
                   <button
                     type="button"
@@ -337,7 +343,7 @@ export function ProductosTenantPage() {
                       ? "text-vialto-fire"
                       : "text-vialto-charcoal"
                   }`}
-                  aria-label="Filtrar por estado del producto"
+                  aria-label={`Filtrar por estado de ${singularFrase}`}
                 >
                   <option value="todos">Todos</option>
                   <option value="activos">Solo activos</option>
@@ -399,8 +405,8 @@ export function ProductosTenantPage() {
         rowKey={(r) => r.id}
         emptyMessage={
           error
-            ? "No se pudieron cargar los productos."
-            : "No hay productos que coincidan con el criterio."
+            ? `No se pudieron cargar los ${pluralFrase}.`
+            : `No hay ${pluralFrase} que coincidan con el criterio.`
         }
         loadingMessage="Cargando…"
         renderActions={(r) => (
@@ -454,6 +460,7 @@ export function ProductosTenantPage() {
 
       {modal.mode === "create" && (
         <ProductoModal
+          labels={labels}
           modo="create"
           getToken={getToken}
           onClose={() => setModal({ mode: "closed" })}
@@ -466,6 +473,7 @@ export function ProductosTenantPage() {
 
       {modal.mode === "view" && (
         <ProductoModal
+          labels={labels}
           modo="view"
           productoInicial={modal.producto}
           getToken={getToken}
@@ -481,6 +489,7 @@ export function ProductosTenantPage() {
 
       {modal.mode === "edit" && (
         <ProductoModal
+          labels={labels}
           modo="edit"
           productoInicial={modal.producto}
           getToken={getToken}

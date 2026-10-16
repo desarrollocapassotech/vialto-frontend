@@ -3,6 +3,8 @@ import { ProductoSearchableSelect } from '@/components/viajes/ProductoSearchable
 import { ProductoModal } from '@/components/stock/ProductoModal';
 import type { OpcionProducto, ViajeProductoItem } from '@/lib/productosViaje';
 import type { Producto } from '@/types/api';
+import { labelEnFrase } from '@/lib/productoLabel';
+import { useProductoLabels } from '@/hooks/useProductoLabels';
 
 export type ViajeProductosListaProps = {
   groupId: string;
@@ -26,6 +28,7 @@ export function ViajeProductosLista({
   getToken,
   onProductoCreado,
 }: ViajeProductosListaProps) {
+  const labels = useProductoLabels();
   const [showNuevo, setShowNuevo] = useState(false);
   const [nuevoParaIndex, setNuevoParaIndex] = useState<number | null>(null);
   const [localOpciones, setLocalOpciones] = useState<OpcionProducto[]>([]);
@@ -83,7 +86,7 @@ export function ViajeProductosLista({
                 patchRow(i, { cantidad: Number.isFinite(n) ? n : null });
               }}
               className={`${triggerClassName} w-24 text-right tabular-nums`}
-              aria-label={`Cantidad de producto ${i + 1}`}
+              aria-label={`Cantidad de ${labelEnFrase(labels.singular)} ${i + 1}`}
             />
           </label>
           <button
@@ -102,10 +105,11 @@ export function ViajeProductosLista({
         onClick={addRow}
         className="h-9 w-fit px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50"
       >
-        + Agregar producto
+        + Agregar {labelEnFrase(labels.singular)}
       </button>
       {showNuevo && getToken && (
         <ProductoModal
+          labels={labels}
           modo="create"
           getToken={getToken}
           onClose={() => { setShowNuevo(false); setNuevoParaIndex(null); }}

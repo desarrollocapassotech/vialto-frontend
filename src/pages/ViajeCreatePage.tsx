@@ -77,6 +77,8 @@ import type {
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import { ProductoLabelsProvider } from "@/hooks/useProductoLabels";
 import {
   labelIdentificacionPersonalizadaViajes,
   idSistemaHabilitado,
@@ -114,6 +116,8 @@ export function ViajeCreatePage() {
   const { isVisible } = useFieldConfig("viajes");
   const { flotaPropiaVisible, transportistaExternoVisible } =
     useTipoFlotaVisible(tenantId || undefined);
+  // Tenant efectivo (propio u override de superadmin), para el label de "Producto".
+  const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId || undefined);
   const desgloseActivo = isVisible("alta_viaje", "desgloseMontos");
   const ivaTransportistaVisible = isVisible(
     "alta_viaje",
@@ -1007,7 +1011,7 @@ export function ViajeCreatePage() {
 
   // ─── RENDERIZADO ──────────────────────────────────────────────────────────
   return (
-    <>
+    <ProductoLabelsProvider tenant={tenantEfectivo}>
       <CrudPageLayout title="Crear viaje" contentClassName="w-full min-w-0">
         {loadingRefs ? (
           <p className="mt-6 text-vialto-steel">Cargando referencias…</p>
@@ -1331,6 +1335,6 @@ export function ViajeCreatePage() {
           }}
         />
       )}
-    </>
+    </ProductoLabelsProvider>
   );
 }

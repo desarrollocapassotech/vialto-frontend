@@ -8,6 +8,7 @@
  */
 import { round2 } from "@/lib/liquidacionConceptosIva";
 import { numeroVisibleViaje } from "@/lib/viajesFlota";
+import { productoLabels } from "@/lib/productoLabel";
 import type { Tenant, Viaje } from "@/types/api";
 
 export type TenantPdfDetalle = Pick<
@@ -17,6 +18,8 @@ export type TenantPdfDetalle = Pick<
   | "idPropio2Habilitado"
   | "idPropio2Label"
   | "unidadCantidadViajes"
+  | "productoLabel"
+  | "productoLabelPlural"
 > | null | undefined;
 
 /** Mismo formato numérico que `fmtNum` de los PDFs (es-AR, 2 decimales, sin símbolo). */
@@ -60,7 +63,7 @@ export function detalleFleteFactura(v: ViajeFactura, tenant: TenantPdfDetalle): 
     .map((p) => p.producto?.nombre)
     .filter(Boolean)
     .join(", ");
-  if (producto) detalle += ` - PRODUCTO: ${producto}`;
+  if (producto) detalle += ` - ${productoLabels(tenant).singular.toUpperCase()}: ${producto}`;
   return detalle;
 }
 
@@ -144,7 +147,7 @@ export function filasPdfLiquidacion(
     ...(opts.unSoloViaje
       ? []
       : [[usaIdPropio ? labelIdPropio : "ID de Viaje", idTexto] as [string, string]]),
-    ["Producto", "SERVICIOS LOGISTICOS"],
+    [productoLabels(tenant).singular, "SERVICIOS LOGISTICOS"],
     ["Descripción", desc.join("\n").toUpperCase()],
     ["Cantidad", cantidad != null ? `${fmtNumPdf(cantidad)} ${unidad(tenant)}` : "1,00"],
     ["Precio", fmtNumPdf(tarifa ?? base)],

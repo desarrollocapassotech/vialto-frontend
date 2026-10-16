@@ -17,6 +17,7 @@ import { OtroGastoAutorDisplay } from "@/components/viajes/OtrosGastosFieldset";
 import { useOrgUserLabels } from "@/hooks/useOrgUserLabels";
 import type { Viaje } from "@/types/api";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useProductoLabels } from "@/hooks/useProductoLabels";
 import {
   etapaViajeBadgeClass,
   etapaViajeBadgeClassDefault,
@@ -106,6 +107,7 @@ export function ViajeViewModal({
 }) {
   const userLabelMap = useOrgUserLabels(tenantId);
   const { isVisible } = useFieldConfig("viajes");
+  const productoLabelsTenant = useProductoLabels();
   const bloqueado = editando || facturando || liquidando;
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -239,7 +241,7 @@ export function ViajeViewModal({
     { key: "vehiculosRows", label: "Vehículos", value: vehiculoPatentes },
     ...(esMultiCliente
       ? []
-      : [{ key: "productoItems", label: "Productos", value: productosDesc }]),
+      : [{ key: "productoItems", label: productoLabelsTenant.plural, value: productosDesc }]),
     ...(esMultiCliente
       ? []
       : [
