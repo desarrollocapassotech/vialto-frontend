@@ -2,7 +2,16 @@ import { fechaDiaYmd, fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Banknote, Eye, FileSpreadsheet, FileText, Filter, Hash, X } from 'lucide-react';
+import {
+  Banknote,
+  Eye,
+  FileSearch,
+  FileSpreadsheet,
+  FileText,
+  Filter,
+  Hash,
+  X,
+} from 'lucide-react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
@@ -33,6 +42,7 @@ import { MovimientoCcFormModal } from './MovimientoCcFormModal';
 import { ImputarPagoModal } from './ImputarPagoModal';
 import { ComprobanteCcModal } from './ComprobanteCcModal';
 import { ComprobanteOrigenCcModal, type ComprobanteOrigenCc } from './ComprobanteOrigenCcModal';
+import { ImputacionesCobroModal } from './ImputacionesCobroModal';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import {
   canAccessEmisionLiquidoProductoArca,
@@ -47,10 +57,19 @@ type ModalState =
   | { kind: 'imputar'; cargo: MovimientoCc }
   | { kind: 'comprobante'; movimiento: MovimientoCc }
   | { kind: 'origen'; comprobante: ComprobanteOrigenCc }
+  | { kind: 'imputaciones'; pago: MovimientoCc }
   | { kind: 'exportar'; formato: 'pdf' | 'excel' }
   | null;
 
-type MovimientoConSaldo = MovimientoCc & { saldoAcumulado: number };
+type MovimientoConSaldo = MovimientoCc & {
+  saldoAcumulado: number;
+  /** Cobro/pago imputado a un solo cargo: ese cargo (su factura/liquidación). */
+  cargoUnico: MovimientoCc | null;
+  /** Columna Comprobante: en un cobro de una sola factura, el número de esa factura. */
+  comprobanteMostrado: string | null;
+  /** Cobro/pago imputado a varios cargos: el número de cada uno. */
+  comprobantesImputados: string[];
+};
 
 /** Saldo con signo pesos adelante: "$ 1.234,00" / "-$ 1.234,00". */
 function fmtSaldo(valor: number): string {
@@ -105,7 +124,7 @@ export function CuentaContraparteView({
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
-  const [accionesDeFila, setAccionesDeFila] = useState<MovimientoCc | null>(null);
+  const [accionesDeFila, setAccionesDeFila] = useState<MovimientoConSaldo | null>(null);
 
   const cargarDatos = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return;
@@ -144,6 +163,7 @@ export function CuentaContraparteView({
     if (!movimientos) return null;
     const ascendente = [...movimientos].sort(compararPorCarga);
     const acumuladoPorMoneda = new Map<string, number>();
+    const porId = new Map(movimientos.map((m) => [m.id, m]));
     const conSaldo: MovimientoConSaldo[] = [];
     for (const m of ascendente) {
       let acumulado = acumuladoPorMoneda.get(m.moneda) ?? 0;
@@ -151,7 +171,24 @@ export function CuentaContraparteView({
         acumulado += esDebeCc(m) ? m.importe : -m.importe;
         acumuladoPorMoneda.set(m.moneda, acumulado);
       }
-      conSaldo.push({ ...m, saldoAcumulado: acumulado });
+      // Cobro/pago imputado a un único cargo: es "el cobro de esa factura/liquidación".
+      const cargoUnico =
+        m.tipo === 'pago' && m.cargosImputadosIds?.length === 1
+          ? porId.get(m.cargosImputadosIds[0]) ?? null
+          : null;
+      // Cobro/pago imputado a varios cargos: sus números (la columna muestra "…" y el
+      // tooltip los lista todos).
+      const comprobantesImputados =
+        m.tipo === 'pago' && (m.cargosImputadosIds?.length ?? 0) > 1
+          ? m.cargosImputadosIds!.map((id) => porId.get(id)?.numeroComprobante?.trim() || 'Sin número')
+          : [];
+      conSaldo.push({
+        ...m,
+        saldoAcumulado: acumulado,
+        cargoUnico,
+        comprobantesImputados,
+        comprobanteMostrado: cargoUnico?.numeroComprobante ?? m.numeroComprobante ?? null,
+      });
     }
     return conSaldo.reverse();
   }, [movimientos]);
@@ -188,7 +225,9 @@ export function CuentaContraparteView({
         return false;
       if (
         comprobanteFiltro.trim() &&
-        !(m.numeroComprobante ?? '').toLowerCase().includes(comprobanteFiltro.trim().toLowerCase())
+        ![m.comprobanteMostrado ?? '', ...m.comprobantesImputados].some((n) =>
+          n.toLowerCase().includes(comprobanteFiltro.trim().toLowerCase()),
+        )
       )
         return false;
       return true;
@@ -207,20 +246,25 @@ export function CuentaContraparteView({
    * Factura o liquidación de la que nace el movimiento. Una anulación no guarda el vínculo:
    * se toma del movimiento que compensa (misma cuenta, ya está en la lista).
    */
-  function comprobanteOrigenDe(m: MovimientoCc): ComprobanteOrigenCc | null {
+  function comprobanteOrigenDe(m: MovimientoConSaldo): ComprobanteOrigenCc | null {
+    // Anulación → el comprobante que compensa; cobro/pago de un solo cargo → ese cargo.
     const base = m.anulaMovimientoId
       ? (movimientos ?? []).find((x) => x.id === m.anulaMovimientoId) ?? null
-      : m;
-    if (!base) return null;
-    if (base.facturaId && puedeVerFacturas) return { tipo: 'factura', id: base.facturaId };
-    if (base.liquidacionId && puedeVerLiquidaciones) {
-      return { tipo: 'liquidacion', id: base.liquidacionId };
-    }
+      : m.tipo === 'pago'
+        ? m.cargoUnico
+        : m;
+    return base ? origenDeCargo(base) : null;
+  }
+
+  /** La factura/liquidación de un cargo, si la empresa tiene el módulo para abrirla. */
+  function origenDeCargo(c: MovimientoCc): ComprobanteOrigenCc | null {
+    if (c.facturaId && puedeVerFacturas) return { tipo: 'factura', id: c.facturaId };
+    if (c.liquidacionId && puedeVerLiquidaciones) return { tipo: 'liquidacion', id: c.liquidacionId };
     return null;
   }
 
   /** Acciones de una fila: las usan el botón de Acciones y el click en la fila. */
-  function accionesDe(m: MovimientoCc): AccionOpcion[] {
+  function accionesDe(m: MovimientoConSaldo): AccionOpcion[] {
     const opciones: AccionOpcion[] = [];
     const puedeImputar =
       m.tipo === 'cargo' &&
@@ -247,11 +291,26 @@ export function CuentaContraparteView({
       });
     }
     const origen = comprobanteOrigenDe(m);
-    if (origen) {
+    // Cobros/pagos y anulaciones: "Ver facturas asociadas" (una → su detalle; varias →
+    // cuánto fue a cada una). Una factura/liquidación: "Ver factura/liquidación".
+    const esAsociada = m.tipo === 'pago' || m.tipo === 'credito';
+    const asociadasLabel = m.clienteId ? 'Ver facturas asociadas' : 'Ver liquidaciones asociadas';
+    if (esAsociada && m.tipo === 'pago' && (m.imputacionesPorCargo?.length ?? 0) > 1) {
       opciones.push({
-        id: 'ver-origen',
-        label: origen.tipo === 'factura' ? 'Ver factura' : 'Ver liquidación',
-        icon: Eye,
+        id: 'ver-asociadas',
+        label: asociadasLabel,
+        icon: FileSearch,
+        onClick: () => setModal({ kind: 'imputaciones', pago: m }),
+      });
+    } else if (origen) {
+      opciones.push({
+        id: esAsociada ? 'ver-asociadas' : 'ver-origen',
+        label: esAsociada
+          ? asociadasLabel
+          : origen.tipo === 'factura'
+            ? 'Ver factura'
+            : 'Ver liquidación',
+        icon: esAsociada ? FileSearch : Eye,
         onClick: () => setModal({ kind: 'origen', comprobante: origen }),
       });
     }
@@ -452,16 +511,6 @@ export function CuentaContraparteView({
                     {String(m.ivaPct).replace('.', ',')}% {formatCurrencyArFromNumber(m.ivaMonto)}
                   </span>
                 )}
-                {m.anuladoPor && (
-                  <span className="block text-xs text-vialto-steel">
-                    anulado el {fmtDateUtc(m.anuladoPor.fecha)}
-                  </span>
-                )}
-                {m.anulaMovimiento && (
-                  <span className="block text-xs text-vialto-steel">
-                    compensa el movimiento del {fmtDateUtc(m.anulaMovimiento.fecha)}
-                  </span>
-                )}
               </span>
             ),
             tdClassName: listadoTablaTdClass,
@@ -470,7 +519,18 @@ export function CuentaContraparteView({
           {
             id: 'numeroFactura',
             header: 'Comprobante',
-            cell: (m: MovimientoConSaldo) => m.numeroComprobante ?? '—',
+            cell: (m: MovimientoConSaldo) =>
+              m.comprobantesImputados.length > 1 ? (
+                // Varias facturas: "…" y el tooltip (oscuro, de ListadoDatos) las lista.
+                <span
+                  className="cursor-help"
+                  title={`Imputado a:\n${m.comprobantesImputados.join('\n')}`}
+                >
+                  …
+                </span>
+              ) : (
+                m.comprobanteMostrado ?? '—'
+              ),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
@@ -614,6 +674,12 @@ export function CuentaContraparteView({
           contraparteNombre={contraparteNombre}
           tipoInicial={modal.tipoInicial}
           permiteCargo={permiteCargoManual}
+          cargosPendientes={(movimientos ?? []).filter(
+            (m) =>
+              m.tipo === 'cargo' &&
+              (m.estadoDisponibilidad === 'pendiente' || m.estadoDisponibilidad === 'parcial') &&
+              (m.pendiente ?? m.importe) > 0.005,
+          )}
           onClose={() => setModal(null)}
           onCreated={cargarDatos}
         />
@@ -631,6 +697,17 @@ export function CuentaContraparteView({
           movimiento={modal.movimiento}
           onClose={() => setModal(null)}
           onDone={cargarDatos}
+        />
+      )}
+      {modal?.kind === 'imputaciones' && (
+        <ImputacionesCobroModal
+          pago={modal.pago}
+          movimientos={movimientos ?? []}
+          onVerCargo={(cargo) => {
+            const origen = origenDeCargo(cargo);
+            return origen ? () => setModal({ kind: 'origen', comprobante: origen }) : null;
+          }}
+          onClose={() => setModal(null)}
         />
       )}
       {modal?.kind === 'origen' && (

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Ban, Banknote, Receipt } from 'lucide-react';
 import { apiJson } from '@/lib/api';
+import { usuarioLabel } from '@/lib/usuarioLabel';
 import { friendlyError } from '@/lib/friendlyError';
 import { useToast } from '@/lib/toast';
 import { Spinner } from '@/components/ui/Spinner';
@@ -522,8 +523,9 @@ export function FacturaViewModal({
                 <p className="mt-1 text-sm">{fmtDate(factura.anulacionCaeFechaVto)}</p>
               </div>
             )}
+            {/* Motivo y "Anulada por" en la misma fila (sin motivo, "Anulada por" va solo). */}
             {factura.motivoAnulacion && (
-              <div className="sm:col-span-2">
+              <div>
                 <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
                   Motivo
                 </p>
@@ -536,7 +538,7 @@ export function FacturaViewModal({
                   Anulada por
                 </p>
                 <p className="mt-1 text-sm">
-                  {factura.anuladoPorNombre ?? factura.anuladoPor}
+                  {usuarioLabel(factura.anuladoPorNombre, factura.anuladoPor)}
                 </p>
               </div>
             )}

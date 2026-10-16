@@ -45,6 +45,10 @@ export type MovimientoCc = {
   comprobanteEditable?: boolean;
   /** Se puede cargar/corregir el vencimiento desde Cuenta corriente (compra de liquidación o manual). */
   vencimientoEditable?: boolean;
+  /** Cobro/pago: cargos a los que está imputado (sin repetir). */
+  cargosImputadosIds?: string[];
+  /** Cobro/pago: cuánto se aplicó a cada cargo. */
+  imputacionesPorCargo?: { cargoId: string; importe: number }[];
   /**
    * Cuánto de ESTE movimiento puntual sigue sin resolverse (cargo: sin cobrar/pagar;
    * pago: sin imputar). Solo viene poblado en `fetchMovimientos` (`GET .../movimientos`).
@@ -197,6 +201,8 @@ export type CreateMovimientoCcInput = {
   numeroComprobante?: string;
   formaPago?: string;
   referencia?: string;
+  /** Cobro/pago: facturas/liquidaciones a imputar (el backend reparte del más viejo al más nuevo). */
+  imputarACargoIds?: string[];
 };
 
 export function createMovimiento(getToken: GetToken, input: CreateMovimientoCcInput) {
