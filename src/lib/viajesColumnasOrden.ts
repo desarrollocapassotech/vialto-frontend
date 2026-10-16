@@ -21,7 +21,7 @@ export const VIAJES_COLUMNAS = [
   { id: "chofer", label: "Chofer" },
   { id: "etapa", label: "Etapa" },
   { id: "origenDestino", label: "Origen — Destino" },
-  { id: "cargaDescarga", label: "Carga — Descarga" },
+  { id: "cargaDescarga", label: "Fecha" },
 ] as const;
 
 export type ViajeColumnaId = (typeof VIAJES_COLUMNAS)[number]["id"];

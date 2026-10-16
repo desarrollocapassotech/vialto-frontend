@@ -2556,7 +2556,7 @@ export function ViajesTenantPage({
     cargaDescarga: (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
         <ViajesListadoHeaderFiltro
-          title="Carga — Descarga"
+          title="Fecha"
           filterActive={
             !!fechaDesdeFiltro.trim() || !!fechaHastaFiltro.trim()
           }
@@ -2830,7 +2830,7 @@ export function ViajesTenantPage({
         </div>
       </ListadoFiltroCampo>
       <ListadoFiltroCampo
-        label="Carga — Descarga"
+        label="Fecha"
         active={!!fechaDesdeFiltro.trim() || !!fechaHastaFiltro.trim()}
       >
         <div className="flex flex-col gap-2">
@@ -3107,17 +3107,14 @@ export function ViajesTenantPage({
             ),
             idPropio1: mostrarColumnaIdPropio1 && (
               <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
-                <TruncarInicio
-                  className="max-w-[5rem]"
-                  title={v.numeroIdentificacionPersonalizado?.trim() || undefined}
-                >
+                <TruncarInicio>
                   {v.numeroIdentificacionPersonalizado?.trim() || "—"}
                 </TruncarInicio>
               </td>
             ),
             idPropio2: mostrarColumnaIdPropio2 && (
               <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
-                <TruncarInicio className="max-w-[5rem]" title={v.idPropio2?.trim() || undefined}>
+                <TruncarInicio>
                   {v.idPropio2?.trim() || "—"}
                 </TruncarInicio>
               </td>
@@ -3490,7 +3487,7 @@ export function ViajesTenantPage({
               ),
             }],
             cargaDescarga: [{
-              label: "Carga — Descarga",
+              label: "Fecha",
               value: (
                 <div className="flex flex-col gap-0.5 tabular-nums">
                   <span
