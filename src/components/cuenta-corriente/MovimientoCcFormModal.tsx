@@ -1,6 +1,8 @@
 import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 import { useAuth } from '@clerk/clerk-react';
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
+import { Info } from 'lucide-react';
+import { TooltipsDelegados } from '@/components/ui/TooltipsDelegados';
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -38,6 +40,20 @@ type Props = {
   onCreated: () => void;
 };
 
+/** Texto del tooltip "Ver detalle" de una factura/liquidación de la lista (una línea por dato). */
+function detalleCargo(c: MovimientoCc): string {
+  const pendiente = c.pendiente ?? c.importe;
+  const monto = (n: number) => `$ ${formatCurrencyArFromNumber(n)} ${c.moneda}`;
+  return [
+    `${c.concepto}${c.numeroComprobante ? ` ${c.numeroComprobante}` : ''}`,
+    `Fecha: ${fmtDateUtc(c.fecha)}`,
+    `Vencimiento: ${c.fechaVencimiento ? fmtDateUtc(c.fechaVencimiento) : 'sin vencimiento'}`,
+    `Total: ${monto(c.importe)}`,
+    `Cobrado: ${monto(c.importe - pendiente)}`,
+    `Saldo: ${monto(pendiente)}`,
+  ].join('\n');
+}
+
 /** Ordena del más viejo al más nuevo: mismo orden en que el backend reparte el importe. */
 function porAntiguedad(a: MovimientoCc, b: MovimientoCc): number {
   const porFecha = new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
@@ -72,6 +88,7 @@ export function MovimientoCcFormModal({
 
   // Cobro/pago: a qué facturas/liquidaciones imputarlo. Vacío = "No imputar" (queda a cuenta).
   const [imputarA, setImputarA] = useState<string[]>([]);
+  const listaRef = useRef<HTMLDivElement>(null);
   const opcionesImputar = [...cargosPendientes].sort(porAntiguedad);
   const elegidos = opcionesImputar.filter((c) => imputarA.includes(c.id));
   const totalElegido = elegidos.reduce((s, c) => s + (c.pendiente ?? c.importe), 0);
@@ -152,6 +169,9 @@ export function MovimientoCcFormModal({
             : 'Registrar pago'
       } — ${contraparteNombre}`}
       onClose={onClose}
+      // Cobro/pago: más ancho y alto para la lista de facturas a imputar.
+      maxWidthClass={esCargo ? undefined : 'sm:max-w-3xl'}
+      scrollBody={!esCargo}
       footer={
         <>
           <button type="button" className={viewModalBtnGhost} onClick={onClose}>
@@ -215,7 +235,11 @@ export function MovimientoCcFormModal({
             <legend className={labelClass}>
               {esCliente ? 'Facturas que cobra' : 'Liquidaciones que paga'}
             </legend>
-            <div className="max-h-56 overflow-y-auto border border-black/15 bg-white text-sm">
+            <TooltipsDelegados contenedorRef={listaRef} />
+            <div
+              ref={listaRef}
+              className="max-h-[45vh] overflow-y-auto border border-black/15 bg-white text-sm"
+            >
               <label className="flex cursor-pointer items-center gap-2 border-b border-black/10 px-2 py-1.5 hover:bg-vialto-mist">
                 <input
                   type="checkbox"
@@ -261,6 +285,16 @@ export function MovimientoCcFormModal({
                           </span>
                         )}
                       </span>
+                      {/* Detalle en tooltip; no marca/desmarca la factura. */}
+                      <button
+                        type="button"
+                        aria-label="Ver detalle"
+                        title={detalleCargo(c)}
+                        onClick={(e) => e.preventDefault()}
+                        className="shrink-0 rounded p-0.5 text-vialto-steel/50 transition-colors hover:text-vialto-charcoal"
+                      >
+                        <Info className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                      </button>
                     </label>
                   );
                 })

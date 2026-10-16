@@ -47,6 +47,8 @@ export type MovimientoCc = {
   vencimientoEditable?: boolean;
   /** Cobro/pago: cargos a los que está imputado (sin repetir). */
   cargosImputadosIds?: string[];
+  /** Cobro/pago: cuánto se aplicó a cada cargo. */
+  imputacionesPorCargo?: { cargoId: string; importe: number }[];
   /**
    * Cuánto de ESTE movimiento puntual sigue sin resolverse (cargo: sin cobrar/pagar;
    * pago: sin imputar). Solo viene poblado en `fetchMovimientos` (`GET .../movimientos`).
