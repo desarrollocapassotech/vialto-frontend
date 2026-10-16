@@ -187,7 +187,10 @@ export function CuentaContraparteView({
         saldoAcumulado: acumulado,
         cargoUnico,
         comprobantesImputados,
-        comprobanteMostrado: cargoUnico?.numeroComprobante ?? m.numeroComprobante ?? null,
+        // Un pago con número propio (ej. orden de pago) muestra el suyo; si no, el de la
+        // factura/liquidación que cancela.
+        comprobanteMostrado:
+          m.numeroComprobante?.trim() || cargoUnico?.numeroComprobante || null,
       });
     }
     return conSaldo.reverse();
@@ -521,12 +524,13 @@ export function CuentaContraparteView({
             header: 'Comprobante',
             cell: (m: MovimientoConSaldo) =>
               m.comprobantesImputados.length > 1 ? (
-                // Varias facturas: "…" y el tooltip (oscuro, de ListadoDatos) las lista.
+                // Varias facturas: su número propio (o "…") y el tooltip (oscuro, de
+                // ListadoDatos) lista a cuáles se imputó.
                 <span
                   className="cursor-help"
                   title={`Imputado a:\n${m.comprobantesImputados.join('\n')}`}
                 >
-                  …
+                  {m.numeroComprobante?.trim() || '…'}
                 </span>
               ) : (
                 m.comprobanteMostrado ?? '—'

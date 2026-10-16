@@ -78,6 +78,7 @@ import {
   viajePendienteComprobanteTransportista,
 } from "@/lib/viajesComprobantes";
 import type { ArcaConfig, LiquidacionEstado, Viaje } from "@/types/api";
+import { LiquidacionPagoBadge } from "@/components/liquidaciones/LiquidacionPagoBadge";
 
 const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
   borrador: "BORRADOR",
@@ -1182,6 +1183,7 @@ export function LiquidacionesTenantPage() {
                       >
                         {ESTADO_LABEL[liq.estado]}
                       </span>
+                      <LiquidacionPagoBadge estadoPago={liq.estadoPago} />
                       {liq.ambiente === "homologacion" && (
                         <span
                           title="Emitida en ambiente de pruebas (homologación)"
@@ -1250,6 +1252,7 @@ export function LiquidacionesTenantPage() {
                           >
                             {ESTADO_LABEL[liq.estado]}
                           </span>
+                          <LiquidacionPagoBadge estadoPago={liq.estadoPago} />
                           <AmbienteTestBadge ambiente={liq.ambiente} />
                         </div>
                       ),
