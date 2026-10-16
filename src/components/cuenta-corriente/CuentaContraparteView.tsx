@@ -50,7 +50,13 @@ type ModalState =
   | { kind: 'exportar'; formato: 'pdf' | 'excel' }
   | null;
 
-type MovimientoConSaldo = MovimientoCc & { saldoAcumulado: number };
+type MovimientoConSaldo = MovimientoCc & {
+  saldoAcumulado: number;
+  /** Cobro/pago imputado a un solo cargo: ese cargo (su factura/liquidación). */
+  cargoUnico: MovimientoCc | null;
+  /** Columna Comprobante: en un cobro de una sola factura, el número de esa factura. */
+  comprobanteMostrado: string | null;
+};
 
 /** Saldo con signo pesos adelante: "$ 1.234,00" / "-$ 1.234,00". */
 function fmtSaldo(valor: number): string {
@@ -105,7 +111,7 @@ export function CuentaContraparteView({
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
-  const [accionesDeFila, setAccionesDeFila] = useState<MovimientoCc | null>(null);
+  const [accionesDeFila, setAccionesDeFila] = useState<MovimientoConSaldo | null>(null);
 
   const cargarDatos = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return;
@@ -144,6 +150,7 @@ export function CuentaContraparteView({
     if (!movimientos) return null;
     const ascendente = [...movimientos].sort(compararPorCarga);
     const acumuladoPorMoneda = new Map<string, number>();
+    const porId = new Map(movimientos.map((m) => [m.id, m]));
     const conSaldo: MovimientoConSaldo[] = [];
     for (const m of ascendente) {
       let acumulado = acumuladoPorMoneda.get(m.moneda) ?? 0;
@@ -151,7 +158,17 @@ export function CuentaContraparteView({
         acumulado += esDebeCc(m) ? m.importe : -m.importe;
         acumuladoPorMoneda.set(m.moneda, acumulado);
       }
-      conSaldo.push({ ...m, saldoAcumulado: acumulado });
+      // Cobro/pago imputado a un único cargo: es "el cobro de esa factura/liquidación".
+      const cargoUnico =
+        m.tipo === 'pago' && m.cargosImputadosIds?.length === 1
+          ? porId.get(m.cargosImputadosIds[0]) ?? null
+          : null;
+      conSaldo.push({
+        ...m,
+        saldoAcumulado: acumulado,
+        cargoUnico,
+        comprobanteMostrado: cargoUnico?.numeroComprobante ?? m.numeroComprobante ?? null,
+      });
     }
     return conSaldo.reverse();
   }, [movimientos]);
@@ -188,7 +205,7 @@ export function CuentaContraparteView({
         return false;
       if (
         comprobanteFiltro.trim() &&
-        !(m.numeroComprobante ?? '').toLowerCase().includes(comprobanteFiltro.trim().toLowerCase())
+        !(m.comprobanteMostrado ?? '').toLowerCase().includes(comprobanteFiltro.trim().toLowerCase())
       )
         return false;
       return true;
@@ -207,10 +224,13 @@ export function CuentaContraparteView({
    * Factura o liquidación de la que nace el movimiento. Una anulación no guarda el vínculo:
    * se toma del movimiento que compensa (misma cuenta, ya está en la lista).
    */
-  function comprobanteOrigenDe(m: MovimientoCc): ComprobanteOrigenCc | null {
+  function comprobanteOrigenDe(m: MovimientoConSaldo): ComprobanteOrigenCc | null {
+    // Anulación → el comprobante que compensa; cobro/pago de un solo cargo → ese cargo.
     const base = m.anulaMovimientoId
       ? (movimientos ?? []).find((x) => x.id === m.anulaMovimientoId) ?? null
-      : m;
+      : m.tipo === 'pago'
+        ? m.cargoUnico
+        : m;
     if (!base) return null;
     if (base.facturaId && puedeVerFacturas) return { tipo: 'factura', id: base.facturaId };
     if (base.liquidacionId && puedeVerLiquidaciones) {
@@ -220,7 +240,7 @@ export function CuentaContraparteView({
   }
 
   /** Acciones de una fila: las usan el botón de Acciones y el click en la fila. */
-  function accionesDe(m: MovimientoCc): AccionOpcion[] {
+  function accionesDe(m: MovimientoConSaldo): AccionOpcion[] {
     const opciones: AccionOpcion[] = [];
     const puedeImputar =
       m.tipo === 'cargo' &&
@@ -452,16 +472,6 @@ export function CuentaContraparteView({
                     {String(m.ivaPct).replace('.', ',')}% {formatCurrencyArFromNumber(m.ivaMonto)}
                   </span>
                 )}
-                {m.anuladoPor && (
-                  <span className="block text-xs text-vialto-steel">
-                    anulado el {fmtDateUtc(m.anuladoPor.fecha)}
-                  </span>
-                )}
-                {m.anulaMovimiento && (
-                  <span className="block text-xs text-vialto-steel">
-                    compensa el movimiento del {fmtDateUtc(m.anulaMovimiento.fecha)}
-                  </span>
-                )}
               </span>
             ),
             tdClassName: listadoTablaTdClass,
@@ -470,7 +480,7 @@ export function CuentaContraparteView({
           {
             id: 'numeroFactura',
             header: 'Comprobante',
-            cell: (m: MovimientoConSaldo) => m.numeroComprobante ?? '—',
+            cell: (m: MovimientoConSaldo) => m.comprobanteMostrado ?? '—',
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {

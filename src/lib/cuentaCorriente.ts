@@ -45,6 +45,8 @@ export type MovimientoCc = {
   comprobanteEditable?: boolean;
   /** Se puede cargar/corregir el vencimiento desde Cuenta corriente (compra de liquidación o manual). */
   vencimientoEditable?: boolean;
+  /** Cobro/pago: cargos a los que está imputado (sin repetir). */
+  cargosImputadosIds?: string[];
   /**
    * Cuánto de ESTE movimiento puntual sigue sin resolverse (cargo: sin cobrar/pagar;
    * pago: sin imputar). Solo viene poblado en `fetchMovimientos` (`GET .../movimientos`).
