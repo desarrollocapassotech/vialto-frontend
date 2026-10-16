@@ -157,6 +157,23 @@ export function MovimientoCcFormModal({
     }
   }
 
+  // Va junto a la moneda (cobro/pago) o junto al vencimiento (venta/compra).
+  const campoFecha = (
+    <div>
+      <label className={labelClass} htmlFor="cc-fecha">
+        Fecha
+      </label>
+      <input
+        id="cc-fecha"
+        type="date"
+        className={inputClass}
+        value={fecha}
+        onChange={(e) => setFecha(e.target.value)}
+        required
+      />
+    </div>
+  );
+
   return (
     <ViewModalShell
       title={`${
@@ -313,7 +330,14 @@ export function MovimientoCcFormModal({
           </fieldset>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        {/* Cobro/pago: importe, moneda y fecha en una fila; el importe toma el ancho que sobra. */}
+        <div
+          className={
+            esCargo
+              ? 'grid grid-cols-2 gap-3'
+              : 'grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_10.5rem]'
+          }
+        >
           <div>
             <label className={labelClass} htmlFor="cc-importe">
               Importe
@@ -342,6 +366,7 @@ export function MovimientoCcFormModal({
               disabled={!esCargo && elegidos.length > 0}
             />
           </div>
+          {!esCargo && campoFecha}
         </div>
 
         {esCargo && (
@@ -389,21 +414,9 @@ export function MovimientoCcFormModal({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelClass} htmlFor="cc-fecha">
-              Fecha
-            </label>
-            <input
-              id="cc-fecha"
-              type="date"
-              className={inputClass}
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              required
-            />
-          </div>
-          {esCargo && (
+        {esCargo && (
+          <div className="grid grid-cols-2 gap-3">
+            {campoFecha}
             <div>
               <label className={labelClass} htmlFor="cc-vencimiento">
                 Vencimiento
@@ -416,8 +429,8 @@ export function MovimientoCcFormModal({
                 onChange={(e) => setFechaVencimiento(e.target.value)}
               />
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {esCargo ? (
           <div>
@@ -434,18 +447,37 @@ export function MovimientoCcFormModal({
             />
           </div>
         ) : (
-          <div>
-            <label className={labelClass} htmlFor="cc-forma-pago">
-              Medio de {esCliente ? 'cobro' : 'pago'} / referencia
-            </label>
-            <input
-              id="cc-forma-pago"
-              type="text"
-              className={inputClass}
-              value={formaPago}
-              onChange={(e) => setFormaPago(e.target.value)}
-              placeholder="Ej. Transferencia, cheque N° 123"
-            />
+          <div className={esCliente ? '' : 'grid grid-cols-1 gap-3 sm:grid-cols-2'}>
+            {/* Pago a proveedor: número del comprobante del pago (orden de pago, recibo). */}
+            {!esCliente && (
+              <div>
+                <label className={labelClass} htmlFor="cc-comprobante-pago">
+                  Número de comprobante
+                </label>
+                <input
+                  id="cc-comprobante-pago"
+                  type="text"
+                  maxLength={64}
+                  className={inputClass}
+                  value={numeroComprobante}
+                  onChange={(e) => setNumeroComprobante(e.target.value)}
+                  placeholder="Ej. Orden de pago 0001-00000123"
+                />
+              </div>
+            )}
+            <div>
+              <label className={labelClass} htmlFor="cc-forma-pago">
+                Medio de {esCliente ? 'cobro' : 'pago'} / referencia
+              </label>
+              <input
+                id="cc-forma-pago"
+                type="text"
+                className={inputClass}
+                value={formaPago}
+                onChange={(e) => setFormaPago(e.target.value)}
+                placeholder="Ej. Transferencia, cheque N° 123"
+              />
+            </div>
           </div>
         )}
 

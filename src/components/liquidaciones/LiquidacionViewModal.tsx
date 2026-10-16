@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Ban, Download, Receipt, RotateCw, Trash2 } from "lucide-react";
 import { usuarioLabel } from "@/lib/usuarioLabel";
+import { LiquidacionPagoBadge } from "./LiquidacionPagoBadge";
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -344,6 +345,7 @@ export function LiquidacionViewModal({
             >
               {ESTADO_LABEL[source.estado]}
             </span>
+            <LiquidacionPagoBadge estadoPago={source.estadoPago} />
             <AmbienteTestBadge ambiente={source.ambiente} />
           </span>
         }

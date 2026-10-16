@@ -920,6 +920,9 @@ export interface ArcaConfig {
   keyConfiguradoProduccion: boolean;
 }
 
+/** Pago de una liquidación según su movimiento en Cuenta corriente. */
+export type EstadoPagoLiquidacion = 'pagada' | 'pago_parcial' | 'pendiente' | null;
+
 export type LiquidacionEstado =
   | "borrador"
   | "pendiente_cae"
@@ -1023,6 +1026,8 @@ export interface Liquidacion {
   anuladoAt?: string | null;
   /** Método usado en esta anulación puntual (snapshot): 'nota_credito_debito' | 'manual'. */
   anulacionMetodo?: string | null;
+  /** Calculado desde Cuenta corriente (no se edita en Liquidaciones). null = no aplica. */
+  estadoPago?: EstadoPagoLiquidacion;
   /** Anulación manual (Tenant.liquidacionAnulacionMetodo = 'manual'): auditoría del paso
    * "pendiente_anulacion" + comprobante pre-impreso adjunto al confirmar. */
   anulacionPendienteDesde?: string | null;
