@@ -153,7 +153,9 @@ import {
   type ViajeSortField,
 } from "@/lib/viajesOrdenamiento";
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
-import { CornerDownRight, Download, Filter, Upload, X } from "lucide-react";
+import { Columns3, CornerDownRight, Download, Filter, Upload, X } from "lucide-react";
+import { mutate } from "swr";
+import { ViajesColumnasOrdenModal } from "@/components/viajes/ViajesColumnasOrdenModal";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import {
   VIAJES_EXPORT_COLUMNS,
@@ -368,6 +370,7 @@ export function ViajesTenantPage({
   );
 
   const [isFacturaModalOpen, setIsFacturaModalOpen] = useState(false);
+  const [ordenColumnasAbierto, setOrdenColumnasAbierto] = useState(false);
   const [facturaDraft, setFacturaDraft] = useState<FacturaDraft>({
     tipo: "cliente",
     transportistaId: "",
@@ -2634,6 +2637,26 @@ export function ViajesTenantPage({
     ),
   };
 
+  // El admin de la empresa (o el superadmin operando sobre ella) puede cambiar el
+  // orden de columnas desde la grilla; aplica a toda la empresa.
+  const puedeOrdenarColumnas =
+    platform || isOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
+  // Habilitadas = las que hoy tienen encabezado (misma visibilidad que la grilla).
+  const columnasHabilitadasGrilla = new Set(
+    ordenColumnas.filter((id) => Boolean(viajesHeaderColumnas[id])),
+  );
+  async function guardarOrdenColumnas(viajesColumnasOrden: string[]) {
+    const orgId = tenantEfectivo?.clerkOrgId;
+    if (!orgId) throw new Error("No se encontró la empresa.");
+    await apiJson(
+      `/api/tenants/${encodeURIComponent(orgId)}/viajes-columnas-orden`,
+      () => getToken(),
+      { method: "PATCH", body: JSON.stringify({ viajesColumnasOrden }) },
+    );
+    // Refresca el tenant cacheado (useCurrentTenant / useTenantPaisFijo usan esta key).
+    await mutate(`/api/tenants/${encodeURIComponent(orgId)}`);
+  }
+
   // ─── RENDER DE LA BARRA DE FILTROS ─────────────────────────────────────────
   const viajesListadoFiltros = (
     <>
@@ -3096,7 +3119,20 @@ export function ViajesTenantPage({
               <Fragment key={id}>{viajesHeaderColumnas[id]}</Fragment>
             ))}
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
-              Acciones
+              <span className="inline-flex items-center justify-end gap-1.5">
+                {puedeOrdenarColumnas && (
+                  <button
+                    type="button"
+                    onClick={() => setOrdenColumnasAbierto(true)}
+                    className="rounded p-0.5 text-vialto-steel/50 transition-colors hover:text-vialto-charcoal"
+                    title="Ordenar columnas"
+                    aria-label="Ordenar columnas"
+                  >
+                    <Columns3 className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                )}
+                Acciones
+              </span>
             </th>
           </tr>
         }
@@ -4317,6 +4353,19 @@ export function ViajesTenantPage({
           />
         )}
       </div>
+      {ordenColumnasAbierto && (
+        <ViajesColumnasOrdenModal
+          ordenInicial={tenantEfectivo?.viajesColumnasOrden}
+          habilitadas={columnasHabilitadasGrilla}
+          labels={{
+            idPropio1: labelIdentificacionPersonalizadaViajes(currentTenant),
+            idPropio2: idPropio2Label(currentTenant),
+            productos: productoLabelsTenant.plural,
+          }}
+          guardar={guardarOrdenColumnas}
+          onClose={() => setOrdenColumnasAbierto(false)}
+        />
+      )}
     </div>
     </ProductoLabelsProvider>
   );
