@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
-import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { modalOverlayClass } from "@/lib/modalLayers";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
@@ -138,7 +138,6 @@ export function ConfirmarAnulacionManualModal({
               fieldErrors.motivo ? "border-red-400" : "border-black/15"
             }`}
           />
-          <CrudFieldError message={fieldErrors.motivo} />
         </label>
 
         <div className="mt-4">
@@ -152,17 +151,11 @@ export function ConfirmarAnulacionManualModal({
             }}
             disabled={isBusy}
             label="Comprobante pre-impreso"
-            error={fieldErrors.file}
           />
         </div>
 
-        {(uploadError || error) && (
-          <p role="alert" className="mt-3 text-sm font-medium text-red-600">
-            {uploadError ?? error}
-          </p>
-        )}
-
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+          <ErrorPieModal error={uploadError ?? error} fieldErrors={fieldErrors} />
           <button type="button" disabled={isBusy} onClick={onCancel} className={btnGhost}>
             Cancelar
           </button>

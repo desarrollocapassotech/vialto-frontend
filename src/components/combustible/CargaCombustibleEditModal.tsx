@@ -16,6 +16,7 @@ import {
 import { useCombustibleValidation } from "@/lib/combustibleValidation";
 import type { CargaCombustible } from "@/types/api";
 import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 
 function toUtcDateString(isoDate: string | null | undefined) {
   if (!isoDate) return "";
@@ -195,7 +196,8 @@ export function CargaCombustibleEditModal({
       title="Editar Carga de Combustible"
       onClose={saving ? () => {} : onClose}
       footer={
-        <div className="flex w-full items-center justify-end gap-3">
+        <div className="flex flex-wrap w-full items-center justify-end gap-3">
+          <ErrorPieModal error={error} />
           <button
             type="button"
             onClick={onClose}
@@ -216,11 +218,6 @@ export function CargaCombustibleEditModal({
       }
     >
       <form id="edit-carga-form" onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-            {error}
-          </div>
-        )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col">

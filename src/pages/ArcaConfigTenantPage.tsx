@@ -52,6 +52,8 @@ type FormValues = {
   ingBrutos: string;
   inicActEmisor: string;
   leyendaFactura: string;
+  colorFactura: string;
+  colorLiquidacion: string;
   ptoVentaCvlp: string;
   ptoVentaFactura: string;
   ambiente: "homologacion" | "produccion";
@@ -69,6 +71,8 @@ const EMPTY: FormValues = {
   ingBrutos: "",
   inicActEmisor: "",
   leyendaFactura: "",
+  colorFactura: "",
+  colorLiquidacion: "",
   ptoVentaCvlp: "1",
   ptoVentaFactura: "1",
   ambiente: "homologacion",
@@ -96,6 +100,11 @@ const FACTURA_FIELDS = [
   "leyendaFactura",
 ] as const satisfies readonly (keyof FormValues)[];
 
+const COLOR_FIELDS = [
+  "colorFactura",
+  "colorLiquidacion",
+] as const satisfies readonly (keyof FormValues)[];
+
 const AMBIENTE_FIELDS = [
   "ambiente",
 ] as const satisfies readonly (keyof FormValues)[];
@@ -114,6 +123,7 @@ const GENERAL_FIELDS = [
   ...EMISOR_FIELDS,
   ...VENTA_FIELDS,
   ...FACTURA_FIELDS,
+  ...COLOR_FIELDS,
   ...COMISION_FIELDS,
 ] as const satisfies readonly (keyof FormValues)[];
 
@@ -126,6 +136,8 @@ function configToForm(c: ArcaConfig): FormValues {
     ingBrutos: c.ingBrutos ?? "",
     inicActEmisor: arcaDateToIso(c.inicActEmisor ?? ""),
     leyendaFactura: c.leyendaFactura ?? "",
+    colorFactura: c.colorFactura ?? "",
+    colorLiquidacion: c.colorLiquidacion ?? "",
     ptoVentaCvlp: String(c.ptoVentaCvlp),
     ptoVentaFactura: String(c.ptoVentaFactura),
     ambiente: c.ambiente,
@@ -182,6 +194,48 @@ function SectionCard({
       </div>
       <div className="space-y-4">{children}</div>
     </section>
+  );
+}
+
+/** Color de acento de un PDF de comprobante: selector + "Sin color" (vacío = blanco y negro). */
+function ColorComprobanteField({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (color: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className={labelClass}>
+        {label}
+      </label>
+      <div className="flex items-center gap-3">
+        <input
+          id={id}
+          type="color"
+          value={value || "#000000"}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-10 w-14 shrink-0 cursor-pointer rounded border border-black/10 bg-white p-1"
+        />
+        <span className="font-mono text-sm text-vialto-charcoal">
+          {value ? value.toUpperCase() : "Sin color"}
+        </span>
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="text-xs uppercase tracking-wider text-vialto-steel hover:underline"
+          >
+            Quitar color
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -313,6 +367,9 @@ export function ArcaConfigTenantPage({
           : undefined,
         // Siempre se manda (vacío = sin leyenda): así se puede borrar.
         leyendaFactura: v.leyendaFactura.trim(),
+        // Igual que la leyenda: vacío = sin color (blanco y negro).
+        colorFactura: v.colorFactura,
+        colorLiquidacion: v.colorLiquidacion,
         ptoVentaCvlp: Number(v.ptoVentaCvlp),
         ptoVentaFactura: Number(v.ptoVentaFactura),
         ambiente: v.ambiente,
@@ -717,6 +774,39 @@ export function ArcaConfigTenantPage({
                   placeholder='Ej: Producido el vencimiento la mora será automática, aplicándose la TNA del BNA "Descubiertos en cta cte. No solicitados previamente", vigente en cada día de mora, hasta su efectiva cancelación.'
                   className="rounded border border-black/10 bg-white px-3 py-2 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35"
                 />
+              </div>
+            </SectionCard>
+          )}
+
+          {(hasFacturasArca || hasLiquidoProductoArca) && (
+            <SectionCard
+              title="Color de los comprobantes"
+              description="Color de los recuadros, el título y el encabezado de la tabla del PDF. Sin color, el comprobante sale en blanco y negro. Aplica a los comprobantes que se generen desde ahora."
+              onSave={() => void saveSection(COLOR_FIELDS).catch(() => {})}
+              saving={loading}
+              dirty={sectionDirty(COLOR_FIELDS)}
+            >
+              <div
+                className={`grid grid-cols-1 gap-4 ${
+                  hasFacturasArca && hasLiquidoProductoArca ? "sm:grid-cols-2" : ""
+                }`}
+              >
+                {hasFacturasArca && (
+                  <ColorComprobanteField
+                    id="colorFactura"
+                    label="Factura y nota de crédito"
+                    value={values.colorFactura}
+                    onChange={(c) => set("colorFactura", c)}
+                  />
+                )}
+                {hasLiquidoProductoArca && (
+                  <ColorComprobanteField
+                    id="colorLiquidacion"
+                    label="Liquidación (CVLP) y su anulación"
+                    value={values.colorLiquidacion}
+                    onChange={(c) => set("colorLiquidacion", c)}
+                  />
+                )}
               </div>
             </SectionCard>
           )}

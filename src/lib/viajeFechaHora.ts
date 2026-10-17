@@ -144,18 +144,27 @@ export function formatIsoFechaHoraListadoEsAr(iso: string | null | undefined): s
   }
 }
 
-/** Listados compactos (una línea por fila): `dd/mm` en Argentina, sin año ni hora (van en el tooltip). */
-export function formatIsoFechaCortaListadoEsAr(iso: string | null | undefined): string {
+/**
+ * Listados compactos (una línea por fila): `dd/mm` en Argentina, sin hora (va en el tooltip).
+ * Con `conAnio` agrega los últimos 2 dígitos del año (`dd/mm/aa`).
+ */
+export function formatIsoFechaCortaListadoEsAr(
+  iso: string | null | undefined,
+  { conAnio = false }: { conAnio?: boolean } = {},
+): string {
   if (!iso) return '—';
   const d = parseIsoFlexible(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  // Armado a mano: sin año, algunos navegadores ignoran '2-digit' en es-AR y devuelven "1/9".
+  // Armado a mano: algunos navegadores ignoran '2-digit' en es-AR y devuelven "1/9".
   const parts = new Intl.DateTimeFormat('es-AR', {
     timeZone: TZ_LISTADOS_AR,
     day: 'numeric',
     month: 'numeric',
+    year: 'numeric',
   }).formatToParts(d);
   const dia = (parts.find((p) => p.type === 'day')?.value ?? '').padStart(2, '0');
   const mes = (parts.find((p) => p.type === 'month')?.value ?? '').padStart(2, '0');
-  return `${dia}/${mes}`;
+  if (!conAnio) return `${dia}/${mes}`;
+  const anio = (parts.find((p) => p.type === 'year')?.value ?? '').slice(-2);
+  return `${dia}/${mes}/${anio}`;
 }

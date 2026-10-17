@@ -3,6 +3,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 
 export function EditarKmVehiculoModal({
   tenantId,
@@ -81,13 +82,9 @@ export function EditarKmVehiculoModal({
           />
         </div>
 
-        {error && (
-          <p className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </p>
-        )}
 
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
+          <ErrorPieModal error={error} />
           <button
             type="button"
             onClick={onClose}

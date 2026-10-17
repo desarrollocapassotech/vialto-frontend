@@ -323,7 +323,7 @@ export function DestinatariosSuperadminPage() {
             }}
             className={listadoTablaAccionClass}
           >
-            Ver
+            Ver destinatario
           </button>
         )}
       />

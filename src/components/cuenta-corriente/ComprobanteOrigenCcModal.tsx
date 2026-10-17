@@ -10,7 +10,6 @@ import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
 import { ViewModalShell } from '@/components/ui/ViewModalShell';
 import { Loader2 } from 'lucide-react';
 import { apiFetch, apiJson } from '@/lib/api';
-import { liquidacionContratoPdfUrl } from '@/lib/liquidacionContratoPdf';
 import { friendlyError } from '@/lib/friendlyError';
 import { useToast } from '@/lib/toast';
 import type { Factura } from '@/types/api';
@@ -133,7 +132,6 @@ export function ComprobanteOrigenCcModal({
         hasArca={hasArcaLiquidaciones}
         canEdit={['borrador', 'error', 'pendiente_cae'].includes(liquidacion.estado)}
         onClose={onClose}
-        contratoPdfUrl={liquidacionContratoPdfUrl(liquidacion.id)}
         onEditar={() => navigate('/liquidaciones')}
         onVerComprobante={
           liquidacion.cbteNro != null

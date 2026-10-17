@@ -439,7 +439,7 @@ export function EgresosStockHistorialTenantPage({
               onClick={() => setViendo(op)}
               className={listadoTablaAccionClass}
             >
-              Ver
+              Ver egreso
             </button>
           </div>
         )}

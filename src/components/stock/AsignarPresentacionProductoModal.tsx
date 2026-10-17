@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
-import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { PresentacionFormModal } from "@/components/stock/PresentacionFormModal";
 import { Spinner } from "@/components/ui/Spinner";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { ApiError, apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
@@ -208,7 +208,6 @@ export function AsignarPresentacionProductoModal({
                   </p>
                 }
               />
-              <CrudFieldError message={fieldErrors.presentacionId} />
             </div>
 
             <div className="space-y-1">
@@ -224,17 +223,12 @@ export function AsignarPresentacionProductoModal({
                 placeholder="Ej. 12"
                 className={`${INPUT} ${fieldErrors.unidadesPorBulto ? "border-red-400" : ""}`}
               />
-              <CrudFieldError message={fieldErrors.unidadesPorBulto} />
             </div>
 
-            {error && (
-              <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-2 py-1">
-                {error}
-              </p>
-            )}
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-black/10 px-5 py-4">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-black/10 px-5 py-4">
+            <ErrorPieModal error={error} fieldErrors={fieldErrors} />
             <button
               type="button"
               disabled={saving}

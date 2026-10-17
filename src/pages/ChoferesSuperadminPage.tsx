@@ -333,7 +333,7 @@ export function ChoferesSuperadminPage() {
               }}
               className={listadoTablaAccionClass}
             >
-              Ver
+              Ver chofer
             </button>
             <Link
               to={`/choferes/${encodeURIComponent(c.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}

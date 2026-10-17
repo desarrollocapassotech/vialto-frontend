@@ -214,6 +214,8 @@ export function TenantHomePage() {
         <FacturaViewModal
           getToken={getToken}
           factura={viewingFactura}
+          idPropio2Habilitado={idPropio2Habilitado(maestro.tenant)}
+          idPropio2Label={idPropio2Label(maestro.tenant)}
           onClose={() => setViewingFactura(null)}
           onEditar={() => {
             const id = viewingFactura.id;

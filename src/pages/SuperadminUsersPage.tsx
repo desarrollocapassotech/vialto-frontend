@@ -415,7 +415,7 @@ export function SuperadminUsersPage() {
                 onClick={() => setViewingUser(u)}
                 className={listadoTablaAccionClass}
               >
-                Ver
+                Ver usuario
               </button>
             ) : (
               <span className="text-xs text-vialto-steel">—</span>

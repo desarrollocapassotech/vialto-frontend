@@ -22,6 +22,8 @@ import { EmisorArcaResumen } from "@/components/facturacion/EmisorArcaResumen";
 import { ParteFacturaResumen } from "@/components/facturacion/ParteFacturaResumen";
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { ConfirmarEmisionArcaDialog } from "@/components/shared/ConfirmarEmisionArcaDialog";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
 import { useValidacionPadronRegistro } from "@/hooks/useValidacionPadronRegistro";
@@ -197,6 +199,11 @@ interface Props {
    * viejo modal intermedio "Emitir comprobante", así la emisión se ve siempre igual.
    */
   liquidacionExistente?: Liquidacion;
+  /**
+   * "Volver a emitir" una liquidación anulada: crea una liquidación NUEVA precargada con el
+   * transportista, viajes, conceptos, comisión, IVA y período de esta (la anulada no se toca).
+   */
+  copiaDe?: Liquidacion;
   /** true = pantalla de superadmin con empresa elegida: usa las rutas /api/platform/... */
   rutasPlataforma?: boolean;
 }
@@ -227,6 +234,7 @@ export function CrearLiquidacionManualModal({
   idPropio2Label = "ID Propio 2",
   opcionesProveedor: opcionesProveedorProp = [],
   liquidacionExistente,
+  copiaDe,
   rutasPlataforma = false,
 }: Props) {
   const showComprobante = !hasLiquidoProductoArca;
@@ -235,6 +243,8 @@ export function CrearLiquidacionManualModal({
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const existente = liquidacionExistente ?? null;
+  /** De dónde se precargan los datos: la liquidación a emitir o la anulada que se vuelve a emitir. */
+  const origen = existente ?? copiaDe ?? null;
   // Una vez que la liquidación entró al circuito de emisión (error de ARCA), sus viajes ya
   // se comunicaron: solo en borrador se pueden agregar/quitar (mismo criterio que la edición).
   const puedeCambiarViajes = !existente || existente.estado === "borrador";
@@ -245,18 +255,18 @@ export function CrearLiquidacionManualModal({
   // El proveedor guardado en la liquidación se ofrece aunque ya no esté en la configuración.
   const opcionesProveedor = useMemo(
     () =>
-      existente?.proveedorContrato &&
-      !opcionesProveedorProp.includes(existente.proveedorContrato)
-        ? [existente.proveedorContrato, ...opcionesProveedorProp]
+      origen?.proveedorContrato &&
+      !opcionesProveedorProp.includes(origen.proveedorContrato)
+        ? [origen.proveedorContrato, ...opcionesProveedorProp]
         : opcionesProveedorProp,
-    [existente?.proveedorContrato, opcionesProveedorProp],
+    [origen?.proveedorContrato, opcionesProveedorProp],
   );
 
   const [resolvedConfig, setResolvedConfig] = useState<ArcaConfig | null>(
     configProp ?? null,
   );
   const [proveedorContrato, setProveedorContrato] = useState<string>(
-    existente?.proveedorContrato ??
+    origen?.proveedorContrato ??
       (opcionesProveedor && opcionesProveedor.length > 0 ? opcionesProveedor[0] : ""),
   );
 
@@ -291,14 +301,14 @@ export function CrearLiquidacionManualModal({
   // — Campos del formulario —
   const [transportistaId, setTransportistaId] = useState(
     () =>
-      (existente
-        ? existente.transportistaId
+      (origen
+        ? origen.transportistaId
         : viajeInicial
           ? transportistaOpcionesViaje[0]?.id
           : transportistaIdInicial) ?? "",
   );
-  // Transportista cuyos viajes se preseleccionan al cargar la lista (grilla o liquidación existente).
-  const transportistaIdPreseleccion = existente?.transportistaId ?? transportistaIdInicial;
+  // Transportista cuyos viajes se preseleccionan al cargar la lista (grilla o liquidación existente/copiada).
+  const transportistaIdPreseleccion = origen?.transportistaId ?? transportistaIdInicial;
   /** Viajes a marcar apenas cargue la lista del transportista inicial (una sola vez). */
   const preseleccionPendiente = useRef<string[] | null>(
     !existente && !viajeInicial && transportistaIdInicial && viajeIdsIniciales?.length
@@ -315,20 +325,20 @@ export function CrearLiquidacionManualModal({
 
   // Si viene de un viaje puntual, se precargan con su fecha de carga/descarga.
   const [periodoDesde, setPeriodoDesde] = useState(() =>
-    dateInputValueFromIso(existente?.periodoDesde ?? viajeInicial?.fechaCarga),
+    dateInputValueFromIso(origen?.periodoDesde ?? viajeInicial?.fechaCarga),
   );
   const [periodoHasta, setPeriodoHasta] = useState(() =>
     dateInputValueFromIso(
-      existente?.periodoHasta ?? viajeInicial?.fechaDescarga ?? viajeInicial?.fechaCarga,
+      origen?.periodoHasta ?? viajeInicial?.fechaDescarga ?? viajeInicial?.fechaCarga,
     ),
   );
-  // Liquidación existente: comisión e IVA son los guardados (no se recalculan por defecto).
+  // Liquidación existente/copiada: comisión e IVA son los guardados (no se recalculan por defecto).
   const [comisionPct, setComisionPct] = useState(() =>
-    existente?.comisionPct != null ? String(existente.comisionPct) : "",
+    origen?.comisionPct != null ? String(origen.comisionPct) : "",
   );
-  const comisionEditadaManualmente = useRef(Boolean(existente));
+  const comisionEditadaManualmente = useRef(Boolean(origen));
   const [ivaPct, setIvaPct] = useState(() => {
-    if (existente?.ivaPct != null) return String(existente.ivaPct);
+    if (origen?.ivaPct != null) return String(origen.ivaPct);
     const fromViaje = uniqueIvaPctFromViajes(
       viajeInicial ? [viajeInicial] : [],
     );
@@ -337,7 +347,7 @@ export function CrearLiquidacionManualModal({
       ? String(configProp.ivaGastosAdmin)
       : "";
   });
-  const ivaEditadaManualmente = useRef(Boolean(existente));
+  const ivaEditadaManualmente = useRef(Boolean(origen));
   const [ptoVenta, setPtoVenta] = useState(
     configProp?.ptoVentaCvlp != null ? String(configProp.ptoVentaCvlp) : "",
   );
@@ -399,23 +409,23 @@ export function CrearLiquidacionManualModal({
     };
   }, [configProp, hasLiquidoProductoArca, getToken, arcaBase, qsTenant]);
 
-  // Liquidación existente: trae el detalle (viajes y conceptos) para precargar el formulario.
-  const existenteId = existente?.id;
+  // Liquidación existente o copiada: trae el detalle (viajes y conceptos) para precargar el formulario.
+  const origenId = origen?.id;
   useEffect(() => {
-    if (!existenteId) return;
+    if (!origenId) return;
     let cancelled = false;
     void (async () => {
       let det: LiquidacionDetalleExistente | null = null;
       try {
         det = await apiJson<LiquidacionDetalleExistente>(
-          `${arcaBase}/liquidaciones/${encodeURIComponent(existenteId)}${qsTenant}`,
+          `${arcaBase}/liquidaciones/${encodeURIComponent(origenId)}${qsTenant}`,
           () => getToken(),
         );
       } catch {
         // Sin detalle se sigue con lo que vino del listado.
       }
       if (cancelled) return;
-      const base = (det ?? liquidacionExistente) as LiquidacionDetalleExistente;
+      const base = (det ?? origen) as LiquidacionDetalleExistente;
       const viajeIds = (base.viajes ?? [])
         .map((lv) => lv.viaje?.id ?? lv.viajeId)
         .filter((id): id is string => Boolean(id));
@@ -441,9 +451,9 @@ export function CrearLiquidacionManualModal({
     return () => {
       cancelled = true;
     };
-    // `liquidacionExistente` solo se usa como respaldo si falla el detalle.
+    // `origen` solo se usa como respaldo si falla el detalle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [existenteId, arcaBase, qsTenant, getToken]);
+  }, [origenId, arcaBase, qsTenant, getToken]);
 
   useEffect(() => {
     if (
@@ -519,8 +529,8 @@ export function CrearLiquidacionManualModal({
       setViajes([]);
       return;
     }
-    // Liquidación existente: se espera su detalle para saber qué viajes preseleccionar.
-    if (existente && !detalleExistente) {
+    // Liquidación existente/copiada: se espera su detalle para saber qué viajes preseleccionar.
+    if (origen && !detalleExistente) {
       setViajesLoading(true);
       return;
     }
@@ -1251,17 +1261,11 @@ export function CrearLiquidacionManualModal({
             : "h-[min(92dvh,920px)] max-w-[min(90rem,calc(100vw-1rem))]"
         }`}
       >
-        {step !== "autorizada" && transportistasLoading ? (
-          <div
-            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white/80 backdrop-blur-[1px]"
-            role="status"
-            aria-live="polite"
-          >
-            <Spinner className="h-8 w-8 text-vialto-charcoal" />
-            <p className="text-sm font-medium text-vialto-charcoal">
-              Cargando transportistas…
-            </p>
-          </div>
+        {submitAction === "emitir" ? (
+          // Emitiendo contra ARCA: se bloquea todo el modal, no solo el botón.
+          <BloqueoModal mensaje="Emitiendo la liquidación en ARCA… No cierres esta ventana." />
+        ) : step !== "autorizada" && transportistasLoading ? (
+          <BloqueoModal mensaje="Cargando transportistas…" />
         ) : null}
         {step === "autorizada" ? (
           <>
@@ -1751,12 +1755,6 @@ export function CrearLiquidacionManualModal({
                     />
                   )}
 
-                  {error && (
-                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
-                      {error}
-                    </div>
-                  )}
-
                   {cvlpClaseBAlerta && (
                     <div
                       className="rounded border border-red-300/60 bg-red-50 px-4 py-3 text-xs text-red-900"
@@ -1946,6 +1944,7 @@ export function CrearLiquidacionManualModal({
             </form>
 
             <div className="flex flex-wrap items-center justify-end gap-3 border-t border-black/10 px-6 py-4 shrink-0">
+              <ErrorPieModal error={error} />
               {datosEmitIncompletos ? (
                 <AvisoFaltantesEmision
                   mensaje={mensajeFaltantes}

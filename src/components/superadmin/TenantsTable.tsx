@@ -291,7 +291,7 @@ export function TenantsTable({
               onClick={() => setViewingTenant(tenant)}
               className={listadoTablaAccionClass}
             >
-              Ver
+              Ver empresa
             </button>
           </div>
         )}

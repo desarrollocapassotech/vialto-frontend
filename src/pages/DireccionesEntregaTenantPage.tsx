@@ -237,7 +237,7 @@ export function DireccionesEntregaTenantPage() {
             }}
             className={listadoTablaAccionClass}
           >
-            Ver
+            Ver dirección
           </button>
         )}
       />

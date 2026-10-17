@@ -2,7 +2,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Minus, Plus } from 'lucide-react';
-import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
+import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
 import { Spinner } from '@/components/ui/Spinner';
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
 import { apiJson } from '@/lib/api';
@@ -238,11 +238,10 @@ export function DivisionBultosModal({
                 </div>
               </div>
             </div>
-
-            <CrudFormErrorAlert message={formError} />
           </div>
 
-          <div className="mt-auto flex justify-end gap-2 border-t border-black/10 px-4 py-3">
+          <div className="mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-black/10 px-4 py-3">
+            <ErrorPieModal error={formError} />
             <button
               type="button"
               onClick={onClose}

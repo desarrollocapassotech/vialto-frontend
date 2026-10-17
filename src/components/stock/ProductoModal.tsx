@@ -14,6 +14,7 @@ import {
   labelEnFrase,
   type ProductoLabels,
 } from "@/lib/productoLabel";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 
 const INPUT_CLASS = "h-9 w-full border border-black/15 bg-white px-2 text-sm";
 const LABEL_CLASS = "text-xs uppercase tracking-[0.08em] text-vialto-steel";
@@ -469,13 +470,9 @@ export function ProductoModal({
             )}
           </div>
 
-          {error && (
-            <p className="mx-5 mb-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-2 py-1">
-              {error}
-            </p>
-          )}
 
-          <div className="flex justify-end gap-2 border-t border-black/10 px-5 py-4">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-black/10 px-5 py-4">
+            <ErrorPieModal error={error} fieldErrors={fieldErrors} />
             <button
               type="button"
               disabled={saving}

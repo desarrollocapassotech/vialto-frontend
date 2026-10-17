@@ -421,7 +421,7 @@ export function DivisionesStockHistorialTenantPage({
                 onClick={() => setViendo(op)}
                 className={listadoTablaAccionClass}
               >
-                Ver
+                Ver división
               </button>
             )}
             actionsThClassName={`${listadoTablaThClass} align-top text-right`}

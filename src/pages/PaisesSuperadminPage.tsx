@@ -181,7 +181,7 @@ export function PaisesSuperadminPage() {
               onClick={() => setViewingPais(p)}
               className={listadoTablaAccionClass}
             >
-              Ver
+              Ver país
             </button>
             {!p.esPredefinido && (
               <>

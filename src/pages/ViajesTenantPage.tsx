@@ -46,8 +46,7 @@ import {
   facturaLetraFromCondicionIva,
 } from "@/lib/arcaCbteTipo";
 import { apiJson, apiFetch, ApiError } from "@/lib/api";
-import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
-import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
+import { hoyArgentinaIso, vencimientoPorDefecto } from "@/lib/facturaFechaEmision";
 import { useToast } from "@/lib/toast";
 import { friendlyError } from "@/lib/friendlyError";
 import {
@@ -76,7 +75,11 @@ import { ViajeEditModal } from "@/components/viajes/ViajeEditModal";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { ViajeAccionesMenu } from "@/components/viajes/ViajeAccionesMenu";
 import { TruncarInicio } from "@/components/ui/TruncarInicio";
-import { ViajesResumenFiltros } from "@/components/viajes/ViajesResumenFiltros";
+import {
+  ViajesResumenFiltros,
+  resumenPendientes,
+} from "@/components/viajes/ViajesResumenFiltros";
+import { FiltrosRapidosBoton } from "@/components/listado/FiltrosRapidos";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner } from "@/components/ui/Spinner";
 import { otroGastoDraftFromApi } from "@/components/viajes/OtrosGastosFieldset";
@@ -153,7 +156,7 @@ import {
   type ViajeSortField,
 } from "@/lib/viajesOrdenamiento";
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
-import { Columns3, CornerDownRight, Download, Filter, Upload, X } from "lucide-react";
+import { Columns3, CornerDownRight, Download, Upload, X } from "lucide-react";
 import { mutate } from "swr";
 import { ViajesColumnasOrdenModal } from "@/components/viajes/ViajesColumnasOrdenModal";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
@@ -377,7 +380,7 @@ export function ViajesTenantPage({
     clienteId: "",
     numero: "",
     fechaEmision: hoyArgentinaIso(),
-    fechaVencimiento: "",
+    fechaVencimiento: vencimientoPorDefecto(hoyArgentinaIso()),
     ivaPct: "",
     viajeIds: [],
     facturarPorTramo: false,
@@ -612,7 +615,6 @@ export function ViajesTenantPage({
   const [resumen, setResumen] = useState<{
     sinFacturar: number;
     sinLiquidar: number;
-    sinPagar: number;
     pagados: number;
   } | null>(null);
   /** Se incrementa tras cada operación que puede cambiar los conteos de los chips. */
@@ -860,7 +862,7 @@ export function ViajesTenantPage({
         : "/api/viajes/paginated?";
       // Cada conteo usa exactamente el mismo filtro que aplica su chip; si no, el número
       // no coincide con lo que muestra la grilla al tocarlo.
-      const [estadoSF, estadoSL, pagoSP, pagoPag] = await Promise.allSettled([
+      const [estadoSF, estadoSL, pagoPag] = await Promise.allSettled([
         apiJson<ViajesPaginatedResponse>(
           `${base}facturacionEstado=sin_facturar&page=1&pageSize=1`,
           () => getToken(),
@@ -868,11 +870,6 @@ export function ViajesTenantPage({
         // Mismo filtro que aplica el chip "Sin liquidar" (columna Liquidación).
         apiJson<ViajesPaginatedResponse>(
           `${base}liquidacionEstado=sin_liquidar&page=1&pageSize=1`,
-          () => getToken(),
-        ),
-        contarViajesPagoTransportistaDesdeApi(
-          `${base}pagoTransportista=sin_pagar&`,
-          "sin_pagar",
           () => getToken(),
         ),
         contarViajesPagoTransportistaDesdeApi(
@@ -887,7 +884,6 @@ export function ViajesTenantPage({
           estadoSF.status === "fulfilled" ? estadoSF.value.meta.total : 0,
         sinLiquidar:
           estadoSL.status === "fulfilled" ? estadoSL.value.meta.total : 0,
-        sinPagar: pagoSP.status === "fulfilled" ? pagoSP.value : 0,
         pagados: pagoPag.status === "fulfilled" ? pagoPag.value : 0,
       });
     })();
@@ -947,7 +943,7 @@ export function ViajesTenantPage({
         if (estF.trim()) filtros.set("etapa", estF.trim());
         if (facEstF.trim()) filtros.set("facturacionEstado", facEstF.trim());
         if (liqEstF.trim()) filtros.set("liquidacionEstado", liqEstF.trim());
-        if (pagoTranspF === "sin_pagar" || pagoTranspF === "pagado") {
+        if (pagoTranspF === "pagado") {
           filtros.set("pagoTransportista", pagoTranspF);
         }
         if ((tf === "carga" || tf === "descarga") && (fd.trim() || fh.trim())) {
@@ -979,10 +975,7 @@ export function ViajesTenantPage({
         // Traemos de a muchos si es búsqueda local para garantizar encontrarlo
         const pageSizeApi = isLocalSearch ? 1000 : pageSizeApiValido(pageSize);
 
-        const pagoFiltroActivo =
-          pagoTranspF === "sin_pagar" || pagoTranspF === "pagado"
-            ? pagoTranspF
-            : null;
+        const pagoFiltroActivo = pagoTranspF === "pagado" ? pagoTranspF : null;
 
         let items: Viaje[];
         let meta: PaginatedMeta;
@@ -1613,7 +1606,7 @@ export function ViajesTenantPage({
       clienteId: cid,
       numero: "",
       fechaEmision: hoyArgentinaIso(),
-      fechaVencimiento: "",
+      fechaVencimiento: vencimientoPorDefecto(hoyArgentinaIso()),
       ivaPct: "",
       viajeIds: ids,
       facturarPorTramo: false,
@@ -1735,7 +1728,7 @@ export function ViajesTenantPage({
       if (estF.trim()) filtros.set("etapa", estF.trim());
       if (facEstF.trim()) filtros.set("facturacionEstado", facEstF.trim());
       if (liqEstF.trim()) filtros.set("liquidacionEstado", liqEstF.trim());
-      if (pagoTranspF === "sin_pagar" || pagoTranspF === "pagado") {
+      if (pagoTranspF === "pagado") {
         filtros.set("pagoTransportista", pagoTranspF);
       }
       if ((tf === "carga" || tf === "descarga") && (fd.trim() || fh.trim())) {
@@ -1766,10 +1759,7 @@ export function ViajesTenantPage({
       const pageSizeApi = 5000; // Un lote grande para traer la tabla entera
       let itemsExport: Viaje[] = [];
       const sortFetch = ordenamientoAplicadoRef.current;
-      const pagoFiltroActivo =
-        pagoTranspF === "sin_pagar" || pagoTranspF === "pagado"
-          ? pagoTranspF
-          : null;
+      const pagoFiltroActivo = pagoTranspF === "pagado" ? pagoTranspF : null;
 
       // Hacemos el pedido sin paginar
       if (pagoFiltroActivo) {
@@ -2007,7 +1997,7 @@ export function ViajesTenantPage({
       clienteId: targetClienteId ?? v.clienteId ?? "",
       numero: "",
       fechaEmision: hoyArgentinaIso(),
-      fechaVencimiento: "",
+      fechaVencimiento: vencimientoPorDefecto(hoyArgentinaIso()),
       ivaPct: "",
       viajeIds: [v.id],
       facturarPorTramo: false,
@@ -2924,25 +2914,15 @@ export function ViajesTenantPage({
   const filtroRapidoContent = (
     <>
       {resumen && (
-        <button
-          type="button"
-          onClick={() => setShowFiltrosRapidos((v) => !v)}
-          aria-expanded={showFiltrosRapidos}
-          aria-label="Mostrar filtros rápidos"
-          className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-vialto-steel transition-colors hover:bg-vialto-mist hover:text-vialto-charcoal ${
-            showFiltrosRapidos ? "bg-vialto-mist text-vialto-charcoal" : ""
-          }`}
-        >
-          <Filter className="h-4 w-4" aria-hidden />
-          {cantidadFiltrosRapidosActivos > 0 && (
-            <span
-              className="absolute -right-1 -top-1 inline-flex min-h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-vialto-fire px-1 font-[family-name:var(--font-ui)] text-[10px] font-semibold tabular-nums leading-none text-white"
-              aria-hidden
-            >
-              {cantidadFiltrosRapidosActivos}
-            </span>
-          )}
-        </button>
+        <FiltrosRapidosBoton
+          abierto={showFiltrosRapidos}
+          onToggle={() => setShowFiltrosRapidos((v) => !v)}
+          cantidadActivos={cantidadFiltrosRapidosActivos}
+          pendientes={resumenPendientes(resumen, {
+            mostrarFiltroPago: mostrarPagosTransportista,
+            mostrarFiltroLiquidacion: mostrarColumnaLiquidacion,
+          })}
+        />
       )}
 
       {resumen && showFiltrosRapidos && (
@@ -3220,6 +3200,8 @@ export function ViajesTenantPage({
                       {mostrarColumnaFactura && (
                         <ViajeFacturacionIndicador
                           viaje={v}
+                          idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+                          idPropio2Label={idPropio2Label(currentTenant)}
                           tenantId={platform ? tid : undefined}
                           variante="icono"
                           onClickOverride={
@@ -3238,6 +3220,8 @@ export function ViajesTenantPage({
                         (hasLiquidacionesResuelto ? (
                           <ViajeLiquidacionIndicador
                             viaje={v}
+                            idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+                            idPropio2Label={idPropio2Label(currentTenant)}
                             tenantId={platform ? tid : undefined}
                             hasArca={hasLiquidoProductoArcaResuelto}
                             onRegistrarPago={() => setRegistrarPagoViaje(v)}
@@ -3289,7 +3273,10 @@ export function ViajesTenantPage({
                       ordenResaltaFechaCarga ? "font-medium text-vialto-charcoal" : ""
                     }
                   >
-                    {formatIsoFechaCortaListadoEsAr(v.fechaCarga)}
+                    {/* Con una sola fecha hay lugar para el año (dd/mm/aa). */}
+                    {formatIsoFechaCortaListadoEsAr(v.fechaCarga, {
+                      conAnio: !v.fechaDescarga,
+                    })}
                   </span>
                   {v.fechaDescarga && (
                     <>
@@ -3460,6 +3447,8 @@ export function ViajesTenantPage({
                   {isViajeFieldVisible("detalle_viaje", "facturacionEstado") && (
                     <ViajeFacturacionIndicador
                       viaje={v}
+                      idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+                      idPropio2Label={idPropio2Label(currentTenant)}
                       tenantId={platform ? tid : undefined}
                       fullWidth
                       onClickOverride={
@@ -3478,6 +3467,8 @@ export function ViajesTenantPage({
                     hasLiquidacionesResuelto ? (
                       <ViajeLiquidacionIndicador
                         viaje={v}
+                        idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+                        idPropio2Label={idPropio2Label(currentTenant)}
                         tenantId={platform ? tid : undefined}
                         hasArca={hasLiquidoProductoArcaResuelto}
                         onRegistrarPago={() => setRegistrarPagoViaje(v)}
@@ -4159,6 +4150,8 @@ export function ViajesTenantPage({
           <FacturaViewModal
             getToken={getToken}
             factura={viewingFactura}
+            idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+            idPropio2Label={idPropio2Label(currentTenant)}
             cliente={
               clientes.find((c) => c.id === viewingFactura.clienteId) ??
               (viewingFactura as any).cliente ??
@@ -4272,10 +4265,6 @@ export function ViajesTenantPage({
                   }
                 : undefined
             }
-            contratoPdfUrl={liquidacionContratoPdfUrl(
-              viewingLiquidacion.id,
-              platform && tid ? { platform: true, tenantId: tid } : undefined,
-            )}
             onVerComprobante={
               viewingLiquidacion.cbteNro != null ||
               viewingLiquidacion.cae != null

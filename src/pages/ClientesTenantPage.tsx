@@ -332,7 +332,7 @@ export function ClientesTenantPage() {
             onClick={() => setViewingCliente(c)}
             className={listadoTablaAccionClass}
           >
-            Ver
+            Ver cliente
           </button>
         )}
       />

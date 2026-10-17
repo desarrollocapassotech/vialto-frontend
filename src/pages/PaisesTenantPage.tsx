@@ -148,7 +148,7 @@ export function PaisesTenantPage() {
               onClick={() => setViewingPais(p)}
               className={listadoTablaAccionClass}
             >
-              Ver
+              Ver país
             </button>
             {!p.esPredefinido && (
               <>

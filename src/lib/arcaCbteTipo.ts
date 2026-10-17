@@ -99,6 +99,26 @@ export function anulacionComprobanteLabel(cbteTipo: number | null | undefined): 
   return esNotaDebitoAnulacion(cbteTipo) ? "Nota de Débito" : "Nota de Crédito";
 }
 
+/**
+ * Si una factura se puede editar desde Facturas: solo si nunca entró al circuito de emisión
+ * de ARCA (`arcaEstado == null`) — con ARCA eso es el borrador; una factura autorizada,
+ * esperando CAE, con error o anulada se corrige anulándola y volviéndola a emitir. Las
+ * facturas manuales (empresa sin ARCA) no tienen `arcaEstado` y se siguen editando. Mismo
+ * criterio que `assertFacturaEditable` del backend; no depende de saber si la empresa tiene
+ * ARCA, así sirve igual desde Viajes, Cuenta corriente o Inicio.
+ */
+export function facturaEditable(factura: {
+  estado: string;
+  arcaEstado?: string | null;
+}): boolean {
+  return factura.arcaEstado == null && factura.estado !== "anulado";
+}
+
+/** "0003-00000072" a partir de punto de venta y número de comprobante. */
+export function nroComprobante(ptoVenta: number | null | undefined, nro: number): string {
+  return `${String(ptoVenta ?? 0).padStart(4, "0")}-${String(nro).padStart(8, "0")}`;
+}
+
 export function facturaLetraLabel(letra: FacturaLetra): string {
   return letra === "a" ? "Factura A" : "Factura B";
 }

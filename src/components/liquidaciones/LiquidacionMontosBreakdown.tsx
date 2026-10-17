@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import { FilaMonto, FilaMontoDesplegable } from "@/components/shared/DetalleComprobante";
 import type { ConceptoLiquidacionSigno } from "@/types/api";
 import {
   fmtLiquidacionMoney,
@@ -33,54 +35,14 @@ type Props = {
   /** Etiqueta del bruto (Sub total vs Bruto). */
   brutoLabel?: string;
   totalLabel?: string;
+  /**
+   * Solo `filas`: detalle que compone el bruto (ej. los viajes). Si viene, la fila del
+   * bruto se vuelve un desplegable que lo muestra debajo.
+   */
+  brutoDetalle?: ReactNode;
+  /** Texto chico al lado del label del bruto desplegable (ej. "1 viaje"). */
+  brutoDetalleResumen?: string;
 };
-
-function Row({
-  label,
-  value,
-  muted,
-  bold,
-  separator,
-}: {
-  label: string;
-  value: string;
-  muted?: boolean;
-  bold?: boolean;
-  separator?: boolean;
-}) {
-  return (
-    <div
-      className={`flex items-baseline justify-between gap-4 ${
-        separator
-          ? "border-t border-black/10 pt-1.5 mt-0.5"
-          : "border-b border-black/5 last:border-0 py-1.5"
-      } ${bold ? "py-1.5" : ""}`}
-    >
-      <span
-        className={`text-xs ${
-          muted
-            ? "text-vialto-steel"
-            : bold
-              ? "font-medium text-vialto-charcoal"
-              : "text-vialto-charcoal"
-        }`}
-      >
-        {label}
-      </span>
-      <span
-        className={`text-sm tabular-nums ${
-          bold
-            ? "font-semibold text-vialto-charcoal"
-            : muted
-              ? "text-vialto-steel"
-              : "text-vialto-charcoal"
-        }`}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
 
 function Campo({ label, value }: { label: string; value: string }) {
   return (
@@ -128,6 +90,8 @@ export function LiquidacionMontosBreakdown({
   variant = "filas",
   brutoLabel = "Bruto",
   totalLabel = "Total neto a liquidar",
+  brutoDetalle,
+  brutoDetalleResumen,
 }: Props) {
   // `gastosAdminIva` es el IVA total de AFIP (incluye el IVA de los conceptos), igual que
   // la línea "IVA" del PDF. El total no se recalcula: es `liquido`.
@@ -251,16 +215,27 @@ export function LiquidacionMontosBreakdown({
 
   return (
     <div>
-      {lineItems.map((item) => (
-        <Row
-          key={item.key}
-          label={item.label}
-          value={item.value}
-          muted={item.muted}
-          bold={item.bold}
-          separator={item.separator}
-        />
-      ))}
+      {lineItems.map((item) =>
+        item.key === "bruto" && brutoDetalle ? (
+          <FilaMontoDesplegable
+            key={item.key}
+            label={item.label}
+            resumen={brutoDetalleResumen}
+            value={item.value}
+          >
+            {brutoDetalle}
+          </FilaMontoDesplegable>
+        ) : (
+          <FilaMonto
+            key={item.key}
+            label={item.label}
+            value={item.value}
+            muted={item.muted}
+            bold={item.bold}
+            separator={item.separator}
+          />
+        ),
+      )}
     </div>
   );
 }

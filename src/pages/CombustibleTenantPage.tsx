@@ -599,7 +599,7 @@ export function CombustibleTenantPage({
           const options: AccionOpcion[] = [
             {
               id: "ver",
-              label: "Ver",
+              label: "Ver carga",
               icon: Eye,
               onClick: () => setViewTargetId(r.id),
             },

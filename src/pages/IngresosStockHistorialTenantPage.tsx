@@ -421,7 +421,7 @@ export function IngresosStockHistorialTenantPage({
             onClick={() => setViendo(op)}
             className={listadoTablaAccionClass}
           >
-            Ver
+            Ver ingreso
           </button>
         )}
         actionsThClassName={`${listadoTablaThClass} align-top text-right`}

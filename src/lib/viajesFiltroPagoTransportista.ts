@@ -8,7 +8,7 @@ import { viajeCoincideFiltroPagoTransportista } from '@/lib/viajesTransportistaP
 import type { PaginatedMeta, Viaje } from '@/types/api';
 
 /** Valores de `pagoTransportista` en GET /api/viajes/paginated (y platform). */
-export const VIAJE_PAGO_TRANSPORTISTA_FILTROS = ['sin_pagar', 'pagado'] as const;
+export const VIAJE_PAGO_TRANSPORTISTA_FILTROS = ['pagado'] as const;
 
 export type ViajePagoTransportistaFiltro = (typeof VIAJE_PAGO_TRANSPORTISTA_FILTROS)[number] | '';
 
@@ -34,7 +34,7 @@ export function esFiltroPagoTransportistaValido(v: string): v is ViajePagoTransp
 /** Asegura que la página mostrada coincida con el badge de ganancia bruta. */
 export function filtrarViajesPorPagoTransportista(
   items: Viaje[],
-  filtro: 'sin_pagar' | 'pagado',
+  filtro: 'pagado',
 ): Viaje[] {
   return items.filter((v) => viajeCoincideFiltroPagoTransportista(v, filtro));
 }
@@ -113,7 +113,7 @@ export function viajeListadoRequiereOrdenCliente(
  */
 export async function contarViajesPagoTransportistaDesdeApi(
   listBaseUrl: string,
-  filtro: 'sin_pagar' | 'pagado',
+  filtro: 'pagado',
   getToken: () => Promise<string | null>,
 ): Promise<number> {
   let page = 1;
@@ -133,7 +133,7 @@ export async function contarViajesPagoTransportistaDesdeApi(
 /** Misma regla que el conteo de chips: recorre el listado paginado y filtra en cliente. */
 export async function listarViajesPorPagoTransportistaDesdeApi(
   listBaseUrl: string,
-  filtro: 'sin_pagar' | 'pagado',
+  filtro: 'pagado',
   page: number,
   pageSize: number,
   sortBy: ViajeSortField,

@@ -3,6 +3,7 @@ import { ApiError, apiJson } from "@/lib/api";
 import { Spinner } from "@/components/ui/Spinner";
 import { friendlyError } from "@/lib/friendlyError";
 import type { Presentacion } from "@/types/api";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 
 export function PresentacionFormModal({
   modo,
@@ -97,13 +98,9 @@ export function PresentacionFormModal({
           </label>
         </div>
 
-        {error && (
-          <p className="mx-5 mb-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-2 py-1">
-            {error}
-          </p>
-        )}
 
-        <div className="flex justify-end gap-2 border-t border-black/10 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-black/10 px-5 py-4">
+          <ErrorPieModal error={error} />
           <button
             type="button"
             disabled={saving}

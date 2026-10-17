@@ -18,7 +18,6 @@ import {
 } from "@/components/liquidaciones/LiquidacionViewModal";
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { apiFetch, apiJson } from "@/lib/api";
-import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
 import type { Viaje } from "@/types/api";
@@ -41,6 +40,9 @@ type Props = {
    * cierra el detalle y el host abre el modal de "Nueva liquidación" sobre esa liquidación.
    */
   onEmitir?: (liq: LiquidacionConTransportista) => void;
+  /** Config "ID Propio 2" de la empresa (superadmin); sin prop el modal usa la empresa propia. */
+  idPropio2Habilitado?: boolean;
+  idPropio2Label?: string;
 };
 
 const badgeClass =
@@ -68,6 +70,8 @@ export function ViajeLiquidacionIndicador({
   onLiquidar,
   variante = "badge",
   onEmitir,
+  idPropio2Habilitado,
+  idPropio2Label,
 }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -155,6 +159,8 @@ export function ViajeLiquidacionIndicador({
       {liquidacionCompleta && (
         <LiquidacionViewModal
           liq={liquidacionCompleta}
+          idPropio2Habilitado={idPropio2Habilitado}
+          idPropio2Label={idPropio2Label}
           ivaPct={liquidacionCompleta.ivaPct ?? undefined}
           hasArca={hasArca}
           canEdit={["borrador", "error", "pendiente_cae"].includes(
@@ -169,10 +175,6 @@ export function ViajeLiquidacionIndicador({
                 }
               : undefined
           }
-          contratoPdfUrl={liquidacionContratoPdfUrl(
-            liquidacionCompleta.id,
-            tenantId ? { platform: true, tenantId } : undefined,
-          )}
           onEditar={() => {
             const params = tenantId
               ? `?tenantId=${encodeURIComponent(tenantId)}`

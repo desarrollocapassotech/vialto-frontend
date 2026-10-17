@@ -42,7 +42,7 @@ export function FacturaAccionesMenu({
 
   const options = useMemo<AccionOpcion[]>(() => {
     const opts: AccionOpcion[] = [
-      { id: 'ver', label: 'Ver', icon: Eye, onClick: onVer },
+      { id: 'ver', label: 'Ver factura', icon: Eye, onClick: onVer },
     ];
     const tieneCaeOriginal = Boolean(factura.cae);
     const anulada =

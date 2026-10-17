@@ -36,13 +36,13 @@ import {
 import { friendlyError } from "@/lib/friendlyError";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
-import { ArcaEmitErrorAlert } from "@/components/ui/ArcaErrorMessage";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { modalOverlayClass } from "@/lib/modalLayers";
 import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
-import { useToast } from "@/lib/toast";
 import { CompletarDatosFiscalesInline } from "@/components/shared/CompletarDatosFiscalesInline";
 import type { ArcaConfig, Cliente, Factura, Viaje } from "@/types/api";
 import { ConfirmarEmisionArcaDialog } from "@/components/shared/ConfirmarEmisionArcaDialog";
@@ -82,7 +82,6 @@ export function EmitirFacturaModal({
   const { tenant: tenantPdf } = useTenantPaisFijo(tenantId);
   const { getToken } = useAuth();
   const navigate = useNavigate();
-  const { showToast } = useToast();
   const platform = Boolean(tenantId?.trim());
   const bloqueadoUsd = arcaBloqueaFacturarUsd(true, factura.moneda);
   const yaAutorizada =
@@ -204,14 +203,10 @@ export function EmitirFacturaModal({
       : null;
 
   function notifyEmitBlock(message: string) {
-    setError(message);
-    showToast(message, "error");
-    requestAnimationFrame(() => {
-      feedbackRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-    });
+    // Va al aviso del pie (ErrorPieModal). Se limpia y se vuelve a poner para que zumbe
+    // aunque el mensaje sea el mismo que ya estaba.
+    setError(null);
+    requestAnimationFrame(() => setError(message));
   }
 
   const totales = useMemo(
@@ -319,7 +314,8 @@ export function EmitirFacturaModal({
   }
 
   function handleOverlayClick(e: MouseEvent) {
-    if (e.target === overlayRef.current) onClose();
+    // Mientras se emite contra ARCA no se puede cerrar.
+    if (e.target === overlayRef.current && !busyArca) onClose();
   }
 
   function renderPortal(content: ReactNode) {
@@ -379,9 +375,13 @@ export function EmitirFacturaModal({
           className={modalOverlayClass}
         >
           <div
-            className="w-full max-w-lg bg-white shadow-xl border border-black/20 flex flex-col max-h-[90dvh] sm:rounded"
+            className="relative w-full max-w-lg bg-white shadow-xl border border-black/20 flex flex-col max-h-[90dvh] sm:rounded"
             onClick={(e) => e.stopPropagation()}
           >
+            {busyArca && (
+              // Emitiendo contra ARCA: se bloquea todo el modal, no solo el botón.
+              <BloqueoModal mensaje="Emitiendo la factura en ARCA… No cierres esta ventana." />
+            )}
             <div className="flex items-center justify-between border-b border-black/10 px-6 py-4 shrink-0">
               <div>
                 <div className="flex items-center gap-2">
@@ -535,7 +535,6 @@ export function EmitirFacturaModal({
                     )}
 
                   <div ref={feedbackRef} className="space-y-2">
-                    {error && <ArcaEmitErrorAlert error={error} />}
                     {arcaConfigMissing && (
                       <button
                         type="button"
@@ -604,9 +603,8 @@ export function EmitirFacturaModal({
                     </div>
                   </section>
 
-                  {error && <ArcaEmitErrorAlert error={error} />}
-
-                  <div className="flex justify-end gap-3">
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <ErrorPieModal error={error} />
                     <button
                       type="button"
                       disabled={downloading}
@@ -638,7 +636,8 @@ export function EmitirFacturaModal({
             </div>
 
             {step === "revision" && (
-              <div className="flex shrink-0 justify-end gap-3 border-t border-black/10 px-6 py-4">
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-black/10 px-6 py-4">
+                <ErrorPieModal error={error} />
                 <button
                   type="button"
                   onClick={onClose}

@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { Spinner } from "@/components/ui/Spinner";
-import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { modalOverlayClass } from "@/lib/modalLayers";
 
 const btnGhost =
@@ -33,12 +34,13 @@ export function AnularLiquidacionModal({
   const descId = useId();
   const motivoId = useId();
   const [motivo, setMotivo] = useState("");
-  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ motivo?: string }>({});
+  const fieldError = fieldErrors.motivo;
 
   useEffect(() => {
     if (!open) return;
     setMotivo("");
-    setFieldError(null);
+    setFieldErrors({});
   }, [open]);
 
   useEffect(() => {
@@ -58,10 +60,10 @@ export function AnularLiquidacionModal({
   function handleConfirm() {
     const trimmed = motivo.trim();
     if (!trimmed) {
-      setFieldError("Ingresá el motivo de anulación.");
+      setFieldErrors({ motivo: "Ingresá el motivo de anulación." });
       return;
     }
-    setFieldError(null);
+    setFieldErrors({});
     void onConfirm(trimmed);
   }
 
@@ -78,9 +80,13 @@ export function AnularLiquidacionModal({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
-        className="w-full max-w-md rounded-t-xl border border-black/15 bg-white p-5 shadow-lg sm:rounded"
+        className="relative w-full max-w-md rounded-t-xl border border-black/15 bg-white p-5 shadow-lg sm:rounded"
         onClick={(e) => e.stopPropagation()}
       >
+        {busy && (
+          // Emitiendo la anulación (NC/ND) contra ARCA: se bloquea todo el modal.
+          <BloqueoModal mensaje="Emitiendo la anulación en ARCA… No cierres esta ventana." />
+        )}
         <h2
           id={titleId}
           className="text-sm font-semibold text-vialto-charcoal"
@@ -104,24 +110,18 @@ export function AnularLiquidacionModal({
             placeholder="Indicá el motivo…"
             onChange={(e) => {
               setMotivo(e.target.value);
-              if (fieldError) setFieldError(null);
+              if (fieldError) setFieldErrors({});
             }}
             className={`w-full rounded border bg-white px-3 py-2 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 disabled:opacity-50 ${
               fieldError ? "border-red-400" : "border-black/15"
             }`}
           />
-          <CrudFieldError message={fieldError ?? undefined} />
         </label>
 
         {children && <div className="mt-4">{children}</div>}
 
-        {error && (
-          <p role="alert" className="mt-3 text-sm font-medium text-red-600">
-            {error}
-          </p>
-        )}
-
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+          <ErrorPieModal error={error} fieldErrors={fieldErrors} />
           <button
             type="button"
             disabled={busy}

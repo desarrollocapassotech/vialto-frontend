@@ -338,7 +338,7 @@ export function VehiculosSuperadminPage() {
               }}
               className={listadoTablaAccionClass}
             >
-              Ver
+              Ver vehículo
             </button>
             <Link
               to={`/vehiculos/${encodeURIComponent(v.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}

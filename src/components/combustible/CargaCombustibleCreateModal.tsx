@@ -11,6 +11,7 @@ import {
 } from "@/lib/combustibleLabels";
 import { useCombustibleValidation } from "@/lib/combustibleValidation";
 import type { CargaCombustible } from "@/types/api";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 
 function fmtVehiculoLabel(v: {
   patente: string;
@@ -340,11 +341,6 @@ export function CargaCombustibleCreateModal({
           Registrar nueva carga
         </h2>
 
-        {error && (
-          <p className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </p>
-        )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -525,7 +521,8 @@ export function CargaCombustibleCreateModal({
             </div>
           </div>
 
-          <div className="mt-4 flex justify-end gap-3 pt-4 border-t border-black/10">
+          <div className="mt-4 flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-black/10">
+            <ErrorPieModal error={error} />
             <button
               type="button"
               onClick={onClose}

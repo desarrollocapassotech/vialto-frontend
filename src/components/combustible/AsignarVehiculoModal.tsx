@@ -6,6 +6,7 @@ import { useToast } from "@/lib/toast";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fmtTipoVehiculo } from "@/lib/combustibleLabels";
 import type { AsignacionVehiculo, Chofer, ConEmpresa, Vehiculo } from "@/types/api";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 
 function fmtVehiculoLabel(v: {
   patente: string;
@@ -133,13 +134,9 @@ export function AsignarVehiculoModal({
           </div>
         </div>
 
-        {error && (
-          <p className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </p>
-        )}
 
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
+          <ErrorPieModal error={error} />
           <button
             type="button"
             onClick={onClose}

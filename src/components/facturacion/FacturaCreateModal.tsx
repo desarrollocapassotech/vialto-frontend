@@ -11,8 +11,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Receipt } from "lucide-react";
 import { useHiddenFiscalFields } from "@/hooks/useHiddenFiscalFields";
-import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
-import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPreviewPanel";
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
@@ -54,8 +54,6 @@ import {
 } from "@/lib/facturaEmitValidation";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
 import { friendlyError } from "@/lib/friendlyError";
-import { ArcaEmitErrorAlert } from "@/components/ui/ArcaErrorMessage";
-import { isAfipInfrastructureError } from "@/lib/arcaFriendlyError";
 import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
@@ -64,6 +62,7 @@ import { MSG_EMITIR_MONTO_CERO } from "@/lib/arcaMontoCero";
 import {
   errorFechaEmisionArca,
   rangoFechaEmisionArca,
+  vencimientoAlCambiarEmision,
 } from "@/lib/facturaFechaEmision";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { unidadCantidadViajes } from "@/lib/pdfDetalleViaje";
@@ -591,6 +590,19 @@ export function FacturaCreateModal({
     setDraft((prev) => ({ ...prev, ...p }));
   }
 
+  /** Mueve el vencimiento junto con la emisión mientras siga en el default (emisión + 30 días). */
+  function cambiarFechaEmision(fechaEmision: string) {
+    setDraft((prev) => ({
+      ...prev,
+      fechaEmision,
+      fechaVencimiento: vencimientoAlCambiarEmision(
+        prev.fechaEmision,
+        prev.fechaVencimiento,
+        fechaEmision,
+      ),
+    }));
+  }
+
   function patchViajeIds(ids: string[]) {
     const tramos = filterFacturaTramosByViajeIds(draft.tramos, ids);
     const facturarPorTramo = ids.length === 0 ? false : draft.facturarPorTramo;
@@ -623,14 +635,10 @@ export function FacturaCreateModal({
   }
 
   function notifyError(message: string) {
-    setLocalError(message);
-    showToast(message, "error");
-    requestAnimationFrame(() => {
-      feedbackRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-    });
+    // Va al aviso del pie (ErrorPieModal). Se limpia y se vuelve a poner para que zumbe
+    // aunque el mensaje sea el mismo que ya estaba.
+    setLocalError(null);
+    requestAnimationFrame(() => setLocalError(message));
   }
 
   async function resolveComprobanteUrl(): Promise<string | null | undefined> {
@@ -915,14 +923,13 @@ export function FacturaCreateModal({
               value={draft.fechaEmision}
               min={rangoFechaArca?.min}
               max={rangoFechaArca?.max}
-              onChange={(e) => patch({ fechaEmision: e.target.value })}
+              onChange={(e) => cambiarFechaEmision(e.target.value)}
               className={
                 errorFechaArca
                   ? compactInputClass.replace("border-black/15", "border-red-400")
                   : compactInputClass
               }
             />
-            <CrudFieldError message={errorFechaArca} />
           </div>
           <div className="flex flex-col gap-1">
             <label className={compactLabelClass}>Fecha de vencimiento</label>
@@ -1041,7 +1048,7 @@ export function FacturaCreateModal({
           <input
             type="date"
             value={draft.fechaEmision}
-            onChange={(e) => patch({ fechaEmision: e.target.value })}
+            onChange={(e) => cambiarFechaEmision(e.target.value)}
             className="h-9 border border-black/20 bg-white px-3 text-sm"
           />
         </div>
@@ -1196,17 +1203,11 @@ export function FacturaCreateModal({
           ].join(" ")}
           onClick={(e) => e.stopPropagation()}
         >
-          {step === "form" && viajesLoading ? (
-            <div
-              className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white/80 backdrop-blur-[1px]"
-              role="status"
-              aria-live="polite"
-            >
-              <Spinner className="h-8 w-8 text-vialto-charcoal" />
-              <p className="text-sm font-medium text-vialto-charcoal">
-                Cargando clientes…
-              </p>
-            </div>
+          {submitAction === "emitir" ? (
+            // Emitiendo contra ARCA: se bloquea todo el modal, no solo el botón.
+            <BloqueoModal mensaje="Emitiendo la factura en ARCA… No cierres esta ventana." />
+          ) : step === "form" && viajesLoading ? (
+            <BloqueoModal mensaje="Cargando clientes…" />
           ) : null}
           <header className="flex shrink-0 items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-6">
             <div className="min-w-0">
@@ -1310,12 +1311,6 @@ export function FacturaCreateModal({
                       }
                       feedbackSlot={
                         <div ref={feedbackRef} className="space-y-2">
-                          {displayError &&
-                            (isAfipInfrastructureError(displayError) ? (
-                              <ArcaEmitErrorAlert error={displayError} />
-                            ) : (
-                              <CrudFormErrorAlert message={displayError} />
-                            ))}
                           {arcaConfigMissing && (
                             <button
                               type="button"
@@ -1342,15 +1337,6 @@ export function FacturaCreateModal({
               ) : (
                 <div className="overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
                   {standardFields}
-                  {displayError && (
-                    <div className="mt-4">
-                      {isAfipInfrastructureError(displayError) ? (
-                        <ArcaEmitErrorAlert error={displayError} />
-                      ) : (
-                        <CrudFormErrorAlert message={displayError} />
-                      )}
-                    </div>
-                  )}
                 </div>
               )
             ) : (
@@ -1439,6 +1425,7 @@ export function FacturaCreateModal({
 
           {step === "form" && (
             <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
+              <ErrorPieModal error={displayError} />
               {/* Faltantes para emitir: fijo en el pie, al lado de "Emitir a ARCA", para que se vea siempre. */}
               {unifiedArca && datosEmitIncompletos && (
                 <AvisoFaltantesEmision

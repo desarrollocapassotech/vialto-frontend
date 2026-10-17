@@ -1,7 +1,7 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
 import {
   Ban,
   Download,
@@ -51,7 +51,6 @@ import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { useToast } from "@/lib/toast";
 import { apiFetch, apiJson } from "@/lib/api";
-import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
 import { friendlyError } from "@/lib/friendlyError";
 import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
@@ -196,7 +195,7 @@ function LiquidacionAccionesMenu({
   const puedeVerComprobante = tieneComprobanteAdjunto || tienePdf;
 
   const options: AccionOpcion[] = [
-    { id: "ver", label: "Ver", icon: Eye, onClick: onVer },
+    { id: "ver", label: "Ver liquidación", icon: Eye, onClick: onVer },
   ];
   if (puedeEmitir) {
     const conError = liq.estado === "error";
@@ -287,6 +286,7 @@ export function LiquidacionesTenantPage() {
   const { getToken, isLoaded, isSignedIn, sessionClaims, orgId } = useAuth();
   const { user } = useUser();
   const { showToast } = useToast();
+  const location = useLocation();
   const tenants = useTenantsList();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const { tenant, transportistas, refreshTransportistas, refreshClientes } =
@@ -385,6 +385,9 @@ export function LiquidacionesTenantPage() {
   const [pendingEmitir, setPendingEmitir] =
     useState<LiquidacionConTransportista | null>(null);
   const [showCrear, setShowCrear] = useState(false);
+  /** Liquidación anulada que se vuelve a emitir: "Nueva liquidación" se abre precargada con ella. */
+  const [copiaLiquidacion, setCopiaLiquidacion] =
+    useState<LiquidacionConTransportista | null>(null);
   const [viajesTodos, setViajesTodos] = useState<Viaje[]>([]);
   const [viajesTodosLoading, setViajesTodosLoading] = useState(false);
   /** true = `viajesTodos` es la carga vigente de esta empresa (false mientras carga o si falló). */
@@ -591,6 +594,34 @@ export function LiquidacionesTenantPage() {
     );
     setPendingEmitir(null);
   }
+
+  // "Volver a emitir" una liquidación anulada desde otra pantalla (Viajes, Cuenta corriente):
+  // llega por el state de navegación y abre "Nueva liquidación" precargada con ella.
+  const volverAEmitirIdRef = useRef(
+    (location.state as { volverAEmitirLiquidacionId?: string } | null)
+      ?.volverAEmitirLiquidacionId?.trim() ?? "",
+  );
+  useEffect(() => {
+    const id = volverAEmitirIdRef.current;
+    if (!id || !activeTenantId) return;
+    volverAEmitirIdRef.current = "";
+    window.history.replaceState({}, "");
+    void (async () => {
+      try {
+        const liq = await apiJson<LiquidacionConTransportista>(
+          `/api/integracion-arca/liquidaciones/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(activeTenantId)}`,
+          () => getToken(),
+        );
+        setCopiaLiquidacion(liq);
+        setShowCrear(true);
+        void cargarViajesTodos();
+      } catch (e) {
+        showToast(friendlyError(e, "liquidaciones"), "error");
+      }
+    })();
+    // `cargarViajesTodos` no está memoizado; el ref ya evita que se dispare dos veces.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTenantId, getToken]);
 
   async function confirmEliminar() {
     const liq = eliminarConfirm;
@@ -1356,6 +1387,7 @@ export function LiquidacionesTenantPage() {
       )}
       {showCrear && activeTenantId && (
         <CrearLiquidacionManualModal
+          copiaDe={copiaLiquidacion ?? undefined}
           transportistas={transportistasParaNuevaLiquidacion}
           transportistasLoading={viajesTodosLoading}
           config={config}
@@ -1388,8 +1420,12 @@ export function LiquidacionesTenantPage() {
                 : [{ ...liq, transportista: null }],
             );
             setShowCrear(false);
+            setCopiaLiquidacion(null);
           }}
-          onClose={() => setShowCrear(false)}
+          onClose={() => {
+            setShowCrear(false);
+            setCopiaLiquidacion(null);
+          }}
         />
       )}
 
@@ -1509,12 +1545,6 @@ export function LiquidacionesTenantPage() {
           getToken={getToken}
           idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
           idPropio2Label={idPropio2Label(empresaTenant)}
-          contratoPdfUrl={liquidacionContratoPdfUrl(
-            detail.liq.id,
-            isSuperAdmin
-              ? { platform: true, tenantId: activeTenantId }
-              : undefined,
-          )}
           onClose={() => setDetail(null)}
           onEditar={() => setDetail({ mode: "edit", liq: detail.liq })}
           onEmitir={() => {
@@ -1551,6 +1581,16 @@ export function LiquidacionesTenantPage() {
             detail.liq.estado === "error" ||
             detail.liq.estado === "pendiente_cae"
               ? () => setEliminarConfirm(detail.liq)
+              : undefined
+          }
+          onVolverAEmitir={
+            detail.liq.estado === "anulado"
+              ? () => {
+                  setCopiaLiquidacion(detail.liq);
+                  setDetail(null);
+                  setShowCrear(true);
+                  void cargarViajesTodos();
+                }
               : undefined
           }
           onAnular={
