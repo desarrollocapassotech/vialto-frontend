@@ -1881,10 +1881,6 @@ export function CrearLiquidacionManualModal({
                                 viaje={v}
                                 ivaPct={v.precioTransportistaIvaIncluidoPct || ivaPctNum}
                                 tenant={tenantEfectivo}
-                                unSoloViaje={selectedViajes.length === 1}
-                                algunoConIdPropio={selectedViajes.some((x) =>
-                                  x.numeroIdentificacionPersonalizado?.trim(),
-                                )}
                               />
                               <ViajeSubtotalTooltip
                                 viaje={v}

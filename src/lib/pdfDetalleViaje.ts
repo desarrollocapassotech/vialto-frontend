@@ -108,37 +108,45 @@ type ViajeLiquidacion = Pick<
   | "origen"
   | "destino"
   | "chofer"
+  | "productosViaje"
   | "precioTransportistaExterno"
   | "cantidadTransportista"
   | "precioUnitarioTransportista"
 >;
 
+/** Identificación del viaje en el CVLP: "CTG 101…-CP 0-1761" (ID propio + ID propio 2) o "Viaje #N". */
+function refViajeCvlp(v: ViajeLiquidacion, tenant: TenantPdfDetalle): string {
+  const idPropio = v.numeroIdentificacionPersonalizado?.trim();
+  const usaIdPropio = (tenant?.idPropio1Habilitado ?? true) && Boolean(idPropio);
+  let ref = usaIdPropio
+    ? `${tenant?.labelIdentificacionPersonalizadaViajes?.trim() || "ID propio"} ${idPropio}`
+    : `Viaje #${v.numero}`;
+  const id2 = idPropio2(v, tenant);
+  if (id2) ref += `-${id2[0]} ${id2[1]}`;
+  return ref;
+}
+
 /**
- * Fila de un viaje en el PDF del CVLP. Con un solo viaje el PDF no tiene columna de ID y
- * lo pone en la descripción; con varios, la columna se llama como el ID propio de la
- * empresa (si algún viaje lo usa) o "ID de Viaje".
+ * Detalle de la línea de un viaje en el CVLP: "Chofer — CTG 101…-CP 0-1761 — Origen a
+ * Destino — Producto". Espejo de `detalleViajeCvlp` en `liquidacion-pdf.service.ts`.
  */
+export function detalleViajeCvlp(v: ViajeLiquidacion, tenant: TenantPdfDetalle): string {
+  const ruta = [v.origen?.trim(), v.destino?.trim()].filter(Boolean).join(" a ");
+  const productos = (v.productosViaje ?? [])
+    .map((p) => p.producto?.nombre?.trim())
+    .filter(Boolean)
+    .join(", ");
+  return [v.chofer?.nombre?.trim(), refViajeCvlp(v, tenant), ruta, productos]
+    .filter(Boolean)
+    .join(" — ");
+}
+
+/** Fila de un viaje en el PDF del CVLP (columnas Cantidad | Detalle | Tarifa | IVA % | Importe). */
 export function filasPdfLiquidacion(
   v: ViajeLiquidacion,
   ivaPct: number,
   tenant: TenantPdfDetalle,
-  opts: { unSoloViaje: boolean; algunoConIdPropio: boolean },
 ): [string, string][] {
-  const labelIdPropio = tenant?.labelIdentificacionPersonalizadaViajes?.trim() || "ID propio";
-  const usaIdPropio = (tenant?.idPropio1Habilitado ?? true) && opts.algunoConIdPropio;
-  const idTexto = (v.numeroIdentificacionPersonalizado ?? v.numero).toString().toUpperCase();
-
-  const desc: string[] = [];
-  if (opts.unSoloViaje) {
-    const prefijo = usaIdPropio && v.numeroIdentificacionPersonalizado?.trim() ? labelIdPropio : "ID";
-    desc.push(`${prefijo}: ${idTexto}`);
-  }
-  const id2 = idPropio2(v, tenant);
-  if (id2) desc.push(`${id2[0]}: ${id2[1]}`);
-  const ruta = [v.origen, v.destino].filter(Boolean).join(" - ");
-  if (ruta) desc.push(ruta);
-  if (v.chofer?.nombre) desc.push(`Chofer: ${v.chofer.nombre.trim()}`);
-
   const cantidad = v.cantidadTransportista ?? null;
   const tarifa = v.precioUnitarioTransportista ?? null;
   const base =
@@ -147,15 +155,10 @@ export function filasPdfLiquidacion(
       : round2(v.precioTransportistaExterno ?? 0);
 
   return [
-    ...(opts.unSoloViaje
-      ? []
-      : [[usaIdPropio ? labelIdPropio : "ID de Viaje", idTexto] as [string, string]]),
-    [productoLabels(tenant).singular, "SERVICIOS LOGISTICOS"],
-    ["Descripción", desc.join("\n").toUpperCase()],
     ["Cantidad", cantidad != null ? `${fmtNumPdf(cantidad)} ${unidadCantidadViajes(tenant)}` : "1,00"],
-    ["Precio", fmtNumPdf(tarifa ?? base)],
-    ["SubTotal", fmtNumPdf(base)],
+    ["Detalle", detalleViajeCvlp(v, tenant)],
+    ["Tarifa", fmtNumPdf(tarifa ?? base)],
     ["IVA %", fmtNumPdf(ivaPct)],
-    ["SubTotal c/IVA", fmtNumPdf(round2(base * (1 + ivaPct / 100)))],
+    ["Importe", fmtNumPdf(base)],
   ];
 }
