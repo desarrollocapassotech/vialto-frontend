@@ -25,6 +25,30 @@ function sumarDiasIso(iso: string, dias: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
+/** Días entre la emisión y el vencimiento que se proponen al crear una factura. */
+export const FACTURA_DIAS_VENCIMIENTO_DEFAULT = 30;
+
+/** Vencimiento por defecto de una factura nueva: emisión + 30 días (`""` sin emisión). */
+export function vencimientoPorDefecto(fechaEmisionIso: string): string {
+  return fechaEmisionIso
+    ? sumarDiasIso(fechaEmisionIso, FACTURA_DIAS_VENCIMIENTO_DEFAULT)
+    : "";
+}
+
+/**
+ * Al cambiar la emisión, el vencimiento se corre con ella solo si seguía en el valor por
+ * defecto (o vacío); si el usuario lo cambió a mano, se respeta.
+ */
+export function vencimientoAlCambiarEmision(
+  emisionAnterior: string,
+  vencimientoActual: string,
+  emisionNueva: string,
+): string {
+  const seguiaPorDefecto =
+    !vencimientoActual || vencimientoActual === vencimientoPorDefecto(emisionAnterior);
+  return seguiaPorDefecto ? vencimientoPorDefecto(emisionNueva) : vencimientoActual;
+}
+
 function isoLegible(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;

@@ -46,7 +46,7 @@ import {
   facturaLetraFromCondicionIva,
 } from "@/lib/arcaCbteTipo";
 import { apiJson, apiFetch, ApiError } from "@/lib/api";
-import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
+import { hoyArgentinaIso, vencimientoPorDefecto } from "@/lib/facturaFechaEmision";
 import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
 import { useToast } from "@/lib/toast";
 import { friendlyError } from "@/lib/friendlyError";
@@ -377,7 +377,7 @@ export function ViajesTenantPage({
     clienteId: "",
     numero: "",
     fechaEmision: hoyArgentinaIso(),
-    fechaVencimiento: "",
+    fechaVencimiento: vencimientoPorDefecto(hoyArgentinaIso()),
     ivaPct: "",
     viajeIds: [],
     facturarPorTramo: false,
@@ -1613,7 +1613,7 @@ export function ViajesTenantPage({
       clienteId: cid,
       numero: "",
       fechaEmision: hoyArgentinaIso(),
-      fechaVencimiento: "",
+      fechaVencimiento: vencimientoPorDefecto(hoyArgentinaIso()),
       ivaPct: "",
       viajeIds: ids,
       facturarPorTramo: false,
@@ -2007,7 +2007,7 @@ export function ViajesTenantPage({
       clienteId: targetClienteId ?? v.clienteId ?? "",
       numero: "",
       fechaEmision: hoyArgentinaIso(),
-      fechaVencimiento: "",
+      fechaVencimiento: vencimientoPorDefecto(hoyArgentinaIso()),
       ivaPct: "",
       viajeIds: [v.id],
       facturarPorTramo: false,

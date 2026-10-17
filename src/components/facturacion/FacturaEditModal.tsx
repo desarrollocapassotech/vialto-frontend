@@ -34,7 +34,7 @@ import {
   computeFacturaTotalesFromBases,
   importeNetoViajeParaFactura,
 } from "@/lib/facturaTotales";
-import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
+import { hoyArgentinaIso, vencimientoPorDefecto } from "@/lib/facturaFechaEmision";
 import type { Cliente, Factura, Viaje } from "@/types/api";
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -93,7 +93,7 @@ export function emptyFacturaDraft(): FacturaDraft {
     transportistaId: "",
     viajeIds: [],
     fechaEmision: todayIso(),
-    fechaVencimiento: "",
+    fechaVencimiento: vencimientoPorDefecto(todayIso()),
     ivaPct: "21",
     facturarPorTramo: false,
     tramos: [],

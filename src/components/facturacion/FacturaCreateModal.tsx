@@ -64,6 +64,7 @@ import { MSG_EMITIR_MONTO_CERO } from "@/lib/arcaMontoCero";
 import {
   errorFechaEmisionArca,
   rangoFechaEmisionArca,
+  vencimientoAlCambiarEmision,
 } from "@/lib/facturaFechaEmision";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { unidadCantidadViajes } from "@/lib/pdfDetalleViaje";
@@ -591,6 +592,19 @@ export function FacturaCreateModal({
     setDraft((prev) => ({ ...prev, ...p }));
   }
 
+  /** Mueve el vencimiento junto con la emisión mientras siga en el default (emisión + 30 días). */
+  function cambiarFechaEmision(fechaEmision: string) {
+    setDraft((prev) => ({
+      ...prev,
+      fechaEmision,
+      fechaVencimiento: vencimientoAlCambiarEmision(
+        prev.fechaEmision,
+        prev.fechaVencimiento,
+        fechaEmision,
+      ),
+    }));
+  }
+
   function patchViajeIds(ids: string[]) {
     const tramos = filterFacturaTramosByViajeIds(draft.tramos, ids);
     const facturarPorTramo = ids.length === 0 ? false : draft.facturarPorTramo;
@@ -915,7 +929,7 @@ export function FacturaCreateModal({
               value={draft.fechaEmision}
               min={rangoFechaArca?.min}
               max={rangoFechaArca?.max}
-              onChange={(e) => patch({ fechaEmision: e.target.value })}
+              onChange={(e) => cambiarFechaEmision(e.target.value)}
               className={
                 errorFechaArca
                   ? compactInputClass.replace("border-black/15", "border-red-400")
@@ -1041,7 +1055,7 @@ export function FacturaCreateModal({
           <input
             type="date"
             value={draft.fechaEmision}
-            onChange={(e) => patch({ fechaEmision: e.target.value })}
+            onChange={(e) => cambiarFechaEmision(e.target.value)}
             className="h-9 border border-black/20 bg-white px-3 text-sm"
           />
         </div>
