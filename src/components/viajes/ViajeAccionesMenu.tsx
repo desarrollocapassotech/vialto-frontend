@@ -117,7 +117,7 @@ export function ViajeAccionesMenu({
   const permiteExportar = viaje.etapa !== 'cancelado' && hasExportacionActiva;
 
   const options = useMemo(() => {
-    const items: AccionOpcion[] = [{ id: 'ver', label: 'Ver', icon: Eye, onClick: onVer }];
+    const items: AccionOpcion[] = [{ id: 'ver', label: 'Ver viaje', icon: Eye, onClick: onVer }];
 
     if (onReintentarFactura) {
       items.push({

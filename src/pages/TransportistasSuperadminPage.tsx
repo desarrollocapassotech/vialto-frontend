@@ -403,7 +403,7 @@ export function TransportistasSuperadminPage() {
             onClick={() => setViewingTransportista(t)}
             className={listadoTablaAccionClass}
           >
-            Ver
+            Ver transportista
           </button>
         )}
       />

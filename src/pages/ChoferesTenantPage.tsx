@@ -323,7 +323,7 @@ export function ChoferesTenantPage() {
               }}
               className={listadoTablaAccionClass}
             >
-              Ver
+              Ver chofer
             </button>
             <Link
               to={`/choferes/${encodeURIComponent(c.id)}/editar`}

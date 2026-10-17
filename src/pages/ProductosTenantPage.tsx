@@ -416,7 +416,7 @@ export function ProductosTenantPage() {
               onClick={() => setModal({ mode: "view", producto: r })}
               className={listadoTablaAccionClass}
             >
-              Ver
+              Ver {singularFrase}
             </button>
             {puedeGestionar && (
               <>

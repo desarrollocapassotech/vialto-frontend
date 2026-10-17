@@ -196,7 +196,7 @@ function LiquidacionAccionesMenu({
   const puedeVerComprobante = tieneComprobanteAdjunto || tienePdf;
 
   const options: AccionOpcion[] = [
-    { id: "ver", label: "Ver", icon: Eye, onClick: onVer },
+    { id: "ver", label: "Ver liquidación", icon: Eye, onClick: onVer },
   ];
   if (puedeEmitir) {
     const conError = liq.estado === "error";

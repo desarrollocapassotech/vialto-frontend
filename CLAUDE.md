@@ -185,6 +185,8 @@ VITE_SENTRY_TRACES_SAMPLE_RATE=0.1
 
 La columna de acciones de cualquier listado debe exponer **únicamente el botón "Ver"** por fila. Al hacer clic se abre un modal en modo solo lectura (read-only). Dentro del modal hay un botón "Editar" que transiciona al formulario de edición.
 
+**El botón dice "Ver" + la entidad (oct 2026)**: "Ver viaje", "Ver cliente", "Ver factura", "Ver vehículo", etc. — nunca "Ver" a secas. Aplica también al `label` de la opción `id: 'ver'` de `AccionesFila` (tooltip del ícono y desplegable). En Productos fuera de Stock se usa el label de la empresa: `Ver {singularFrase}`.
+
 ### Dos patrones según el tipo de edición
 
 | Tipo de edición | Patrón |

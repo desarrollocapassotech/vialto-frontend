@@ -776,7 +776,7 @@ export function StockMovimientosTenantPage({
                     onClick={() => setViendoOperacion(op)}
                     className={listadoTablaAccionClass}
                   >
-                    Ver
+                    Ver movimiento
                   </button>
                 </div>
               }
@@ -801,7 +801,7 @@ export function StockMovimientosTenantPage({
               onClick={() => setViendoOperacion(op)}
               className={listadoTablaAccionClass}
             >
-              Ver
+              Ver movimiento
             </button>
           </div>
         )}

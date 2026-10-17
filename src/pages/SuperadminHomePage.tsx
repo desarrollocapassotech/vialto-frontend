@@ -112,7 +112,7 @@ export function SuperadminHomePage() {
                         to={`/superadmin/empresas/${encodeURIComponent(tenant.clerkOrgId)}/editar`}
                         className="text-xs uppercase tracking-wider px-2 py-1 border border-black/15 hover:bg-vialto-mist"
                       >
-                        Ver
+                        Ver empresa
                       </Link>
                     </li>
                   ))}
@@ -141,7 +141,7 @@ export function SuperadminHomePage() {
                         to={`/superadmin/empresas/${encodeURIComponent(tenant.clerkOrgId)}/editar`}
                         className="text-xs uppercase tracking-wider px-2 py-1 border border-black/15 hover:bg-vialto-mist"
                       >
-                        Ver
+                        Ver empresa
                       </Link>
                     </li>
                   ))}
@@ -170,7 +170,7 @@ export function SuperadminHomePage() {
                         to={`/superadmin/empresas/${encodeURIComponent(tenant.clerkOrgId)}/editar`}
                         className="text-xs uppercase tracking-wider px-2 py-1 border border-black/15 hover:bg-vialto-mist"
                       >
-                        Ver
+                        Ver empresa
                       </Link>
                     </li>
                   ))}
@@ -206,7 +206,7 @@ export function SuperadminHomePage() {
                         to={`/superadmin/empresas/${encodeURIComponent(tenant.clerkOrgId)}/editar`}
                         className="text-xs uppercase tracking-wider px-2 py-1 border border-black/15 hover:bg-vialto-mist"
                       >
-                        Ver
+                        Ver empresa
                       </Link>
                     </li>
                   ))}

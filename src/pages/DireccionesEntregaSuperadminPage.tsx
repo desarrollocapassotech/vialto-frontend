@@ -326,7 +326,7 @@ export function DireccionesEntregaSuperadminPage() {
             }}
             className={listadoTablaAccionClass}
           >
-            Ver
+            Ver dirección
           </button>
         )}
       />

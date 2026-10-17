@@ -395,7 +395,7 @@ export function ClientesSuperadminPage() {
             onClick={() => setViewingCliente(c)}
             className={listadoTablaAccionClass}
           >
-            Ver
+            Ver cliente
           </button>
         )}
       />

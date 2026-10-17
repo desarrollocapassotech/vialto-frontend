@@ -164,7 +164,7 @@ export function VerFacturasMultiClienteModal({
                         className="inline-flex h-8 items-center justify-center rounded border border-vialto-blue/20 px-3 text-xs font-medium text-vialto-blue hover:bg-vialto-blue/5"
                       >
                         <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                        Ver
+                        Ver factura
                       </button>
                     </td>
                   </tr>

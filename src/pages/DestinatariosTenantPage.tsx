@@ -231,7 +231,7 @@ export function DestinatariosTenantPage() {
             }}
             className={listadoTablaAccionClass}
           >
-            Ver
+            Ver destinatario
           </button>
         )}
       />

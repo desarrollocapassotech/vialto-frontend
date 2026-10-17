@@ -450,7 +450,7 @@ export function ProductosSuperadminPage() {
                   onClick={() => setModal({ mode: "view", producto: r })}
                   className={listadoTablaAccionClass}
                 >
-                  Ver
+                  Ver {singularFrase}
                 </button>
                 {r.activo ? (
                   <button

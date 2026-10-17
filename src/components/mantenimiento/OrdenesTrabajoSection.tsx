@@ -272,7 +272,7 @@ export function OrdenesTrabajoSection({
         loadingMessage="Cargando…"
         actionsTdClassName={listadoTablaAccionesTdClass}
         renderActions={(o) => {
-          const opciones: AccionOpcion[] = [{ id: "ver", label: "Ver", icon: Eye, onClick: () => onVer(o.id) }];
+          const opciones: AccionOpcion[] = [{ id: "ver", label: "Ver orden de trabajo", icon: Eye, onClick: () => onVer(o.id) }];
           if (!soloLectura && o.estado !== "anulada") {
             opciones.push({ id: "anular", label: "Anular", icon: Ban, onClick: () => setAAnular(o) });
           }

@@ -1127,7 +1127,7 @@ export function StockPanelTenantPage({
                             }
                             className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
                           >
-                            Ver
+                            Ver producto
                           </button>
                         </td>
                       </tr>
@@ -1259,7 +1259,7 @@ export function StockPanelTenantPage({
                             }
                             className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist transition-colors"
                           >
-                            Ver
+                            Ver producto
                           </button>
                         </div>
                       }
