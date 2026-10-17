@@ -100,7 +100,6 @@ export function FacturaViewModal({
   onVerComprobante,
   onEmitirArca,
   onAnular,
-  onVerNotaCredito,
   onMarcarCobrada,
   onVolverAEmitir,
   idPropio2Habilitado: idPropio2HabilitadoProp,
