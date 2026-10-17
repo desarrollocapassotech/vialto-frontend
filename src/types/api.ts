@@ -915,6 +915,8 @@ export interface ArcaConfig {
   ingBrutos: string | null;
   inicActEmisor: string | null;
   logoUrl: string | null;
+  /** Leyenda en letra chica bajo la condición de venta del PDF de factura (ej. mora). */
+  leyendaFactura?: string | null;
   ptoVentaCvlp: number;
   ptoVentaFactura: number;
   ambiente: "homologacion" | "produccion";
