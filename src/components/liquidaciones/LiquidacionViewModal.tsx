@@ -1,25 +1,22 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
-import { Ban, Download, Receipt, RotateCw, Trash2 } from "lucide-react";
+import { Ban, FileText, Receipt, RotateCw, Trash2 } from "lucide-react";
+import { anulacionComprobanteLabel } from "@/lib/arcaCbteTipo";
 import { usuarioLabel } from "@/lib/usuarioLabel";
 import { LiquidacionPagoBadge } from "./LiquidacionPagoBadge";
 import {
   ViewModalShell,
   viewModalBtnGhost,
   viewModalBtnPrimary,
-  viewModalGridClass,
 } from "@/components/ui/ViewModalShell";
-import {
-  fmtLiquidacionMoney,
-  LiquidacionMontosBreakdown,
-} from "@/components/liquidaciones/LiquidacionMontosBreakdown";
+import { LiquidacionMontosBreakdown } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
+import { fmtSignedLiquidacionMoney } from "@/lib/liquidacionMoney";
 import { Spinner } from "@/components/ui/Spinner";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
-import { apiFetch, apiJson } from "@/lib/api";
-import { filenameFromContentDisposition } from "@/lib/downloadFilename";
+import { apiJson } from "@/lib/api";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
@@ -83,19 +80,27 @@ function fmtDateTime(iso: string | null | undefined) {
   });
 }
 
-function Campo({
+/** Dato compacto del bloque de cabecera: etiqueta chica, valor y una línea secundaria opcional. */
+function Dato({
   label,
   value,
+  sub,
+  className = "",
 }: {
   label: string;
   value: string | number | null | undefined;
+  sub?: string;
+  className?: string;
 }) {
   return (
-    <div>
-      <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+    <div className={`min-w-0 ${className}`}>
+      <p className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel">
         {label}
       </p>
-      <p className="mt-1 text-sm text-vialto-charcoal">{value ?? "—"}</p>
+      <p className="truncate text-sm font-medium text-vialto-charcoal" title={String(value ?? "")}>
+        {value ?? "—"}
+      </p>
+      {sub && <p className="truncate text-xs text-vialto-steel">{sub}</p>}
     </div>
   );
 }
@@ -145,7 +150,6 @@ export function LiquidacionViewModal({
   onVerAnulacion,
   onVerComprobanteAnulacionManual,
   onVolverAEmitir,
-  contratoPdfUrl,
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
 }: {
@@ -182,8 +186,6 @@ export function LiquidacionViewModal({
    * botón navega a Liquidaciones con `volverAEmitirLiquidacionId` y la pantalla lo resuelve.
    */
   onVolverAEmitir?: () => void;
-  /** PDF comercial (contrato / liquidación a proveedor). Si hay URL, se muestra "Descargar PDF". */
-  contratoPdfUrl?: string;
   /** true = el tenant habilitó "ID Propio 2" — se muestra junto a cada viaje incluido. */
   idPropio2Habilitado?: boolean;
   /** Label configurable de "ID Propio 2". */
@@ -198,31 +200,6 @@ export function LiquidacionViewModal({
   const [loadingDetail, setLoadingDetail] = useState(Boolean(getToken));
   const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
   const [loadingViajeId, setLoadingViajeId] = useState<string | null>(null);
-  const [downloadingContrato, setDownloadingContrato] = useState(false);
-
-  async function handleDescargarContrato() {
-    if (!contratoPdfUrl || downloadingContrato) return;
-    setDownloadingContrato(true);
-    try {
-      const res = await apiFetch(contratoPdfUrl, () => getAuthToken());
-      if (!res.ok) throw new Error("Error al generar el PDF");
-      const filename = filenameFromContentDisposition(
-        res.headers.get("Content-Disposition"),
-        `liquidacion-${liq.id}.pdf`,
-      );
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      showToast(friendlyError(e, "liquidaciones"), "error");
-    } finally {
-      setDownloadingContrato(false);
-    }
-  }
 
   async function handleVerViaje(viajeId: string) {
     setLoadingViajeId(viajeId);
@@ -319,6 +296,76 @@ export function LiquidacionViewModal({
   })();
   const conceptosLineas = normalizeConceptosLineas(source.conceptosLineas);
   const viajesIncluidos: LiquidacionViajeItem[] = source.viajes ?? [];
+  const cantViajes = viajesIncluidos.length || source.cantViajes || 0;
+  const anulada = source.estado === "anulado";
+  const anulacionManual = source.anulacionMetodo === "manual";
+  /** "Nota de Crédito"/"Nota de Débito" si se anuló con comprobante ARCA; null si fue manual. */
+  const anulacionNcNd =
+    anulada && !anulacionManual
+      ? anulacionComprobanteLabel(source.anulacionCbteTipo)
+      : null;
+  // Botones de comprobantes del pie: con anulación se distingue el original del de anulación.
+  const verAnulacion = anulada
+    ? anulacionManual
+      ? onVerComprobanteAnulacionManual && {
+          label: "Ver comprobante de anulación",
+          onClick: onVerComprobanteAnulacionManual,
+        }
+      : onVerAnulacion && {
+          label: `Ver ${anulacionNcNd!.toLowerCase()}`,
+          onClick: onVerAnulacion,
+        }
+    : undefined;
+  // Viajes que componen el bruto: se ven al desplegar la fila "Bruto" del detalle.
+  const viajesDetalle =
+    viajesIncluidos.length === 0 ? (
+      <p className="px-2 text-xs text-vialto-steel">
+        {cantViajes > 0 ? "Sin detalle disponible." : "Sin viajes asociados."}
+      </p>
+    ) : (
+      // Sin recuadro propio: el importe de cada viaje queda alineado con los demás montos.
+      <div className="max-h-52 overflow-y-auto divide-y divide-black/5">
+        {viajesIncluidos.map((row) => {
+          const v = row.viaje;
+          const viajeId = v?.id ?? row.viajeId;
+          const numero =
+            v?.numeroIdentificacionPersonalizado?.trim() || v?.numero || "—";
+          return (
+            <button
+              key={row.viajeId}
+              type="button"
+              disabled={loadingViajeId === viajeId}
+              onClick={() => void handleVerViaje(viajeId)}
+              className="flex w-full items-baseline justify-between gap-4 py-1.5 pl-5 text-left hover:bg-vialto-mist/40 focus:outline-none focus-visible:bg-vialto-mist disabled:opacity-60 disabled:cursor-wait"
+            >
+              <span className="min-w-0">
+                <span className="block text-xs text-vialto-charcoal">
+                  Viaje #{numero}
+                  {v?.fechaCarga && (
+                    <span className="ml-1.5 text-vialto-steel">
+                      {fmtDate(v.fechaCarga)}
+                    </span>
+                  )}
+                </span>
+                {(v?.origen || v?.destino) && (
+                  <span className="block truncate text-[11px] text-vialto-steel">
+                    {v?.origen ?? "—"} → {v?.destino ?? "—"}
+                  </span>
+                )}
+                {idPropio2Habilitado && v?.idPropio2?.trim() && (
+                  <span className="block text-[11px] text-vialto-steel">
+                    {idPropio2Label}: {v.idPropio2.trim()}
+                  </span>
+                )}
+              </span>
+              <span className="shrink-0 text-sm tabular-nums text-vialto-charcoal">
+                {fmtSignedLiquidacionMoney(Number(row.subtotal) || 0, "plus")}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    );
   const puedeEliminar =
     Boolean(onEliminar) &&
     (source.estado === "borrador" ||
@@ -369,6 +416,26 @@ export function LiquidacionViewModal({
             >
               Cerrar
             </button>
+            {onVerComprobante && (
+              <button
+                type="button"
+                onClick={onVerComprobante}
+                className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+              >
+                <FileText className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                {verAnulacion ? "Ver comprobante original" : "Ver comprobante"}
+              </button>
+            )}
+            {verAnulacion && (
+              <button
+                type="button"
+                onClick={verAnulacion.onClick}
+                className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+              >
+                <FileText className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                {verAnulacion.label}
+              </button>
+            )}
             {hasArca &&
               onEmitir &&
               (source.estado === "borrador" || source.estado === "error") && (
@@ -475,21 +542,6 @@ export function LiquidacionViewModal({
                 Volver a emitir
               </button>
             )}
-            {contratoPdfUrl && (
-              <button
-                type="button"
-                onClick={() => void handleDescargarContrato()}
-                disabled={downloadingContrato}
-                className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-60"
-              >
-                <Download
-                  className="h-4 w-4 shrink-0"
-                  strokeWidth={1.75}
-                  aria-hidden
-                />
-                {downloadingContrato ? "Descargando…" : "Descargar PDF"}
-              </button>
-            )}
             {canEdit && (
               <button
                 type="button"
@@ -503,20 +555,86 @@ export function LiquidacionViewModal({
         }
       >
         <div className="space-y-6">
-          <div>
-            <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
-              Destinatario
-            </p>
-            <div className="rounded border border-black/10 bg-vialto-mist px-4 py-3">
-              <p className="font-medium text-vialto-charcoal">
-                {transportistaNombre}
-              </p>
-              {source.transportista?.idFiscal && (
-                <p className="mt-0.5 text-xs text-vialto-steel">
-                  CUIT {source.transportista.idFiscal}
-                </p>
-              )}
-            </div>
+          {/* Datos de cabecera (destinatario, comprobante, período, CAE…) en un bloque compacto. */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 rounded border border-black/10 bg-vialto-mist/60 px-4 py-3 sm:grid-cols-3">
+            <Dato
+              label="Destinatario"
+              value={transportistaNombre}
+              sub={
+                source.transportista?.idFiscal
+                  ? `CUIT ${source.transportista.idFiscal}`
+                  : undefined
+              }
+              className="col-span-2 sm:col-span-1"
+            />
+            {hasArca ? (
+              <Dato
+                label="Comprobante"
+                value={CBTE_TIPO[source.cbteTipo] ?? `Tipo ${source.cbteTipo}`}
+                sub={
+                  source.cbteNro != null
+                    ? `N° ${String(source.ptoVenta ?? 0).padStart(4, "0")}-${String(source.cbteNro).padStart(8, "0")}`
+                    : undefined
+                }
+              />
+            ) : (
+              source.numeroComprobanteProveedor && (
+                <Dato
+                  label="N° de factura del proveedor"
+                  value={source.numeroComprobanteProveedor}
+                />
+              )
+            )}
+            <Dato
+              label="Período"
+              value={`${fmtDate(source.periodoDesde)} — ${fmtDate(source.periodoHasta)}`}
+            />
+            {source.cae && (
+              <Dato
+                label="CAE"
+                value={source.cae}
+                sub={
+                  source.caeFechaVto
+                    ? `Vto. ${fmtDate(source.caeFechaVto)}`
+                    : undefined
+                }
+              />
+            )}
+            <Dato
+              label="Creada"
+              value={fmtDate(source.createdAt)}
+              sub={
+                source.ambiente
+                  ? source.ambiente === "homologacion"
+                    ? "Homologación (prueba)"
+                    : "Producción"
+                  : undefined
+              }
+            />
+            {source.proveedorContrato && (
+              <Dato label="Proveedor contrato" value={source.proveedorContrato} />
+            )}
+            {anulada && (
+              <>
+                <Dato
+                  label="Anulada"
+                  value={fmtDateTime(source.anuladoAt)}
+                  sub={`Por ${usuarioLabel(source.anuladoPorNombre, source.anuladoPor)}`}
+                />
+                {anulacionNcNd && source.anulacionCbteNro != null && (
+                  <Dato
+                    label={anulacionNcNd}
+                    value={`N° ${String(source.anulacionPtoVenta ?? 0).padStart(4, "0")}-${String(source.anulacionCbteNro).padStart(8, "0")}`}
+                    sub={source.anulacionCae ? `CAE ${source.anulacionCae}` : undefined}
+                  />
+                )}
+                <Dato
+                  label="Motivo de anulación"
+                  value={source.motivoAnulacion}
+                  className="col-span-2 sm:col-span-1"
+                />
+              </>
+            )}
           </div>
 
           <div>
@@ -538,108 +656,15 @@ export function LiquidacionViewModal({
                   gastosAdminIva={source.gastosAdminIva}
                   ivaPct={ivaPctEfectivo}
                   liquido={source.liquido}
+                  brutoDetalleResumen={
+                    cantViajes > 0
+                      ? `${cantViajes} viaje${cantViajes === 1 ? "" : "s"}`
+                      : undefined
+                  }
+                  brutoDetalle={viajesDetalle}
                 />
               )}
             </div>
-          </div>
-
-          <div>
-            <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
-              Viajes ({viajesIncluidos.length || source.cantViajes})
-            </p>
-            {loadingDetail ? (
-              <div className="flex justify-center rounded border border-black/10 py-6">
-                <Spinner className="h-5 w-5" />
-              </div>
-            ) : viajesIncluidos.length === 0 ? (
-              <p className="rounded border border-black/10 bg-white px-4 py-3 text-sm text-vialto-steel">
-                {source.cantViajes > 0
-                  ? `${source.cantViajes} viaje${source.cantViajes === 1 ? "" : "s"} (sin detalle disponible).`
-                  : "Sin viajes asociados."}
-              </p>
-            ) : (
-              <div className="max-h-52 overflow-y-auto rounded border border-black/10 divide-y divide-black/5 bg-white">
-                {viajesIncluidos.map((row) => {
-                  const v = row.viaje;
-                  const viajeId = v?.id ?? row.viajeId;
-                  const numero =
-                    v?.numeroIdentificacionPersonalizado?.trim() ||
-                    v?.numero ||
-                    "—";
-                  return (
-                    <button
-                      key={row.viajeId}
-                      type="button"
-                      disabled={loadingViajeId === viajeId}
-                      onClick={() => void handleVerViaje(viajeId)}
-                      className="block w-full text-left px-3 py-2.5 hover:bg-vialto-mist/60 focus:outline-none focus-visible:bg-vialto-mist disabled:opacity-60 disabled:cursor-wait"
-                    >
-                      <p className="text-xs font-medium text-vialto-charcoal">
-                        Viaje #{numero}
-                        {v?.fechaCarga && (
-                          <span className="ml-1.5 font-normal text-vialto-steel">
-                            {fmtDate(v.fechaCarga)}
-                          </span>
-                        )}
-                      </p>
-                      {(v?.origen || v?.destino) && (
-                        <p className="text-[11px] text-vialto-steel truncate">
-                          {v?.origen ?? "—"} → {v?.destino ?? "—"}
-                        </p>
-                      )}
-                      {idPropio2Habilitado && v?.idPropio2?.trim() && (
-                        <p className="text-[11px] text-vialto-steel">
-                          {idPropio2Label}: {v.idPropio2.trim()}
-                        </p>
-                      )}
-                      <p className="text-[11px] text-vialto-charcoal tabular-nums">
-                        {fmtLiquidacionMoney(Number(row.subtotal) || 0)}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className={viewModalGridClass}>
-            <Campo
-              label="Período"
-              value={`${fmtDate(source.periodoDesde)} — ${fmtDate(source.periodoHasta)}`}
-            />
-            {hasArca && (
-              <Campo
-                label="Tipo de comprobante"
-                value={CBTE_TIPO[source.cbteTipo] ?? `Tipo ${source.cbteTipo}`}
-              />
-            )}
-            {source.cbteNro != null && (
-              <Campo label="Nº comprobante" value={source.cbteNro} />
-            )}
-            {hasArca && source.ptoVenta != null && (
-              <Campo label="Punto de venta" value={source.ptoVenta} />
-            )}
-            {source.cae && <Campo label="CAE" value={source.cae} />}
-            {source.caeFechaVto && (
-              <Campo label="Vto. CAE" value={fmtDate(source.caeFechaVto)} />
-            )}
-            {source.ambiente && (
-              <Campo
-                label="Ambiente"
-                value={
-                  source.ambiente === "homologacion"
-                    ? "Homologación (prueba)"
-                    : "Producción"
-                }
-              />
-            )}
-            <Campo label="Creada" value={fmtDate(source.createdAt)} />
-            {source.proveedorContrato && (
-              <Campo label="Proveedor contrato" value={source.proveedorContrato} />
-            )}
-            {!hasArca && source.numeroComprobanteProveedor && (
-              <Campo label="N° de factura del proveedor" value={source.numeroComprobanteProveedor} />
-            )}
           </div>
 
           {source.estado === "pendiente_anulacion" && (
@@ -659,46 +684,6 @@ export function LiquidacionViewModal({
             </div>
           )}
 
-          {source.estado === "anulado" && (
-            <div>
-              <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
-                Anulación
-              </p>
-              <div className="rounded border border-black/10 bg-vialto-mist px-4 py-3 space-y-2">
-                <Campo label="Motivo" value={source.motivoAnulacion} />
-                <div className={viewModalGridClass}>
-                  <Campo
-                    label="Anulada el"
-                    value={fmtDateTime(source.anuladoAt)}
-                  />
-                  <Campo
-                    label="Anulada por"
-                    value={usuarioLabel(source.anuladoPorNombre, source.anuladoPor)}
-                  />
-                </div>
-                {source.anulacionMetodo === "manual"
-                  ? onVerComprobanteAnulacionManual && (
-                      <button
-                        type="button"
-                        onClick={onVerComprobanteAnulacionManual}
-                        className="px-3 py-1.5 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
-                      >
-                        Ver comprobante de anulación
-                      </button>
-                    )
-                  : onVerAnulacion && (
-                      <button
-                        type="button"
-                        onClick={onVerAnulacion}
-                        className="px-3 py-1.5 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
-                      >
-                        Ver anulación
-                      </button>
-                    )}
-              </div>
-            </div>
-          )}
-
           {source.arcaError && (
             <div className="rounded px-0 py-0 text-sm">
               <ArcaErrorMessage
@@ -707,21 +692,6 @@ export function LiquidacionViewModal({
                 }
                 detalle={source.arcaErrorDetalle ?? undefined}
               />
-            </div>
-          )}
-
-          {onVerComprobante && (
-            <div className="border-t border-black/10 pt-4">
-              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                Comprobante
-              </p>
-              <button
-                type="button"
-                onClick={onVerComprobante}
-                className="mt-2 px-3 py-1.5 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
-              >
-                Ver comprobante
-              </button>
             </div>
           )}
         </div>

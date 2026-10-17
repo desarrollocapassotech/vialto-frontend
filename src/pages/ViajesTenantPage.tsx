@@ -47,7 +47,6 @@ import {
 } from "@/lib/arcaCbteTipo";
 import { apiJson, apiFetch, ApiError } from "@/lib/api";
 import { hoyArgentinaIso, vencimientoPorDefecto } from "@/lib/facturaFechaEmision";
-import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
 import { useToast } from "@/lib/toast";
 import { friendlyError } from "@/lib/friendlyError";
 import {
@@ -4256,10 +4255,6 @@ export function ViajesTenantPage({
                   }
                 : undefined
             }
-            contratoPdfUrl={liquidacionContratoPdfUrl(
-              viewingLiquidacion.id,
-              platform && tid ? { platform: true, tenantId: tid } : undefined,
-            )}
             onVerComprobante={
               viewingLiquidacion.cbteNro != null ||
               viewingLiquidacion.cae != null

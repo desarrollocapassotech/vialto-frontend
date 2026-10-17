@@ -1,3 +1,5 @@
+import { useState, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import type { ConceptoLiquidacionSigno } from "@/types/api";
 import {
   fmtLiquidacionMoney,
@@ -33,6 +35,13 @@ type Props = {
   /** Etiqueta del bruto (Sub total vs Bruto). */
   brutoLabel?: string;
   totalLabel?: string;
+  /**
+   * Solo `filas`: detalle que compone el bruto (ej. los viajes). Si viene, la fila del
+   * bruto se vuelve un desplegable que lo muestra debajo.
+   */
+  brutoDetalle?: ReactNode;
+  /** Texto chico al lado del label del bruto desplegable (ej. "1 viaje"). */
+  brutoDetalleResumen?: string;
 };
 
 function Row({
@@ -128,7 +137,10 @@ export function LiquidacionMontosBreakdown({
   variant = "filas",
   brutoLabel = "Bruto",
   totalLabel = "Total neto a liquidar",
+  brutoDetalle,
+  brutoDetalleResumen,
 }: Props) {
+  const [brutoAbierto, setBrutoAbierto] = useState(false);
   // `gastosAdminIva` es el IVA total de AFIP (incluye el IVA de los conceptos), igual que
   // la línea "IVA" del PDF. El total no se recalcula: es `liquido`.
   const conceptosNetoSum = conceptosLineas.reduce(
@@ -251,16 +263,46 @@ export function LiquidacionMontosBreakdown({
 
   return (
     <div>
-      {lineItems.map((item) => (
-        <Row
-          key={item.key}
-          label={item.label}
-          value={item.value}
-          muted={item.muted}
-          bold={item.bold}
-          separator={item.separator}
-        />
-      ))}
+      {lineItems.map((item) =>
+        item.key === "bruto" && brutoDetalle ? (
+          <div key={item.key} className="border-b border-black/5">
+            <button
+              type="button"
+              onClick={() => setBrutoAbierto((v) => !v)}
+              aria-expanded={brutoAbierto}
+              className="flex w-full cursor-pointer items-baseline justify-between gap-4 py-1.5 text-left hover:bg-vialto-mist/40"
+            >
+              <span className="inline-flex items-center gap-1.5 text-xs text-vialto-charcoal">
+                <ChevronDown
+                  className={`h-3.5 w-3.5 shrink-0 self-center text-vialto-steel transition-transform ${
+                    brutoAbierto ? "rotate-180" : ""
+                  }`}
+                  strokeWidth={2}
+                  aria-hidden
+                />
+                {item.label}
+                {brutoDetalleResumen && (
+                  <span className="text-vialto-steel">({brutoDetalleResumen})</span>
+                )}
+              </span>
+              {/* Abierto, el total lo reemplazan los importes de cada línea del detalle. */}
+              {!brutoAbierto && (
+                <span className="text-sm tabular-nums text-vialto-charcoal">{item.value}</span>
+              )}
+            </button>
+            {brutoAbierto && <div className="pb-1.5">{brutoDetalle}</div>}
+          </div>
+        ) : (
+          <Row
+            key={item.key}
+            label={item.label}
+            value={item.value}
+            muted={item.muted}
+            bold={item.bold}
+            separator={item.separator}
+          />
+        ),
+      )}
     </div>
   );
 }
