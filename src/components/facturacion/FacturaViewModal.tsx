@@ -15,8 +15,8 @@ import {
   ViajesDetalleLista,
 } from '@/components/shared/DetalleComprobante';
 import { useAuth } from '@clerk/clerk-react';
-import { apiFetch, apiJson } from '@/lib/api';
-import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
+import { apiJson } from '@/lib/api';
+import { verPdfFacturaArca } from '@/lib/facturaPdfArca';
 import { usuarioLabel } from '@/lib/usuarioLabel';
 import { friendlyError } from '@/lib/friendlyError';
 import { useToast } from '@/lib/toast';
@@ -319,38 +319,20 @@ export function FacturaViewModal({
     </div>
   );
   // Botones de comprobantes del pie: con anulación se distingue el original de la NC.
-  const puedeVerComprobante = Boolean(onVerComprobante && factura.comprobanteUrl?.trim());
-  // Sin handler de la pantalla (ej. abierto desde Viajes), el modal abre la NC por su cuenta.
-  const puedeVerNotaCredito = Boolean(
-    anulada && (factura.notaCreditoUrl?.trim() || factura.anulacionCae),
-  );
+  // Factura emitida en ARCA: los dos PDF se generan en el momento (mismo diseño, el actual);
+  // sin ARCA, "Ver comprobante" abre el archivo que se adjuntó.
+  const emitidaEnArca = Boolean(factura.cae);
+  const puedeVerComprobante =
+    emitidaEnArca || Boolean(onVerComprobante && factura.comprobanteUrl?.trim());
+  const puedeVerNotaCredito = Boolean(anulada && factura.anulacionCae);
 
-  /** PDF de la NC en pestaña nueva: el subido si existe; si no, el que genera el backend. */
-  async function verNotaCreditoPorDefecto() {
-    const token = () => (getToken ? getToken() : getAuthToken());
-    const url = factura.notaCreditoUrl?.trim();
-    if (url) {
-      void abrirAdjuntoEnPestana({ url }, token, 'Nota de crédito');
-      return;
-    }
-    // La pestaña se abre en el click (si no, el navegador la bloquea como popup).
-    const ventana = window.open('', '_blank');
-    try {
-      const res = await apiFetch(
-        tenantIdUrl
-          ? `/api/platform/arca/facturas/${encodeURIComponent(factura.id)}/pdf-anulacion?tenantId=${encodeURIComponent(tenantIdUrl)}`
-          : `/api/integracion-arca/facturas/${encodeURIComponent(factura.id)}/pdf-anulacion`,
-        token,
-      );
-      if (!res.ok) throw new Error('No se pudo generar el PDF de la nota de crédito.');
-      const blobUrl = URL.createObjectURL(await res.blob());
-      if (ventana) ventana.location.href = blobUrl;
-      else window.open(blobUrl, '_blank');
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-    } catch (e) {
-      ventana?.close();
-      showToast(friendlyError(e, 'arca'), 'error');
-    }
+  function verPdfArca(kind: 'factura' | 'nc') {
+    verPdfFacturaArca(
+      factura.id,
+      kind,
+      () => (getToken ? getToken() : getAuthToken()),
+      tenantIdUrl || undefined,
+    ).catch((e) => showToast(friendlyError(e, 'arca'), 'error'));
   }
 
   const arcaErrorTexto = formatStoredArcaError(factura.arcaError);
@@ -427,7 +409,7 @@ export function FacturaViewModal({
           {puedeVerComprobante && (
             <button
               type="button"
-              onClick={onVerComprobante}
+              onClick={emitidaEnArca ? () => verPdfArca('factura') : onVerComprobante}
               className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
             >
               <FileText className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
@@ -437,7 +419,7 @@ export function FacturaViewModal({
           {puedeVerNotaCredito && (
             <button
               type="button"
-              onClick={onVerNotaCredito ?? (() => void verNotaCreditoPorDefecto())}
+              onClick={() => verPdfArca('nc')}
               className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
             >
               <FileText className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
