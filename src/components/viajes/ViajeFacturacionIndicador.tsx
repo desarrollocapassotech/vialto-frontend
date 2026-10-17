@@ -32,6 +32,9 @@ type Props = {
   fullWidth?: boolean;
   /** `icono`: ícono compacto de una sola línea (columna "Factura" de la grilla). */
   variante?: "badge" | "icono";
+  /** Config "ID Propio 2" de la empresa (superadmin); sin prop el modal usa la empresa propia. */
+  idPropio2Habilitado?: boolean;
+  idPropio2Label?: string;
 };
 
 const badgeClass =
@@ -55,6 +58,8 @@ export function ViajeFacturacionIndicador({
   onFacturar,
   fullWidth = false,
   variante = "badge",
+  idPropio2Habilitado,
+  idPropio2Label,
 }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -131,6 +136,8 @@ export function ViajeFacturacionIndicador({
         <FacturaViewModal
           getToken={getToken}
           factura={facturaCompleta}
+          idPropio2Habilitado={idPropio2Habilitado}
+          idPropio2Label={idPropio2Label}
           clienteNombre={viaje.cliente?.nombre}
           onClose={() => setFacturaCompleta(null)}
           onEditar={() => {

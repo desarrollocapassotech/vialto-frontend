@@ -2,7 +2,18 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Ban, FileText, Receipt, RotateCw, Trash2 } from "lucide-react";
-import { anulacionComprobanteLabel } from "@/lib/arcaCbteTipo";
+import { anulacionComprobanteLabel, nroComprobante } from "@/lib/arcaCbteTipo";
+import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import {
+  idPropio2Habilitado as idPropio2HabilitadoTenant,
+  idPropio2Label as idPropio2LabelTenant,
+} from "@/lib/viajesFlota";
+import {
+  Dato,
+  DatosCabecera,
+  DetalleMontosCard,
+  ViajesDetalleLista,
+} from "@/components/shared/DetalleComprobante";
 import { usuarioLabel } from "@/lib/usuarioLabel";
 import { LiquidacionPagoBadge } from "./LiquidacionPagoBadge";
 import {
@@ -12,7 +23,6 @@ import {
 } from "@/components/ui/ViewModalShell";
 import { LiquidacionMontosBreakdown } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
 import { fmtSignedLiquidacionMoney } from "@/lib/liquidacionMoney";
-import { Spinner } from "@/components/ui/Spinner";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
@@ -80,31 +90,6 @@ function fmtDateTime(iso: string | null | undefined) {
   });
 }
 
-/** Dato compacto del bloque de cabecera: etiqueta chica, valor y una línea secundaria opcional. */
-function Dato({
-  label,
-  value,
-  sub,
-  className = "",
-}: {
-  label: string;
-  value: string | number | null | undefined;
-  sub?: string;
-  className?: string;
-}) {
-  return (
-    <div className={`min-w-0 ${className}`}>
-      <p className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel">
-        {label}
-      </p>
-      <p className="truncate text-sm font-medium text-vialto-charcoal" title={String(value ?? "")}>
-        {value ?? "—"}
-      </p>
-      {sub && <p className="truncate text-xs text-vialto-steel">{sub}</p>}
-    </div>
-  );
-}
-
 /** Normaliza líneas por si el payload viene incompleto o con alias. */
 function normalizeConceptosLineas(
   raw: LiquidacionConceptoLinea[] | null | undefined,
@@ -150,8 +135,8 @@ export function LiquidacionViewModal({
   onVerAnulacion,
   onVerComprobanteAnulacionManual,
   onVolverAEmitir,
-  idPropio2Habilitado = false,
-  idPropio2Label = "ID Propio 2",
+  idPropio2Habilitado: idPropio2HabilitadoProp,
+  idPropio2Label: idPropio2LabelProp,
 }: {
   liq: LiquidacionConTransportista;
   ivaPct?: number;
@@ -186,11 +171,17 @@ export function LiquidacionViewModal({
    * botón navega a Liquidaciones con `volverAEmitirLiquidacionId` y la pantalla lo resuelve.
    */
   onVolverAEmitir?: () => void;
-  /** true = el tenant habilitó "ID Propio 2" — se muestra junto a cada viaje incluido. */
+  /**
+   * true = el tenant habilitó "ID Propio 2" — se muestra junto a cada viaje incluido.
+   * Sin prop se toma la configuración de la empresa propia.
+   */
   idPropio2Habilitado?: boolean;
-  /** Label configurable de "ID Propio 2". */
+  /** Label configurable de "ID Propio 2". Sin prop, el de la empresa propia. */
   idPropio2Label?: string;
 }) {
+  const { tenant: tenantPropio } = useCurrentTenant();
+  const mostrarIdPropio2 = idPropio2HabilitadoProp ?? idPropio2HabilitadoTenant(tenantPropio);
+  const labelIdPropio2 = idPropio2LabelProp ?? idPropio2LabelTenant(tenantPropio);
   const { getToken: getAuthToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -317,55 +308,30 @@ export function LiquidacionViewModal({
         }
     : undefined;
   // Viajes que componen el bruto: se ven al desplegar la fila "Bruto" del detalle.
-  const viajesDetalle =
-    viajesIncluidos.length === 0 ? (
-      <p className="px-2 text-xs text-vialto-steel">
-        {cantViajes > 0 ? "Sin detalle disponible." : "Sin viajes asociados."}
-      </p>
-    ) : (
-      // Sin recuadro propio: el importe de cada viaje queda alineado con los demás montos.
-      <div className="max-h-52 overflow-y-auto divide-y divide-black/5">
-        {viajesIncluidos.map((row) => {
-          const v = row.viaje;
-          const viajeId = v?.id ?? row.viajeId;
-          const numero =
-            v?.numeroIdentificacionPersonalizado?.trim() || v?.numero || "—";
-          return (
-            <button
-              key={row.viajeId}
-              type="button"
-              disabled={loadingViajeId === viajeId}
-              onClick={() => void handleVerViaje(viajeId)}
-              className="flex w-full items-baseline justify-between gap-4 py-1.5 pl-5 text-left hover:bg-vialto-mist/40 focus:outline-none focus-visible:bg-vialto-mist disabled:opacity-60 disabled:cursor-wait"
-            >
-              <span className="min-w-0">
-                <span className="block text-xs text-vialto-charcoal">
-                  Viaje #{numero}
-                  {v?.fechaCarga && (
-                    <span className="ml-1.5 text-vialto-steel">
-                      {fmtDate(v.fechaCarga)}
-                    </span>
-                  )}
-                </span>
-                {(v?.origen || v?.destino) && (
-                  <span className="block truncate text-[11px] text-vialto-steel">
-                    {v?.origen ?? "—"} → {v?.destino ?? "—"}
-                  </span>
-                )}
-                {idPropio2Habilitado && v?.idPropio2?.trim() && (
-                  <span className="block text-[11px] text-vialto-steel">
-                    {idPropio2Label}: {v.idPropio2.trim()}
-                  </span>
-                )}
-              </span>
-              <span className="shrink-0 text-sm tabular-nums text-vialto-charcoal">
-                {fmtSignedLiquidacionMoney(Number(row.subtotal) || 0, "plus")}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    );
+  const viajesDetalle = (
+    <ViajesDetalleLista
+      items={viajesIncluidos.map((row) => {
+        const v = row.viaje;
+        return {
+          key: row.viajeId,
+          viajeId: v?.id ?? row.viajeId,
+          numero: String(v?.numeroIdentificacionPersonalizado?.trim() || v?.numero || "—"),
+          fechaCarga: v?.fechaCarga,
+          origen: v?.origen,
+          destino: v?.destino,
+          extra:
+            mostrarIdPropio2 && v?.idPropio2?.trim()
+              ? `${labelIdPropio2}: ${v.idPropio2.trim()}`
+              : null,
+          importe: fmtSignedLiquidacionMoney(Number(row.subtotal) || 0, "plus"),
+        };
+      })}
+      vacio={cantViajes > 0 ? "Sin detalle disponible." : "Sin viajes asociados."}
+      loadingViajeId={loadingViajeId}
+      onVerViaje={(id) => void handleVerViaje(id)}
+      fmtFecha={fmtDate}
+    />
+  );
   const puedeEliminar =
     Boolean(onEliminar) &&
     (source.estado === "borrador" ||
@@ -556,7 +522,7 @@ export function LiquidacionViewModal({
       >
         <div className="space-y-6">
           {/* Datos de cabecera (destinatario, comprobante, período, CAE…) en un bloque compacto. */}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3 rounded border border-black/10 bg-vialto-mist/60 px-4 py-3 sm:grid-cols-3">
+          <DatosCabecera>
             <Dato
               label="Destinatario"
               value={transportistaNombre}
@@ -573,7 +539,7 @@ export function LiquidacionViewModal({
                 value={CBTE_TIPO[source.cbteTipo] ?? `Tipo ${source.cbteTipo}`}
                 sub={
                   source.cbteNro != null
-                    ? `N° ${String(source.ptoVenta ?? 0).padStart(4, "0")}-${String(source.cbteNro).padStart(8, "0")}`
+                    ? `N° ${nroComprobante(source.ptoVenta, source.cbteNro)}`
                     : undefined
                 }
               />
@@ -624,7 +590,7 @@ export function LiquidacionViewModal({
                 {anulacionNcNd && source.anulacionCbteNro != null && (
                   <Dato
                     label={anulacionNcNd}
-                    value={`N° ${String(source.anulacionPtoVenta ?? 0).padStart(4, "0")}-${String(source.anulacionCbteNro).padStart(8, "0")}`}
+                    value={`N° ${nroComprobante(source.anulacionPtoVenta, source.anulacionCbteNro)}`}
                     sub={source.anulacionCae ? `CAE ${source.anulacionCae}` : undefined}
                   />
                 )}
@@ -635,37 +601,26 @@ export function LiquidacionViewModal({
                 />
               </>
             )}
-          </div>
+          </DatosCabecera>
 
-          <div>
-            <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
-              Detalle del comprobante
-            </p>
-            <div className="rounded border border-black/10 bg-white px-4 py-1 min-h-[4rem]">
-              {loadingDetail ? (
-                <div className="flex justify-center py-6">
-                  <Spinner className="h-5 w-5" />
-                </div>
-              ) : (
-                <LiquidacionMontosBreakdown
-                  variant="filas"
-                  bruto={source.bruto}
-                  comision={source.comision}
-                  comisionPct={source.comisionPct}
-                  conceptosLineas={conceptosLineas}
-                  gastosAdminIva={source.gastosAdminIva}
-                  ivaPct={ivaPctEfectivo}
-                  liquido={source.liquido}
-                  brutoDetalleResumen={
-                    cantViajes > 0
-                      ? `${cantViajes} viaje${cantViajes === 1 ? "" : "s"}`
-                      : undefined
-                  }
-                  brutoDetalle={viajesDetalle}
-                />
-              )}
-            </div>
-          </div>
+          <DetalleMontosCard loading={loadingDetail}>
+            <LiquidacionMontosBreakdown
+              variant="filas"
+              bruto={source.bruto}
+              comision={source.comision}
+              comisionPct={source.comisionPct}
+              conceptosLineas={conceptosLineas}
+              gastosAdminIva={source.gastosAdminIva}
+              ivaPct={ivaPctEfectivo}
+              liquido={source.liquido}
+              brutoDetalleResumen={
+                cantViajes > 0
+                  ? `${cantViajes} viaje${cantViajes === 1 ? "" : "s"}`
+                  : undefined
+              }
+              brutoDetalle={viajesDetalle}
+            />
+          </DetalleMontosCard>
 
           {source.estado === "pendiente_anulacion" && (
             <div>

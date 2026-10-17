@@ -1,17 +1,28 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Ban, Banknote, Receipt, RotateCw } from 'lucide-react';
+import { Ban, Banknote, FileText, Receipt, RotateCw } from 'lucide-react';
+import { useCurrentTenant } from '@/hooks/useCurrentTenant';
+import {
+  idPropio2Habilitado as idPropio2HabilitadoTenant,
+  idPropio2Label as idPropio2LabelTenant,
+} from '@/lib/viajesFlota';
+import {
+  Dato,
+  DatosCabecera,
+  DetalleMontosCard,
+  FilaMonto,
+  FilaMontoDesplegable,
+  ViajesDetalleLista,
+} from '@/components/shared/DetalleComprobante';
 import { apiJson } from '@/lib/api';
 import { usuarioLabel } from '@/lib/usuarioLabel';
 import { friendlyError } from '@/lib/friendlyError';
 import { useToast } from '@/lib/toast';
-import { Spinner } from '@/components/ui/Spinner';
 import { ViajeViewModal } from '@/components/viajes/ViajeViewModal';
 import {
   ViewModalShell,
   viewModalBtnGhost,
   viewModalBtnPrimary,
-  viewModalGridClass,
 } from '@/components/ui/ViewModalShell';
 import { AmbienteTestBadge } from '@/components/liquidaciones/AmbienteTestBadge';
 import { importeTotalConIvaPorTramo, roundMoney2 } from '@/lib/facturaTotales';
@@ -29,6 +40,7 @@ import {
   facturaLetraLabel,
   facturaNcCbteTipoFromFactura,
   facturaNcLabel,
+  nroComprobante,
 } from '@/lib/arcaCbteTipo';
 import type { Cliente, Factura, Viaje } from '@/types/api';
 import { fmtDateUtc } from '@/lib/fmtDateUtc';
@@ -53,10 +65,6 @@ function fmtImporte(moneda: string, importe: number, minDecimals?: number) {
   const opts = minDecimals != null ? { minimumFractionDigits: minDecimals } : undefined;
   return `${prefix}${importe.toLocaleString('es-AR', opts)}`;
 }
-
-const TIPO_LABEL: Record<string, string> = {
-  cliente: 'Cliente',
-};
 
 const ESTADO_LABEL: Record<string, string> = {
   borrador: 'BORRADOR',
@@ -92,6 +100,8 @@ export function FacturaViewModal({
   onVerNotaCredito,
   onMarcarCobrada,
   onVolverAEmitir,
+  idPropio2Habilitado: idPropio2HabilitadoProp,
+  idPropio2Label: idPropio2LabelProp,
 }: {
   factura: Factura;
   clienteNombre?: string;
@@ -111,7 +121,17 @@ export function FacturaViewModal({
    * navega a Facturas con `volverAEmitirFacturaId` y la pantalla lo resuelve.
    */
   onVolverAEmitir?: () => void;
+  /**
+   * true = el tenant habilitó "ID Propio 2" — se muestra junto a cada viaje (igual que en
+   * Liquidación). Sin prop se toma la configuración de la empresa propia.
+   */
+  idPropio2Habilitado?: boolean;
+  /** Label configurable de "ID Propio 2". Sin prop, el de la empresa propia. */
+  idPropio2Label?: string;
 }) {
+  const { tenant: tenantPropio } = useCurrentTenant();
+  const mostrarIdPropio2 = idPropio2HabilitadoProp ?? idPropio2HabilitadoTenant(tenantPropio);
+  const labelIdPropio2 = idPropio2LabelProp ?? idPropio2LabelTenant(tenantPropio);
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -183,7 +203,6 @@ export function FacturaViewModal({
   }, [factura]);
 
   const source = detail;
-  const importeFormato = fmtImporte(source.moneda, source.importe);
   const ivaN = source.ivaPct ?? 0;
   const tramos = source.tramos ?? [];
   const porTramo = Boolean(factura.facturarPorTramo) && tramos.length > 0;
@@ -242,45 +261,61 @@ export function FacturaViewModal({
   const puedeMarcarCobrada =
     factura.tipo === 'cliente' && !anulada && !factura.cobrado;
 
-  const campos: { label: string; value: string | null | undefined }[] = [
-    { label: 'Número', value: factura.numero },
-    { label: 'Tipo', value: TIPO_LABEL[factura.tipo] ?? factura.tipo },
-    ...(letra ? [{ label: 'Comprobante ARCA', value: letra }] : []),
-    { label: 'Cliente', value: clienteNombre },
-    { label: 'Importe', value: importeFormato },
-    ...(porTramo
-      ? [
-          { label: 'Facturación', value: 'Por tramo' },
-          ...(ivaN > 0
-            ? [{ label: 'IVA viajes sin tramo', value: `${ivaN}%` }]
-            : []),
-          { label: 'Total con IVA', value: fmtImporte(factura.moneda, totalConIva, 2) },
-          ...(saldoPendiente != null
-            ? [
-                {
-                  label: 'Saldo pendiente',
-                  value: fmtImporte(factura.moneda, saldoPendiente, 2),
-                },
-              ]
-            : []),
-        ]
-      : muestraIva
-        ? [
-            { label: 'IVA', value: `${ivaN}%` },
-            { label: 'Total con IVA', value: fmtImporte(factura.moneda, totalConIva, 2) },
-          ]
-        : []),
-    { label: 'Fecha de emisión', value: factura.fechaEmision ? fmtDate(factura.fechaEmision) : null },
-    { label: 'Fecha de vencimiento', value: factura.fechaVencimiento ? fmtDate(factura.fechaVencimiento) : null },
-    {
-      label: 'Diferencia',
-      value: factura.diferencia != null ? `$ ${factura.diferencia.toLocaleString('es-AR')}` : null,
-    },
-    ...(factura.cae ? [{ label: 'CAE', value: factura.cae }] : []),
-    ...(factura.caeFechaVto
-      ? [{ label: 'Vto. CAE', value: fmtDate(factura.caeFechaVto) }]
-      : []),
-  ];
+  const fmt2 = (n: number) => fmtImporte(factura.moneda, n, 2);
+  const ivaTotal = roundMoney2(totalConIva - factura.importe);
+  const viajesFactura = source.viajes ?? [];
+  const cantViajes = viajesFactura.length || source.viajeIds.length;
+  // Viajes que componen el neto: se ven al desplegar la fila "Neto" del detalle.
+  const viajesDetalle = (
+    <ViajesDetalleLista
+      items={viajesFactura.map((v) => ({
+        key: v.id,
+        viajeId: v.id,
+        numero: String(v.numeroIdentificacionPersonalizado?.trim() || v.numero || '—'),
+        fechaCarga: v.fechaCarga,
+        origen: v.origen,
+        destino: v.destino,
+        extra:
+          mostrarIdPropio2 && v.idPropio2?.trim()
+            ? `${labelIdPropio2}: ${v.idPropio2.trim()}`
+            : null,
+        importe: fmtImporte(v.monedaMonto, Number(v.monto) || 0, 2),
+      }))}
+      vacio={cantViajes > 0 ? 'Sin detalle disponible.' : 'Sin viajes asociados.'}
+      loadingViajeId={loadingViajeId}
+      onVerViaje={(id) => void handleVerViaje(id)}
+      fmtFecha={fmtDate}
+    />
+  );
+  // Por tramo: el IVA se arma por tramo; al desplegar la fila de IVA se ve cada uno.
+  const tramosDetalle = (
+    <div className="divide-y divide-black/5">
+      {tramos
+        .slice()
+        .sort((a, b) => a.orden - b.orden)
+        .map((t) => (
+          <div
+            key={t.id}
+            className="flex items-baseline justify-between gap-4 py-1.5 pl-5"
+          >
+            <span className="min-w-0">
+              <span className="block text-xs text-vialto-charcoal">{t.detalle}</span>
+              <span className="block text-[11px] text-vialto-steel">
+                {fmt2(t.monto)} · IVA {t.ivaPct}%
+              </span>
+            </span>
+            <span className="shrink-0 text-sm tabular-nums text-vialto-charcoal">
+              + {fmt2(roundMoney2((t.monto * t.ivaPct) / 100))}
+            </span>
+          </div>
+        ))}
+    </div>
+  );
+  // Botones de comprobantes del pie: con anulación se distingue el original de la NC.
+  const puedeVerComprobante = Boolean(onVerComprobante && factura.comprobanteUrl?.trim());
+  const puedeVerNotaCredito = Boolean(
+    anulada && onVerNotaCredito && (factura.notaCreditoUrl?.trim() || factura.anulacionCae),
+  );
 
   const arcaErrorTexto = formatStoredArcaError(factura.arcaError);
   const mostrarArcaError =
@@ -345,11 +380,34 @@ export function FacturaViewModal({
         </span>
       }
       onClose={onClose}
+      // Mismo ancho y scroll que el detalle de liquidación.
+      scrollBody
+      maxWidthClass="sm:max-w-4xl"
       footer={
         <>
           <button type="button" onClick={onClose} className={viewModalBtnGhost}>
             Cerrar
           </button>
+          {puedeVerComprobante && (
+            <button
+              type="button"
+              onClick={onVerComprobante}
+              className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+            >
+              <FileText className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+              {puedeVerNotaCredito ? 'Ver comprobante original' : 'Ver comprobante'}
+            </button>
+          )}
+          {puedeVerNotaCredito && (
+            <button
+              type="button"
+              onClick={onVerNotaCredito}
+              className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+            >
+              <FileText className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+              Ver nota de crédito
+            </button>
+          )}
           {puedeEmitirArca && onEmitirArca && (
             <button
               type="button"
@@ -410,13 +468,119 @@ export function FacturaViewModal({
         </>
       }
     >
-      <div className={viewModalGridClass}>
-        {campos.filter((c) => c.value != null && c.value !== '').map((c, i) => (
-          <div key={i}>
-            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{c.label}</p>
-            <p className="mt-1 text-sm">{c.value}</p>
-          </div>
-        ))}
+      <div className="space-y-6">
+        {/* Datos de cabecera (cliente, comprobante, fechas, CAE, anulación) en un bloque compacto. */}
+        <DatosCabecera>
+          <Dato
+            label="Cliente"
+            value={clienteNombre}
+            sub={cliente?.idFiscal ? `CUIT ${cliente.idFiscal}` : undefined}
+            className="col-span-2 sm:col-span-1"
+          />
+          <Dato
+            label="Comprobante"
+            value={letra ?? 'Factura'}
+            sub={factura.numero ? `N° ${factura.numero}` : undefined}
+          />
+          <Dato
+            label="Emisión"
+            value={factura.fechaEmision ? fmtDate(factura.fechaEmision) : '—'}
+            sub={
+              factura.fechaVencimiento
+                ? `Vence ${fmtDate(factura.fechaVencimiento)}`
+                : undefined
+            }
+          />
+          {factura.cae && (
+            <Dato
+              label="CAE"
+              value={factura.cae}
+              sub={factura.caeFechaVto ? `Vto. ${fmtDate(factura.caeFechaVto)}` : undefined}
+            />
+          )}
+          <Dato
+            label="Creada"
+            value={fmtDate(factura.createdAt)}
+            sub={
+              factura.ambiente
+                ? factura.ambiente === 'homologacion'
+                  ? 'Homologación (prueba)'
+                  : 'Producción'
+                : undefined
+            }
+          />
+          {factura.diferencia != null && (
+            <Dato
+              label="Diferencia"
+              value={`$ ${factura.diferencia.toLocaleString('es-AR')}`}
+            />
+          )}
+          {anulada && (
+            <>
+              <Dato
+                label="Anulada"
+                value={fmtDateTime(factura.anuladoAt ?? factura.anulacionFecha)}
+                sub={
+                  factura.anuladoPorNombre || factura.anuladoPor
+                    ? `Por ${usuarioLabel(factura.anuladoPorNombre, factura.anuladoPor)}`
+                    : undefined
+                }
+              />
+              <Dato
+                label={facturaNcLabel(ncTipo).replace(/ \(cód\. \d+\)$/, '')}
+                value={
+                  factura.anulacionCbteNro != null
+                    ? `N° ${nroComprobante(factura.anulacionPtoVenta, factura.anulacionCbteNro)}`
+                    : '—'
+                }
+                sub={factura.anulacionCae ? `CAE ${factura.anulacionCae}` : undefined}
+              />
+              {factura.motivoAnulacion && (
+                <Dato
+                  label="Motivo de anulación"
+                  value={factura.motivoAnulacion}
+                  className="col-span-2 sm:col-span-1"
+                />
+              )}
+            </>
+          )}
+        </DatosCabecera>
+
+        <DetalleMontosCard loading={loadingDetail}>
+          <FilaMontoDesplegable
+            label="Neto"
+            resumen={
+              cantViajes > 0 ? `${cantViajes} viaje${cantViajes === 1 ? '' : 's'}` : undefined
+            }
+            value={fmt2(factura.importe)}
+          >
+            {viajesDetalle}
+          </FilaMontoDesplegable>
+          {porTramo ? (
+            <FilaMontoDesplegable
+              label="IVA por tramo"
+              resumen={`${tramos.length} tramo${tramos.length === 1 ? '' : 's'}${
+                ivaN > 0 ? ` · resto ${ivaN}%` : ''
+              }`}
+              value={`+ ${fmt2(ivaTotal)}`}
+            >
+              {tramosDetalle}
+            </FilaMontoDesplegable>
+          ) : (
+            muestraIva && (
+              <FilaMonto label={`IVA ${ivaN}%`} value={`+ ${fmt2(ivaTotal)}`} muted />
+            )
+          )}
+          <FilaMonto
+            label={muestraIva ? 'Total con IVA' : 'Total'}
+            value={fmt2(totalConIva)}
+            bold
+            separator
+          />
+          {saldoPendiente != null && (
+            <FilaMonto label="Saldo pendiente" value={fmt2(saldoPendiente)} muted />
+          )}
+        </DetalleMontosCard>
       </div>
 
       {mostrarArcaError && arcaErrorTexto && (
@@ -430,173 +594,6 @@ export function FacturaViewModal({
         </div>
       )}
 
-      <div className="mt-6 border-t border-black/10 pt-4">
-        <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
-          Viajes ({source.viajes?.length || source.viajeIds.length})
-        </p>
-        {loadingDetail ? (
-          <div className="flex justify-center rounded border border-black/10 py-6">
-            <Spinner className="h-5 w-5" />
-          </div>
-        ) : !source.viajes?.length ? (
-          <p className="rounded border border-black/10 bg-white px-4 py-3 text-sm text-vialto-steel">
-            {source.viajeIds.length > 0
-              ? `${source.viajeIds.length} viaje${source.viajeIds.length === 1 ? '' : 's'} (sin detalle disponible).`
-              : 'Sin viajes asociados.'}
-          </p>
-        ) : (
-          <div className="max-h-52 overflow-y-auto rounded border border-black/10 divide-y divide-black/5 bg-white">
-            {source.viajes.map((v) => {
-              const numero =
-                v.numeroIdentificacionPersonalizado?.trim() ||
-                v.numero ||
-                '—';
-              return (
-                <button
-                  key={v.id}
-                  type="button"
-                  disabled={loadingViajeId === v.id}
-                  onClick={() => void handleVerViaje(v.id)}
-                  className="block w-full text-left px-3 py-2.5 hover:bg-vialto-mist/60 focus:outline-none focus-visible:bg-vialto-mist disabled:opacity-60 disabled:cursor-wait"
-                >
-                  <p className="text-xs font-medium text-vialto-charcoal">
-                    Viaje #{numero}
-                    {v.fechaCarga && (
-                      <span className="ml-1.5 font-normal text-vialto-steel">
-                        {fmtDate(v.fechaCarga)}
-                      </span>
-                    )}
-                  </p>
-                  {(v.origen || v.destino) && (
-                    <p className="text-[11px] text-vialto-steel truncate">
-                      {v.origen ?? '—'} → {v.destino ?? '—'}
-                    </p>
-                  )}
-                  {v.idPropio2?.trim() && (
-                    <p className="text-[11px] text-vialto-steel">
-                      ID Propio 2: {v.idPropio2.trim()}
-                    </p>
-                  )}
-                  <p className="text-[11px] text-vialto-charcoal tabular-nums">
-                    {fmtImporte(v.monedaMonto, Number(v.monto) || 0)}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {porTramo && (
-        <div className="mt-6 border-t border-black/10 pt-4 space-y-3">
-          <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-            Tramos
-          </p>
-          <ul className="space-y-2">
-            {tramos
-              .slice()
-              .sort((a, b) => a.orden - b.orden)
-              .map((t) => {
-                const ivaMonto = (t.monto * t.ivaPct) / 100;
-                const totalTramo = t.monto + ivaMonto;
-                return (
-                  <li
-                    key={t.id}
-                    className="border border-black/10 bg-vialto-mist/30 px-3 py-2 text-sm"
-                  >
-                    <p className="font-medium text-vialto-charcoal">{t.detalle}</p>
-                    <p className="mt-1 text-xs text-vialto-steel">
-                      Monto {fmtImporte(factura.moneda, t.monto, 2)}
-                      {' · '}
-                      IVA {t.ivaPct}% ({fmtImporte(factura.moneda, ivaMonto, 2)})
-                      {' · '}
-                      Total {fmtImporte(factura.moneda, totalTramo, 2)}
-                    </p>
-                  </li>
-                );
-              })}
-          </ul>
-        </div>
-      )}
-
-      {anulada && (
-        <div className="mt-6 border-t border-black/10 pt-4 space-y-3">
-          <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-            Anulación
-          </p>
-          <div className={viewModalGridClass}>
-            <div>
-              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                Tipo NC
-              </p>
-              <p className="mt-1 text-sm">{facturaNcLabel(ncTipo)}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                Anulada el
-              </p>
-              <p className="mt-1 text-sm">{fmtDateTime(factura.anuladoAt ?? factura.anulacionFecha)}</p>
-            </div>
-            {factura.anulacionCae && (
-              <div>
-                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                  CAE NC
-                </p>
-                <p className="mt-1 text-sm">{factura.anulacionCae}</p>
-              </div>
-            )}
-            {factura.anulacionCaeFechaVto && (
-              <div>
-                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                  Vto. CAE NC
-                </p>
-                <p className="mt-1 text-sm">{fmtDate(factura.anulacionCaeFechaVto)}</p>
-              </div>
-            )}
-            {/* Motivo y "Anulada por" en la misma fila (sin motivo, "Anulada por" va solo). */}
-            {factura.motivoAnulacion && (
-              <div>
-                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                  Motivo
-                </p>
-                <p className="mt-1 text-sm">{factura.motivoAnulacion}</p>
-              </div>
-            )}
-            {(factura.anuladoPorNombre || factura.anuladoPor) && (
-              <div>
-                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                  Anulada por
-                </p>
-                <p className="mt-1 text-sm">
-                  {usuarioLabel(factura.anuladoPorNombre, factura.anuladoPor)}
-                </p>
-              </div>
-            )}
-          </div>
-          {onVerNotaCredito && (factura.notaCreditoUrl?.trim() || factura.anulacionCae) && (
-            <button
-              type="button"
-              onClick={onVerNotaCredito}
-              className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist"
-            >
-              Ver Nota de Crédito
-            </button>
-          )}
-        </div>
-      )}
-
-      {onVerComprobante && factura.comprobanteUrl?.trim() && (
-        <div className="mt-6 border-t border-black/10 pt-4">
-          <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Comprobante</p>
-          <button
-            type="button"
-            onClick={onVerComprobante}
-            className="mt-2 text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist"
-          >
-            Ver comprobante
-          </button>
-        </div>
-      )}
       </ViewModalShell>
       {viewingViaje && (
         <ViajeViewModal

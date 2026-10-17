@@ -1832,6 +1832,8 @@ export function FacturacionTenantPage({
         <FacturaViewModal
           getToken={getToken}
           factura={viewingFactura}
+          idPropio2Habilitado={idPropio2Habilitado(tenantParaIdPropio2)}
+          idPropio2Label={idPropio2Label(tenantParaIdPropio2)}
           clienteNombre={nombreCliente(viewingFactura.clienteId)}
           cliente={clienteById(viewingFactura.clienteId)}
           hasArca={hasArca}

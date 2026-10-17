@@ -99,6 +99,11 @@ export function anulacionComprobanteLabel(cbteTipo: number | null | undefined): 
   return esNotaDebitoAnulacion(cbteTipo) ? "Nota de Débito" : "Nota de Crédito";
 }
 
+/** "0003-00000072" a partir de punto de venta y número de comprobante. */
+export function nroComprobante(ptoVenta: number | null | undefined, nro: number): string {
+  return `${String(ptoVenta ?? 0).padStart(4, "0")}-${String(nro).padStart(8, "0")}`;
+}
+
 export function facturaLetraLabel(letra: FacturaLetra): string {
   return letra === "a" ? "Factura A" : "Factura B";
 }

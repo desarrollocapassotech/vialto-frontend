@@ -40,6 +40,9 @@ type Props = {
    * cierra el detalle y el host abre el modal de "Nueva liquidación" sobre esa liquidación.
    */
   onEmitir?: (liq: LiquidacionConTransportista) => void;
+  /** Config "ID Propio 2" de la empresa (superadmin); sin prop el modal usa la empresa propia. */
+  idPropio2Habilitado?: boolean;
+  idPropio2Label?: string;
 };
 
 const badgeClass =
@@ -67,6 +70,8 @@ export function ViajeLiquidacionIndicador({
   onLiquidar,
   variante = "badge",
   onEmitir,
+  idPropio2Habilitado,
+  idPropio2Label,
 }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -154,6 +159,8 @@ export function ViajeLiquidacionIndicador({
       {liquidacionCompleta && (
         <LiquidacionViewModal
           liq={liquidacionCompleta}
+          idPropio2Habilitado={idPropio2Habilitado}
+          idPropio2Label={idPropio2Label}
           ivaPct={liquidacionCompleta.ivaPct ?? undefined}
           hasArca={hasArca}
           canEdit={["borrador", "error", "pendiente_cae"].includes(

@@ -3200,6 +3200,8 @@ export function ViajesTenantPage({
                       {mostrarColumnaFactura && (
                         <ViajeFacturacionIndicador
                           viaje={v}
+                          idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+                          idPropio2Label={idPropio2Label(currentTenant)}
                           tenantId={platform ? tid : undefined}
                           variante="icono"
                           onClickOverride={
@@ -3218,6 +3220,8 @@ export function ViajesTenantPage({
                         (hasLiquidacionesResuelto ? (
                           <ViajeLiquidacionIndicador
                             viaje={v}
+                            idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+                            idPropio2Label={idPropio2Label(currentTenant)}
                             tenantId={platform ? tid : undefined}
                             hasArca={hasLiquidoProductoArcaResuelto}
                             onRegistrarPago={() => setRegistrarPagoViaje(v)}
@@ -3443,6 +3447,8 @@ export function ViajesTenantPage({
                   {isViajeFieldVisible("detalle_viaje", "facturacionEstado") && (
                     <ViajeFacturacionIndicador
                       viaje={v}
+                      idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+                      idPropio2Label={idPropio2Label(currentTenant)}
                       tenantId={platform ? tid : undefined}
                       fullWidth
                       onClickOverride={
@@ -3461,6 +3467,8 @@ export function ViajesTenantPage({
                     hasLiquidacionesResuelto ? (
                       <ViajeLiquidacionIndicador
                         viaje={v}
+                        idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+                        idPropio2Label={idPropio2Label(currentTenant)}
                         tenantId={platform ? tid : undefined}
                         hasArca={hasLiquidoProductoArcaResuelto}
                         onRegistrarPago={() => setRegistrarPagoViaje(v)}
@@ -4142,6 +4150,8 @@ export function ViajesTenantPage({
           <FacturaViewModal
             getToken={getToken}
             factura={viewingFactura}
+            idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+            idPropio2Label={idPropio2Label(currentTenant)}
             cliente={
               clientes.find((c) => c.id === viewingFactura.clienteId) ??
               (viewingFactura as any).cliente ??
