@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Ban, Banknote, Receipt } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Ban, Banknote, Receipt, RotateCw } from 'lucide-react';
 import { apiJson } from '@/lib/api';
 import { usuarioLabel } from '@/lib/usuarioLabel';
 import { friendlyError } from '@/lib/friendlyError';
@@ -91,6 +91,7 @@ export function FacturaViewModal({
   onAnular,
   onVerNotaCredito,
   onMarcarCobrada,
+  onVolverAEmitir,
 }: {
   factura: Factura;
   clienteNombre?: string;
@@ -105,9 +106,16 @@ export function FacturaViewModal({
   onVerNotaCredito?: () => void;
   /** Solo facturas a cliente, no anuladas y no ya cobradas. */
   onMarcarCobrada?: () => void;
+  /**
+   * Factura anulada: abre "Nueva factura" precargada con sus datos. Sin handler, el botón
+   * navega a Facturas con `volverAEmitirFacturaId` y la pantalla lo resuelve.
+   */
+  onVolverAEmitir?: () => void;
 }) {
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const tenantIdUrl = searchParams.get('tenantId')?.trim() ?? '';
   const [detail, setDetail] = useState<Factura>(factura);
   const [loadingDetail, setLoadingDetail] = useState(Boolean(getToken));
   const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
@@ -370,6 +378,28 @@ export function FacturaViewModal({
             >
               <Banknote className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
               Marcar como cobrada
+            </button>
+          )}
+          {anulada && hasArca && (
+            <button
+              type="button"
+              onClick={
+                onVolverAEmitir ??
+                // Abierto desde otra pantalla (Viajes, Cuenta corriente, Inicio): se va a
+                // Facturas, que abre "Nueva factura" precargada con esta.
+                // Superadmin: la empresa viene en `?tenantId=` y Facturas la toma del state.
+                (() =>
+                  navigate('/facturacion', {
+                    state: {
+                      volverAEmitirFacturaId: factura.id,
+                      ...(tenantIdUrl ? { tenantId: tenantIdUrl } : {}),
+                    },
+                  }))
+              }
+              className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+            >
+              <RotateCw className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+              Volver a emitir
             </button>
           )}
           {!anulada && (

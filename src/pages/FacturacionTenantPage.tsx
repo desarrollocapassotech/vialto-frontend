@@ -13,6 +13,7 @@ import {
   type FacturaDraft,
 } from "@/components/facturacion/FacturaEditModal";
 import { FacturaCreateModal } from "@/components/facturacion/FacturaCreateModal";
+import { facturaLetraFromCbteTipo } from "@/lib/arcaCbteTipo";
 import { FacturaAccionesMenu } from "@/components/facturacion/FacturaAccionesMenu";
 import { AnularFacturaModal } from "@/components/facturacion/AnularFacturaModal";
 import { EmitirFacturaModal } from "@/components/facturacion/EmitirFacturaModal";
@@ -128,6 +129,8 @@ type FacturaNuevaNavState = {
    * sigue con error de ARCA o en borrador sin emitir.
    */
   emitirFacturaId?: string;
+  /** "Volver a emitir" una factura anulada desde otra pantalla: abre "Nueva factura" precargada. */
+  volverAEmitirFacturaId?: string;
 };
 
 export function FacturacionTenantPage({
@@ -679,6 +682,17 @@ export function FacturacionTenantPage({
   }, []);
 
   useEffect(() => {
+    const id = (
+      location.state as FacturaNuevaNavState | null
+    )?.volverAEmitirFacturaId?.trim();
+    if (!id) return;
+    window.history.replaceState({}, "");
+    void volverAEmitirFactura(id);
+    // Se consume una sola vez al montar (mismo criterio que `newFacturaDraft`).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     const expand = (
       location.state as FacturaNuevaNavState | null
     )?.expandFacturaId?.trim();
@@ -803,6 +817,34 @@ export function FacturacionTenantPage({
     } finally {
       setSaving(false);
     }
+  }
+
+  /**
+   * Factura anulada → "Nueva factura" precargada con su cliente, viajes, IVA, tramos y letra.
+   * La anulada no se toca: sus viajes ya quedaron disponibles para facturar de nuevo.
+   */
+  async function volverAEmitirFactura(facturaId: string) {
+    setViewingFactura(null);
+    let full: Factura;
+    try {
+      full = await apiJson<Factura>(facturaUrl(facturaId), () => getToken());
+    } catch (e) {
+      showToast(friendlyError(e, "facturacion"), "error");
+      return;
+    }
+    const base = facturaToEditDraft(full);
+    setDraftError(null);
+    setDraft({
+      ...emptyFacturaDraft(),
+      clienteId: base.clienteId,
+      viajeIds: base.viajeIds,
+      ivaPct: base.ivaPct,
+      facturarPorTramo: base.facturarPorTramo,
+      tramos: base.tramos,
+      letraComprobante: facturaLetraFromCbteTipo(full.cbteTipo),
+    });
+    setCreating(true);
+    void ensureViajesLoaded();
   }
 
   function startEdit(f: Factura) {
@@ -1820,6 +1862,7 @@ export function FacturacionTenantPage({
               ? () => abrirMarcarCobrada(viewingFactura)
               : undefined
           }
+          onVolverAEmitir={() => void volverAEmitirFactura(viewingFactura.id)}
         />
       )}
 

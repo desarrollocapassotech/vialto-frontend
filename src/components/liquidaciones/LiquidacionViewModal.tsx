@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Ban, Download, Receipt, RotateCw, Trash2 } from "lucide-react";
 import { usuarioLabel } from "@/lib/usuarioLabel";
@@ -144,6 +144,7 @@ export function LiquidacionViewModal({
   onVerComprobante,
   onVerAnulacion,
   onVerComprobanteAnulacionManual,
+  onVolverAEmitir,
   contratoPdfUrl,
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
@@ -176,6 +177,11 @@ export function LiquidacionViewModal({
   onVerAnulacion?: () => void;
   /** Ver el comprobante pre-impreso adjunto en la anulación manual. Solo si `anulacionMetodo === 'manual'`. */
   onVerComprobanteAnulacionManual?: () => void;
+  /**
+   * Liquidación anulada: abre "Nueva liquidación" precargada con sus datos. Sin handler, el
+   * botón navega a Liquidaciones con `volverAEmitirLiquidacionId` y la pantalla lo resuelve.
+   */
+  onVolverAEmitir?: () => void;
   /** PDF comercial (contrato / liquidación a proveedor). Si hay URL, se muestra "Descargar PDF". */
   contratoPdfUrl?: string;
   /** true = el tenant habilitó "ID Propio 2" — se muestra junto a cada viaje incluido. */
@@ -185,6 +191,8 @@ export function LiquidacionViewModal({
 }) {
   const { getToken: getAuthToken } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const tenantIdUrl = searchParams.get("tenantId")?.trim() ?? "";
   const { showToast } = useToast();
   const [detail, setDetail] = useState<LiquidacionConTransportista>(liq);
   const [loadingDetail, setLoadingDetail] = useState(Boolean(getToken));
@@ -439,6 +447,32 @@ export function LiquidacionViewModal({
                   aria-hidden
                 />
                 Confirmar anulación
+              </button>
+            )}
+            {source.estado === "anulado" && (
+              <button
+                type="button"
+                onClick={
+                  onVolverAEmitir ??
+                  // Abierto desde otra pantalla (Viajes, Cuenta corriente): se va a
+                  // Liquidaciones, que abre "Nueva liquidación" precargada con esta.
+                  // Superadmin: la empresa viene en `?tenantId=` y Liquidaciones la lee de ahí.
+                  (() =>
+                    navigate(
+                      tenantIdUrl
+                        ? `/liquidaciones?tenantId=${encodeURIComponent(tenantIdUrl)}`
+                        : "/liquidaciones",
+                      { state: { volverAEmitirLiquidacionId: liq.id } },
+                    ))
+                }
+                className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+              >
+                <RotateCw
+                  className="h-4 w-4 shrink-0"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                Volver a emitir
               </button>
             )}
             {contratoPdfUrl && (
