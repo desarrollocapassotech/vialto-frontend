@@ -37,6 +37,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { modalOverlayClass } from "@/lib/modalLayers";
 import {
   MSG_ARCA_NO_FACTURA_USD,
@@ -313,7 +314,8 @@ export function EmitirFacturaModal({
   }
 
   function handleOverlayClick(e: MouseEvent) {
-    if (e.target === overlayRef.current) onClose();
+    // Mientras se emite contra ARCA no se puede cerrar.
+    if (e.target === overlayRef.current && !busyArca) onClose();
   }
 
   function renderPortal(content: ReactNode) {
@@ -373,9 +375,13 @@ export function EmitirFacturaModal({
           className={modalOverlayClass}
         >
           <div
-            className="w-full max-w-lg bg-white shadow-xl border border-black/20 flex flex-col max-h-[90dvh] sm:rounded"
+            className="relative w-full max-w-lg bg-white shadow-xl border border-black/20 flex flex-col max-h-[90dvh] sm:rounded"
             onClick={(e) => e.stopPropagation()}
           >
+            {busyArca && (
+              // Emitiendo contra ARCA: se bloquea todo el modal, no solo el botón.
+              <BloqueoModal mensaje="Emitiendo la factura en ARCA… No cierres esta ventana." />
+            )}
             <div className="flex items-center justify-between border-b border-black/10 px-6 py-4 shrink-0">
               <div>
                 <div className="flex items-center gap-2">

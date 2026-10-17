@@ -17,6 +17,7 @@ import {
 } from "@/components/facturacion/FacturaLineasEditor";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { Spinner } from "@/components/ui/Spinner";
 import { ApiError, apiFetch, apiJson } from "@/lib/api";
@@ -334,9 +335,13 @@ export function AnularFacturaModal({
           className={modalOverlayClass}
         >
           <div
-            className="w-full max-w-4xl bg-white shadow-xl border border-black/20 flex flex-col max-h-[90dvh] sm:rounded"
+            className="relative w-full max-w-4xl bg-white shadow-xl border border-black/20 flex flex-col max-h-[90dvh] sm:rounded"
             onClick={(e) => e.stopPropagation()}
           >
+            {busy && (
+              // Emitiendo la NC contra ARCA: se bloquea todo el modal, no solo el botón.
+              <BloqueoModal mensaje="Emitiendo la nota de crédito en ARCA… No cierres esta ventana." />
+            )}
             <div className="flex items-center justify-between border-b border-black/10 px-6 py-4 shrink-0">
               <div>
                 <h2 className="inline-flex flex-wrap items-center gap-3 font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">

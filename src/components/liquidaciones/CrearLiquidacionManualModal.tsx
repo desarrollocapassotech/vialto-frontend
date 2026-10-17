@@ -23,6 +23,7 @@ import { ParteFacturaResumen } from "@/components/facturacion/ParteFacturaResume
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { ConfirmarEmisionArcaDialog } from "@/components/shared/ConfirmarEmisionArcaDialog";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
 import { useValidacionPadronRegistro } from "@/hooks/useValidacionPadronRegistro";
@@ -1260,17 +1261,11 @@ export function CrearLiquidacionManualModal({
             : "h-[min(92dvh,920px)] max-w-[min(90rem,calc(100vw-1rem))]"
         }`}
       >
-        {step !== "autorizada" && transportistasLoading ? (
-          <div
-            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white/80 backdrop-blur-[1px]"
-            role="status"
-            aria-live="polite"
-          >
-            <Spinner className="h-8 w-8 text-vialto-charcoal" />
-            <p className="text-sm font-medium text-vialto-charcoal">
-              Cargando transportistas…
-            </p>
-          </div>
+        {submitAction === "emitir" ? (
+          // Emitiendo contra ARCA: se bloquea todo el modal, no solo el botón.
+          <BloqueoModal mensaje="Emitiendo la liquidación en ARCA… No cierres esta ventana." />
+        ) : step !== "autorizada" && transportistasLoading ? (
+          <BloqueoModal mensaje="Cargando transportistas…" />
         ) : null}
         {step === "autorizada" ? (
           <>

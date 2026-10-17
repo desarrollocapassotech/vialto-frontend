@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { modalOverlayClass } from "@/lib/modalLayers";
 
 const btnGhost =
@@ -79,9 +80,13 @@ export function AnularLiquidacionModal({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
-        className="w-full max-w-md rounded-t-xl border border-black/15 bg-white p-5 shadow-lg sm:rounded"
+        className="relative w-full max-w-md rounded-t-xl border border-black/15 bg-white p-5 shadow-lg sm:rounded"
         onClick={(e) => e.stopPropagation()}
       >
+        {busy && (
+          // Emitiendo la anulación (NC/ND) contra ARCA: se bloquea todo el modal.
+          <BloqueoModal mensaje="Emitiendo la anulación en ARCA… No cierres esta ventana." />
+        )}
         <h2
           id={titleId}
           className="text-sm font-semibold text-vialto-charcoal"

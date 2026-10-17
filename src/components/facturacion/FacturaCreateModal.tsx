@@ -12,6 +12,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { Receipt } from "lucide-react";
 import { useHiddenFiscalFields } from "@/hooks/useHiddenFiscalFields";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPreviewPanel";
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
@@ -1202,17 +1203,11 @@ export function FacturaCreateModal({
           ].join(" ")}
           onClick={(e) => e.stopPropagation()}
         >
-          {step === "form" && viajesLoading ? (
-            <div
-              className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white/80 backdrop-blur-[1px]"
-              role="status"
-              aria-live="polite"
-            >
-              <Spinner className="h-8 w-8 text-vialto-charcoal" />
-              <p className="text-sm font-medium text-vialto-charcoal">
-                Cargando clientes…
-              </p>
-            </div>
+          {submitAction === "emitir" ? (
+            // Emitiendo contra ARCA: se bloquea todo el modal, no solo el botón.
+            <BloqueoModal mensaje="Emitiendo la factura en ARCA… No cierres esta ventana." />
+          ) : step === "form" && viajesLoading ? (
+            <BloqueoModal mensaje="Cargando clientes…" />
           ) : null}
           <header className="flex shrink-0 items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-6">
             <div className="min-w-0">
