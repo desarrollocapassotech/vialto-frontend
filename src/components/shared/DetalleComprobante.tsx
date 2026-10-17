@@ -21,11 +21,14 @@ export function Dato({
   label,
   value,
   sub,
+  sub2,
   className = "",
 }: {
   label: string;
   value: ReactNode;
   sub?: string;
+  /** Segunda línea secundaria (ej. domicilio debajo del CUIT). */
+  sub2?: string;
   className?: string;
 }) {
   return (
@@ -40,6 +43,11 @@ export function Dato({
         {value ?? "—"}
       </p>
       {sub && <p className="truncate text-xs text-vialto-steel">{sub}</p>}
+      {sub2 && (
+        <p className="truncate text-xs text-vialto-steel" title={sub2}>
+          {sub2}
+        </p>
+      )}
     </div>
   );
 }
@@ -47,15 +55,17 @@ export function Dato({
 /** Título + recuadro del detalle de montos. */
 export function DetalleMontosCard({
   loading,
+  titulo = "Detalle del comprobante",
   children,
 }: {
   loading?: boolean;
+  titulo?: string;
   children: ReactNode;
 }) {
   return (
     <div>
       <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
-        Detalle del comprobante
+        {titulo}
       </p>
       <div className="min-h-[4rem] rounded border border-black/10 bg-white px-4 py-1">
         {loading ? (

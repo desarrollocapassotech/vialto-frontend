@@ -15,8 +15,9 @@ import {
   defaultFacturaLineas,
   type FacturaLineaDraft,
 } from "@/components/facturacion/FacturaLineasEditor";
-import { AmbienteHomologacionWarning } from "@/components/liquidaciones/AmbienteHomologacionWarning";
-import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
+import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
+import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { Spinner } from "@/components/ui/Spinner";
 import { ApiError, apiFetch, apiJson } from "@/lib/api";
@@ -27,7 +28,14 @@ import {
   facturaLetraLabel,
   facturaNcCbteTipoFromFactura,
   facturaNcLabel,
+  nroComprobante,
 } from "@/lib/arcaCbteTipo";
+import {
+  Dato,
+  DatosCabecera,
+  DetalleMontosCard,
+  FilaMonto,
+} from "@/components/shared/DetalleComprobante";
 import { friendlyError } from "@/lib/friendlyError";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import {
@@ -99,6 +107,8 @@ export function AnularFacturaModal({
   );
   const [datosReady, setDatosReady] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+  // Falta el motivo: aviso rojo en el pie que zumba al tocar "Confirmar y anular".
+  const zumbidoAviso = useZumbidoAviso();
 
   useLockBodyScroll(true);
 
@@ -182,6 +192,7 @@ export function AnularFacturaModal({
     const trimmed = motivo.trim();
     if (!trimmed) {
       setMotivoError("Ingresá el motivo de anulación.");
+      zumbidoAviso.disparar();
       return;
     }
     if (!puedeAnular) {
@@ -327,13 +338,15 @@ export function AnularFacturaModal({
           className={modalOverlayClass}
         >
           <div
-            className="w-full max-w-lg bg-white shadow-xl border border-black/20 flex flex-col max-h-[90dvh] sm:rounded"
+            className="w-full max-w-4xl bg-white shadow-xl border border-black/20 flex flex-col max-h-[90dvh] sm:rounded"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-black/10 px-6 py-4 shrink-0">
               <div>
-                <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
+                <h2 className="inline-flex flex-wrap items-center gap-3 font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
                   Anular factura
+                  {/* Ambiente de pruebas: badge junto al título, como en los demás modales. */}
+                  <AmbienteTestBadge ambiente={arcaConfig?.ambiente} />
                 </h2>
                 <p className="text-xs text-vialto-steel mt-0.5">
                   Factura {factura.numero} · se emite{" "}
@@ -353,119 +366,82 @@ export function AnularFacturaModal({
             <div className="px-6 py-5 overflow-y-auto flex-1">
               {step === "revision" && (
                 <div className="space-y-5">
-                  <div className="rounded border border-amber-300/70 bg-amber-50 px-3 py-2.5 text-xs text-amber-950">
-                    Se emitirá una Nota de Crédito asociada a la{" "}
-                    {facturaLetraLabel(letraFactura)} original (pto. vta.{" "}
-                    {factura.ptoVenta ?? "—"} / nro. {factura.cbteNro ?? "—"}).
-                    Revisá los datos antes de confirmar: son los que figurarán
-                    en el PDF.
-                  </div>
 
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs uppercase tracking-wider text-vialto-steel">
-                      Tipo NC:
-                    </span>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-vialto-charcoal">
-                      {facturaNcLabel(ncTipo)}
-                    </span>
-                  </div>
-
-                  <section className="space-y-1">
-                    <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
-                      Emisor
-                    </p>
-                    <p className="text-sm text-vialto-charcoal font-medium">
-                      {arcaConfig?.razonSocial ?? "—"}
-                    </p>
-                    <p className="text-xs text-vialto-steel">
-                      CUIT {arcaConfig?.cuitEmisor ?? "—"}
-                      {arcaConfig?.domicilioEmisor
-                        ? ` · ${arcaConfig.domicilioEmisor}`
-                        : ""}
-                    </p>
-                    {arcaConfig?.condicionIvaEmisor && (
-                      <p className="text-xs text-vialto-steel">
-                        {arcaConfig.condicionIvaEmisor}
-                      </p>
-                    )}
-                  </section>
-
-                  <section className="space-y-1">
-                    <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
-                      Receptor (cliente)
-                    </p>
-                    <p className="text-sm text-vialto-charcoal font-medium">
-                      {clienteDetalle?.nombre ?? "—"}
-                    </p>
-                    <p className="text-xs text-vialto-steel">
-                      {condicionIvaLabel(condicionIva)}
-                      {clienteDetalle?.idFiscal
-                        ? ` · CUIT ${clienteDetalle.idFiscal}`
-                        : ""}
-                    </p>
-                    {clienteDetalle?.direccion && (
-                      <p className="text-xs text-vialto-steel">
-                        {clienteDetalle.direccion}
-                      </p>
-                    )}
-                  </section>
-
-                  <section className="space-y-1.5">
-                    <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
-                      Comprobante original
-                    </p>
-                    <Row
-                      label="Tipo"
+                  {/* Cabecera compacta, mismo criterio que los detalles de Factura y Liquidación. */}
+                  <DatosCabecera>
+                    <Dato
+                      label="Se emite"
+                      value={facturaNcLabel(ncTipo).replace(/ \(cód\. \d+\)$/, "")}
+                      sub={facturaNcLabel(ncTipo).match(/\(cód\. \d+\)$/)?.[0]}
+                    />
+                    <Dato
+                      label="Factura original"
                       value={facturaLetraLabel(letraFactura)}
+                      sub={
+                        factura.cbteNro != null
+                          ? `N° ${nroComprobante(factura.ptoVenta, factura.cbteNro)}`
+                          : factura.numero
+                            ? `N° ${factura.numero}`
+                            : undefined
+                      }
+                      sub2={
+                        factura.cae
+                          ? `CAE ${factura.cae} · ${fmtDate(factura.fechaEmision)}`
+                          : fmtDate(factura.fechaEmision)
+                      }
                     />
-                    <Row label="Número local" value={factura.numero ?? "—"} />
-                    <Row
-                      label="Pto. venta / Nro."
-                      value={`${factura.ptoVenta ?? "—"} / ${factura.cbteNro ?? "—"}`}
+                    <Dato
+                      label="Cliente"
+                      value={clienteDetalle?.nombre ?? "—"}
+                      sub={[
+                        clienteDetalle?.idFiscal ? `CUIT ${clienteDetalle.idFiscal}` : null,
+                        condicionIva != null ? condicionIvaLabel(condicionIva) : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      sub2={clienteDetalle?.direccion ?? undefined}
+                      className="col-span-2 sm:col-span-1"
                     />
-                    <Row label="CAE" value={factura.cae ?? "—"} />
-                    <Row
-                      label="Fecha emisión"
-                      value={fmtDate(factura.fechaEmision)}
+                    <Dato
+                      label="Emisor"
+                      value={arcaConfig?.razonSocial ?? "—"}
+                      sub={[
+                        arcaConfig?.cuitEmisor ? `CUIT ${arcaConfig.cuitEmisor}` : null,
+                        arcaConfig?.condicionIvaEmisor
+                          ? condicionIvaLabel(Number(arcaConfig.condicionIvaEmisor))
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      sub2={arcaConfig?.domicilioEmisor ?? undefined}
+                      className="col-span-2 sm:col-span-1"
                     />
-                  </section>
+                  </DatosCabecera>
 
-                  <section className="space-y-2">
-                    <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
-                      Líneas a revertir
-                    </p>
-                    <div className="space-y-1.5">
-                      {lineas.map((l, i) => (
-                        <div
-                          key={`${l.descripcion}-${i}`}
-                          className="flex justify-between gap-3 text-xs"
-                        >
-                          <span className="text-vialto-charcoal min-w-0">
+                  <DetalleMontosCard titulo="Líneas a revertir">
+                    {lineas.map((l, i) => (
+                      <FilaMonto
+                        key={`${l.descripcion}-${i}`}
+                        label={
+                          <>
                             {l.descripcion || "—"}
-                            {l.ivaPct != null ? (
-                              <span className="text-vialto-steel">
-                                {" "}
-                                (IVA {l.ivaPct}%)
-                              </span>
-                            ) : null}
-                          </span>
-                          <span className="tabular-nums text-vialto-charcoal shrink-0">
-                            {fmtMoney(l.importe)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="border-t border-black/10 pt-2 space-y-1">
-                      <Row label="Neto" value={fmtMoney(totales.neto)} />
-                      <Row label="IVA" value={fmtMoney(totales.iva)} />
-                      <div className="flex justify-between text-xs font-semibold text-vialto-charcoal pt-0.5">
-                        <span>Total a acreditar</span>
-                        <span className="tabular-nums">
-                          {fmtMoney(totales.total)}
-                        </span>
-                      </div>
-                    </div>
-                  </section>
+                            {l.ivaPct != null && (
+                              <span className="text-vialto-steel"> (IVA {l.ivaPct}%)</span>
+                            )}
+                          </>
+                        }
+                        value={fmtMoney(l.importe)}
+                      />
+                    ))}
+                    <FilaMonto label="Neto" value={fmtMoney(totales.neto)} separator />
+                    <FilaMonto label="IVA" value={`+ ${fmtMoney(totales.iva)}`} muted />
+                    <FilaMonto
+                      label="Total a acreditar"
+                      value={fmtMoney(totales.total)}
+                      bold
+                      separator
+                    />
+                  </DetalleMontosCard>
 
                   <label className="grid gap-1.5">
                     <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel">
@@ -486,14 +462,9 @@ export function AnularFacturaModal({
                         motivoError ? "border-red-400" : "border-black/15"
                       }`}
                     />
-                    <CrudFieldError message={motivoError ?? undefined} />
                   </label>
 
                   {error && <ArcaEmitErrorAlert error={error} />}
-
-                  <AmbienteHomologacionWarning
-                    ambiente={arcaConfig?.ambiente}
-                  />
                 </div>
               )}
 
@@ -585,7 +556,16 @@ export function AnularFacturaModal({
             </div>
 
             {step === "revision" && (
-              <div className="flex shrink-0 justify-end gap-3 border-t border-black/10 px-6 py-4">
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-black/10 px-6 py-4">
+                {motivoError && (
+                  <AvisoFaltantesEmision
+                    mensaje={motivoError}
+                    hayOcultos={false}
+                    bloqueante
+                    zumbando={zumbidoAviso.zumbando}
+                    onZumbidoEnd={zumbidoAviso.terminar}
+                  />
+                )}
                 <button
                   type="button"
                   onClick={onClose}
