@@ -88,6 +88,7 @@ type ViajeItem = Pick<
   | "idPropio2"
   | "fechaCarga"
   | "fechaDescarga"
+  | "etapa"
   | "origen"
   | "destino"
   | "precioTransportistaExterno"
@@ -547,9 +548,15 @@ export function CrearLiquidacionManualModal({
             items = items.filter((v) =>
               puedeCambiarViajes
                 ? propios.has(v.id) ||
-                  !viajeTieneLiquidacionActivaParaTransportista(v, transportistaId)
+                  (v.etapa !== "cancelado" &&
+                    !viajeTieneLiquidacionActivaParaTransportista(v, transportistaId))
                 : propios.has(v.id),
             );
+          } else {
+            // Un viaje cancelado no se liquida: el select de transportistas ya no lo cuenta
+            // como pendiente (`transportistasParaNuevaLiquidacion`), y el backend no filtra
+            // por etapa en `sinLiquidacionActiva`.
+            items = items.filter((v) => v.etapa !== "cancelado");
           }
           setViajes(items);
           if (preseleccion && transportistaId === transportistaIdPreseleccion) {

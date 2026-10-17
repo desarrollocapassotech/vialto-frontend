@@ -301,15 +301,15 @@ export function FacturacionTenantPage({
   /**
    * Clientes con al menos un viaje pendiente de facturar, para el select de "Nueva
    * factura" (no aplica a filtros de listado, que deben seguir mostrando todos los
-   * clientes). Mientras los viajes todavía no se cargaron (o el tenant no tiene
-   * ninguno), se muestra la lista completa para no dejar el select vacío por un
-   * instante de carga.
+   * clientes). Mismo criterio que `viajesNuevaFactura` (incluye el bloqueo de USD con
+   * ARCA). Mientras los viajes cargan se pasa la lista completa (el modal deshabilita el
+   * select y vuelve a filtrar al terminar); sin viajes pendientes, queda vacía.
    */
   const clientesParaNuevaFactura = useMemo(() => {
-    if (viajesLoading || viajes.length === 0) return clientes;
-    const ids = clientesConViajesPendientesFactura(viajes);
+    if (viajesLoading) return clientes;
+    const ids = clientesConViajesPendientesFactura(viajes, { hasArca });
     return clientes.filter((c) => ids.has(c.id));
-  }, [clientes, viajes, viajesLoading]);
+  }, [clientes, viajes, viajesLoading, hasArca]);
 
   const viajesEdicionFactura = useMemo(() => {
     if (!editDraft || !editingId) return [];

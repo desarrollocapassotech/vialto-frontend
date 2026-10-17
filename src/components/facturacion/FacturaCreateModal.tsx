@@ -245,15 +245,18 @@ export function FacturaCreateModal({
   const [step, setStep] = useState<"form" | "autorizada">("form");
   const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
 
-  // Clientes con al menos un viaje disponible para vincular a esta factura nueva —
-  // mientras los viajes no cargaron (o el tenant no tiene ninguno) no se filtra, para no
-  // dejar el select vacío por un instante de carga (mismo criterio que
-  // `clientesParaNuevaFactura` en FacturacionTenantPage.tsx). Sin este filtro acá, un
-  // `clientes` prop ya filtrado por el caller quedaba pisado igual: este memo volvía a
-  // sumar cualquier cliente referenciado por `viajes` sin chequear disponibilidad.
+  // Clientes con al menos un viaje disponible para vincular a esta factura nueva — mismo
+  // criterio que la tabla de viajes (`viajesNueva`), incluido el bloqueo de USD con ARCA.
+  // Mientras los viajes cargan no se filtra (el select queda deshabilitado con `loading`).
+  // Ya cargados y sin ninguno pendiente, la lista queda vacía: las líneas de la factura
+  // salen solo de los viajes, así que un cliente sin viajes no tiene nada que facturar.
+  // Todos los hosts (Facturación, Inicio, Viajes) cargan los viajes al abrir el modal.
+  // Sin este filtro acá, un `clientes` prop ya filtrado por el caller quedaba pisado
+  // igual: este memo vuelve a sumar clientes referenciados por `viajes`.
   const allAvailableClientes = useMemo(() => {
-    const sinFiltrar = viajesLoading || viajes.length === 0;
-    const facturables = sinFiltrar ? null : clientesConViajesPendientesFactura(viajes);
+    const facturables = viajesLoading
+      ? null
+      : clientesConViajesPendientesFactura(viajes, { hasArca });
     const map = new Map<string, Cliente>();
     for (const c of clientes ?? []) {
       if (c && c.id && (!facturables || facturables.has(c.id))) map.set(c.id, c);
@@ -279,7 +282,7 @@ export function FacturaCreateModal({
       }
     }
     return Array.from(map.values());
-  }, [clientes, viajes, viajesLoading]);
+  }, [clientes, viajes, viajesLoading, hasArca]);
 
   const derivedViajes = useMemo(() => {
     return viajes.map((v) => {

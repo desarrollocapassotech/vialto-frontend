@@ -387,6 +387,8 @@ export function LiquidacionesTenantPage() {
   const [showCrear, setShowCrear] = useState(false);
   const [viajesTodos, setViajesTodos] = useState<Viaje[]>([]);
   const [viajesTodosLoading, setViajesTodosLoading] = useState(false);
+  /** true = `viajesTodos` es la carga vigente de esta empresa (false mientras carga o si falló). */
+  const [viajesTodosCargados, setViajesTodosCargados] = useState(false);
   const [anularConfirm, setAnularConfirm] =
     useState<LiquidacionConTransportista | null>(null);
   const [pendienteAnulacionConfirm, setPendienteAnulacionConfirm] =
@@ -416,17 +418,26 @@ export function LiquidacionesTenantPage() {
     );
   }
 
-  async function ensureViajesTodosLoaded() {
-    if (viajesTodos.length > 0 || viajesTodosLoading || !activeTenantId) return;
+  /**
+   * Se recarga en cada apertura de "Nueva liquidación" (no una sola vez): después de
+   * liquidar, un transportista que ya no tiene nada pendiente seguía en el select hasta
+   * recargar la página, y en superadmin quedaban los viajes de la empresa anterior.
+   * Mismo criterio que `refetchViajesParaFacturar` en Facturación.
+   */
+  async function cargarViajesTodos() {
+    if (viajesTodosLoading || !activeTenantId) return;
     setViajesTodosLoading(true);
+    setViajesTodosCargados(false);
     try {
       const url = isSuperAdmin
         ? `/api/platform/viajes?tenantId=${encodeURIComponent(activeTenantId)}`
         : "/api/viajes";
       const data = await apiJson<Viaje[]>(url, () => getToken());
       setViajesTodos(data);
+      setViajesTodosCargados(true);
     } catch {
       // best-effort: si falla, el select de "Nueva liquidación" muestra todos los transportistas
+      // (la tabla del modal trae sus viajes aparte, así que igual se puede liquidar)
     } finally {
       setViajesTodosLoading(false);
     }
@@ -435,12 +446,13 @@ export function LiquidacionesTenantPage() {
   /**
    * Transportistas con al menos un viaje pendiente de liquidar, para el select de
    * "Nueva liquidación" (no aplica al filtro del listado, que debe seguir mostrando
-   * todos los transportistas). Mientras los viajes todavía no se cargaron (o el
-   * tenant no tiene ninguno), se muestra la lista completa para no dejar el select
-   * vacío por un instante de carga.
+   * todos los transportistas). Mismo criterio que la tabla del modal (viajes del
+   * transportista sin liquidación activa para él, sin cancelados). Mientras los viajes
+   * cargan (select deshabilitado) o si la carga falló, se muestra la lista completa; ya
+   * cargados y sin nada pendiente, queda vacía.
    */
   const transportistasParaNuevaLiquidacion = useMemo(() => {
-    if (viajesTodosLoading || viajesTodos.length === 0) return transportistas;
+    if (viajesTodosLoading || !viajesTodosCargados) return transportistas;
     const ids = new Set<string>();
     for (const v of viajesTodos) {
       if (v.etapa === "cancelado") continue;
@@ -453,7 +465,7 @@ export function LiquidacionesTenantPage() {
       }
     }
     return transportistas.filter((t) => ids.has(t.id));
-  }, [transportistas, viajesTodos, viajesTodosLoading]);
+  }, [transportistas, viajesTodos, viajesTodosLoading, viajesTodosCargados]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -931,7 +943,7 @@ export function LiquidacionesTenantPage() {
               type="button"
               onClick={() => {
                 setShowCrear(true);
-                void ensureViajesTodosLoaded();
+                void cargarViajesTodos();
               }}
               className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
             >
