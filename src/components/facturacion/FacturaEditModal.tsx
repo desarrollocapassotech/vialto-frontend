@@ -6,7 +6,7 @@ import {
   type SetStateAction,
   useCallback,
 } from "react";
-import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import {
   FacturaTramosEditor,
@@ -839,15 +839,10 @@ export function FacturaEditModal({
               />
             </div>
           )}
-
-          {displayError && (
-            <div className="mt-4">
-              <CrudFormErrorAlert message={displayError} />
-            </div>
-          )}
         </div>
 
-        <footer className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
+        <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
+          <ErrorPieModal error={displayError} />
           <button
             type="button"
             onClick={onClose}

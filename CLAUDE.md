@@ -395,15 +395,27 @@ setFieldErrors({});
 - `CrudInput` y `CrudSelect` (`src/components/crud/CrudFields.tsx`): reciben prop `error?: string` que agrega `border-red-400` automáticamente.
 - `CrudFormErrorAlert` (`src/components/crud/CrudFormErrorAlert.tsx`): solo para errores de servidor/API.
 
-### En modales (inputs nativos sin CrudInput)
+### Errores en modales: aviso rojo en el pie que zumba (oct 2026)
 
-Aplicar la clase `border-red-400` de forma condicional:
+**En modales la regla de arriba cambia** (lo de `CrudFieldError`/`CrudFormErrorAlert` sigue valiendo para páginas):
+
+- El input con error sigue con `border-red-400`.
+- **El texto del error no va debajo del input ni en una alerta del cuerpo**: va en el pie, a la izquierda de los botones, con `ErrorPieModal` (`components/shared/ErrorPieModal.tsx`). Es el mismo aviso rojo de `AvisoFaltantesEmision`, y zumba (`useZumbidoAviso`) cada vez que aparece o cambia.
+- Junta validación y servidor: `<ErrorPieModal error={error} fieldErrors={fieldErrors} />`. Con varios errores muestra el primero + "(y N errores más)". Un error de infraestructura de AFIP se muestra con `MSG_AFIP_INFRA`.
+- El pie tiene que ser `flex flex-wrap items-center` (el pie de `ViewModalShell` ya lo es).
+- `fieldErrors` tiene que ser un objeto estable (estado o `useMemo`), nunca un literal armado en el render: el zumbido se dispara cuando cambia la referencia. Si se juntan varios estados (ej. `ViajeEditModal`, `OrdenTrabajoModal`), armarlos con `useMemo`.
+- Para que zumbe aunque el mensaje sea el mismo, la validación tiene que crear un objeto nuevo en cada intento (`setFieldErrors(errs)`). Para un error de texto: `setError(null)` y en el próximo frame `setError(msg)` (ver `notifyError` en `FacturaCreateModal`).
+- Componentes compartidos con páginas que muestran el error debajo del campo (`ViajeFechaHoraFields`, `ViajeClientesFieldset`) aceptan `ocultarTextoError` para usarlos dentro de un modal.
+- **Quedan afuera a propósito**: avisos de estado que no son el error de una acción (CUIT rechazado por el padrón, campos ocultos, cámara sin permiso en `TomarFotoRemitoModal`), el panel interactivo de faltantes de `MicCrtExportModal`, y las validaciones en vivo de `CargaCombustibleCreateModal` (monto vs litros×precio y km), que cambian mientras se escribe y harían zumbar en cada tecla.
 
 ```tsx
-<input
-  className={`${I} ${fieldErrors.nombre ? 'border-red-400' : 'border-black/15'}`}
-/>
-<CrudFieldError message={fieldErrors.nombre} />
+<input className={`${I} ${fieldErrors.nombre ? 'border-red-400' : 'border-black/15'}`} />
+…
+<div className="flex flex-wrap items-center justify-end gap-2 border-t border-black/10 px-5 py-4">
+  <ErrorPieModal error={error} fieldErrors={fieldErrors} />
+  <button …>Cancelar</button>
+  <button …>Guardar</button>
+</div>
 ```
 
 ---

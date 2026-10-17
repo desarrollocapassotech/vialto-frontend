@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
-import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import {
   VIAJES_COLUMNAS,
   esOrdenEstandarColumnasViajes,
@@ -206,12 +206,10 @@ export function ViajesColumnasOrdenModal({
               Restablecer orden estándar
             </button>
           )}
-          <div className="mt-3">
-            <CrudFormErrorAlert message={error ?? errorCarga ?? null} />
-          </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-black/10 px-5 py-3">
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-black/10 px-5 py-3">
+          <ErrorPieModal error={error ?? errorCarga ?? null} />
           <button
             type="button"
             onClick={onClose}

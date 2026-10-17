@@ -36,13 +36,12 @@ import {
 import { friendlyError } from "@/lib/friendlyError";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
-import { ArcaEmitErrorAlert } from "@/components/ui/ArcaErrorMessage";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { modalOverlayClass } from "@/lib/modalLayers";
 import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
-import { useToast } from "@/lib/toast";
 import { CompletarDatosFiscalesInline } from "@/components/shared/CompletarDatosFiscalesInline";
 import type { ArcaConfig, Cliente, Factura, Viaje } from "@/types/api";
 import { ConfirmarEmisionArcaDialog } from "@/components/shared/ConfirmarEmisionArcaDialog";
@@ -82,7 +81,6 @@ export function EmitirFacturaModal({
   const { tenant: tenantPdf } = useTenantPaisFijo(tenantId);
   const { getToken } = useAuth();
   const navigate = useNavigate();
-  const { showToast } = useToast();
   const platform = Boolean(tenantId?.trim());
   const bloqueadoUsd = arcaBloqueaFacturarUsd(true, factura.moneda);
   const yaAutorizada =
@@ -204,14 +202,10 @@ export function EmitirFacturaModal({
       : null;
 
   function notifyEmitBlock(message: string) {
-    setError(message);
-    showToast(message, "error");
-    requestAnimationFrame(() => {
-      feedbackRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-    });
+    // Va al aviso del pie (ErrorPieModal). Se limpia y se vuelve a poner para que zumbe
+    // aunque el mensaje sea el mismo que ya estaba.
+    setError(null);
+    requestAnimationFrame(() => setError(message));
   }
 
   const totales = useMemo(
@@ -535,7 +529,6 @@ export function EmitirFacturaModal({
                     )}
 
                   <div ref={feedbackRef} className="space-y-2">
-                    {error && <ArcaEmitErrorAlert error={error} />}
                     {arcaConfigMissing && (
                       <button
                         type="button"
@@ -604,9 +597,8 @@ export function EmitirFacturaModal({
                     </div>
                   </section>
 
-                  {error && <ArcaEmitErrorAlert error={error} />}
-
-                  <div className="flex justify-end gap-3">
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <ErrorPieModal error={error} />
                     <button
                       type="button"
                       disabled={downloading}
@@ -638,7 +630,8 @@ export function EmitirFacturaModal({
             </div>
 
             {step === "revision" && (
-              <div className="flex shrink-0 justify-end gap-3 border-t border-black/10 px-6 py-4">
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-black/10 px-6 py-4">
+                <ErrorPieModal error={error} />
                 <button
                   type="button"
                   onClick={onClose}

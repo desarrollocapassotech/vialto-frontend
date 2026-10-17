@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
@@ -236,6 +237,11 @@ export function LiquidacionEditModal({
   );
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  // Errores de validación (campos con borde rojo + viajes): el texto va al pie del modal.
+  const erroresPie = useMemo(
+    () => ({ ...fieldErrors, viajes: viajesFieldError }),
+    [fieldErrors, viajesFieldError],
+  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -501,6 +507,7 @@ export function LiquidacionEditModal({
       maxWidthClass={canEditViajes ? "sm:max-w-4xl" : "sm:max-w-xl"}
       footer={
         <>
+          <ErrorPieModal error={error} fieldErrors={erroresPie} />
           <button
             type="button"
             disabled={saving}
@@ -671,11 +678,6 @@ export function LiquidacionEditModal({
                   maxHeightClass="max-h-56"
                   emptyMessage="No hay viajes disponibles para este transportista."
                 />
-                {viajesFieldError && (
-                  <p className="mt-1 text-xs font-medium text-red-600">
-                    {viajesFieldError}
-                  </p>
-                )}
               </div>
             )}
 
@@ -792,12 +794,6 @@ export function LiquidacionEditModal({
             disabled={saving}
             label="Comprobante"
           />
-        )}
-
-        {error && (
-          <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-            {error}
-          </div>
         )}
       </form>
     </ViewModalShell>

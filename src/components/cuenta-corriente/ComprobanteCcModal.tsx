@@ -8,6 +8,7 @@ import {
 import { fechaDiaYmd } from '@/lib/fmtDateUtc';
 import { friendlyError } from '@/lib/friendlyError';
 import { actualizarComprobanteMovimiento, type MovimientoCc } from '@/lib/cuentaCorriente';
+import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
@@ -59,6 +60,7 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
       onClose={onClose}
       footer={
         <>
+          <ErrorPieModal error={error} />
           <button type="button" className={viewModalBtnGhost} onClick={onClose}>
             Cancelar
           </button>
@@ -134,11 +136,6 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
           </p>
         )}
 
-        {error && (
-          <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-            {error}
-          </p>
-        )}
       </form>
     </ViewModalShell>
   );

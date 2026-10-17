@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudFieldLabel, CrudInput } from '@/components/crud/CrudFields';
 import { Spinner } from '@/components/ui/Spinner';
+import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Destinatario } from '@/types/api';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
@@ -97,14 +97,9 @@ export function DestinatarioModal({
               autoFocus
               onChange={(e) => setNombre(e.target.value)}
             />
-            <CrudFieldError message={fieldErrors.nombre} />
           </label>
-          {error && (
-            <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-              {error}
-            </p>
-          )}
-          <div className="flex justify-end gap-2 pt-1">
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+            <ErrorPieModal error={error} fieldErrors={fieldErrors} />
             <button
               type="button"
               onClick={onClose}

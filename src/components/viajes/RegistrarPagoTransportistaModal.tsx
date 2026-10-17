@@ -2,9 +2,9 @@ import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
-import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { apiJson } from "@/lib/api";
 import { Spinner } from "@/components/ui/Spinner";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   normalizeViajeMoneda,
@@ -243,7 +243,6 @@ export function RegistrarPagoTransportistaModal({
                 disabled={saving}
                 aria-label="Monto del pago"
               />
-              <CrudFieldError message={fieldErrors.monto} />
             </div>
             <div className="flex flex-col gap-1">
               <span className={labelClass}>Moneda</span>
@@ -280,16 +279,8 @@ export function RegistrarPagoTransportistaModal({
           </div>
         </div>
 
-        {error && (
-          <p
-            role="alert"
-            className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800"
-          >
-            {error}
-          </p>
-        )}
-
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+          <ErrorPieModal error={error} fieldErrors={fieldErrors} />
           <button
             type="button"
             disabled={saving}

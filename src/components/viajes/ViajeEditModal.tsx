@@ -7,7 +7,7 @@ import {
 } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import {
   ChoferSearchSelect,
   ClienteSearchSelect,
@@ -293,6 +293,22 @@ export function ViajeEditModal({
     | "chofer-prop"
     | "pais";
   const { user } = useUser();
+  // Errores de validación de los campos (sus inputs quedan con borde rojo): el texto va al pie.
+  const erroresPie = useMemo(
+    () => ({
+      fechaCarga: fechaCargaError,
+      fechaDescarga: fechaDescargaError,
+      destinos: destinosError,
+      transportistaEfectivo: transportistaEfectivoError,
+      ...Object.fromEntries(
+        Object.entries(clientesRowErrors ?? {}).map(([i, msg]) => [
+          `cliente${i}`,
+          `Cliente ${Number(i) + 1}: ${msg}`,
+        ]),
+      ),
+    }),
+    [fechaCargaError, fechaDescargaError, destinosError, transportistaEfectivoError, clientesRowErrors],
+  );
   const { isVisible } = useFieldConfig("viajes");
   const { flotaPropiaVisible, transportistaExternoVisible } =
     useTipoFlotaVisible(tenantId || undefined);
@@ -807,7 +823,6 @@ export function ViajeEditModal({
                         paisFijo={paisFijo}
                         sugerenciasCiudad={sugerenciasCiudad}
                       />
-                      <CrudFieldError message={destinosError} />
                     </div>
                     {isVisible("edicion_viaje", "productoItems") && (
                       <div className="flex flex-col gap-1">
@@ -973,6 +988,7 @@ export function ViajeEditModal({
                   </div>
                 </ClienteCard>
                 <ViajeClientesFieldset
+                  ocultarTextoError
                   rows={draft.clientesRows}
                   onChange={(rows) => {
                     setDraft((p) => (p ? { ...p, clientesRows: rows } : p));
@@ -1401,11 +1417,6 @@ export function ViajeEditModal({
                                   : undefined
                               }
                             />
-                            {transportistaEfectivoError && (
-                              <span className="text-xs text-red-600">
-                                {transportistaEfectivoError}
-                              </span>
-                            )}
                           </div>
                         )}
                       </div>
@@ -1536,6 +1547,7 @@ export function ViajeEditModal({
                 inputClassName={inputClass}
                 errorFechaCarga={fechaCargaError}
                 errorFechaDescarga={fechaDescargaError}
+                ocultarTextoError
               />
 
               {(isVisible("edicion_viaje", "kmRecorridos") ||
@@ -1698,17 +1710,10 @@ export function ViajeEditModal({
                   </div>
                 ))}
             </div>
-            {error && (
-              <p
-                role="alert"
-                className="mt-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
-              >
-                {error}
-              </p>
-            )}
           </div>
 
           <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
+            <ErrorPieModal error={error} fieldErrors={erroresPie} />
             <div className="flex flex-wrap items-center gap-2">
               {muestraBotonFacturar ? (
                 <button

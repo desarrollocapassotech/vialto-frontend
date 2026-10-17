@@ -16,8 +16,7 @@ import {
   type FacturaLineaDraft,
 } from "@/components/facturacion/FacturaLineasEditor";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
-import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
-import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { Spinner } from "@/components/ui/Spinner";
 import { ApiError, apiFetch, apiJson } from "@/lib/api";
@@ -95,7 +94,7 @@ export function AnularFacturaModal({
 
   const [step, setStep] = useState<Step>("revision");
   const [motivo, setMotivo] = useState("");
-  const [motivoError, setMotivoError] = useState<string | null>(null);
+  const [motivoErrors, setMotivoErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [facturaResultado, setFacturaResultado] = useState<Factura>(factura);
@@ -107,8 +106,6 @@ export function AnularFacturaModal({
   );
   const [datosReady, setDatosReady] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
-  // Falta el motivo: aviso rojo en el pie que zumba al tocar "Confirmar y anular".
-  const zumbidoAviso = useZumbidoAviso();
 
   useLockBodyScroll(true);
 
@@ -191,8 +188,7 @@ export function AnularFacturaModal({
     if (busy) return;
     const trimmed = motivo.trim();
     if (!trimmed) {
-      setMotivoError("Ingresá el motivo de anulación.");
-      zumbidoAviso.disparar();
+      setMotivoErrors({ motivo: "Ingresá el motivo de anulación." });
       return;
     }
     if (!puedeAnular) {
@@ -203,7 +199,7 @@ export function AnularFacturaModal({
       );
       return;
     }
-    setMotivoError(null);
+    setMotivoErrors({});
     setError(null);
     setBusy(true);
     try {
@@ -456,15 +452,13 @@ export function AnularFacturaModal({
                       placeholder="Indicá el motivo…"
                       onChange={(e) => {
                         setMotivo(e.target.value);
-                        if (motivoError) setMotivoError(null);
+                        if (motivoErrors.motivo) setMotivoErrors({});
                       }}
                       className={`w-full rounded border bg-white px-3 py-2 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 disabled:opacity-50 ${
-                        motivoError ? "border-red-400" : "border-black/15"
+                        motivoErrors.motivo ? "border-red-400" : "border-black/15"
                       }`}
                     />
                   </label>
-
-                  {error && <ArcaEmitErrorAlert error={error} />}
                 </div>
               )}
 
@@ -557,15 +551,7 @@ export function AnularFacturaModal({
 
             {step === "revision" && (
               <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-black/10 px-6 py-4">
-                {motivoError && (
-                  <AvisoFaltantesEmision
-                    mensaje={motivoError}
-                    hayOcultos={false}
-                    bloqueante
-                    zumbando={zumbidoAviso.zumbando}
-                    onZumbidoEnd={zumbidoAviso.terminar}
-                  />
-                )}
+                <ErrorPieModal error={error} fieldErrors={motivoErrors} />
                 <button
                   type="button"
                   onClick={onClose}

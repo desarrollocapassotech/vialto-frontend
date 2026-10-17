@@ -68,7 +68,7 @@ export function ViewModalShell({
         </div>
 
         {footer && (
-          <div className="flex shrink-0 flex-col gap-2 border-t border-black/10 bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:flex-wrap sm:justify-end sm:px-6 [&_button]:w-full sm:[&_button]:w-auto [&_a]:flex [&_a]:w-full [&_a]:justify-center sm:[&_a]:w-auto">
+          <div className="flex shrink-0 flex-col gap-2 border-t border-black/10 bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:px-6 [&_button]:w-full sm:[&_button]:w-auto [&_a]:flex [&_a]:w-full [&_a]:justify-center sm:[&_a]:w-auto">
             {footer}
           </div>
         )}

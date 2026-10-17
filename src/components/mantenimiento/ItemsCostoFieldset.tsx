@@ -1,5 +1,4 @@
 import { Plus, Trash2 } from "lucide-react";
-import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { maskCurrencyArInput } from "@/lib/currencyMask";
 import { nuevaLineaCosto, totalLineas, type LineaCosto } from "@/lib/mantenimientoCostos";
 import { fmtMoneda } from "@/lib/mantenimientoLabels";
@@ -17,7 +16,7 @@ export function ItemsCostoFieldset({
 }: {
   lineas: LineaCosto[];
   onChange: (next: LineaCosto[]) => void;
-  /** Errores por línea: `{ [key]: { descripcion?, importe? } }`. */
+  /** Errores por línea: `{ [key]: { descripcion?, importe? } }` (solo borde rojo; el texto va al pie del modal). */
   errores: Record<string, { descripcion?: string; importe?: string }>;
 }) {
   function actualizar(key: string, cambio: Partial<LineaCosto>) {
@@ -40,7 +39,6 @@ export function ItemsCostoFieldset({
               aria-label="Descripción del costo"
               className={`${INPUT} ${errores[l.key]?.descripcion ? "border-red-400" : "border-black/15"}`}
             />
-            <CrudFieldError message={errores[l.key]?.descripcion} />
           </div>
           <div className="grid gap-1">
             <input
@@ -52,7 +50,6 @@ export function ItemsCostoFieldset({
               aria-label="Importe"
               className={`${INPUT} text-right tabular-nums ${errores[l.key]?.importe ? "border-red-400" : "border-black/15"}`}
             />
-            <CrudFieldError message={errores[l.key]?.importe} />
           </div>
           <button
             type="button"

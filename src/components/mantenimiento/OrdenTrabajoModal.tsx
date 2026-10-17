@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TriangleAlert } from "lucide-react";
-import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { CrudFieldLabel, CrudSelect } from "@/components/crud/CrudFields";
-import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { filtrarVehiculos } from "@/components/forms/maestroSearchFilters";
 import { FechaPicker } from "@/components/mantenimiento/FechaPicker";
@@ -115,6 +114,21 @@ export function OrdenTrabajoModal({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [lineaErrors, setLineaErrors] = useState<Record<string, { descripcion?: string; importe?: string }>>({});
   const [error, setError] = useState<string | null>(null);
+  // Errores de campos y de líneas de costo (los inputs quedan con borde rojo): el texto va al pie.
+  const erroresPie = useMemo(
+    () => ({
+      ...fieldErrors,
+      ...Object.fromEntries(
+        Object.entries(lineaErrors).flatMap(([key, e]) =>
+          [
+            e.descripcion ? [`${key}-descripcion`, e.descripcion] : null,
+            e.importe ? [`${key}-importe`, e.importe] : null,
+          ].filter((x): x is [string, string] => x !== null),
+        ),
+      ),
+    }),
+    [fieldErrors, lineaErrors],
+  );
   const [guardando, setGuardando] = useState(false);
 
   const cargarFormDesde = useCallback((o: OrdenTrabajoDetalle) => {
@@ -269,6 +283,7 @@ export function OrdenTrabajoModal({
   const footer =
     modo === "ver" ? (
       <>
+        <ErrorPieModal error={error} />
         <button type="button" onClick={onClose} className={viewModalBtnGhost}>
           Cerrar
         </button>
@@ -287,6 +302,7 @@ export function OrdenTrabajoModal({
       </>
     ) : (
       <>
+        <ErrorPieModal error={error} fieldErrors={erroresPie} />
         <button
           type="button"
           disabled={guardando}
@@ -334,7 +350,6 @@ export function OrdenTrabajoModal({
                 aria-label="Vehículo"
                 inputClassName={`${INPUT} ${fieldErrors.vehiculoId ? "border-red-400" : "border-black/15"}`}
               />
-              <CrudFieldError message={fieldErrors.vehiculoId} />
             </label>
             <label className="grid gap-1.5">
               <CrudFieldLabel required>Tipo</CrudFieldLabel>
@@ -349,7 +364,6 @@ export function OrdenTrabajoModal({
             <label className="grid gap-1.5">
               <CrudFieldLabel required>Fecha del trabajo</CrudFieldLabel>
               <FechaPicker value={fecha} onChange={setFecha} error={fieldErrors.fecha} aria-label="Fecha del trabajo" />
-              <CrudFieldError message={fieldErrors.fecha} />
             </label>
             <label className="grid gap-1.5">
               <CrudFieldLabel>Km del vehículo</CrudFieldLabel>
@@ -364,7 +378,6 @@ export function OrdenTrabajoModal({
                 placeholder="Ej. 512340"
                 className={`${INPUT} ${fieldErrors.km ? "border-red-400" : "border-black/15"}`}
               />
-              <CrudFieldError message={fieldErrors.km} />
             </label>
             <div className="grid gap-1.5 sm:col-span-2">
               <CrudFieldLabel>Taller</CrudFieldLabel>
@@ -421,10 +434,8 @@ export function OrdenTrabajoModal({
           {vehiculo && modo === "crear" && !kmTocado && vehiculo.kmActual > 0 && (
             <p className="text-xs text-vialto-steel">El km sugerido es el último cargado en el vehículo.</p>
           )}
-          <CrudFormErrorAlert message={error} />
         </div>
       )}
-      {!cargando && modo === "ver" && error && <CrudFormErrorAlert message={error} />}
     </ViewModalShell>
   );
 }

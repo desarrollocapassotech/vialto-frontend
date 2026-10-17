@@ -109,6 +109,8 @@ interface Props {
   onChange: (rows: ViajeClienteDraft[]) => void;
   clientes: Cliente[];
   rowErrors?: Record<number, string>;
+  /** Dentro de un modal: el texto de `rowErrors` va en el pie (`ErrorPieModal`), no en la fila. */
+  ocultarTextoError?: boolean;
   className?: string;
   desgloseActivo: boolean;
   paises: Pais[];
@@ -147,6 +149,7 @@ export function ViajeClientesFieldset({
   onChange,
   clientes,
   rowErrors,
+  ocultarTextoError = false,
   className,
   desgloseActivo,
   paises,
@@ -397,7 +400,7 @@ export function ViajeClientesFieldset({
                 </div>
               )}
             </div>
-            {rowErrors?.[i] && (
+            {rowErrors?.[i] && !ocultarTextoError && (
               <p className="mt-2 text-xs font-medium text-red-600">{rowErrors[i]}</p>
             )}
           </ClienteCard>

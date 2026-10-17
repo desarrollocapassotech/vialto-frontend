@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Viaje } from '@/types/api';
+import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
 import type { MicCrtActor, MicCrtExportPayload, MicCrtPrefillResponse } from '@/types/micCrtDocumento';
 import {
   labelCampo,
@@ -13,7 +14,6 @@ import {
   TIPOS_BULTOS_MIC,
   validateMicCrtForm,
 } from '@/types/micCrtDocumento';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiFetch, apiJson } from '@/lib/api';
@@ -141,12 +141,12 @@ function Field({
   const labelText = isRequired ? label.slice(0, -2) : label;
   return (
     <label className={`grid min-w-0 gap-0.5 ${className ?? ''}`}>
-      <span className={labelClass}>
+      {/* Con error el label va en rojo (el texto del error está en el pie del modal). */}
+      <span className={`${labelClass} ${error ? '!text-red-600' : ''}`}>
         {labelText}
         {isRequired && <span className="text-red-500"> *</span>}
       </span>
       {children}
-      <CrudFieldError message={error} />
     </label>
   );
 }
@@ -766,7 +766,8 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
               disabled={ocupado}
               onSaved={() => void corregirDatosYReintentar()}
             />
-          ) : error ? (
+          ) : error && typeof error !== 'string' ? (
+            // Error con estructura (lista de motivos): queda en el cuerpo; los de texto van al pie.
             <div className="border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 leading-snug">
               <p>{error}</p>
             </div>
@@ -779,7 +780,16 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
           )}
         </div>
 
-        <div className="flex shrink-0 flex-col gap-2 border-t border-black/10 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end">
+        <div className="flex shrink-0 flex-col gap-2 border-t border-black/10 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+          {/* Validación: los campos marcados; si no, el error de texto (no el panel de faltantes). */}
+          <ErrorPieModal
+            fieldErrors={fieldErrors}
+            error={
+              Object.keys(fieldErrors).length === 0 && !missingGroups && typeof error === 'string'
+                ? error
+                : null
+            }
+          />
           <button type="button" disabled={ocupado} onClick={onClose}
             className="inline-flex min-h-11 w-full items-center justify-center text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50 sm:w-auto">
             Cancelar

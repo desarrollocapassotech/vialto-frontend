@@ -6,6 +6,7 @@ import {
 } from '@/components/ui/ViewModalShell';
 import { Spinner } from '@/components/ui/Spinner';
 import { CUIT_TEST_HOMOLOGACION } from '@/lib/arcaCbteTipo';
+import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
 
 const labelClass =
   'font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-vialto-steel';
@@ -151,6 +152,7 @@ export function ArcaCertificadoModal({
       maxWidthClass="sm:max-w-3xl"
       footer={
         <>
+          <ErrorPieModal error={error} />
           <button
             type="button"
             onClick={onClose}
@@ -171,14 +173,6 @@ export function ArcaCertificadoModal({
         </>
       }
     >
-      {error && (
-        <div
-          className="mb-4 rounded border border-amber-600/40 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-          role="alert"
-        >
-          {error}
-        </div>
-      )}
 
       <div className="space-y-5">
         {/* Homologación */}

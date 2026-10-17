@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { Spinner } from '@/components/ui/Spinner';
+import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Pais } from '@/types/api';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
@@ -108,7 +108,6 @@ export function PaisModal({
                 placeholder="Ej: Bolivia"
                 className={`${I} ${fieldErrors.nombre ? 'border-red-400' : 'border-black/15'}`}
               />
-              <CrudFieldError message={fieldErrors.nombre} />
             </label>
             <label className="flex flex-col gap-1">
               <span className={L}>
@@ -121,16 +120,11 @@ export function PaisModal({
                 maxLength={2}
                 className={`${I} ${fieldErrors.codigo ? 'border-red-400' : 'border-black/15'}`}
               />
-              <CrudFieldError message={fieldErrors.codigo} />
             </label>
           </div>
         </div>
-        {error && (
-          <p className="mx-5 mb-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-sm text-red-800">
-            {error}
-          </p>
-        )}
-        <div className="flex shrink-0 justify-end gap-2 border-t border-black/10 px-5 py-4">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-black/10 px-5 py-4">
+          <ErrorPieModal error={error} fieldErrors={fieldErrors} />
           <button
             type="button"
             disabled={saving}

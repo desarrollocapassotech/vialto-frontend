@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { Spinner } from '@/components/ui/Spinner';
+import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
 import { friendlyError } from '@/lib/friendlyError';
 import { choferWritePayloadFromForm, validarDniForm, type ChoferFormState } from '@/lib/choferForm';
 import type { Chofer } from '@/types/api';
@@ -101,7 +101,6 @@ export function ChoferModal({
               placeholder="Ej: Juan Pérez"
               className={`${I} ${fieldErrors.nombre ? 'border-red-400' : 'border-black/15'}`}
             />
-            <CrudFieldError message={fieldErrors.nombre} />
           </label>
           <label className="flex flex-col gap-1">
             <span className={L}>DNI</span>
@@ -111,7 +110,6 @@ export function ChoferModal({
               placeholder="Ej: 30123456"
               className={`${I} ${fieldErrors.dni ? 'border-red-400' : 'border-black/15'}`}
             />
-            <CrudFieldError message={fieldErrors.dni} />
           </label>
           <label className="flex flex-col gap-1">
             <span className={L}>CUIT</span>
@@ -132,12 +130,8 @@ export function ChoferModal({
             />
           </label>
         </div>
-        {error && (
-          <p className="mx-5 mb-3 rounded border border-red-200 bg-red-50 px-2 py-1 text-sm text-red-800">
-            {error}
-          </p>
-        )}
-        <div className="flex justify-end gap-2 border-t border-black/10 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-black/10 px-5 py-4">
+          <ErrorPieModal error={error} fieldErrors={fieldErrors} />
           <button
             type="button"
             disabled={saving}

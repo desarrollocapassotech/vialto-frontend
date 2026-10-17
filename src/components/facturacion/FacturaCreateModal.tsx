@@ -11,8 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Receipt } from "lucide-react";
 import { useHiddenFiscalFields } from "@/hooks/useHiddenFiscalFields";
-import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
-import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPreviewPanel";
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
@@ -54,8 +53,6 @@ import {
 } from "@/lib/facturaEmitValidation";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
 import { friendlyError } from "@/lib/friendlyError";
-import { ArcaEmitErrorAlert } from "@/components/ui/ArcaErrorMessage";
-import { isAfipInfrastructureError } from "@/lib/arcaFriendlyError";
 import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
@@ -637,14 +634,10 @@ export function FacturaCreateModal({
   }
 
   function notifyError(message: string) {
-    setLocalError(message);
-    showToast(message, "error");
-    requestAnimationFrame(() => {
-      feedbackRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-    });
+    // Va al aviso del pie (ErrorPieModal). Se limpia y se vuelve a poner para que zumbe
+    // aunque el mensaje sea el mismo que ya estaba.
+    setLocalError(null);
+    requestAnimationFrame(() => setLocalError(message));
   }
 
   async function resolveComprobanteUrl(): Promise<string | null | undefined> {
@@ -936,7 +929,6 @@ export function FacturaCreateModal({
                   : compactInputClass
               }
             />
-            <CrudFieldError message={errorFechaArca} />
           </div>
           <div className="flex flex-col gap-1">
             <label className={compactLabelClass}>Fecha de vencimiento</label>
@@ -1324,12 +1316,6 @@ export function FacturaCreateModal({
                       }
                       feedbackSlot={
                         <div ref={feedbackRef} className="space-y-2">
-                          {displayError &&
-                            (isAfipInfrastructureError(displayError) ? (
-                              <ArcaEmitErrorAlert error={displayError} />
-                            ) : (
-                              <CrudFormErrorAlert message={displayError} />
-                            ))}
                           {arcaConfigMissing && (
                             <button
                               type="button"
@@ -1356,15 +1342,6 @@ export function FacturaCreateModal({
               ) : (
                 <div className="overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
                   {standardFields}
-                  {displayError && (
-                    <div className="mt-4">
-                      {isAfipInfrastructureError(displayError) ? (
-                        <ArcaEmitErrorAlert error={displayError} />
-                      ) : (
-                        <CrudFormErrorAlert message={displayError} />
-                      )}
-                    </div>
-                  )}
                 </div>
               )
             ) : (
@@ -1453,6 +1430,7 @@ export function FacturaCreateModal({
 
           {step === "form" && (
             <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
+              <ErrorPieModal error={displayError} />
               {/* Faltantes para emitir: fijo en el pie, al lado de "Emitir a ARCA", para que se vea siempre. */}
               {unifiedArca && datosEmitIncompletos && (
                 <AvisoFaltantesEmision

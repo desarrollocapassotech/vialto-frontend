@@ -20,6 +20,8 @@ type Props = {
   mode?: 'both' | 'cargaOnly' | 'tablaCargaDescarga';
   errorFechaCarga?: string | null;
   errorFechaDescarga?: string | null;
+  /** Dentro de un modal: solo borde rojo, el texto del error va en el pie (`ErrorPieModal`). */
+  ocultarTextoError?: boolean;
 };
 
 /** Misma altura de línea para sub-etiquetas (fecha / hora) y alinear inputs abajo. */
@@ -36,6 +38,7 @@ function campoFechaHora({
   ariaHora,
   errorFecha,
   required = true,
+  ocultarTextoError = false,
 }: {
   labelFecha: string;
   labelHora: string;
@@ -49,6 +52,7 @@ function campoFechaHora({
   ariaHora: string;
   errorFecha?: string | null;
   required?: boolean;
+  ocultarTextoError?: boolean;
 }) {
   const subLabel = `${labelClassName} block min-h-[1.25rem] leading-tight`;
   const inputCls = `${inputClassName}${errorFecha ? ' border-red-400' : ''}`;
@@ -66,7 +70,7 @@ function campoFechaHora({
           aria-label={ariaFecha}
           required={required}
         />
-        {errorFecha && (
+        {errorFecha && !ocultarTextoError && (
           <span className="text-xs text-red-600">{errorFecha}</span>
         )}
       </div>
@@ -95,14 +99,17 @@ export function ViajeFechaHoraFields({
   mode = 'both',
   errorFechaCarga,
   errorFechaDescarga,
+  ocultarTextoError = false,
 }: Props) {
+  const campo = (args: Parameters<typeof campoFechaHora>[0]) =>
+    campoFechaHora({ ...args, ocultarTextoError });
   const tituloSeccion =
     'text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel';
 
   if (mode === 'cargaOnly') {
     return (
       <div className="min-w-[10rem]">
-        {campoFechaHora({
+        {campo({
           labelFecha: 'Fecha',
           labelHora: 'Hora',
           fecha: fechaCarga,
@@ -124,7 +131,7 @@ export function ViajeFechaHoraFields({
       <div className="flex min-w-0 flex-col gap-3 min-w-[10rem]">
         <div className="flex min-w-0 flex-col gap-2">
           <span className={tituloSeccion}>Carga</span>
-          {campoFechaHora({
+          {campo({
             labelFecha: 'Fecha',
             labelHora: 'Hora',
             fecha: fechaCarga,
@@ -140,7 +147,7 @@ export function ViajeFechaHoraFields({
         </div>
         <div className="flex min-w-0 flex-col gap-2">
           <span className={tituloSeccion}>Descarga</span>
-          {campoFechaHora({
+          {campo({
             labelFecha: 'Fecha',
             labelHora: 'Hora',
             fecha: fechaDescarga,
@@ -163,7 +170,7 @@ export function ViajeFechaHoraFields({
     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
       <div className="flex min-w-0 flex-col gap-2">
         <span className={tituloSeccion}>Carga</span>
-        {campoFechaHora({
+        {campo({
           labelFecha: 'Fecha',
           labelHora: 'Hora',
           fecha: fechaCarga,
@@ -180,7 +187,7 @@ export function ViajeFechaHoraFields({
 
       <div className="flex min-w-0 flex-col gap-2">
         <span className={tituloSeccion}>Descarga</span>
-        {campoFechaHora({
+        {campo({
           labelFecha: 'Fecha',
           labelHora: 'Hora',
           fecha: fechaDescarga,

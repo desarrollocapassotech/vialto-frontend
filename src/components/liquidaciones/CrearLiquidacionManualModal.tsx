@@ -22,6 +22,7 @@ import { EmisorArcaResumen } from "@/components/facturacion/EmisorArcaResumen";
 import { ParteFacturaResumen } from "@/components/facturacion/ParteFacturaResumen";
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { ConfirmarEmisionArcaDialog } from "@/components/shared/ConfirmarEmisionArcaDialog";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
 import { useValidacionPadronRegistro } from "@/hooks/useValidacionPadronRegistro";
@@ -1759,12 +1760,6 @@ export function CrearLiquidacionManualModal({
                     />
                   )}
 
-                  {error && (
-                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
-                      {error}
-                    </div>
-                  )}
-
                   {cvlpClaseBAlerta && (
                     <div
                       className="rounded border border-red-300/60 bg-red-50 px-4 py-3 text-xs text-red-900"
@@ -1954,6 +1949,7 @@ export function CrearLiquidacionManualModal({
             </form>
 
             <div className="flex flex-wrap items-center justify-end gap-3 border-t border-black/10 px-6 py-4 shrink-0">
+              <ErrorPieModal error={error} />
               {datosEmitIncompletos ? (
                 <AvisoFaltantesEmision
                   mensaje={mensajeFaltantes}
