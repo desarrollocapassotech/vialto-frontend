@@ -279,11 +279,11 @@ export type MicCrtPrefillResponse = {
 };
 
 export const TIPOS_BULTOS_MIC = [
-  'PALETA',
-  'CAJA',
   'BOLSA',
-  'TAMBOR',
-  'CONTENEDOR',
   'BULTO',
+  'CAJA',
+  'CONTENEDOR',
+  'PALETA',
+  'TAMBOR',
   'OTRO',
 ] as const;

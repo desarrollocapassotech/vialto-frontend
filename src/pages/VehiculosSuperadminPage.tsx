@@ -25,6 +25,7 @@ import { LISTADO_PAGE_SIZE_OPTIONS } from "@/lib/listadoPaginacion";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { ConEmpresa, PaginatedMeta, Vehiculo } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 export function VehiculosSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -69,7 +70,7 @@ export function VehiculosSuperadminPage() {
         new Set(
           (allRows || []).map((r) => r.patente).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [allRows],
   );
   const opcionesPertenencia = useMemo(
@@ -85,7 +86,7 @@ export function VehiculosSuperadminPage() {
             )
             .filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [allRows, nombresTransportistas],
   );
 

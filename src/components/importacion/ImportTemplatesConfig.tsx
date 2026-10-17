@@ -6,6 +6,7 @@ import { useImportTemplates } from "@/hooks/useImportTemplates";
 import { apiJson } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import { labelModulo } from "@/lib/platformLabels";
+import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 
 /** Campo importable del catálogo del backend (se arma desde el modelo Prisma + overlays). */
 type CatalogoColumn = {
@@ -380,7 +381,7 @@ export function ImportTemplatesConfig({
                 className="w-full border border-black/25 bg-white px-3 py-2 text-sm text-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
               >
                 <option value="">Seleccioná un módulo…</option>
-                {modulosDisponibles.map((m) => (
+                {ordenarAlfabetico(modulosDisponibles, labelModulo).map((m) => (
                   <option key={m} value={m}>
                     {labelModulo(m)}
                   </option>

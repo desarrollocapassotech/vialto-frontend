@@ -3,6 +3,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 're
 import { createPortal } from 'react-dom';
 import { useIsMobileViewport } from '@/hooks/useIsMobileViewport';
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
+import { ordenarAlfabetico } from '@/lib/ordenAlfabetico';
 
 export type SearchableEntitySelectProps<T extends { id: string }> = {
   items: T[];
@@ -88,7 +89,14 @@ export function SearchableEntitySelect<T extends { id: string }>({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
-  const filtered = useMemo(() => filterItems(items, filter), [items, filter, filterItems]);
+  const ordenados = useMemo(
+    () => ordenarAlfabetico(items, getPrimaryLabel),
+    [items, getPrimaryLabel],
+  );
+  const filtered = useMemo(
+    () => filterItems(ordenados, filter),
+    [ordenados, filter, filterItems],
+  );
 
   type Row = { kind: 'empty' } | { kind: 'item'; item: T };
 

@@ -19,6 +19,7 @@ import {
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { ConEmpresa, Destinatario, PaginatedMeta } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 export function DestinatariosSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -57,7 +58,7 @@ export function DestinatariosSuperadminPage() {
         new Set(
           (rows || []).map((r) => r.nombre).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
   const opcionesEmpresa = useMemo(
@@ -68,7 +69,7 @@ export function DestinatariosSuperadminPage() {
             .map((r) => r.empresaNombre)
             .filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
 

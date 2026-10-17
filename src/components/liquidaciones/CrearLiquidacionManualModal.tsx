@@ -27,10 +27,12 @@ import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
 import { useValidacionPadronRegistro } from "@/hooks/useValidacionPadronRegistro";
 import { useReceptorPadronBloqueado } from "@/hooks/useReceptorPadronBloqueado";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import { unidadCantidadViajes } from "@/lib/pdfDetalleViaje";
 import { PadronValidacionEstado } from "@/components/shared/PadronValidacionEstado";
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson, apiFetch } from "@/lib/api";
+import { apiJsonTodasLasPaginas } from "@/lib/listadoPaginacion";
 import { collectCvlpEmitMissingFields } from "@/lib/cvlpEmitValidation";
 import {
   CVLP_CLASE_B_WARNING,
@@ -77,6 +79,7 @@ import type {
   Viaje,
   ArcaConfig,
 } from "@/types/api";
+import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 
 type ViajeItem = Pick<
   Viaje,
@@ -86,6 +89,7 @@ type ViajeItem = Pick<
   | "idPropio2"
   | "fechaCarga"
   | "fechaDescarga"
+  | "etapa"
   | "origen"
   | "destino"
   | "precioTransportistaExterno"
@@ -525,12 +529,15 @@ export function CrearLiquidacionManualModal({
     setSelectedViajeIds(new Set());
     void (async () => {
       try {
-        // En una liquidación existente sus propios viajes ya tienen liquidación activa (esta):
-        // se traen todos y se dejan los suyos + los que no tengan otra activa.
-        const qs = `transportistaId=${encodeURIComponent(transportistaId)}&pageSize=100&page=1${
-          existente ? "" : "&sinLiquidacionActiva=1"
+        // Solo los pendientes del transportista; en una liquidación existente, además sus
+        // propios viajes (que tienen liquidación activa: esta) vía `incluirLiquidacionId`.
+        // Antes se traía todo el historial del transportista y se filtraba acá: con muchos
+        // viajes liquidados eran muchas páginas. Se traen todas las páginas: con una sola
+        // (máx. 100) los viajes que pasaban de 100 no aparecían, sin ningún aviso.
+        const qs = `transportistaId=${encodeURIComponent(transportistaId)}&sinLiquidacionActiva=1${
+          existente ? `&incluirLiquidacionId=${encodeURIComponent(existente.id)}` : ""
         }`;
-        const res = await apiJson<{ items: ViajeItem[] }>(
+        const todos = await apiJsonTodasLasPaginas<ViajeItem>(
           plataforma
             ? `/api/platform/viajes/paginated?${qs}&tenantId=${encodeURIComponent(tenantId!)}`
             : `/api/viajes/paginated?${qs}`,
@@ -539,15 +546,21 @@ export function CrearLiquidacionManualModal({
         if (!cancelled) {
           const preseleccion = preseleccionPendiente.current;
           preseleccionPendiente.current = null;
-          let items = res.items ?? [];
+          let items = todos;
           if (existente) {
             const propios = new Set(preseleccion ?? []);
             items = items.filter((v) =>
               puedeCambiarViajes
                 ? propios.has(v.id) ||
-                  !viajeTieneLiquidacionActivaParaTransportista(v, transportistaId)
+                  (v.etapa !== "cancelado" &&
+                    !viajeTieneLiquidacionActivaParaTransportista(v, transportistaId))
                 : propios.has(v.id),
             );
+          } else {
+            // Un viaje cancelado no se liquida: el select de transportistas ya no lo cuenta
+            // como pendiente (`transportistasParaNuevaLiquidacion`), y el backend no filtra
+            // por etapa en `sinLiquidacionActiva`.
+            items = items.filter((v) => v.etapa !== "cancelado");
           }
           setViajes(items);
           if (preseleccion && transportistaId === transportistaIdPreseleccion) {
@@ -1400,13 +1413,15 @@ export function CrearLiquidacionManualModal({
                           <option value="">
                             — Seleccioná un transportista —
                           </option>
-                          {(viajeInicial
-                            ? transportistaOpcionesViaje
-                            : transportistas.map((t) => ({
-                                id: t.id,
-                                nombre: t.nombre,
-                                rolLabel: "",
-                              }))
+                          {ordenarAlfabetico(
+                            viajeInicial
+                              ? transportistaOpcionesViaje
+                              : transportistas.map((t) => ({
+                                  id: t.id,
+                                  nombre: t.nombre,
+                                  rolLabel: "",
+                                })),
+                            (opt) => opt.nombre,
                           ).map((opt) => (
                             <option key={opt.id} value={opt.id}>
                               {opt.rolLabel
@@ -1480,7 +1495,7 @@ export function CrearLiquidacionManualModal({
                         onChange={(e) => setProveedorContrato(e.target.value)}
                         className={selectClass}
                       >
-                        {opcionesProveedor.map((opt) => (
+                        {ordenarAlfabetico(opcionesProveedor, (opt) => opt).map((opt) => (
                           <option key={opt} value={opt}>
                             {opt}
                           </option>
@@ -1668,6 +1683,16 @@ export function CrearLiquidacionManualModal({
                             conMoneda,
                           )
                         }
+                        cantidadTarifa={{
+                          unidad: unidadCantidadViajes(tenantEfectivo),
+                          cantidadDe: (v) => v.cantidadTransportista,
+                          renderTarifa: (v, conMoneda) =>
+                            fmtMoney(
+                              v.precioUnitarioTransportista ?? null,
+                              v.monedaPrecioTransportistaExterno,
+                              conMoneda,
+                            ),
+                        }}
                         disabledCheck={(v) => {
                           const moneda = monedaViaje(v);
                           const disabled =
@@ -1856,10 +1881,6 @@ export function CrearLiquidacionManualModal({
                                 viaje={v}
                                 ivaPct={v.precioTransportistaIvaIncluidoPct || ivaPctNum}
                                 tenant={tenantEfectivo}
-                                unSoloViaje={selectedViajes.length === 1}
-                                algunoConIdPropio={selectedViajes.some((x) =>
-                                  x.numeroIdentificacionPersonalizado?.trim(),
-                                )}
                               />
                               <ViajeSubtotalTooltip
                                 viaje={v}

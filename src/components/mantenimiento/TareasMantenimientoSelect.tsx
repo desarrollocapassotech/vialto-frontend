@@ -14,9 +14,13 @@ import {
   TAREA_OTRO,
 } from "@/lib/mantenimientoLabels";
 import type { TareaMantenimiento } from "@/types/mantenimiento";
+import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 
 const GRUPOS = [
-  ...TAREAS_POR_CATEGORIA,
+  ...ordenarAlfabetico(TAREAS_POR_CATEGORIA, (g) => g.label).map((g) => ({
+    ...g,
+    opciones: ordenarAlfabetico(g.opciones, ([, label]) => label),
+  })),
   { id: "otro" as const, label: "Otro", opciones: [TAREA_OTRO] },
 ];
 

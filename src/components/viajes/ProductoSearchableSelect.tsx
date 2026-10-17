@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { OpcionProducto } from '@/lib/productosViaje';
+import { PRODUCTO_LABELS_DEFAULT, labelEnFrase } from '@/lib/productoLabel';
+import { useProductoLabels } from '@/hooks/useProductoLabels';
+import { ordenarAlfabetico } from '@/lib/ordenAlfabetico';
 
 function filaLabel(o: OpcionProducto) {
   return o.nombre;
 }
 
-function etiquetaSeleccion(value: string, opciones: OpcionProducto[]) {
-  if (!value.trim()) return '— Sin producto —';
+function etiquetaSeleccion(value: string, opciones: OpcionProducto[], sinValor: string) {
+  if (!value.trim()) return sinValor;
   const o = opciones.find((x) => x.id === value);
-  return o ? filaLabel(o) : '— Sin producto —';
+  return o ? filaLabel(o) : sinValor;
 }
 
 export type ProductoSearchableSelectProps = {
@@ -33,6 +36,8 @@ export function ProductoSearchableSelect({
   id,
   onNuevoProducto,
 }: ProductoSearchableSelectProps) {
+  const { singular, plural } = useProductoLabels();
+  const sinValor = `— Sin ${labelEnFrase(singular)} —`;
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -40,11 +45,13 @@ export function ProductoSearchableSelect({
   const searchRef = useRef<HTMLInputElement>(null);
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
 
+  const ordenadas = useMemo(() => ordenarAlfabetico(opciones, filaLabel), [opciones]);
+
   const filtradas = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return opciones;
-    return opciones.filter((o) => o.nombre.toLowerCase().includes(q));
-  }, [opciones, search]);
+    if (!q) return ordenadas;
+    return ordenadas.filter((o) => o.nombre.toLowerCase().includes(q));
+  }, [ordenadas, search]);
 
   const actualizarRect = useCallback(() => {
     const el = btnRef.current;
@@ -127,9 +134,9 @@ export function ProductoSearchableSelect({
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar producto…"
+            placeholder={`Buscar ${labelEnFrase(singular)}…`}
             className="h-8 w-full border border-black/15 bg-vialto-mist/40 px-2 text-sm outline-none focus:border-vialto-fire/40"
-            aria-label="Buscar producto"
+            aria-label={`Buscar ${labelEnFrase(singular)}`}
             onKeyDown={(e) => e.stopPropagation()}
           />
         </div>
@@ -142,12 +149,12 @@ export function ProductoSearchableSelect({
               className="flex w-full px-2 py-1.5 text-left text-sm hover:bg-vialto-mist/80"
               onClick={() => { onChange(''); setOpen(false); setSearch(''); setRect(null); }}
             >
-              — Sin producto —
+              {sinValor}
             </button>
           </li>
           {filtradas.length === 0 && search.trim() ? (
             <li role="none" className="px-2 py-2 text-xs text-vialto-steel">
-              No hay productos que coincidan.
+              No hay {labelEnFrase(plural)} que coincidan.
             </li>
           ) : (
             filtradas.map((o) => (
@@ -172,7 +179,10 @@ export function ProductoSearchableSelect({
               className="flex w-full items-center justify-center gap-1 border border-black/20 bg-vialto-mist/60 px-2 py-1.5 text-xs font-medium uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
               onClick={() => { setOpen(false); setSearch(''); setRect(null); onNuevoProducto(); }}
             >
-              + Nuevo producto
+              {/* Con label propio, "Crear": "Nuevo" no concuerda con un label femenino. */}
+              {singular === PRODUCTO_LABELS_DEFAULT.singular
+                ? '+ Nuevo producto'
+                : `+ Crear ${labelEnFrase(singular)}`}
             </button>
           </div>
         )}
@@ -193,7 +203,7 @@ export function ProductoSearchableSelect({
         className={`flex h-9 w-full min-w-0 items-center justify-between gap-2 border border-black/15 bg-white px-2 text-left text-sm disabled:opacity-50 ${triggerClassName}`}
         onClick={() => { if (disabled) return; setOpen((v) => !v); }}
       >
-        <span className="min-w-0 truncate">{etiquetaSeleccion(value, opciones)}</span>
+        <span className="min-w-0 truncate">{etiquetaSeleccion(value, opciones, sinValor)}</span>
         <span className="shrink-0 text-vialto-steel" aria-hidden>▾</span>
       </button>
       {menu}

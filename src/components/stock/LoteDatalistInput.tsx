@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useId, useState } from 'react';
 import { apiJson } from '@/lib/api';
+import { ordenarAlfabetico } from '@/lib/ordenAlfabetico';
 
 function buildUrl(
   base: string,
@@ -67,7 +68,7 @@ export function LoteDatalistInput({
         autoComplete="off"
       />
       <datalist id={listId}>
-        {sugerencias.map((s) => (
+        {ordenarAlfabetico(sugerencias, (s) => s).map((s) => (
           <option key={s} value={s} />
         ))}
       </datalist>

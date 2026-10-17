@@ -26,7 +26,7 @@ type Props = {
    * true = el título nunca se parte en dos líneas (la columna se angosta como mucho hasta
    * el ancho del título/contenido en una sola línea). Default false: el título puede saltar
    * de línea si la columna se angosta (ok para columnas con contenido largo debajo, como
-   * "Origen — Destino" o "Carga — Descarga", donde no tiene sentido forzar el ancho del
+   * "Origen — Destino" o "Fecha" (carga — descarga), donde no tiene sentido forzar el ancho del
    * header). Usar junto con `minWidthClass="min-w-0"` en columnas de contenido corto (ej. ID,
    * ID propio, Etapa) para que la columna se achique al mínimo posible sin cortar texto.
    */

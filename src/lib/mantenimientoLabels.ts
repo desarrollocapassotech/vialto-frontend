@@ -193,8 +193,8 @@ export function fmtReferencia(f: FilaVencimiento): string {
 // ── Órdenes de trabajo ───────────────────────────────────────────────────────
 
 export const TIPO_ORDEN_LABELS: Record<TipoOrden, string> = {
-  preventivo: "Preventivo",
   correctivo: "Correctivo",
+  preventivo: "Preventivo",
 };
 
 export function fmtTipoOrden(tipo: string): string {

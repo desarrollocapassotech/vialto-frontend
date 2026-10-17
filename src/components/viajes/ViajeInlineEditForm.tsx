@@ -25,6 +25,7 @@ import {
   vehiculosFlotaPropia,
 } from '@/lib/viajesFlota';
 import { useFieldConfig } from '@/hooks/useFieldConfig';
+import { useProductoLabels } from '@/hooks/useProductoLabels';
 import { useEffect, useMemo, useRef } from 'react';
 import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
 import type { ViajeInlineDraft } from './viajesSuperadminTypes';
@@ -77,6 +78,7 @@ export function ViajeInlineEditForm({
   onCancel,
 }: Props) {
   const { isVisible } = useFieldConfig("viajes");
+  const productoLabelsTenant = useProductoLabels();
   const desgloseActivo = isVisible("edicion_viaje", "desgloseMontos");
   const choferesPropios = useMemo(() => choferesFlotaPropia(choferes), [choferes]);
   const vehiculosPropios = useMemo(() => vehiculosFlotaPropia(vehiculos), [vehiculos]);
@@ -448,7 +450,7 @@ export function ViajeInlineEditForm({
 
           {isVisible("edicion_viaje", "productoItems") && (
             <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-              <span className={LABEL}>Productos</span>
+              <span className={LABEL}>{productoLabelsTenant.plural}</span>
               <ViajeProductosLista
                 groupId={`viaje-inline-${draft.numero || 'e'}`}
                 value={draft.productoItems}

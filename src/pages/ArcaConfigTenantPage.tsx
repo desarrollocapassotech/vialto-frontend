@@ -19,11 +19,11 @@ import { useMaestroData } from "@/hooks/useMaestroData";
 import type { ArcaConfig } from "@/types/api";
 
 const CONDICION_IVA = [
-  { value: "1", label: "IVA Responsable Inscripto" },
-  { value: "6", label: "Responsable Monotributo" },
-  { value: "4", label: "IVA Sujeto Exento" },
   { value: "5", label: "Consumidor Final" },
   { value: "3", label: "IVA no Responsable" },
+  { value: "1", label: "IVA Responsable Inscripto" },
+  { value: "4", label: "IVA Sujeto Exento" },
+  { value: "6", label: "Responsable Monotributo" },
   { value: "7", label: "Sujeto no Categorizado" },
 ];
 
@@ -51,6 +51,7 @@ type FormValues = {
   condicionIvaEmisor: string;
   ingBrutos: string;
   inicActEmisor: string;
+  leyendaFactura: string;
   ptoVentaCvlp: string;
   ptoVentaFactura: string;
   ambiente: "homologacion" | "produccion";
@@ -67,6 +68,7 @@ const EMPTY: FormValues = {
   condicionIvaEmisor: "",
   ingBrutos: "",
   inicActEmisor: "",
+  leyendaFactura: "",
   ptoVentaCvlp: "1",
   ptoVentaFactura: "1",
   ambiente: "homologacion",
@@ -90,6 +92,10 @@ const VENTA_FIELDS = [
   "ptoVentaFactura",
 ] as const satisfies readonly (keyof FormValues)[];
 
+const FACTURA_FIELDS = [
+  "leyendaFactura",
+] as const satisfies readonly (keyof FormValues)[];
+
 const AMBIENTE_FIELDS = [
   "ambiente",
 ] as const satisfies readonly (keyof FormValues)[];
@@ -107,6 +113,7 @@ const CERT_FIELDS = [
 const GENERAL_FIELDS = [
   ...EMISOR_FIELDS,
   ...VENTA_FIELDS,
+  ...FACTURA_FIELDS,
   ...COMISION_FIELDS,
 ] as const satisfies readonly (keyof FormValues)[];
 
@@ -118,6 +125,7 @@ function configToForm(c: ArcaConfig): FormValues {
     condicionIvaEmisor: c.condicionIvaEmisor ?? "",
     ingBrutos: c.ingBrutos ?? "",
     inicActEmisor: arcaDateToIso(c.inicActEmisor ?? ""),
+    leyendaFactura: c.leyendaFactura ?? "",
     ptoVentaCvlp: String(c.ptoVentaCvlp),
     ptoVentaFactura: String(c.ptoVentaFactura),
     ambiente: c.ambiente,
@@ -303,6 +311,8 @@ export function ArcaConfigTenantPage({
         inicActEmisor: v.inicActEmisor
           ? isoToArcaDate(v.inicActEmisor)
           : undefined,
+        // Siempre se manda (vacío = sin leyenda): así se puede borrar.
+        leyendaFactura: v.leyendaFactura.trim(),
         ptoVentaCvlp: Number(v.ptoVentaCvlp),
         ptoVentaFactura: Number(v.ptoVentaFactura),
         ambiente: v.ambiente,
@@ -685,6 +695,31 @@ export function ArcaConfigTenantPage({
               )}
             </div>
           </SectionCard>
+
+          {hasFacturasArca && (
+            <SectionCard
+              title="Leyenda en la factura"
+              description="Texto en letra chica debajo de la condición de venta del PDF de la factura (ej. intereses por mora). Dejalo vacío para no mostrar nada."
+              onSave={() => void saveSection(FACTURA_FIELDS).catch(() => {})}
+              saving={loading}
+              dirty={sectionDirty(FACTURA_FIELDS)}
+            >
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="leyendaFactura" className={labelClass}>
+                  Leyenda
+                </label>
+                <textarea
+                  id="leyendaFactura"
+                  rows={3}
+                  maxLength={1000}
+                  value={values.leyendaFactura}
+                  onChange={(e) => set("leyendaFactura", e.target.value)}
+                  placeholder='Ej: Producido el vencimiento la mora será automática, aplicándose la TNA del BNA "Descubiertos en cta cte. No solicitados previamente", vigente en cada día de mora, hasta su efectiva cancelación.'
+                  className="rounded border border-black/10 bg-white px-3 py-2 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35"
+                />
+              </div>
+            </SectionCard>
+          )}
 
           {hasLiquidoProductoArca && (
             <SectionCard

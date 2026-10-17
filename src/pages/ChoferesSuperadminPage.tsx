@@ -24,6 +24,7 @@ import { LISTADO_PAGE_SIZE_OPTIONS } from "@/lib/listadoPaginacion";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Chofer, ConEmpresa, PaginatedMeta } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 export function ChoferesSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -66,7 +67,7 @@ export function ChoferesSuperadminPage() {
         new Set(
           (allRows || []).map((r) => r.nombre).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [allRows],
   );
   const opcionesPertenencia = useMemo(
@@ -82,7 +83,7 @@ export function ChoferesSuperadminPage() {
             )
             .filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [allRows, nombresTransportistas],
   );
 

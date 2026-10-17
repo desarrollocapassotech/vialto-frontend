@@ -402,6 +402,14 @@ export interface Tenant {
   unidadCantidadViajes?: string;
   /** Opciones configuradas de entidades/proveedores para el contrato comercial PDF. */
   opcionesProveedorLiquidacion?: string[];
+  /** Orden de columnas de la grilla de Viajes ([] = estándar). Leer con `ordenColumnasViajes` (`lib/viajesColumnasOrden.ts`). */
+  viajesColumnasOrden?: string[];
+  /** true = la grilla de Viajes muestra la columna de productos. Default false; solo lo cambia superadmin. */
+  viajesColumnaProductosHabilitada?: boolean;
+  /** Label que reemplaza a "Producto" fuera de Stock (ej. "Grano"). Leer con `useProductoLabels`. */
+  productoLabel?: string | null;
+  /** Plural de productoLabel (ej. "Granos"); lo genera la IA al guardar el singular. */
+  productoLabelPlural?: string | null;
   createdAt: string;
 }
 
@@ -907,6 +915,8 @@ export interface ArcaConfig {
   ingBrutos: string | null;
   inicActEmisor: string | null;
   logoUrl: string | null;
+  /** Leyenda en letra chica bajo la condición de venta del PDF de factura (ej. mora). */
+  leyendaFactura?: string | null;
   ptoVentaCvlp: number;
   ptoVentaFactura: number;
   ambiente: "homologacion" | "produccion";

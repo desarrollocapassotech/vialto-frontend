@@ -24,6 +24,7 @@ import {
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { ConEmpresa, Transportista } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 export function TransportistasSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -70,7 +71,7 @@ export function TransportistasSuperadminPage() {
         new Set(
           (rows || []).map((r) => r.nombre).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
   const opcionesIdFiscal = useMemo(
@@ -79,7 +80,7 @@ export function TransportistasSuperadminPage() {
         new Set(
           (rows || []).map((r) => r.idFiscal).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
   const opcionesPais = useMemo(
@@ -88,7 +89,7 @@ export function TransportistasSuperadminPage() {
         new Set(
           (rows || []).map((r) => r.pais).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
   const opcionesPaut = useMemo(
@@ -97,7 +98,7 @@ export function TransportistasSuperadminPage() {
         new Set(
           (rows || []).map((r) => r.paut).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
 

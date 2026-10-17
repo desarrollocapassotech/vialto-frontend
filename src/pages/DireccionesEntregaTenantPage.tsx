@@ -16,6 +16,7 @@ import {
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { DireccionEntrega, PaginatedMeta } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 export function DireccionesEntregaTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -50,7 +51,7 @@ export function DireccionesEntregaTenantPage() {
         new Set(
           (rows || []).map((r) => r.direccion).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
 

@@ -452,9 +452,16 @@ export function viajesFiltradosParaFactura(
  * propio `facturacionEstado`. Usado para no listar en el select de "Nueva factura"
  * clientes que no tienen nada pendiente de facturar.
  */
-export function clientesConViajesPendientesFactura(todos: Viaje[]): Set<string> {
+export function clientesConViajesPendientesFactura(
+  todos: Viaje[],
+  opciones?: { hasArca?: boolean },
+): Set<string> {
   const ids = new Set<string>();
   for (const v of todos) {
+    // Con ARCA no se factura en USD: esos viajes no aparecen en la tabla de la factura
+    // (`viajesNueva` filtra con `arcaBloqueaFacturarUsd` sobre la moneda del viaje), así
+    // que tampoco cuentan para ofrecer al cliente — si no, se elegía y la tabla quedaba vacía.
+    if (opciones?.hasArca && normalizeViajeMoneda(v.monedaMonto) === "USD") continue;
     if (v.clienteId && tramoFacturableParaCliente(v, v.clienteId).facturable) {
       ids.add(v.clienteId);
     }

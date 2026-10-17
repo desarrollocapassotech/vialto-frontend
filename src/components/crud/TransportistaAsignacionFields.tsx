@@ -1,5 +1,6 @@
 import { CrudSelect } from '@/components/crud/CrudFields';
 import type { Transportista } from '@/types/api';
+import { ordenarAlfabetico } from '@/lib/ordenAlfabetico';
 
 export type AsignacionModo = 'propio' | 'externo';
 
@@ -79,7 +80,7 @@ export function TransportistaAsignacionFields({
             <option value="">
               {loadingTransportistas ? 'Cargando…' : 'Seleccioná un transportista…'}
             </option>
-            {transportistas.map((t) => (
+            {ordenarAlfabetico(transportistas, (t) => t.nombre).map((t) => (
               <option key={t.id} value={t.id}>
                 {t.nombre}
               </option>

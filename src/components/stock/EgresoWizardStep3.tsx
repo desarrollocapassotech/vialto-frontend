@@ -22,6 +22,7 @@ import {
   STOCK_FORM_ACTIONS_STICKY,
 } from '@/lib/stockFormLayout';
 import type { Producto, ProductoPresentacion } from '@/types/api';
+import { ordenarAlfabetico } from '@/lib/ordenAlfabetico';
 
 export type EgresoLoteLinea = {
   _key: string;
@@ -374,7 +375,7 @@ export function EgresoWizardStep3({
                         ? 'Primero elegí un producto'
                         : 'Elegí una presentación…'}
                     </option>
-                    {pps.map((pp) => (
+                    {ordenarAlfabetico(pps, (pp) => pp.presentacion?.nombre ?? pp.presentacionId).map((pp) => (
                       <option key={pp.id} value={pp.id}>
                         {pp.presentacion?.nombre ?? pp.presentacionId} —{' '}
                         {pp.unidadesPorBulto} uds/bulto

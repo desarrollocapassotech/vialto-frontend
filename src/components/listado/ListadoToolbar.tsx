@@ -1,3 +1,4 @@
+import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 interface FiltroSelect {
   value: string;
   onChange: (value: string) => void;
@@ -40,7 +41,7 @@ export function ListadoToolbar({
           className="h-10 rounded border border-black/15 bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-bright/40"
         >
           <option value="">{f.placeholder}</option>
-          {f.opciones.map((o) => (
+          {ordenarAlfabetico(f.opciones, (o) => o.label).map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>

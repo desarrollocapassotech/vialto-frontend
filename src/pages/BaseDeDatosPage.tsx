@@ -34,6 +34,7 @@ import { UsuariosTenantPage } from "./UsuariosTenantPage";
 import { DireccionesEntregaPage } from "./DireccionesEntregaPage";
 import { PaisesPage } from "./PaisesPage";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { useProductoLabels } from "@/hooks/useProductoLabels";
 import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import {
@@ -108,7 +109,10 @@ export function BaseDeDatosPage() {
     superadmin ||
     userIsOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
 
-  const visibleTabs = ALL_TABS.filter((tab) => {
+  const productoLabelsTenant = useProductoLabels();
+  const visibleTabs = ALL_TABS.map((tab) =>
+    tab.id === "productos" ? { ...tab, label: productoLabelsTenant.plural } : tab,
+  ).filter((tab) => {
     switch (tab.id) {
       case "clientes":
         return hasViajes || hasStock || hasFacturacion;

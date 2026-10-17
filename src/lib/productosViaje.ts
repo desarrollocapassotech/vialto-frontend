@@ -12,6 +12,26 @@ export type OpcionProducto = {
   activo: boolean;
 };
 
+type ProductoNombrado = { producto?: { nombre?: string | null } | null };
+
+/**
+ * Nombres de los productos del viaje, sin repetir: los del viaje y los de cada
+ * cliente adicional (multi-cliente), en ese orden.
+ */
+export function nombresProductosViaje(v: {
+  productosViaje?: ProductoNombrado[];
+  clientesViaje?: { productosCliente?: ProductoNombrado[] }[];
+}): string[] {
+  const filas = [
+    ...(v.productosViaje ?? []),
+    ...(v.clientesViaje ?? []).flatMap((c) => c.productosCliente ?? []),
+  ];
+  const nombres = filas
+    .map((p) => p.producto?.nombre?.trim())
+    .filter((n): n is string => Boolean(n));
+  return [...new Set(nombres)];
+}
+
 /** Items de producto del viaje en orden guardado. */
 export function productoItemsDesdeViaje(v: Viaje): ViajeProductoItem[] {
   const rows = v.productosViaje ?? [];

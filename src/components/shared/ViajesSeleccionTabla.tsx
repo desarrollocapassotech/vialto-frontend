@@ -2,7 +2,9 @@ import { useMemo, useState, type ReactNode } from "react";
 import { CalendarDays, Filter, Search, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { numeroVisibleViaje } from "@/lib/viajesFlota";
+import { nombresProductosViaje } from "@/lib/productosViaje";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { fmtNumPdf } from "@/lib/pdfDetalleViaje";
 
 export type ViajeSeleccionable = {
   id: string;
@@ -19,10 +21,22 @@ export type ViajeSeleccionable = {
   cliente?: { nombre: string } | null;
 };
 
+export type CantidadTarifaColumnas<T> = {
+  /** Encabezado de la cantidad: "TN" o "UD" según `unidadCantidadViajes` del tenant. */
+  unidad: string;
+  cantidadDe: (v: T) => number | null | undefined;
+  /** `conMoneda` igual que en `renderMonto`. */
+  renderTarifa: (v: T, conMoneda: boolean) => ReactNode;
+};
+
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
   const [y, m, d] = iso.slice(0, 10).split("-");
   return `${d}/${m}/${y}`;
+}
+
+function fmtCantidad(n: number | null | undefined): string {
+  return n == null ? "—" : fmtNumPdf(n);
 }
 
 function nombreChoferSeleccion(v: ViajeSeleccionable): string {
@@ -30,9 +44,7 @@ function nombreChoferSeleccion(v: ViajeSeleccionable): string {
 }
 
 function nombresProductosSeleccion(v: ViajeSeleccionable): string {
-  const nombres = (v.productosViaje ?? [])
-    .map((p) => p.producto?.nombre?.trim())
-    .filter((n): n is string => Boolean(n));
+  const nombres = nombresProductosViaje(v);
   return nombres.length ? nombres.join(", ") : "—";
 }
 
@@ -59,6 +71,7 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
   mostrarCliente = false,
   mostrarTransporte = true,
   monedaDe,
+  cantidadTarifa,
 }: {
   viajes: T[];
   selectedIds: string[];
@@ -96,6 +109,11 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
   monedaDe?: (v: T) => string;
   /** true = el monto es sin IVA: el encabezado dice "Monto (s/IVA)", sin la moneda. */
   montoSinIva?: boolean;
+  /**
+   * Columnas de cantidad (TN/UD) y tarifa unitaria antes del monto. La factura usa
+   * `cantidadFactura`/`precioUnitarioFactura` y la liquidación los `*Transportista`.
+   */
+  cantidadTarifa?: CantidadTarifaColumnas<T>;
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
@@ -288,6 +306,14 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                 {mostrarTransporte && (
                   <th className="px-2 py-2 text-left">Transporte</th>
                 )}
+                {cantidadTarifa && (
+                  <>
+                    <th className="whitespace-nowrap px-2 py-2 text-right">
+                      {cantidadTarifa.unidad}
+                    </th>
+                    <th className="whitespace-nowrap px-2 py-2 text-right">Tarifa</th>
+                  </>
+                )}
                 <th className="whitespace-nowrap px-2 py-2 text-right">
                   {montoSinIva
                     ? "Monto (s/IVA)"
@@ -361,6 +387,16 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                       <td className="px-2 py-1.5 text-vialto-steel">
                         {v.transportista?.nombre ?? "—"}
                       </td>
+                    )}
+                    {cantidadTarifa && (
+                      <>
+                        <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-vialto-steel">
+                          {fmtCantidad(cantidadTarifa.cantidadDe(v))}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-vialto-steel">
+                          {cantidadTarifa.renderTarifa(v, !monedaUnica)}
+                        </td>
+                      </>
                     )}
                     <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-vialto-steel">
                       {renderMonto(v, !monedaUnica)}

@@ -2,6 +2,7 @@ import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { STOCK_FORM_INPUT as INPUT, STOCK_FORM_LABEL as LABEL } from '@/lib/stockFormLayout';
 import type { Cliente, Deposito } from '@/types/api';
+import { ordenarAlfabetico } from '@/lib/ordenAlfabetico';
 
 export function IngresoWizardStep1({
   clientes,
@@ -60,7 +61,7 @@ export function IngresoWizardStep1({
             className={`${INPUT} ${fieldErrors.depositoId ? 'border-red-400' : ''}`}
           >
             <option value="">Elegí un depósito…</option>
-            {depositos.map((d) => (
+            {ordenarAlfabetico(depositos, (d) => d.nombre).map((d) => (
               <option key={d.id} value={d.id}>
                 {d.nombre}
               </option>

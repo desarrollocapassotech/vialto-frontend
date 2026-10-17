@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Viaje } from "@/types/api";
 import { formatViajeImporteForListado } from "@/lib/viajesFlota";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { useProductoLabels } from "@/hooks/useProductoLabels";
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -49,6 +50,7 @@ export function FacturarSelectorMultiClienteModal({
   onSelect: (clienteId: string) => void;
 }) {
   const { clientes } = useMaestroData();
+  const productoLabelsTenant = useProductoLabels();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const rows: ClienteRow[] = [];
@@ -68,7 +70,7 @@ export function FacturarSelectorMultiClienteModal({
 
   function formatProductos(productos?: any[]) {
     if (!productos || productos.length === 0) return null;
-    return productos.map((p) => p.producto?.nombre || "Producto").join(", ");
+    return productos.map((p) => p.producto?.nombre || productoLabelsTenant.singular).join(", ");
   }
 
   rows.push({

@@ -20,6 +20,7 @@ import { fmtFecha, fmtKm, fmtMoneda, fmtTipoOrden, TIPO_ORDEN_LABELS } from "@/l
 import { useToast } from "@/lib/toast";
 import type { PaginatedMeta, Vehiculo } from "@/types/api";
 import type { OrdenTrabajo, Taller, TipoOrden } from "@/types/mantenimiento";
+import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 
 const FILTRO_INPUT = "h-9 w-full border border-black/15 bg-white px-2 text-sm";
 
@@ -229,7 +230,7 @@ export function OrdenesTrabajoSection({
                   className={`${FILTRO_INPUT} ${tallerId ? "text-vialto-fire" : ""}`}
                 >
                   <option value="">Todos</option>
-                  {talleres.map((t) => (
+                  {ordenarAlfabetico(talleres, (t) => t.nombre).map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.nombre}
                     </option>

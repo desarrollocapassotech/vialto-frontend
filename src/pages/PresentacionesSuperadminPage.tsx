@@ -25,6 +25,7 @@ import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHead
 import type { Presentacion } from "@/types/api";
 import { ConfirmDialog } from "@/components/crud/ConfirmDialog";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 type FormState = { nombre: string; activo: boolean };
 
@@ -66,7 +67,7 @@ export function PresentacionesSuperadminPage() {
         new Set(
           (rows || []).map((r) => r.nombre).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
 

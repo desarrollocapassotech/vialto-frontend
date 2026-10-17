@@ -42,21 +42,15 @@ export function ViajeDetallePdfTooltip({
   viaje: v,
   ivaPct,
   tenant,
-  unSoloViaje,
-  algunoConIdPropio,
 }: {
   viaje: Parameters<typeof filasPdfLiquidacion>[0];
   ivaPct: number;
   tenant: TenantPdfDetalle;
-  /** El PDF cambia de formato con un solo viaje (sin columna de ID). */
-  unSoloViaje: boolean;
-  /** Algún viaje de la liquidación tiene ID propio (define el nombre de la columna de ID). */
-  algunoConIdPropio: boolean;
 }) {
   return (
     <DetalleConTooltip
       label={`Viaje #${numeroVisibleViaje(v)}`}
-      filas={filasPdfLiquidacion(v, ivaPct, tenant, { unSoloViaje, algunoConIdPropio })}
+      filas={filasPdfLiquidacion(v, ivaPct, tenant)}
     />
   );
 }

@@ -334,6 +334,19 @@ Ejemplo real (histórico, la situación concreta ya no aplica pero el patrón si
 
 ---
 
+## Selects: opciones en orden alfabético (oct 2026)
+
+**Regla global para todos los selects actuales y futuros** (nativos, `CrudSelect`, con buscador).
+
+- Las opciones van **A→Z**, con `lib/ordenAlfabetico.ts`: `ordenarAlfabetico(items, (x) => x.nombre)` para listas y `compararAlfabetico` como comparador de `.sort()`. Nunca `.sort()` pelado: ordena por código de carácter ("Álvarez" y las minúsculas quedan al final).
+- El helper ignora mayúsculas/acentos, compara números como números ("Camión 2" < "Camión 10") y manda "Otro/Otra" al final.
+- La opción fija de arriba ("Todos", "Elegí…", "Sin asignar") queda primera: se renderiza aparte, no pasa por el orden.
+- `SearchableSelect`, `SearchableEntitySelect` (y todo lo que se arma sobre él: `MaestroSearchSelects`, `PaisSearchSelect`, `TallerSelect`, stock) y `ProductoSearchableSelect` ya ordenan solos — no hace falta ordenar antes de pasarles los ítems.
+- Constantes fijas (`SERVICE_STATIONS`, `PAISES_SOPORTADOS`, tipos de vehículo, condición IVA, roles, tipos de bulto MIC…) se escriben ya ordenadas en su definición. Si se agrega un valor, insertarlo en su lugar alfabético.
+- **Excepciones (orden lógico, no alfabético):** etapas/estados de un circuito (viajes, facturación, liquidación, vencimientos, suscripción), alícuotas de IVA, signo de concepto, tamaños de página, pares Sí/No · Activos/Inactivos · Origen/Destino · Carga/Descarga, pagos a imputar (por fecha), lotes (FEFO) y el autocompletado de ciudades (relevancia del buscador externo).
+
+---
+
 ## Validación de formularios: errores por campo
 
 **Regla global para todos los formularios actuales y futuros.**
@@ -553,6 +566,9 @@ Historia: sep 2026 — vencimiento de póliza un día antes (`VehiculoViewModal`
   Cuenta corriente hace lo mismo (`limpiarFiltrosSlot` de `CuentaContraparteView`).
 - **Filas compactas en todas las tablas (oct 2026)**: `listadoTablaTdClass` = `h-8 px-3 py-1` y la celda de acciones usa `listadoTablaAccionesTdClass` (`py-0 align-middle`, sumar `text-right`), así una fila con botones de acción (h-8) mide lo mismo que una sin acciones. `ListadoDatos` ya lo usa por defecto; las filas armadas a mano (Viajes, Facturas) usan las mismas medidas. No volver a `py-2` en celdas de grilla.
 - **"Ver comprobante" / adjuntos siempre en pestaña nueva, nunca en modal (oct 2026)**: `abrirAdjuntoEnPestana` (`lib/abrirAdjunto.ts`) abre la pestaña en el click, muestra "Cargando…" y carga el archivo como blob (la URL directa de Cloudinary fuerza la descarga de los PDF). `AdjuntoPreviewModal` quedó como envoltorio de compatibilidad: al montarse abre la pestaña y se cierra. Botones nuevos: llamar `abrirAdjuntoEnPestana` directo.
+- **Orden de columnas de Viajes por empresa (oct 2026)**: `Tenant.viajesColumnasOrden` (`String[]`, `[]` = orden estándar), editable desde superadmin ("Configuración por empresa" → pestaña Viajes, `ViajesColumnasOrdenConfig`) y por el admin de la empresa desde la grilla (ícono sutil junto a "Acciones" → `PATCH /tenants/:orgId/viajes-columnas-orden`, que solo toca ese campo). Los dos usan el mismo `ViajesColumnasOrdenModal` (`components/viajes/`), que recibe las columnas habilitadas y su propio `guardar`; el orden aplica a toda la empresa. `ViajesTenantPage` arma `viajesHeaderColumnas`/`celdas`/`camposMobile` como mapas por id y los recorre con `ordenColumnasViajes(tenantEfectivo)` (`lib/viajesColumnasOrden.ts`); la visibilidad de cada columna sigue siendo la suya. Selección en lote y Acciones quedan fijas. **Columna nueva en la grilla**: sumarla a `VIAJES_COLUMNAS` (front) y a `VIAJES_COLUMNAS_ORDENABLES` (backend, `update-tenant.dto.ts`); los órdenes guardados la reciben al final.
+- **Columna opcional Productos en Viajes (oct 2026)**: `Tenant.viajesColumnaProductosHabilitada` (switch en "Configuración por empresa" → pestaña Viajes) + campo `productoItems` visible. Muestra `nombresProductosViaje(v)` (`lib/productosViaje.ts`, viaje + clientes adicionales, sin repetir).
+- **Label de "Producto" por empresa (oct 2026)**: `Tenant.productoLabel`/`productoLabelPlural` (superadmin, pestaña General; el plural lo genera la IA en el backend). Leer siempre con `useProductoLabels()` (`hooks/useProductoLabels.tsx`) — nunca escribir "Producto" fijo fuera de Stock. Las páginas que operan sobre un tenant elegido por superadmin montan `ProductoLabelsProvider` con el tenant efectivo (hoy `ViajesTenantPage`, `ViajeCreatePage`); sin provider se usa el tenant propio. **Stock queda afuera**: los componentes compartidos con Stock reciben el label por prop (`ProductoModal labels=…`) y con el default muestran los textos de siempre. "Líquido Producto" (ARCA) no se toca. Frases neutras en género ("Crear grano", "No hay mercaderías que…"), no "Nuevo {label}". Detalle backend en `vialto-backend/CLAUDE.md`, "Label de Producto por tenant".
 - **Columnas de ID: truncar por el principio** (se ven los últimos caracteres, "…01406"), con `TruncarInicio` (`components/ui/TruncarInicio.tsx`). Hoy: ID sistema, ID propio 1 y 2 de Viajes. Toda columna de ID nueva usa ese componente, no `truncate` a secas.
 - Indicadores de pantalla tipo "Emisión electrónica vía ARCA" / "Ambiente de pruebas" no van junto al título sino en la línea del breadcrumb, a la derecha: `BreadcrumbExtras` (`hooks/useBreadcrumbOverride.tsx`), ver `ArcaEmisionIndicadores`.
 
