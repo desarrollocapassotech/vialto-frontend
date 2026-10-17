@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/ViewModalShell";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
+import { apiJsonTodasLasPaginas } from "@/lib/listadoPaginacion";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
 import {
   normalizeViajeMoneda,
@@ -42,6 +43,7 @@ type ViajeItem = Pick<
   | "numeroIdentificacionPersonalizado"
   | "idPropio2"
   | "fechaCarga"
+  | "etapa"
   | "origen"
   | "destino"
   | "precioTransportistaExterno"
@@ -284,7 +286,7 @@ export function LiquidacionEditModal({
     };
   }, [canEditDatos, getToken, liq.id]);
 
-  // Trae todos los viajes del transportista (incluidos y disponibles para agregar)
+  // Trae los viajes del transportista incluidos en esta liquidación y los disponibles para agregar
   // para poder armar la tabla de selección con datos en vivo (moneda, precio).
   useEffect(() => {
     if (!canEditViajes) {
@@ -295,11 +297,14 @@ export function LiquidacionEditModal({
     setViajesTransportistaLoading(true);
     void (async () => {
       try {
-        const res = await apiJson<{ items: ViajeItem[] }>(
-          `/api/viajes/paginated?transportistaId=${encodeURIComponent(liq.transportistaId)}&pageSize=100&page=1`,
+        // Solo los pendientes del transportista + los de esta liquidación (no todo su
+        // historial). Todas las páginas (de a 100, el máximo del backend): con una sola,
+        // los viajes que pasaban de 100 no aparecían, sin ningún aviso.
+        const items = await apiJsonTodasLasPaginas<ViajeItem>(
+          `/api/viajes/paginated?transportistaId=${encodeURIComponent(liq.transportistaId)}&sinLiquidacionActiva=1&incluirLiquidacionId=${encodeURIComponent(liq.id)}`,
           () => getToken(),
         );
-        if (!cancelled) setViajesTransportista(res.items ?? []);
+        if (!cancelled) setViajesTransportista(items);
       } catch {
         if (!cancelled) setViajesTransportista([]);
       } finally {
@@ -330,12 +335,13 @@ export function LiquidacionEditModal({
   }, [selectedViajeIds, canEditViajes]);
 
   // Viajes elegibles en la tabla: los ya incluidos + los del transportista que no
-  // tengan otra liquidación activa (misma regla que "Nueva liquidación").
+  // tengan otra liquidación activa ni estén cancelados (misma regla que "Nueva liquidación").
   const viajesParaTabla = useMemo(() => {
     return viajesTransportista.filter(
       (v) =>
         selectedViajeIds.has(v.id) ||
-        !viajeTieneLiquidacionActivaParaTransportista(v, liq.transportistaId),
+        (v.etapa !== "cancelado" &&
+          !viajeTieneLiquidacionActivaParaTransportista(v, liq.transportistaId)),
     );
   }, [viajesTransportista, selectedViajeIds]);
 

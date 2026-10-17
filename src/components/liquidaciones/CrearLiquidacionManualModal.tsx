@@ -32,6 +32,7 @@ import { PadronValidacionEstado } from "@/components/shared/PadronValidacionEsta
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson, apiFetch } from "@/lib/api";
+import { apiJsonTodasLasPaginas } from "@/lib/listadoPaginacion";
 import { collectCvlpEmitMissingFields } from "@/lib/cvlpEmitValidation";
 import {
   CVLP_CLASE_B_WARNING,
@@ -528,12 +529,15 @@ export function CrearLiquidacionManualModal({
     setSelectedViajeIds(new Set());
     void (async () => {
       try {
-        // En una liquidación existente sus propios viajes ya tienen liquidación activa (esta):
-        // se traen todos y se dejan los suyos + los que no tengan otra activa.
-        const qs = `transportistaId=${encodeURIComponent(transportistaId)}&pageSize=100&page=1${
-          existente ? "" : "&sinLiquidacionActiva=1"
+        // Solo los pendientes del transportista; en una liquidación existente, además sus
+        // propios viajes (que tienen liquidación activa: esta) vía `incluirLiquidacionId`.
+        // Antes se traía todo el historial del transportista y se filtraba acá: con muchos
+        // viajes liquidados eran muchas páginas. Se traen todas las páginas: con una sola
+        // (máx. 100) los viajes que pasaban de 100 no aparecían, sin ningún aviso.
+        const qs = `transportistaId=${encodeURIComponent(transportistaId)}&sinLiquidacionActiva=1${
+          existente ? `&incluirLiquidacionId=${encodeURIComponent(existente.id)}` : ""
         }`;
-        const res = await apiJson<{ items: ViajeItem[] }>(
+        const todos = await apiJsonTodasLasPaginas<ViajeItem>(
           plataforma
             ? `/api/platform/viajes/paginated?${qs}&tenantId=${encodeURIComponent(tenantId!)}`
             : `/api/viajes/paginated?${qs}`,
@@ -542,7 +546,7 @@ export function CrearLiquidacionManualModal({
         if (!cancelled) {
           const preseleccion = preseleccionPendiente.current;
           preseleccionPendiente.current = null;
-          let items = res.items ?? [];
+          let items = todos;
           if (existente) {
             const propios = new Set(preseleccion ?? []);
             items = items.filter((v) =>
