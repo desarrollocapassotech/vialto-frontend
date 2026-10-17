@@ -5,11 +5,10 @@ export type ViajesResumenFiltrosData = {
   sinFacturar: number;
   /** Viajes con liquidación al transportista pendiente (`liquidacionEstado=sin_liquidar`). */
   sinLiquidar: number;
-  sinPagar: number;
   pagados: number;
 };
 
-type FiltroId = 'sin_facturar' |'sin_liquidar' | 'sin_pagar' | 'pagado';
+type FiltroId = 'sin_facturar' | 'sin_liquidar' | 'pagado';
 type Tipo = 'facturacion' | 'liquidacion' | 'pago';
 
 const OPCIONES: Array<{
@@ -20,9 +19,29 @@ const OPCIONES: Array<{
 }> = [
   { id: 'sin_facturar', label: 'Sin facturar', countKey: 'sinFacturar', tipo: 'facturacion' },
   { id: 'sin_liquidar', label: 'Sin liquidar', countKey: 'sinLiquidar', tipo: 'liquidacion' },
-  { id: 'sin_pagar', label: 'Sin pagar', countKey: 'sinPagar', tipo: 'pago' },
   { id: 'pagado', label: 'Pagados', countKey: 'pagados', tipo: 'pago' },
 ];
+
+/** Chips que marcan algo pendiente ("Pagados" no: es un estado resuelto, casi siempre > 0). */
+const PENDIENTES: ReadonlySet<FiltroId> = new Set(['sin_facturar', 'sin_liquidar']);
+
+function opcionesVisibles(mostrarFiltroPago: boolean, mostrarFiltroLiquidacion: boolean) {
+  return OPCIONES.filter(
+    (o) =>
+      (o.tipo !== 'pago' || mostrarFiltroPago) &&
+      (o.tipo !== 'liquidacion' || mostrarFiltroLiquidacion),
+  );
+}
+
+/** Chips visibles de pendientes con su contador, para `FiltrosRapidosBoton` (palpita y tooltip). */
+export function resumenPendientes(
+  resumen: ViajesResumenFiltrosData,
+  { mostrarFiltroPago = true, mostrarFiltroLiquidacion = true } = {},
+): { label: string; count: number }[] {
+  return opcionesVisibles(mostrarFiltroPago, mostrarFiltroLiquidacion)
+    .filter((o) => PENDIENTES.has(o.id))
+    .map((o) => ({ label: o.label, count: resumen[o.countKey] }));
+}
 
 type Props = {
   resumen: ViajesResumenFiltrosData;
@@ -57,11 +76,7 @@ export function ViajesResumenFiltros({
     liquidacion: liquidacionFiltro,
     pago: pagoTransportistaFiltro,
   };
-  const opciones = OPCIONES.filter(
-    (o) =>
-      (o.tipo !== 'pago' || mostrarFiltroPago) &&
-      (o.tipo !== 'liquidacion' || mostrarFiltroLiquidacion),
-  );
+  const opciones = opcionesVisibles(mostrarFiltroPago, mostrarFiltroLiquidacion);
 
   function toggle(id: FiltroId, tipo: Tipo) {
     const nuevo = valorActual[tipo] === id ? '' : id;

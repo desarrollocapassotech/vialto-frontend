@@ -226,10 +226,9 @@ export function estadoPagoTransportistaExterno(
 
 export function viajeCoincideFiltroPagoTransportista(
   v: Viaje,
-  filtro: "sin_pagar" | "pagado",
+  filtro: "pagado",
 ): boolean {
-  const estado = estadoPagoTransportistaExterno(v);
-  return filtro === "sin_pagar" ? estado === "sin_pago" : estado === "pagado";
+  return estadoPagoTransportistaExterno(v) === filtro;
 }
 
 export function calcularSaldoTransportista(
