@@ -917,6 +917,10 @@ export interface ArcaConfig {
   logoUrl: string | null;
   /** Leyenda en letra chica bajo la condición de venta del PDF de factura (ej. mora). */
   leyendaFactura?: string | null;
+  /** Color de acento del PDF de factura/NC ("#rrggbb"); null = blanco y negro. */
+  colorFactura?: string | null;
+  /** Color de acento del PDF de liquidación CVLP y su anulación; null = blanco y negro. */
+  colorLiquidacion?: string | null;
   ptoVentaCvlp: number;
   ptoVentaFactura: number;
   ambiente: "homologacion" | "produccion";
