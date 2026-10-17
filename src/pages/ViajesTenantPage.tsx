@@ -3289,7 +3289,10 @@ export function ViajesTenantPage({
                       ordenResaltaFechaCarga ? "font-medium text-vialto-charcoal" : ""
                     }
                   >
-                    {formatIsoFechaCortaListadoEsAr(v.fechaCarga)}
+                    {/* Con una sola fecha hay lugar para el año (dd/mm/aa). */}
+                    {formatIsoFechaCortaListadoEsAr(v.fechaCarga, {
+                      conAnio: !v.fechaDescarga,
+                    })}
                   </span>
                   {v.fechaDescarga && (
                     <>
