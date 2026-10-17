@@ -19,11 +19,11 @@ import { useMaestroData } from "@/hooks/useMaestroData";
 import type { ArcaConfig } from "@/types/api";
 
 const CONDICION_IVA = [
-  { value: "1", label: "IVA Responsable Inscripto" },
-  { value: "6", label: "Responsable Monotributo" },
-  { value: "4", label: "IVA Sujeto Exento" },
   { value: "5", label: "Consumidor Final" },
   { value: "3", label: "IVA no Responsable" },
+  { value: "1", label: "IVA Responsable Inscripto" },
+  { value: "4", label: "IVA Sujeto Exento" },
+  { value: "6", label: "Responsable Monotributo" },
   { value: "7", label: "Sujeto no Categorizado" },
 ];
 

@@ -22,6 +22,7 @@ import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useIdFiscalLabel } from "@/hooks/useIdFiscalLabel";
 import type { Cliente, ConEmpresa, PaginatedMeta } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 export function ClientesSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -67,7 +68,7 @@ export function ClientesSuperadminPage() {
         new Set(
           (rows || []).map((r) => r.nombre).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
   const opcionesIdFiscal = useMemo(
@@ -76,7 +77,7 @@ export function ClientesSuperadminPage() {
         new Set(
           (rows || []).map((r) => r.idFiscal).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
   const opcionesPais = useMemo(
@@ -85,7 +86,7 @@ export function ClientesSuperadminPage() {
         new Set(
           (rows || []).map((r) => r.pais).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
 

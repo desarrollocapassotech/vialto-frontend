@@ -13,8 +13,8 @@ import type { PlatformUser } from '@/types/api';
 
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
-  { value: 'member', label: 'Miembro' },
   { value: 'stock_viewer', label: 'Consulta de stock' },
+  { value: 'member', label: 'Miembro' },
   { value: 'stock_operator', label: 'Operador de stock' },
 ] as const;
 

@@ -16,6 +16,7 @@ import type {
   ConceptoLiquidacion,
   ConceptoLiquidacionSigno,
 } from "@/types/api";
+import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 
 export type ConceptoLineaDraft = {
   conceptoLiquidacionId: string;
@@ -570,7 +571,7 @@ export function ConceptosLiquidacionLineasEditor({
                           {linea.nombre ?? "Concepto"}
                         </option>
                       )}
-                    {catalogo.map((c) => (
+                    {ordenarAlfabetico(catalogo, (c) => c.nombre).map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.nombre}
                       </option>

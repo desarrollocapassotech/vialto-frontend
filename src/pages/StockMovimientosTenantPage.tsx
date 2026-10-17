@@ -437,9 +437,9 @@ export function StockMovimientosTenantPage({
                   }`}
                 >
                   <option value="">Todos</option>
-                  <option value="ingreso">Ingreso</option>
-                  <option value="egreso">Egreso</option>
                   <option value="division">División</option>
+                  <option value="egreso">Egreso</option>
+                  <option value="ingreso">Ingreso</option>
                 </select>
               </ViajesListadoHeaderFiltro>
             ),

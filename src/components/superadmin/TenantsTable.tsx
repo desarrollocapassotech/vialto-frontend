@@ -12,6 +12,7 @@ import { labelBillingStatus, labelModulo } from "@/lib/platformLabels";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Tenant } from "@/types/api";
 import { TenantViewModal } from "./TenantViewModal";
+import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 interface TenantsTableProps {
   loading: boolean;
@@ -65,7 +66,7 @@ export function TenantsTable({
         new Set(
           (items || []).map((t) => t.name).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [items],
   );
   const opcionesSuscripcion = useMemo(
@@ -76,7 +77,7 @@ export function TenantsTable({
             .map((t) => t.billingStatus)
             .filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [items],
   );
 

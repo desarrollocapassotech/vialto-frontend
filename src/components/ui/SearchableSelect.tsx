@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 
 export type SearchableSelectOption = { value: string; label: string };
 
@@ -47,11 +48,16 @@ export function SearchableSelect({
     width: number;
   } | null>(null);
 
+  const ordenadas = useMemo(
+    () => ordenarAlfabetico(options, (o) => o.label),
+    [options],
+  );
+
   const filtradas = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return options;
-    return options.filter((o) => o.label.toLowerCase().includes(q));
-  }, [options, search]);
+    if (!q) return ordenadas;
+    return ordenadas.filter((o) => o.label.toLowerCase().includes(q));
+  }, [ordenadas, search]);
 
   const actualizarRect = useCallback(() => {
     const el = btnRef.current;

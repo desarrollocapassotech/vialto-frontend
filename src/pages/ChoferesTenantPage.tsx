@@ -18,6 +18,7 @@ import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Chofer, PaginatedMeta } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 type ChoferesPaginatedResponse = {
   items: Chofer[];
@@ -62,14 +63,14 @@ export function ChoferesTenantPage() {
         new Set(
           (rows || []).map((r) => r.nombre).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
   const opcionesDni = useMemo(
     () =>
       Array.from(
         new Set((rows || []).map((r) => r.dni).filter((v): v is string => !!v)),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
 

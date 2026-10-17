@@ -25,10 +25,10 @@ type VehiculosPaginatedResponse = {
 
 const TIPO_OPCIONES = [
   { value: "", label: "Todos" },
-  { value: "tractor", label: "Tractor" },
-  { value: "semirremolque", label: "Semirremolque" },
-  { value: "camion", label: "Camión" },
   { value: "acoplado", label: "Acoplado" },
+  { value: "camion", label: "Camión" },
+  { value: "semirremolque", label: "Semirremolque" },
+  { value: "tractor", label: "Tractor" },
   { value: "utilitario", label: "Utilitario" },
   { value: "otro", label: "Otro" },
 ] as const;

@@ -20,6 +20,7 @@ import {
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { PlatformUser, PaginatedMeta } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 function formatRole(role: string, platformRole?: string | null) {
   if (platformRole === "superadmin") return "Superadmin";
@@ -87,7 +88,7 @@ export function SuperadminUsersPage() {
             .map(getFullName)
             .filter((v): v is string => !!v && v !== "—"),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
   const opcionesEmail = useMemo(
@@ -96,7 +97,7 @@ export function SuperadminUsersPage() {
         new Set(
           (rows || []).map((r) => r.email).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
   const opcionesRol = useMemo(
@@ -105,7 +106,7 @@ export function SuperadminUsersPage() {
         new Set(
           (rows || []).map((r) => r.role).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
 

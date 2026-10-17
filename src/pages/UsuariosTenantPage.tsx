@@ -22,6 +22,7 @@ import {
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { PlatformUser } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 type TenantUser = Pick<
   PlatformUser,
@@ -427,7 +428,7 @@ export function UsuariosTenantPage() {
             .map(getFullName)
             .filter((v): v is string => !!v && v !== "—"),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [allRows],
   );
   const opcionesEmail = useMemo(
@@ -436,7 +437,7 @@ export function UsuariosTenantPage() {
         new Set(
           (allRows || []).map((r) => r.email).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [allRows],
   );
   const opcionesRol = useMemo(
@@ -445,7 +446,7 @@ export function UsuariosTenantPage() {
         new Set(
           (allRows || []).map((r) => r.role).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [allRows],
   );
 

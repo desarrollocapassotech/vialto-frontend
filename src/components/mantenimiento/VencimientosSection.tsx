@@ -216,8 +216,8 @@ export function VencimientosSection({
                   className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${categoria ? "text-vialto-fire" : ""}`}
                 >
                   <option value="">Mecánicos y documentales</option>
-                  <option value="mecanico">Mecánicos</option>
                   <option value="documental">Documentales</option>
+                  <option value="mecanico">Mecánicos</option>
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>

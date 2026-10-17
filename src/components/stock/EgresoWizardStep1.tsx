@@ -2,6 +2,7 @@ import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { STOCK_FORM_INPUT as INPUT, STOCK_FORM_LABEL as LABEL } from '@/lib/stockFormLayout';
 import type { Cliente, Deposito } from '@/types/api';
+import { ordenarAlfabetico } from '@/lib/ordenAlfabetico';
 
 export function EgresoWizardStep1({
   clientes,
@@ -63,7 +64,7 @@ export function EgresoWizardStep1({
             <option value="">
               {!clienteId ? 'Primero elegí una empresa…' : 'Elegí un depósito…'}
             </option>
-            {depositos.map((d) => (
+            {ordenarAlfabetico(depositos, (d) => d.nombre).map((d) => (
               <option key={d.id} value={d.id}>
                 {d.nombre}
               </option>

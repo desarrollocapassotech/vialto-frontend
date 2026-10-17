@@ -13,10 +13,10 @@ export type PaisOpcion = {
  */
 export const PAISES_SOPORTADOS: readonly PaisOpcion[] = [
   { codigo: "AR", etiqueta: "Argentina" },
-  { codigo: "UY", etiqueta: "Uruguay" },
-  { codigo: "PY", etiqueta: "Paraguay" },
-  { codigo: "CL", etiqueta: "Chile" },
   { codigo: "BR", etiqueta: "Brasil" },
+  { codigo: "CL", etiqueta: "Chile" },
+  { codigo: "PY", etiqueta: "Paraguay" },
+  { codigo: "UY", etiqueta: "Uruguay" },
 ] as const;
 
 export function esPaisSoportado(c: string): c is PaisCodigo {
@@ -90,10 +90,10 @@ const CONDICION_IVA_AR: CondicionSelectInfo = {
   type: "select",
   label: "Condición frente al IVA",
   options: [
-    { value: 1, label: "IVA Responsable Inscripto" },
-    { value: 6, label: "Responsable Monotributo" },
-    { value: 4, label: "IVA Sujeto Exento" },
     { value: 5, label: "Consumidor Final" },
+    { value: 1, label: "IVA Responsable Inscripto" },
+    { value: 4, label: "IVA Sujeto Exento" },
+    { value: 6, label: "Responsable Monotributo" },
   ],
 };
 

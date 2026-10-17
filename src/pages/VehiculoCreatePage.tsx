@@ -26,10 +26,10 @@ import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 
 const TIPOS = [
-  "tractor",
-  "semirremolque",
-  "camion",
   "acoplado",
+  "camion",
+  "semirremolque",
+  "tractor",
   "utilitario",
   "otro",
 ] as const;

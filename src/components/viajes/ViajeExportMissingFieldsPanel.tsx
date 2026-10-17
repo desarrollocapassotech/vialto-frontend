@@ -12,6 +12,7 @@ import {
   type ViajeExportMissingGroup,
 } from '@/lib/viajeExportMissingFields';
 import { apiJson } from '@/lib/api';
+import { ordenarAlfabetico } from '@/lib/ordenAlfabetico';
 
 type Props = {
   viaje: Viaje;
@@ -45,7 +46,7 @@ function renderField(
         <span className="text-[10px] text-red-700">{label}</span>
         <select value={value} onChange={(e) => onChange(e.target.value)} disabled={ocupado} className={inputClass}>
           <option value="">— Seleccionar chofer —</option>
-          {choferesList.map((c) => (
+          {ordenarAlfabetico(choferesList, (c) => c.nombre).map((c) => (
             <option key={c.id} value={c.id}>
               {c.nombre}
               {c.dni ? ` · ${c.dni}` : ''}
@@ -62,7 +63,7 @@ function renderField(
         <span className="text-[10px] text-red-700">{label}</span>
         <select value={value} onChange={(e) => onChange(e.target.value)} disabled={ocupado} className={inputClass}>
           <option value="">— Seleccionar vehículo —</option>
-          {vehiculosList.map((v) => (
+          {ordenarAlfabetico(vehiculosList, (v) => v.patente).map((v) => (
             <option key={v.id} value={v.id}>
               {v.patente}
               {v.tipo ? ` (${v.tipo})` : ''}

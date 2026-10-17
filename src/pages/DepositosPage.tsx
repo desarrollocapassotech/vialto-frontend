@@ -16,6 +16,7 @@ import {
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Deposito, PaginatedMeta } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 type DepositoFormState = {
   nombre: string;
@@ -96,7 +97,7 @@ export function DepositosPage({
             .map((r) => r.nombre)
             .filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [depositos],
   );
 

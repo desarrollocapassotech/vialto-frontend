@@ -29,6 +29,7 @@ import type {
 } from "@/types/api";
 import { fechaHoraToIso, isoToFechaHora } from "@/lib/viajeFechaHora";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
 
@@ -407,7 +408,7 @@ export function DivisionesStockTenantPage({
                     ? "Primero elegí una empresa…"
                     : "Elegí un depósito…"}
                 </option>
-                {depositosFiltrados.map((d) => (
+                {ordenarAlfabetico(depositosFiltrados, (d) => d.nombre).map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.nombre}
                   </option>
@@ -481,7 +482,10 @@ export function DivisionesStockTenantPage({
                     ? "Primero elegí un producto"
                     : "Elegí una presentación…"}
                 </option>
-                {(productoSeleccionado?.productoPresentaciones ?? []).map(
+                {ordenarAlfabetico(
+                  productoSeleccionado?.productoPresentaciones ?? [],
+                  (pp) => pp.presentacion?.nombre ?? pp.presentacionId,
+                ).map(
                   (pp) => (
                     <option key={pp.id} value={pp.id}>
                       {pp.presentacion?.nombre ?? pp.presentacionId} —{" "}

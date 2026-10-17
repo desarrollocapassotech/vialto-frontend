@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { OpcionProducto } from '@/lib/productosViaje';
 import { PRODUCTO_LABELS_DEFAULT, labelEnFrase } from '@/lib/productoLabel';
 import { useProductoLabels } from '@/hooks/useProductoLabels';
+import { ordenarAlfabetico } from '@/lib/ordenAlfabetico';
 
 function filaLabel(o: OpcionProducto) {
   return o.nombre;
@@ -44,11 +45,13 @@ export function ProductoSearchableSelect({
   const searchRef = useRef<HTMLInputElement>(null);
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
 
+  const ordenadas = useMemo(() => ordenarAlfabetico(opciones, filaLabel), [opciones]);
+
   const filtradas = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return opciones;
-    return opciones.filter((o) => o.nombre.toLowerCase().includes(q));
-  }, [opciones, search]);
+    if (!q) return ordenadas;
+    return ordenadas.filter((o) => o.nombre.toLowerCase().includes(q));
+  }, [ordenadas, search]);
 
   const actualizarRect = useCallback(() => {
     const el = btnRef.current;

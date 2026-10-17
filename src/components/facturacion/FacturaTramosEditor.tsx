@@ -8,6 +8,7 @@ import {
   ivaMontoDeTramos,
   roundMoney2,
 } from "@/lib/facturaTotales";
+import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 
 export type FacturaTramoDraft = {
   viajeId: string;
@@ -221,7 +222,7 @@ export function FacturaTramosEditor({
                 aria-label="Viaje del tramo"
               >
                 <option value="">— Elegí un viaje —</option>
-                {vinculados.map((v) => (
+                {ordenarAlfabetico(vinculados, (v) => numeroVisibleViaje(v)).map((v) => (
                   <option key={v.id} value={v.id}>
                     #{numeroVisibleViaje(v)}
                     {v.origen && v.destino

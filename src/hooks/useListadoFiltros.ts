@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { compararAlfabetico } from '@/lib/ordenAlfabetico';
 
 interface FiltrableRow {
   pais?: string | null;
@@ -14,7 +15,7 @@ export function useListadoFiltros<T extends FiltrableRow>(
   const paisesList = useMemo(() => {
     if (!rows) return [];
     const set = new Set(rows.map((t) => t.pais).filter(Boolean) as string[]);
-    return Array.from(set).sort();
+    return Array.from(set).sort(compararAlfabetico);
   }, [rows]);
 
   const rowsFiltradas = useMemo(() => {

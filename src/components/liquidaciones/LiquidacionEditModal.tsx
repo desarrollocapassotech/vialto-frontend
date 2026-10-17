@@ -33,6 +33,7 @@ import {
 import { viajeTieneLiquidacionActivaParaTransportista } from "@/lib/viajesComprobantes";
 import type { LiquidacionConTransportista } from "@/components/liquidaciones/LiquidacionViewModal";
 import type { Viaje } from "@/types/api";
+import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 
 type ViajeItem = Pick<
   Viaje,
@@ -600,7 +601,7 @@ export function LiquidacionEditModal({
                   disabled={saving}
                   className={INPUT}
                 >
-                  {opcionesSelect.map((opt) => (
+                  {ordenarAlfabetico(opcionesSelect, (opt) => opt).map((opt) => (
                     <option key={opt} value={opt}>
                       {opt}
                     </option>

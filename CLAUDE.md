@@ -334,6 +334,19 @@ Ejemplo real (histórico, la situación concreta ya no aplica pero el patrón si
 
 ---
 
+## Selects: opciones en orden alfabético (oct 2026)
+
+**Regla global para todos los selects actuales y futuros** (nativos, `CrudSelect`, con buscador).
+
+- Las opciones van **A→Z**, con `lib/ordenAlfabetico.ts`: `ordenarAlfabetico(items, (x) => x.nombre)` para listas y `compararAlfabetico` como comparador de `.sort()`. Nunca `.sort()` pelado: ordena por código de carácter ("Álvarez" y las minúsculas quedan al final).
+- El helper ignora mayúsculas/acentos, compara números como números ("Camión 2" < "Camión 10") y manda "Otro/Otra" al final.
+- La opción fija de arriba ("Todos", "Elegí…", "Sin asignar") queda primera: se renderiza aparte, no pasa por el orden.
+- `SearchableSelect`, `SearchableEntitySelect` (y todo lo que se arma sobre él: `MaestroSearchSelects`, `PaisSearchSelect`, `TallerSelect`, stock) y `ProductoSearchableSelect` ya ordenan solos — no hace falta ordenar antes de pasarles los ítems.
+- Constantes fijas (`SERVICE_STATIONS`, `PAISES_SOPORTADOS`, tipos de vehículo, condición IVA, roles, tipos de bulto MIC…) se escriben ya ordenadas en su definición. Si se agrega un valor, insertarlo en su lugar alfabético.
+- **Excepciones (orden lógico, no alfabético):** etapas/estados de un circuito (viajes, facturación, liquidación, vencimientos, suscripción), alícuotas de IVA, signo de concepto, tamaños de página, pares Sí/No · Activos/Inactivos · Origen/Destino · Carga/Descarga, pagos a imputar (por fecha), lotes (FEFO) y el autocompletado de ciudades (relevancia del buscador externo).
+
+---
+
 ## Validación de formularios: errores por campo
 
 **Regla global para todos los formularios actuales y futuros.**

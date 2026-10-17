@@ -516,11 +516,11 @@ export function CargaCombustibleCreateModal({
                 <option value="" disabled>
                   Seleccione método...
                 </option>
-                <option value="efectivo">{FORMA_PAGO_LABELS.efectivo}</option>
-                <option value="tarjeta">{FORMA_PAGO_LABELS.tarjeta}</option>
                 <option value="cuenta_corriente">
                   {FORMA_PAGO_LABELS.cuenta_corriente}
                 </option>
+                <option value="efectivo">{FORMA_PAGO_LABELS.efectivo}</option>
+                <option value="tarjeta">{FORMA_PAGO_LABELS.tarjeta}</option>
               </select>
             </div>
           </div>

@@ -19,6 +19,7 @@ import {
   type LiquidacionAnulacionMetodo,
 } from "@/components/superadmin/LiquidacionAnulacionMetodoFields";
 import type { Pais, Tenant, TipoFlota } from "@/types/api";
+import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 
 /**
  * Módulos de `FIELD_CATALOG` que son módulos vendibles reales (`Tenant.modules`)
@@ -1526,7 +1527,7 @@ export function CamposEmpresaPage() {
                                   className="h-9 w-full max-w-xs border border-black/15 bg-white px-2 text-sm text-left disabled:opacity-50"
                                 >
                                   <option value="">Sin elegir…</option>
-                                  {paisesEmpresa.map((p) => (
+                                  {ordenarAlfabetico(paisesEmpresa, (p) => p.nombre).map((p) => (
                                     <option key={p.id} value={p.id}>
                                       {p.nombre}
                                     </option>
@@ -1717,7 +1718,7 @@ export function CamposEmpresaPage() {
                       onChange={(e) => setFormulario(e.target.value)}
                       className="h-9 w-56 border border-black/15 bg-white px-2 text-sm"
                     >
-                      {formulariosDelModulo.map((f) => (
+                      {ordenarAlfabetico(formulariosDelModulo, (f) => catalogo[modulo].formularios[f].label).map((f) => (
                         <option key={f} value={f}>
                           {catalogo[modulo].formularios[f].label}
                         </option>

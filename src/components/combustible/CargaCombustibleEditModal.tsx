@@ -15,6 +15,7 @@ import {
 } from "@/lib/combustibleLabels";
 import { useCombustibleValidation } from "@/lib/combustibleValidation";
 import type { CargaCombustible } from "@/types/api";
+import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 
 function toUtcDateString(isoDate: string | null | undefined) {
   if (!isoDate) return "";
@@ -261,7 +262,7 @@ export function CargaCombustibleEditModal({
                     {carga.chofer?.nombre ?? "Conductor actual"}
                   </option>
                 )}
-              {choferes.map((c) => (
+              {ordenarAlfabetico(choferes, (c) => c.nombre).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nombre}
                 </option>
@@ -290,7 +291,7 @@ export function CargaCombustibleEditModal({
                     {carga.vehiculo?.patente ?? "Vehículo actual"}
                   </option>
                 )}
-              {vehiculos.map((v) => (
+              {ordenarAlfabetico(vehiculos, (v) => v.patente).map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.patente}
                 </option>
@@ -448,11 +449,11 @@ export function CargaCombustibleEditModal({
               <option value="" disabled>
                 Seleccionar
               </option>
-              <option value="efectivo">{FORMA_PAGO_LABELS.efectivo}</option>
-              <option value="tarjeta">{FORMA_PAGO_LABELS.tarjeta}</option>
               <option value="cuenta_corriente">
                 {FORMA_PAGO_LABELS.cuenta_corriente}
               </option>
+              <option value="efectivo">{FORMA_PAGO_LABELS.efectivo}</option>
+              <option value="tarjeta">{FORMA_PAGO_LABELS.tarjeta}</option>
             </select>
           </div>
         </div>

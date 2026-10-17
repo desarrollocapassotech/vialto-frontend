@@ -18,6 +18,7 @@ import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useIdFiscalLabel } from "@/hooks/useIdFiscalLabel";
 import type { PaginatedMeta, Transportista } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 type TransportistasPaginatedResponse = {
   items: Transportista[];
@@ -60,7 +61,7 @@ export function TransportistasTenantPage() {
         new Set(
           (rows || []).map((r) => r.nombre).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
   const opcionesIdFiscal = useMemo(
@@ -69,7 +70,7 @@ export function TransportistasTenantPage() {
         new Set(
           (rows || []).map((r) => r.idFiscal).filter((v): v is string => !!v),
         ),
-      ).sort(),
+      ).sort(compararAlfabetico),
     [rows],
   );
 

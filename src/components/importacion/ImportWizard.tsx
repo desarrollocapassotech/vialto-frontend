@@ -37,6 +37,7 @@ import type {
   ImportColumnasEsperadasModulo,
   ImportCampoUnicoConflicto,
 } from "@/types/api";
+import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 
 interface ImportWizardProps {
   tenantId: string;
@@ -71,9 +72,9 @@ const td = "px-3 py-2 border-t border-black/10";
 const PREFIJO_COLUMNAS_FALTANTES = "Faltan columnas obligatorias en el archivo:";
 
 const TIPOS_VEHICULO = [
-  "tractor",
-  "semirremolque",
   "camion",
+  "semirremolque",
+  "tractor",
   "utilitario",
   "otro",
 ];
@@ -881,7 +882,7 @@ function RevisionArchivo({
                     aria-label={`Qué contiene la hoja ${a.hoja}`}
                   >
                     <option value="">Elegí…</option>
-                    {a.candidatos.map((m) => (
+                    {ordenarAlfabetico(a.candidatos, labelModulo).map((m) => (
                       <option key={m} value={m} disabled={tomados.has(m)}>
                         {labelModulo(m)}
                       </option>

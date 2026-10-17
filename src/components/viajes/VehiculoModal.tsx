@@ -7,7 +7,7 @@ import { vehiculoCreatePayloadFromForm, type VehiculoFormState } from '@/lib/veh
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
 import type { Vehiculo } from '@/types/api';
 
-const TIPOS = ['tractor', 'semirremolque', 'camion', 'utilitario', 'otro'] as const;
+const TIPOS = ['camion', 'semirremolque', 'tractor', 'utilitario', 'otro'] as const;
 
 const emptyForm = (): VehiculoFormState => ({
   patente: '',
