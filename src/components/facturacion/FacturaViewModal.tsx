@@ -14,7 +14,9 @@ import {
   FilaMontoDesplegable,
   ViajesDetalleLista,
 } from '@/components/shared/DetalleComprobante';
-import { apiJson } from '@/lib/api';
+import { useAuth } from '@clerk/clerk-react';
+import { apiFetch, apiJson } from '@/lib/api';
+import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
 import { usuarioLabel } from '@/lib/usuarioLabel';
 import { friendlyError } from '@/lib/friendlyError';
 import { useToast } from '@/lib/toast';
@@ -39,6 +41,7 @@ import {
   facturaLetraFromCondicionIva,
   facturaLetraLabel,
   facturaNcCbteTipoFromFactura,
+  facturaEditable,
   facturaNcLabel,
   nroComprobante,
 } from '@/lib/arcaCbteTipo';
@@ -134,6 +137,7 @@ export function FacturaViewModal({
   const labelIdPropio2 = idPropio2LabelProp ?? idPropio2LabelTenant(tenantPropio);
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const { getToken: getAuthToken } = useAuth();
   const [searchParams] = useSearchParams();
   const tenantIdUrl = searchParams.get('tenantId')?.trim() ?? '';
   const [detail, setDetail] = useState<Factura>(factura);
@@ -258,6 +262,9 @@ export function FacturaViewModal({
     (factura.arcaEstado === 'autorizado' ||
       factura.arcaEstado === 'pendiente_cae' ||
       factura.arcaEstado === 'error');
+  // Con ARCA solo se edita un borrador: una factura emitida se corrige anulándola y volviendo
+  // a emitir (el backend también lo rechaza). Sin ARCA no hay estados de emisión.
+  const puedeEditar = facturaEditable(factura);
   const puedeMarcarCobrada =
     factura.tipo === 'cliente' && !anulada && !factura.cobrado;
 
@@ -313,9 +320,38 @@ export function FacturaViewModal({
   );
   // Botones de comprobantes del pie: con anulación se distingue el original de la NC.
   const puedeVerComprobante = Boolean(onVerComprobante && factura.comprobanteUrl?.trim());
+  // Sin handler de la pantalla (ej. abierto desde Viajes), el modal abre la NC por su cuenta.
   const puedeVerNotaCredito = Boolean(
-    anulada && onVerNotaCredito && (factura.notaCreditoUrl?.trim() || factura.anulacionCae),
+    anulada && (factura.notaCreditoUrl?.trim() || factura.anulacionCae),
   );
+
+  /** PDF de la NC en pestaña nueva: el subido si existe; si no, el que genera el backend. */
+  async function verNotaCreditoPorDefecto() {
+    const token = () => (getToken ? getToken() : getAuthToken());
+    const url = factura.notaCreditoUrl?.trim();
+    if (url) {
+      void abrirAdjuntoEnPestana({ url }, token, 'Nota de crédito');
+      return;
+    }
+    // La pestaña se abre en el click (si no, el navegador la bloquea como popup).
+    const ventana = window.open('', '_blank');
+    try {
+      const res = await apiFetch(
+        tenantIdUrl
+          ? `/api/platform/arca/facturas/${encodeURIComponent(factura.id)}/pdf-anulacion?tenantId=${encodeURIComponent(tenantIdUrl)}`
+          : `/api/integracion-arca/facturas/${encodeURIComponent(factura.id)}/pdf-anulacion`,
+        token,
+      );
+      if (!res.ok) throw new Error('No se pudo generar el PDF de la nota de crédito.');
+      const blobUrl = URL.createObjectURL(await res.blob());
+      if (ventana) ventana.location.href = blobUrl;
+      else window.open(blobUrl, '_blank');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (e) {
+      ventana?.close();
+      showToast(friendlyError(e, 'arca'), 'error');
+    }
+  }
 
   const arcaErrorTexto = formatStoredArcaError(factura.arcaError);
   const mostrarArcaError =
@@ -401,7 +437,7 @@ export function FacturaViewModal({
           {puedeVerNotaCredito && (
             <button
               type="button"
-              onClick={onVerNotaCredito}
+              onClick={onVerNotaCredito ?? (() => void verNotaCreditoPorDefecto())}
               className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
             >
               <FileText className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
@@ -438,7 +474,8 @@ export function FacturaViewModal({
               Marcar como cobrada
             </button>
           )}
-          {anulada && hasArca && (
+          {/* Anulada implica ARCA (la NC sale de ahí): no depende de que la pantalla pase `hasArca`. */}
+          {anulada && (
             <button
               type="button"
               onClick={
@@ -460,7 +497,7 @@ export function FacturaViewModal({
               Volver a emitir
             </button>
           )}
-          {!anulada && (
+          {puedeEditar && (
             <button type="button" onClick={onEditar} className={viewModalBtnPrimary}>
               Editar
             </button>

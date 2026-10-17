@@ -26,7 +26,8 @@ import { fmtSignedLiquidacionMoney } from "@/lib/liquidacionMoney";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
-import { apiJson } from "@/lib/api";
+import { apiFetch, apiJson } from "@/lib/api";
+import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
@@ -296,17 +297,51 @@ export function LiquidacionViewModal({
       ? anulacionComprobanteLabel(source.anulacionCbteTipo)
       : null;
   // Botones de comprobantes del pie: con anulación se distingue el original del de anulación.
+  // Sin handler de la pantalla (ej. abierto desde Viajes o Cuenta corriente), el modal abre el
+  // comprobante de anulación por su cuenta.
   const verAnulacion = anulada
     ? anulacionManual
-      ? onVerComprobanteAnulacionManual && {
-          label: "Ver comprobante de anulación",
-          onClick: onVerComprobanteAnulacionManual,
-        }
-      : onVerAnulacion && {
-          label: `Ver ${anulacionNcNd!.toLowerCase()}`,
-          onClick: onVerAnulacion,
-        }
+      ? source.anulacionManualComprobanteUrl?.trim()
+        ? {
+            label: "Ver comprobante de anulación",
+            onClick:
+              onVerComprobanteAnulacionManual ??
+              (() =>
+                void abrirAdjuntoEnPestana(
+                  { url: source.anulacionManualComprobanteUrl!.trim() },
+                  () => getAuthToken(),
+                  "Comprobante de anulación",
+                )),
+          }
+        : undefined
+      : source.anulacionCae
+        ? {
+            label: `Ver ${anulacionNcNd!.toLowerCase()}`,
+            onClick: onVerAnulacion ?? (() => void verPdfAnulacionPorDefecto()),
+          }
+        : undefined
     : undefined;
+
+  /** PDF de la NC/ND de anulación en pestaña nueva (lo genera el backend). */
+  async function verPdfAnulacionPorDefecto() {
+    // La pestaña se abre en el click (si no, el navegador la bloquea como popup).
+    const ventana = window.open("", "_blank");
+    try {
+      const qs = tenantIdUrl ? `?tenantId=${encodeURIComponent(tenantIdUrl)}` : "";
+      const res = await apiFetch(
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf-anulacion${qs}`,
+        () => getAuthToken(),
+      );
+      if (!res.ok) throw new Error("No se pudo generar el PDF de la anulación.");
+      const blobUrl = URL.createObjectURL(await res.blob());
+      if (ventana) ventana.location.href = blobUrl;
+      else window.open(blobUrl, "_blank");
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (e) {
+      ventana?.close();
+      showToast(friendlyError(e, "arca"), "error");
+    }
+  }
   // Viajes que componen el bruto: se ven al desplegar la fila "Bruto" del detalle.
   const viajesDetalle = (
     <ViajesDetalleLista

@@ -13,7 +13,7 @@ import {
   type FacturaDraft,
 } from "@/components/facturacion/FacturaEditModal";
 import { FacturaCreateModal } from "@/components/facturacion/FacturaCreateModal";
-import { facturaLetraFromCbteTipo } from "@/lib/arcaCbteTipo";
+import { facturaEditable, facturaLetraFromCbteTipo } from "@/lib/arcaCbteTipo";
 import { FacturaAccionesMenu } from "@/components/facturacion/FacturaAccionesMenu";
 import { AnularFacturaModal } from "@/components/facturacion/AnularFacturaModal";
 import { EmitirFacturaModal } from "@/components/facturacion/EmitirFacturaModal";
@@ -702,7 +702,9 @@ export function FacturacionTenantPage({
     void (async () => {
       try {
         const f = await apiJson<Factura>(facturaUrl(expand), () => getToken());
-        startEdit(f);
+        // Con ARCA solo se edita un borrador; si ya se emitió, se muestra el detalle.
+        if (facturaEditable(f)) startEdit(f);
+        else setViewingFactura(f);
       } catch {
         // si falla, simplemente no se abre el editor automático
       }
