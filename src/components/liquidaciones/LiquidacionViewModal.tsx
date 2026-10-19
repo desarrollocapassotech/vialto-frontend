@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
-import { Ban, FileText, Receipt, RotateCw, Trash2 } from "lucide-react";
+import { Ban, FileText, Paperclip, Receipt, RotateCw, Trash2 } from "lucide-react";
 import { anulacionComprobanteLabel, nroComprobante } from "@/lib/arcaCbteTipo";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import {
@@ -133,6 +133,7 @@ export function LiquidacionViewModal({
   onMarcarPendienteAnulacion,
   onConfirmarAnulacionManual,
   onVerComprobante,
+  onAdjuntarComprobante,
   onVerAnulacion,
   onVerComprobanteAnulacionManual,
   onVolverAEmitir,
@@ -163,6 +164,8 @@ export function LiquidacionViewModal({
   onConfirmarAnulacionManual?: () => void;
   /** Ver el comprobante: PDF del CVLP autorizado (ARCA) o adjunto manual (sin ARCA), según lo resuelva el caller. */
   onVerComprobante?: () => void;
+  /** Sin ARCA: botón "Adjuntar comprobante" si la liquidación todavía no tiene archivo. */
+  onAdjuntarComprobante?: () => void;
   /** Ver el PDF de la Nota de Crédito/Débito de anulación. Solo tiene sentido si `estado === 'anulado'` y anulacionMetodo = 'nota_credito_debito'. */
   onVerAnulacion?: () => void;
   /** Ver el comprobante pre-impreso adjunto en la anulación manual. Solo si `anulacionMetodo === 'manual'`. */
@@ -427,6 +430,16 @@ export function LiquidacionViewModal({
                 {verAnulacion ? "Ver comprobante original" : "Ver comprobante"}
               </button>
             )}
+            {onAdjuntarComprobante && !hasArca && !source.comprobanteUrl?.trim() && (
+              <button
+                type="button"
+                onClick={onAdjuntarComprobante}
+                className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+              >
+                <Paperclip className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                Adjuntar comprobante
+              </button>
+            )}
             {verAnulacion && (
               <button
                 type="button"
@@ -581,7 +594,7 @@ export function LiquidacionViewModal({
             ) : (
               source.numeroComprobanteProveedor && (
                 <Dato
-                  label="N° de factura del proveedor"
+                  label="Número de comprobante"
                   value={source.numeroComprobanteProveedor}
                 />
               )

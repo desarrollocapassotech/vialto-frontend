@@ -1,5 +1,15 @@
 import { useMemo, useState } from 'react';
-import { Ban, Banknote, Eye, FileMinus, FileText, Receipt, RotateCw, Trash2 } from 'lucide-react';
+import {
+  Ban,
+  Banknote,
+  Eye,
+  FileMinus,
+  FileText,
+  Paperclip,
+  Receipt,
+  RotateCw,
+  Trash2,
+} from 'lucide-react';
 import { AccionesFila } from '@/components/ui/AccionesFila';
 import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Factura } from '@/types/api';
@@ -11,6 +21,8 @@ interface Props {
   onVer: () => void;
   onEliminar: () => void;
   onVerComprobante?: () => void;
+  /** Solo sin ARCA: se ofrece si la factura todavía no tiene comprobante adjunto. */
+  onAdjuntarComprobante?: () => void;
   onEmitirArca?: () => void;
   onAnular?: () => void;
   onVerNotaCredito?: () => void;
@@ -28,6 +40,7 @@ export function FacturaAccionesMenu({
   onVer,
   onEliminar,
   onVerComprobante,
+  onAdjuntarComprobante,
   onEmitirArca,
   onAnular,
   onVerNotaCredito,
@@ -106,6 +119,14 @@ export function FacturaAccionesMenu({
         onClick: onVerComprobante,
       });
     }
+    if (onAdjuntarComprobante && !factura.comprobanteUrl?.trim()) {
+      opts.push({
+        id: 'adjuntar-comprobante',
+        label: 'Adjuntar comprobante',
+        icon: Paperclip,
+        onClick: onAdjuntarComprobante,
+      });
+    }
     if (
       anulada &&
       onVerNotaCredito &&
@@ -138,6 +159,7 @@ export function FacturaAccionesMenu({
     onAnular,
     onMarcarCobrada,
     onVerComprobante,
+    onAdjuntarComprobante,
     onVerNotaCredito,
     onEliminar,
     deleting,
@@ -163,5 +185,6 @@ const FACTURA_ACCIONES_DESTACADAS = [
   'marcar-cobrada',
   'anular',
   'comprobante',
+  'adjuntar-comprobante',
   'nota-credito',
 ];

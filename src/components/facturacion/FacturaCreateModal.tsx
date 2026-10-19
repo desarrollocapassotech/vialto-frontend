@@ -890,7 +890,7 @@ export function FacturaCreateModal({
       <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
         {!hasArca && (
           <div className="flex flex-col gap-1">
-            <label className={compactLabelClass}>Número (opcional)</label>
+            <label className={compactLabelClass}>Número de comprobante</label>
             <input
               type="text"
               value={draft.numero}
@@ -1020,7 +1020,7 @@ export function FacturaCreateModal({
         {!hasArca && (
           <div className="flex flex-col gap-1">
             <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-              Número (opcional)
+              Número de comprobante
             </label>
             <input
               type="text"

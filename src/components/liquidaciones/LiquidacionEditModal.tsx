@@ -761,7 +761,7 @@ export function LiquidacionEditModal({
         {showComprobante && (
           <div>
             <label htmlFor="liq-numero-comprobante-proveedor" className={LABEL}>
-              N° de factura del proveedor
+              Número de comprobante
             </label>
             <input
               id="liq-numero-comprobante-proveedor"

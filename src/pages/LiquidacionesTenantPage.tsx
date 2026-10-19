@@ -1,3 +1,9 @@
+import {
+  AdjuntarComprobanteClip,
+  ComprobanteAdjuntoClip,
+} from "@/components/shared/ComprobanteAdjuntoClip";
+import { AdjuntarComprobanteModal } from "@/components/shared/AdjuntarComprobanteModal";
+import { uploadComprobante } from "@/lib/comprobanteUpload";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -12,6 +18,7 @@ import {
   Receipt,
   RotateCw,
   Trash2,
+  Paperclip,
 } from "lucide-react";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -35,6 +42,7 @@ const LIQUIDACION_ACCIONES_DESTACADAS = [
   "reintentar",
   "emitir",
   "comprobante",
+  "adjuntar-comprobante",
   "anular",
   "marcar-pendiente-anulacion",
   "confirmar-anulacion-manual",
@@ -58,7 +66,7 @@ import { modalOverlayClass } from "@/lib/modalLayers";
 import { listadoTablaHeadRowClass, listadoTablaAccionesTdClass, listadoTablaTdClass, listadoTablaThClass } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
-import { anulacionComprobanteLabel } from "@/lib/arcaCbteTipo";
+import { anulacionComprobanteLabel, nroComprobante } from "@/lib/arcaCbteTipo";
 import { canAccessEmisionLiquidoProductoArca } from "@/lib/tenantModules";
 import {
   idSistemaHabilitado,
@@ -140,6 +148,7 @@ function LiquidacionAccionesMenu({
   onConfirmarAnulacionManual,
   onEliminar,
   onVerComprobante,
+  onAdjuntarComprobante,
   open: openProp,
   onOpenChange,
 }: {
@@ -155,6 +164,8 @@ function LiquidacionAccionesMenu({
   onConfirmarAnulacionManual: () => void;
   onEliminar: () => void;
   onVerComprobante: () => void;
+  /** Sin ARCA: "Adjuntar comprobante" si la liquidación todavía no tiene archivo. */
+  onAdjuntarComprobante?: () => void;
   /** Si se pasa junto con `onOpenChange`, el abierto/cerrado pasa a ser controlado por el padre (ej. click en la fila de la tabla). */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -213,6 +224,14 @@ function LiquidacionAccionesMenu({
       label: "Ver comprobante",
       icon: FileText,
       onClick: onVerComprobante,
+    });
+  }
+  if (onAdjuntarComprobante && !hasArca && !liq.comprobanteUrl?.trim()) {
+    options.push({
+      id: "adjuntar-comprobante",
+      label: "Adjuntar comprobante",
+      icon: Paperclip,
+      onClick: onAdjuntarComprobante,
     });
   }
   if (tieneComprobanteAnulacion) {
@@ -335,6 +354,8 @@ export function LiquidacionesTenantPage() {
     "todos",
   );
   const [transportistaFilter, setTransportistaFilter] = useState("");
+  /** N° de comprobante: texto libre, matchea "0003-00000062", "3-62", "62" o el N° del proveedor. */
+  const [numeroFilter, setNumeroFilter] = useState("");
   const [periodoDesdeFilter, setPeriodoDesdeFilter] = useState("");
   const [periodoHastaFilter, setPeriodoHastaFilter] = useState("");
 
@@ -360,6 +381,7 @@ export function LiquidacionesTenantPage() {
   function limpiarFiltros() {
     setEstadoFilter("todos");
     setTransportistaFilter("");
+    setNumeroFilter("");
     setPeriodoDesdeFilter("");
     setPeriodoHastaFilter("");
     setPage(1);
@@ -367,6 +389,7 @@ export function LiquidacionesTenantPage() {
 
   const anyFiltroActivo =
     (hasArca && estadoFilter !== "todos") ||
+    !!numeroFilter.trim() ||
     !!transportistaFilter ||
     !!periodoDesdeFilter ||
     !!periodoHastaFilter;
@@ -406,6 +429,10 @@ export function LiquidacionesTenantPage() {
   const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
     string | null
   >(null);
+  /** Liquidación sin ARCA a la que se le adjunta el comprobante (modal). */
+  const [adjuntarLiq, setAdjuntarLiq] = useState<LiquidacionConTransportista | null>(
+    null,
+  );
   const [detail, setDetail] = useState<
     | { mode: "view"; liq: LiquidacionConTransportista }
     | { mode: "edit"; liq: LiquidacionConTransportista }
@@ -577,6 +604,42 @@ export function LiquidacionesTenantPage() {
       { replace: true },
     );
   }, [searchParams, setSearchParams]);
+
+  /**
+   * "Adjuntar comprobante" (sin ARCA): sube el archivo y guarda archivo + N° de factura
+   * del proveedor (mismos campos que la edición de la liquidación).
+   */
+  async function guardarAdjuntoLiquidacion(
+    liq: LiquidacionConTransportista,
+    datos: { numero: string; file: File },
+  ) {
+    const comprobanteUrl = await uploadComprobante(
+      () => getToken(),
+      datos.file,
+      "integracion-arca",
+      isSuperAdmin ? activeTenantId : undefined,
+    );
+    const updated = await apiJson<LiquidacionConTransportista>(
+      `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}?tenantId=${encodeURIComponent(activeTenantId)}`,
+      () => getToken(),
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          comprobanteUrl,
+          numeroComprobanteProveedor: datos.numero || null,
+        }),
+      },
+    );
+    const merged = {
+      ...updated,
+      transportista: updated.transportista ?? liq.transportista,
+      conceptosLineas: updated.conceptosLineas ?? liq.conceptosLineas,
+    };
+    setRows((prev) => prev?.map((r) => (r.id === liq.id ? merged : r)) ?? prev);
+    setDetail((d) => (d && d.liq.id === liq.id ? { ...d, liq: merged } : d));
+    setAdjuntarLiq(null);
+    showToast("Comprobante adjuntado", "success");
+  }
 
   /** Al cerrar el modal de emisión (emitida, guardada o con error de ARCA): refresca la fila. */
   function onEmitirSuccess(updated: LiquidacionConTransportista) {
@@ -784,6 +847,42 @@ export function LiquidacionesTenantPage() {
     }
   }
 
+  /**
+   * Clip de la grilla: adjunto subido (manual) o PDF del CVLP si se emitió por ARCA
+   * (no tiene URL guardada, se genera al pedirlo). Sin comprobante, sin clip.
+   */
+  function abrirComprobanteClip(liq: LiquidacionConTransportista): (() => void) | undefined {
+    if (liq.comprobanteUrl?.trim()) return () => setPreviewComprobanteUrl(liq.comprobanteUrl);
+    if (liq.cbteNro != null) return () => void verPdf(liq);
+    return undefined;
+  }
+
+  /**
+   * N° de comprobante: el del CVLP (PV-número) con ARCA, o el de la factura del proveedor
+   * sin ARCA. Sin número: "" si tiene adjunto (queda solo el clip), "—" si no tiene nada.
+   */
+  function numeroLiquidacion(liq: LiquidacionConTransportista): string {
+    if (liq.cbteNro != null) return nroComprobante(liq.ptoVenta, liq.cbteNro);
+    const proveedor = liq.numeroComprobanteProveedor?.trim();
+    if (proveedor) return proveedor;
+    // Sin ARCA y sin adjunto se ofrece "Adjuntar comprobante" en lugar del "—".
+    return liq.comprobanteUrl?.trim() || !hasArca ? "" : "—";
+  }
+
+  /**
+   * Filtro de Número: compara contra el formato completo ("0003-00000062") y sin ceros a
+   * la izquierda ("3-62"), así matchea como lo escriba el usuario.
+   */
+  function coincideNumeroLiquidacion(liq: LiquidacionConTransportista, q: string): boolean {
+    const busqueda = q.trim().toLowerCase();
+    const proveedor = liq.numeroComprobanteProveedor?.trim().toLowerCase();
+    if (proveedor?.includes(busqueda)) return true;
+    if (liq.cbteNro == null) return false;
+    const completo = nroComprobante(liq.ptoVenta, liq.cbteNro);
+    const corto = `${liq.ptoVenta ?? 0}-${liq.cbteNro}`;
+    return completo.includes(busqueda) || corto.includes(busqueda);
+  }
+
   function verPdf(liq: LiquidacionConTransportista) {
     const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
     return verPdfEnPestania(
@@ -800,6 +899,19 @@ export function LiquidacionesTenantPage() {
       "Error al generar el PDF de la anulación",
       liq.id,
     );
+  }
+
+  /**
+   * Segundo clip (rojo) de la columna Comprobante: el comprobante que anuló la liquidación
+   * (NC/ND de ARCA o el adjunto de la anulación manual). Mismo criterio que "Ver anulación".
+   */
+  function abrirAnulacionClip(liq: LiquidacionConTransportista): (() => void) | undefined {
+    if (!hasArca || liq.estado !== "anulado") return undefined;
+    if (liq.anulacionMetodo === "manual") {
+      const url = liq.anulacionManualComprobanteUrl?.trim();
+      return url ? () => window.open(url, "_blank", "noopener,noreferrer") : undefined;
+    }
+    return liq.anulacionCae ? () => void verPdfAnulacion(liq) : undefined;
   }
 
   function accionesProps(liq: LiquidacionConTransportista) {
@@ -860,6 +972,7 @@ export function LiquidacionesTenantPage() {
         if (hasArca) void verPdf(liq);
         else if (liq.comprobanteUrl) setPreviewComprobanteUrl(liq.comprobanteUrl);
       },
+      onAdjuntarComprobante: !hasArca ? () => setAdjuntarLiq(liq) : undefined,
     };
   }
 
@@ -868,6 +981,8 @@ export function LiquidacionesTenantPage() {
         if (hasArca && estadoFilter !== "todos" && r.estado !== estadoFilter)
           return false;
         if (transportistaFilter && r.transportistaId !== transportistaFilter)
+          return false;
+        if (numeroFilter.trim() && !coincideNumeroLiquidacion(r, numeroFilter))
           return false;
         if (
           periodoDesdeFilter &&
@@ -1008,9 +1123,35 @@ export function LiquidacionesTenantPage() {
 
       <ListadoDatos
         className="mt-6"
-        tableColSpan={(hasArca ? 8 : 7) - (mostrarPeriodo ? 0 : 1)}
+        tableColSpan={(hasArca ? 9 : 8) - (mostrarPeriodo ? 0 : 1)}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                <ViajesListadoHeaderFiltro
+                  title="Comprobante"
+                  filterActive={!!numeroFilter.trim()}
+                  filterSignature={numeroFilter}
+                  onClear={() => {
+                    setNumeroFilter("");
+                    setPage(1);
+                  }}
+                >
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={numeroFilter}
+                    onChange={(e) => {
+                      setNumeroFilter(e.target.value);
+                      setPage(1);
+                    }}
+                    placeholder={hasArca ? "Ej. 0003-00000062" : "N° de comprobante"}
+                    aria-label="Filtrar por número de comprobante"
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      numeroFilter.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
+                    }`}
+                  />
+                </ViajesListadoHeaderFiltro>
+              </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Transportista"
@@ -1125,13 +1266,49 @@ export function LiquidacionesTenantPage() {
           </tr>
         }
         columns={[
+          // N° de comprobante (CVLP con ARCA, factura del proveedor sin ARCA) + clip,
+          // como la columna Número de Facturas.
+          {
+            id: "comprobante",
+            header: "Comprobante",
+            cell: (liq: LiquidacionConTransportista) => (
+              <span className="flex items-center gap-1.5 font-medium tabular-nums whitespace-nowrap">
+                {numeroLiquidacion(liq)}
+                {abrirComprobanteClip(liq) ? (
+                  <ComprobanteAdjuntoClip
+                    onClick={abrirComprobanteClip(liq)!}
+                    conTexto={!numeroLiquidacion(liq)}
+                  />
+                ) : (
+                  !hasArca && (
+                    <AdjuntarComprobanteClip
+                      onClick={() => setAdjuntarLiq(liq)}
+                      conTexto={!numeroLiquidacion(liq)}
+                    />
+                  )
+                )}
+                {abrirAnulacionClip(liq) && (
+                  <ComprobanteAdjuntoClip
+                    onClick={abrirAnulacionClip(liq)!}
+                    tono="anulacion"
+                    titulo={
+                      liq.anulacionMetodo === "manual"
+                        ? "Ver comprobante de anulación manual"
+                        : `Ver ${anulacionComprobanteLabel(liq.anulacionCbteTipo)}`
+                    }
+                  />
+                )}
+              </span>
+            ),
+            tdClassName: listadoTablaTdClass,
+          },
           {
             id: "transportista",
             header: "Transportista",
             primary: true,
             cell: (liq) => (
               <p
-                className="font-medium"
+                className="flex items-center gap-1.5 font-medium"
                 title={
                   liq.transportista?.idFiscal
                     ? `CUIT: ${liq.transportista.idFiscal}`
@@ -1263,8 +1440,18 @@ export function LiquidacionesTenantPage() {
         renderMobileCard={(liq) => (
           <ListadoCard
             onClick={() => setAccionesAbiertoLiqId(liq.id)}
-            primary={transportistaNombre(liq)}
+            primary={
+              <span className="inline-flex items-center gap-1.5">
+                {transportistaNombre(liq)}
+                {abrirComprobanteClip(liq) && (
+                  <ComprobanteAdjuntoClip onClick={abrirComprobanteClip(liq)!} />
+                )}
+              </span>
+            }
             fields={[
+              ...(numeroLiquidacion(liq)
+                ? [{ label: "Comprobante", value: numeroLiquidacion(liq) }]
+                : []),
               ...(mostrarPeriodo
                 ? [
                     {
@@ -1527,6 +1714,16 @@ export function LiquidacionesTenantPage() {
         </div>
       )}
 
+      {adjuntarLiq && (
+        <AdjuntarComprobanteModal
+          titulo={`Liquidación a ${transportistaNombre(adjuntarLiq)}`}
+
+          numeroInicial={adjuntarLiq.numeroComprobanteProveedor}
+          onClose={() => setAdjuntarLiq(null)}
+          onGuardar={(datos) => guardarAdjuntoLiquidacion(adjuntarLiq, datos)}
+        />
+      )}
+
       {previewComprobanteUrl && (
         <AdjuntoPreviewModal
           url={previewComprobanteUrl}
@@ -1611,6 +1808,9 @@ export function LiquidacionesTenantPage() {
             hasArca && detail.liq.estado === "pendiente_anulacion"
               ? () => setConfirmarAnulacionManualTarget(detail.liq)
               : undefined
+          }
+          onAdjuntarComprobante={
+            !hasArca ? () => setAdjuntarLiq(detail.liq) : undefined
           }
         />
       )}

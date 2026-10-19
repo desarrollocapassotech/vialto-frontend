@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Ban, Banknote, FileText, Receipt, RotateCw } from 'lucide-react';
+import { Ban, Banknote, FileText, Paperclip, Receipt, RotateCw } from 'lucide-react';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import {
   idPropio2Habilitado as idPropio2HabilitadoTenant,
@@ -98,6 +98,7 @@ export function FacturaViewModal({
   onClose,
   onEditar,
   onVerComprobante,
+  onAdjuntarComprobante,
   onEmitirArca,
   onAnular,
   onMarcarCobrada,
@@ -113,6 +114,8 @@ export function FacturaViewModal({
   onClose: () => void;
   onEditar: () => void;
   onVerComprobante?: () => void;
+  /** Solo sin ARCA: botón "Adjuntar comprobante" si la factura todavía no tiene archivo. */
+  onAdjuntarComprobante?: () => void;
   onEmitirArca?: () => void;
   onAnular?: () => void;
   onVerNotaCredito?: () => void;
@@ -413,6 +416,16 @@ export function FacturaViewModal({
             >
               <FileText className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
               {puedeVerNotaCredito ? 'Ver comprobante original' : 'Ver comprobante'}
+            </button>
+          )}
+          {onAdjuntarComprobante && !emitidaEnArca && !factura.comprobanteUrl?.trim() && (
+            <button
+              type="button"
+              onClick={onAdjuntarComprobante}
+              className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+            >
+              <Paperclip className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+              Adjuntar comprobante
             </button>
           )}
           {puedeVerNotaCredito && (
