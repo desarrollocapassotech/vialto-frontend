@@ -214,9 +214,7 @@ export function RegistrarPagoTransportistaModal({
                     )}
                   </div>
                   <span className="text-right text-vialto-steel tabular-nums">
-                    {p.fecha
-                      ? fmtDateUtc(p.fecha)
-                      : "—"}
+                    {fmtDateUtc(p.fecha)}
                   </span>
                 </div>
               ))}

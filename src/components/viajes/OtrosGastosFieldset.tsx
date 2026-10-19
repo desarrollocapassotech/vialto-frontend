@@ -10,6 +10,7 @@ import { resolveClerkUserLabel } from '@/lib/clerkUserLabels';
 import { useOrgUserLabels } from '@/hooks/useOrgUserLabels';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ClienteCard } from '@/components/viajes/ViajeClientesFieldset';
+import { fechaDiaYmd } from '@/lib/fmtDateUtc';
 import type { OtroGasto } from '@/types/api';
 
 export type OtroGastoAutor = { id: string; label: string };
@@ -96,7 +97,7 @@ export function otroGastoDraftFromApi(g: OtroGasto): OtroGastoDraft {
     descripcion: g.descripcion,
     montoStr: formatNumberForMoneda(g.monto, moneda),
     moneda,
-    fecha: g.fecha ?? '',
+    fecha: g.fecha ? (fechaDiaYmd(g.fecha) ?? '') : '',
     createdBy: g.createdBy,
     createdByLabel: g.createdByLabel,
   };
@@ -112,7 +113,7 @@ export function otroGastoDraftToApi(
     monto,
     moneda: d.moneda,
   };
-  if (d.fecha.trim()) out.fecha = d.fecha.trim();
+  if (d.fecha.trim()) out.fecha = fechaDiaYmd(d.fecha.trim()) ?? d.fecha.trim();
   if (d.createdBy?.trim()) out.createdBy = d.createdBy.trim();
   return out;
 }

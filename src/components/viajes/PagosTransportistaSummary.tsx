@@ -75,9 +75,7 @@ export function PagosTransportistaSummary({ viaje, onRegistrarPago }: Props) {
                 {formatViajeImporteForListado(p.monto, p.moneda)}
               </span>
               <span className="text-vialto-steel">
-                {p.fecha
-                  ? fmtDateUtc(p.fecha)
-                  : '—'}
+                {fmtDateUtc(p.fecha)}
               </span>
               {p.observaciones && (
                 <span className="text-vialto-steel/70">{p.observaciones}</span>
