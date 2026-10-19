@@ -3692,7 +3692,8 @@ export function ViajesTenantPage({
         <ViajeViewModal
           viaje={viewingViaje}
           tenantId={platform ? tid : undefined}
-          hasLiquidoProductoArca={hasLiquidoProductoArca}
+          modulos={platform ? tenantModules : currentTenant?.modules}
+          hasLiquidoProductoArca={hasLiquidoProductoArcaResuelto}
           editando={abriendoEditorViaje}
           onClose={() => setViewingViaje(null)}
           onEditar={() => {

@@ -33,8 +33,12 @@ type Props = {
   onRegistrarPago?: () => void;
   /** Si se pasa, el modal de detalle (sin liquidación vinculada) ofrece "Liquidar". */
   onLiquidar?: () => void;
-  /** `icono`: ícono compacto de una sola línea (columna "Liquidación" de la grilla). */
-  variante?: "badge" | "icono";
+  /**
+   * `icono`: ícono compacto de una sola línea (columna "Liquidación" de la grilla).
+   * `link`: acción "Ver liquidación" (sección Liquidación del detalle del viaje); solo se
+   * muestra si hay una liquidación vinculada.
+   */
+  variante?: "badge" | "icono" | "link";
   /**
    * Si se pasa, el detalle de una liquidación en borrador / con error ofrece "Emitir": se
    * cierra el detalle y el host abre el modal de "Nueva liquidación" sobre esa liquidación.
@@ -85,6 +89,7 @@ export function ViajeLiquidacionIndicador({
   if (viaje.liquidacionEstado == null) return null;
   const estado = viaje.liquidacionEstado as LiquidacionEstado;
   const elegida = liquidacionElegidaDeViaje(viaje);
+  if (variante === "link" && !elegida) return null;
 
   async function handleClick() {
     if (!elegida) {
@@ -126,7 +131,16 @@ export function ViajeLiquidacionIndicador({
 
   return (
     <>
-      {variante === "icono" ? (
+      {variante === "link" ? (
+        <button
+          type="button"
+          onClick={() => void handleClick()}
+          disabled={cargando}
+          className="text-[10px] uppercase tracking-[0.12em] text-vialto-fire hover:underline disabled:cursor-wait disabled:opacity-60"
+        >
+          {cargando ? "Abriendo…" : "Ver liquidación"}
+        </button>
+      ) : variante === "icono" ? (
         <EstadoIcono
           icon={HandCoins}
           glifo={glifoEstadoComprobante(estado)}
