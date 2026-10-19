@@ -30,8 +30,12 @@ type Props = {
   onFacturar?: () => void;
   /** Columna ETAPA del listado: el badge ocupa todo el ancho disponible en vez de su ancho de contenido. */
   fullWidth?: boolean;
-  /** `icono`: ícono compacto de una sola línea (columna "Factura" de la grilla). */
-  variante?: "badge" | "icono";
+  /**
+   * `icono`: ícono compacto de una sola línea (columna "Factura" de la grilla).
+   * `link`: acción "Ver factura" (sección Facturación del detalle del viaje); solo se
+   * muestra si hay una factura vinculada o un `onClickOverride`.
+   */
+  variante?: "badge" | "icono" | "link";
   /** Config "ID Propio 2" de la empresa (superadmin); sin prop el modal usa la empresa propia. */
   idPropio2Habilitado?: boolean;
   idPropio2Label?: string;
@@ -97,9 +101,20 @@ export function ViajeFacturacionIndicador({
   const tooltip =
     (viaje.clientesViaje ?? []).length > 0 ? displayLabel : tooltipFacturacionEstado(viaje);
 
+  if (variante === "link" && !viaje.factura && !onClickOverride) return null;
+
   return (
     <>
-      {variante === "icono" ? (
+      {variante === "link" ? (
+        <button
+          type="button"
+          onClick={() => void handleClick()}
+          disabled={cargando}
+          className="text-[10px] uppercase tracking-[0.12em] text-vialto-fire hover:underline disabled:cursor-wait disabled:opacity-60"
+        >
+          {cargando ? "Abriendo…" : "Ver factura"}
+        </button>
+      ) : variante === "icono" ? (
         <EstadoIcono
           icon={Receipt}
           glifo={glifoEstadoComprobante(agregado)}
