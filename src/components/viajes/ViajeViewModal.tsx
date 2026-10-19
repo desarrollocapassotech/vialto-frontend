@@ -32,14 +32,10 @@ import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionI
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
 import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
 import { numeroVisibleViaje, viajeUsaNumeroInterno } from "@/lib/viajesFlota";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 
 function fmtDate(iso: string | null | undefined) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return fmtDateUtc(iso);
 }
 
 function fmtMonto(monto: number | null | undefined, moneda?: string | null) {
