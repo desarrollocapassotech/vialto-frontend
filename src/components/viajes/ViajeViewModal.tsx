@@ -4,7 +4,6 @@ import {
   ViewModalShell,
   viewModalBtnGhost,
   viewModalBtnPrimary,
-  viewModalGridClass,
 } from "@/components/ui/ViewModalShell";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { listadoTablaTdClass, listadoTablaThClass } from "@/lib/listadoTabla";
@@ -23,16 +22,43 @@ import {
   etapaViajeBadgeClassDefault,
   etapaViajeLabel,
   facturacionEstadoAgregado,
+  facturacionEstadoBadgeClass,
   facturacionEstadoLabel,
   facturacionPermiteVincular,
+  liquidacionEstadoBadgeClass,
+  liquidacionEstadoLabel,
   tooltipFacturacionEstado,
   tooltipLiquidacionEstado,
+  type LiquidacionEstado,
 } from "@/lib/viajesIndicadores";
 import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
 import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
 import { numeroVisibleViaje, viajeUsaNumeroInterno } from "@/lib/viajesFlota";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
+import { Dato, DatosCabecera } from "@/components/shared/DetalleComprobante";
+import {
+  AccionSeccionViaje,
+  BadgeEstadoViaje,
+  FilaDetalleViaje,
+  SeccionDetalleViaje,
+} from "@/components/viajes/ViajeDetalleSecciones";
+import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import {
+  canAccessEmisionFacturasArca,
+  canAccessEmisionLiquidoProductoArca,
+  canAccessFacturacion,
+  canAccessLiquidaciones,
+} from "@/lib/tenantModules";
+import { calcularSaldoTransportista } from "@/lib/viajesTransportistaPagos";
+import { nroComprobante } from "@/lib/arcaCbteTipo";
+
+/** Clase de grilla de las secciones según cuántas se muestran (clases fijas para Tailwind). */
+const SECCIONES_GRID: Record<number, string> = {
+  1: "",
+  2: "sm:grid-cols-2",
+  3: "sm:grid-cols-3",
+};
 
 function fmtDate(iso: string | null | undefined) {
   return fmtDateUtc(iso);
@@ -75,8 +101,15 @@ export function ViajeViewModal({
   onLiquidar,
   liquidando = false,
   onRegistrarPago,
+  modulos,
 }: {
   viaje: Viaje;
+  /**
+   * Módulos de la empresa del viaje. Desde superadmin pasar los de la empresa elegida
+   * (`useCurrentTenant()` ahí resuelve la org del superadmin). Si no se pasa se usan los
+   * del tenant actual; sin ninguno (superadmin sin dato) se decide por los datos del viaje.
+   */
+  modulos?: string[] | null;
   onClose: () => void;
   onEditar: () => void;
   onVerFactura?: () => void;
@@ -104,6 +137,22 @@ export function ViajeViewModal({
   const userLabelMap = useOrgUserLabels(tenantId);
   const { isVisible } = useFieldConfig("viajes");
   const productoLabelsTenant = useProductoLabels();
+  const { tenant: currentTenant } = useCurrentTenant();
+  const mods = modulos ?? currentTenant?.modules ?? null;
+  // Mismo criterio que la grilla de Viajes: Facturación (manual o ARCA) y Liquidaciones
+  // (registro manual o CVLP por ARCA). Sin módulos conocidos, decide el dato del viaje.
+  const tieneFacturacion =
+    mods == null ||
+    canAccessFacturacion(mods) ||
+    canAccessEmisionFacturasArca(mods) ||
+    !!viaje.facturaId;
+  const tieneLiqArca =
+    hasLiquidoProductoArca ||
+    (mods != null && canAccessEmisionLiquidoProductoArca(mods));
+  const tieneLiquidaciones =
+    mods == null
+      ? tieneLiqArca || viaje.liquidacionEstado != null
+      : tieneLiqArca || canAccessLiquidaciones(mods);
   const bloqueado = editando || facturando || liquidando;
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -173,7 +222,30 @@ export function ViajeViewModal({
       ]
     : [];
 
-  const campos = [
+  const ver = (key: string) => isVisible("detalle_viaje", key);
+  const fechaCargaTxt =
+    ver("fechaCarga") && viaje.fechaCarga ? fmtDate(viaje.fechaCarga) : null;
+  const fechaDescargaTxt =
+    ver("fechaDescarga") && viaje.fechaDescarga
+      ? fmtDate(viaje.fechaDescarga)
+      : null;
+  const montoClienteTxt =
+    !esMultiCliente && viaje.monto != null
+      ? fmtMonto(viaje.monto, viaje.monedaMonto)
+      : null;
+  const montoClienteSub =
+    viaje.cantidadFactura != null && viaje.precioUnitarioFactura != null
+      ? `${viaje.cantidadFactura.toLocaleString("es-AR")} × ${fmtMonto(viaje.precioUnitarioFactura, viaje.monedaMonto)}`
+      : undefined;
+
+  /** Datos generales del viaje en el bloque compacto (montos y estados van en sus secciones). */
+  const datos: {
+    key: string;
+    label: string;
+    value: string | number | null;
+    sub?: string;
+    className?: string;
+  }[] = [
     ...(esMultiCliente
       ? []
       : [{ key: "clienteId", label: "Cliente", value: clienteNombre }]),
@@ -187,31 +259,6 @@ export function ViajeViewModal({
       label: "Chofer",
       value: viaje.chofer?.nombre?.trim() || null,
     },
-    {
-      key: "precioTransportistaExterno",
-      label: "Precio transportista",
-      value:
-        viaje.precioTransportistaExterno != null ? (
-          <span className="inline-flex flex-wrap items-center gap-2">
-            <span>
-              {fmtMonto(
-                viaje.precioTransportistaExterno,
-                viaje.monedaPrecioTransportistaExterno,
-              )}
-              {isVisible(
-                "detalle_viaje",
-                "precioTransportistaIvaIncluidoPct",
-              ) && viaje.precioTransportistaIvaIncluidoPct
-                ? ` (+${viaje.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
-                : ""}
-            </span>
-            <ViajePagoTransportistaIndicador
-              viaje={viaje}
-              onClick={onRegistrarPago}
-            />
-          </span>
-        ) : null,
-    },
     ...(esMultiCliente
       ? []
       : [
@@ -222,49 +269,315 @@ export function ViajeViewModal({
               viaje.origen,
               etiquetasDestinosDesdeViaje(viaje),
             ),
+            className: "col-span-2",
           },
         ]),
-    {
-      key: "fechaCarga",
-      label: "Fecha de carga",
-      value: viaje.fechaCarga ? fmtDate(viaje.fechaCarga) : null,
-    },
-    {
-      key: "fechaDescarga",
-      label: "Fecha de descarga",
-      value: viaje.fechaDescarga ? fmtDate(viaje.fechaDescarga) : null,
-    },
+    // Carga y descarga en un solo dato; si no hay carga, la descarga va sola.
+    fechaCargaTxt
+      ? {
+          key: "fechaCarga",
+          label: "Fecha de carga",
+          value: fechaCargaTxt,
+          sub: fechaDescargaTxt ? `Descarga ${fechaDescargaTxt}` : undefined,
+        }
+      : { key: "fechaDescarga", label: "Fecha de descarga", value: fechaDescargaTxt },
     { key: "vehiculosRows", label: "Vehículos", value: vehiculoPatentes },
     ...(esMultiCliente
       ? []
       : [{ key: "productoItems", label: productoLabelsTenant.plural, value: productosDesc }]),
-    ...(esMultiCliente
+    // Sin módulo de facturación no hay sección "Facturación": el monto queda acá.
+    ...(tieneFacturacion
       ? []
       : [
           {
             key: "monto",
             label: "Monto cliente",
-            value:
-              viaje.monto != null
-                ? fmtMonto(viaje.monto, viaje.monedaMonto)
-                : null,
+            value: montoClienteTxt,
+            sub: montoClienteSub,
           },
         ]),
-    { key: "kmRecorridos", label: "KM recorridos", value: viaje.kmRecorridos },
-    {
-      key: "litrosConsumidos",
-      label: "Litros consumidos",
-      value: viaje.litrosConsumidos,
-    },
-    {
-      key: "fechaFinalizado",
-      label: "Fecha finalizado",
-      value: viaje.fechaFinalizado ? fmtDate(viaje.fechaFinalizado) : null,
-    },
-  ].filter(
-    (c) =>
-      c.value != null && c.value !== "" && isVisible("detalle_viaje", c.key),
-  );
+  ].filter((c) => c.value != null && c.value !== "" && ver(c.key));
+
+  // ── Estado ───────────────────────────────────────────────────────────────
+  const filasEstado = [
+    // La etapa (pendiente / en curso / finalizado / cancelado) va siempre: es el dato
+    // central de la sección, aunque la empresa oculte su badge en el encabezado.
+    viaje.etapa && (
+      <FilaDetalleViaje
+        key="etapa"
+        label="Etapa"
+        value={
+          <BadgeEstadoViaje
+            className={etapaViajeBadgeClass[viaje.etapa] ?? etapaViajeBadgeClassDefault}
+          >
+            {etapaViajeLabel[viaje.etapa] ?? viaje.etapa}
+          </BadgeEstadoViaje>
+        }
+      />
+    ),
+    ver("fechaFinalizado") && viaje.fechaFinalizado && (
+      <FilaDetalleViaje
+        key="fin"
+        label="Finalizado"
+        value={fmtDate(viaje.fechaFinalizado)}
+      />
+    ),
+    ver("kmRecorridos") && viaje.kmRecorridos != null && (
+      <FilaDetalleViaje
+        key="km"
+        label="KM recorridos"
+        value={viaje.kmRecorridos.toLocaleString("es-AR")}
+      />
+    ),
+    ver("litrosConsumidos") && viaje.litrosConsumidos != null && (
+      <FilaDetalleViaje
+        key="litros"
+        label="Litros consumidos"
+        value={viaje.litrosConsumidos.toLocaleString("es-AR")}
+      />
+    ),
+  ].filter(Boolean);
+
+  // ── Facturación ──────────────────────────────────────────────────────────
+  // Con un solo cliente la factura se abre encima de este modal (como la liquidación).
+  // Multi-cliente: el host elige cuál de las facturas abrir (`onVerFactura`).
+  const verFacturaOverride = esMultiCliente ? onVerFactura : undefined;
+  const estadoFact = facturacionEstadoAgregado(viaje);
+  const factura = viaje.factura;
+  const nroFactura =
+    factura?.cbteNro != null
+      ? nroComprobante(factura.ptoVenta, factura.cbteNro)
+      : factura?.numero || viaje.nroFactura;
+  const totalMultiCliente =
+    Object.entries(
+      clientesDetalle.reduce<Record<string, number>>((acc, c) => {
+        if (c.monto == null) return acc;
+        const moneda = c.monedaMonto === "USD" ? "USD" : "ARS";
+        acc[moneda] = (acc[moneda] ?? 0) + c.monto;
+        return acc;
+      }, {}),
+    )
+      .map(([moneda, total]) => fmtMonto(total, moneda))
+      .join(" + ") || "—";
+  const filasFacturacion = !tieneFacturacion
+    ? []
+    : [
+        ver("facturacionEstado") && (
+          <FilaDetalleViaje
+            key="estado"
+            label="Estado"
+            value={
+              <BadgeEstadoViaje className={facturacionEstadoBadgeClass[estadoFact]}>
+                {facturacionEstadoLabel[estadoFact]}
+              </BadgeEstadoViaje>
+            }
+            // Error de AFIP / anulada: el texto largo explica qué pasó.
+            sub={
+              !esMultiCliente &&
+              (estadoFact === "error_afip" || estadoFact === "anulado")
+                ? tooltipFacturacionEstado(viaje)
+                : undefined
+            }
+            subClassName={
+              estadoFact === "error_afip" ? "text-red-700" : "text-vialto-steel"
+            }
+          />
+        ),
+        ver("monto") && montoClienteTxt && (
+          <FilaDetalleViaje
+            key="monto"
+            label="Monto cliente"
+            value={montoClienteTxt}
+            sub={montoClienteSub}
+          />
+        ),
+        ver("facturacionEstado") && !esMultiCliente && nroFactura && (
+          <FilaDetalleViaje
+            key="factura"
+            label="Factura"
+            value={`N° ${nroFactura}`}
+            sub={
+              [
+                factura?.fechaEmision ? `Emitida ${fmtDate(factura.fechaEmision)}` : null,
+                factura?.cae ? `CAE ${factura.cae}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || undefined
+            }
+          />
+        ),
+        ver("facturacionEstado") &&
+          !esMultiCliente &&
+          viaje.montoFacturadoReal != null && (
+            <FilaDetalleViaje
+              key="facturadoReal"
+              label="Facturado"
+              value={fmtMonto(
+                viaje.montoFacturadoReal,
+                viaje.monedaMontoFacturadoReal,
+              )}
+            />
+          ),
+      ].filter(Boolean);
+
+  // ── Liquidación / pago al transportista ──────────────────────────────────
+  const conTransportista = !!viaje.transportistaId;
+  const precioTransportistaFila = ver("precioTransportistaExterno") &&
+    viaje.precioTransportistaExterno != null && (
+      <FilaDetalleViaje
+        key="precio"
+        label="Precio transportista"
+        value={fmtMonto(
+          viaje.precioTransportistaExterno,
+          viaje.monedaPrecioTransportistaExterno,
+        )}
+        sub={
+          [
+            viaje.cantidadTransportista != null &&
+            viaje.precioUnitarioTransportista != null
+              ? `${viaje.cantidadTransportista.toLocaleString("es-AR")} × ${fmtMonto(viaje.precioUnitarioTransportista, viaje.monedaPrecioTransportistaExterno)}`
+              : null,
+            ver("precioTransportistaIvaIncluidoPct") &&
+            viaje.precioTransportistaIvaIncluidoPct
+              ? `+${viaje.precioTransportistaIvaIncluidoPct}% IVA en efectivo`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ") || undefined
+        }
+      />
+    );
+  const estadoLiq = viaje.liquidacionEstado as LiquidacionEstado | null;
+  const saldoTransportista =
+    !tieneLiquidaciones && ver("pagosTransportista")
+      ? calcularSaldoTransportista(viaje)
+      : null;
+  const filasLiquidacion = !conTransportista
+    ? []
+    : tieneLiquidaciones
+      ? [
+          // Estado primero, alineado con el de Etapa y Facturación.
+          ver("liquidacionEstado") && estadoLiq && (
+            <FilaDetalleViaje
+              key="estado"
+              label="Estado"
+              value={
+                <BadgeEstadoViaje className={liquidacionEstadoBadgeClass[estadoLiq]}>
+                  {liquidacionEstadoLabel[estadoLiq] ?? estadoLiq}
+                </BadgeEstadoViaje>
+              }
+              sub={
+                estadoLiq === "error_afip" || estadoLiq === "anulado"
+                  ? tooltipLiquidacionEstado(viaje)
+                  : undefined
+              }
+              subClassName={
+                estadoLiq === "error_afip" ? "text-red-700" : "text-vialto-steel"
+              }
+            />
+          ),
+          precioTransportistaFila,
+          ...(ver("liquidacionEstado") ? viaje.liquidacionesViaje ?? [] : []).map(
+            (lv) => {
+              const l = lv.liquidacion;
+              return (
+                <FilaDetalleViaje
+                  key={lv.liquidacionId}
+                  label="Liquidación"
+                  value={fmtMonto(lv.monto ?? l.liquido)}
+                  sub={
+                    [
+                      l.cbteNro != null
+                        ? `N° ${nroComprobante(l.ptoVenta, l.cbteNro)}`
+                        : null,
+                      l.cae ? `CAE ${l.cae}` : null,
+                      l.anuladoAt ? "Anulada" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || undefined
+                  }
+                />
+              );
+            },
+          ),
+        ].filter(Boolean)
+      : [
+          precioTransportistaFila,
+          saldoTransportista && saldoTransportista.totalAcordado > 0 && (
+            <FilaDetalleViaje
+              key="pagado"
+              label="Pagado"
+              value={fmtMonto(saldoTransportista.totalPagado, saldoTransportista.moneda)}
+            />
+          ),
+          saldoTransportista && saldoTransportista.totalAcordado > 0 && (
+            <FilaDetalleViaje
+              key="saldo"
+              label="Saldo"
+              value={
+                saldoTransportista.pagado ? (
+                  <BadgeEstadoViaje className="border-emerald-500/80 bg-emerald-100 text-emerald-950">
+                    Pagado
+                  </BadgeEstadoViaje>
+                ) : (
+                  fmtMonto(saldoTransportista.saldo, saldoTransportista.moneda)
+                )
+              }
+            />
+          ),
+        ].filter(Boolean);
+
+  const secciones = [
+    filasEstado.length > 0 && (
+      <SeccionDetalleViaje key="estado" titulo="Estado">
+        {filasEstado}
+      </SeccionDetalleViaje>
+    ),
+    filasFacturacion.length > 0 && (
+      <SeccionDetalleViaje
+        key="facturacion"
+        titulo="Facturación"
+        accion={
+          !bloqueado && ver("facturacionEstado") ? (
+            <ViajeFacturacionIndicador
+              viaje={viaje}
+              tenantId={tenantId}
+              onClickOverride={verFacturaOverride}
+              variante="link"
+            />
+          ) : undefined
+        }
+      >
+        {filasFacturacion}
+      </SeccionDetalleViaje>
+    ),
+    filasLiquidacion.length > 0 && (
+      <SeccionDetalleViaje
+        key="liquidacion"
+        titulo={tieneLiquidaciones ? "Liquidación" : "Pago al transportista"}
+        accion={
+          tieneLiquidaciones ? (
+            !bloqueado && ver("liquidacionEstado") ? (
+              <ViajeLiquidacionIndicador
+                viaje={viaje}
+                tenantId={tenantId}
+                hasArca={tieneLiqArca}
+                variante="link"
+              />
+            ) : undefined
+          ) : !tieneLiquidaciones &&
+          onRegistrarPago &&
+          !bloqueado &&
+          saldoTransportista &&
+          !saldoTransportista.pagado ? (
+            <AccionSeccionViaje onClick={onRegistrarPago}>Registrar pago</AccionSeccionViaje>
+          ) : undefined
+        }
+      >
+        {filasLiquidacion}
+      </SeccionDetalleViaje>
+    ),
+  ].filter(Boolean);
 
   return (
     <ViewModalShell
@@ -286,15 +599,15 @@ export function ViajeViewModal({
             </span>
           )}
           <span className="inline-flex items-center gap-1.5">
-            {isVisible("detalle_viaje", "facturacionEstado") && (
-              <ViajeFacturacionIndicador viaje={viaje} tenantId={tenantId} onClickOverride={onVerFactura} />
+            {tieneFacturacion && isVisible("detalle_viaje", "facturacionEstado") && (
+              <ViajeFacturacionIndicador viaje={viaje} tenantId={tenantId} onClickOverride={verFacturaOverride} />
             )}
             {isVisible("detalle_viaje", "liquidacionEstado") && (
-              hasLiquidoProductoArca ? (
+              tieneLiquidaciones ? (
                 <ViajeLiquidacionIndicador
                   viaje={viaje}
                   tenantId={tenantId}
-                  hasArca={hasLiquidoProductoArca}
+                  hasArca={tieneLiqArca}
                   onRegistrarPago={onRegistrarPago}
                 />
               ) : (
@@ -308,7 +621,7 @@ export function ViajeViewModal({
         </span>
       }
       onClose={bloqueado ? () => {} : onClose}
-      maxWidthClass="sm:max-w-4xl"
+      maxWidthClass="sm:max-w-6xl"
       scrollBody
       footer={
         <>
@@ -390,53 +703,46 @@ export function ViajeViewModal({
     >
       <div className="flex flex-col divide-y divide-black/5">
         <div className="flex flex-col gap-4 pb-5">
-          <div className={viewModalGridClass}>
-            <div>
-              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                Facturación
-              </p>
-              <p className="mt-1 text-sm">
-                {esMultiCliente
-                  ? facturacionEstadoLabel[facturacionEstadoAgregado(viaje)]
-                  : tooltipFacturacionEstado(viaje)}
-              </p>
-            </div>
-            {viaje.liquidacionEstado != null && (
-              <div>
-                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                  Liquidación
-                </p>
-                <p className="mt-1 text-sm">
-                  {tooltipLiquidacionEstado(viaje)}
-                </p>
-              </div>
-            )}
-            {campos.map((c, i) => (
-              <div key={i}>
-                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                  {c.label}
-                </p>
-                <p className="mt-1 text-sm">{c.value}</p>
-              </div>
-            ))}
-          </div>
-          {isVisible("detalle_viaje", "detalleCarga") && viaje.detalleCarga && (
-            <div>
-              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                Detalle de carga
-              </p>
-              <p className="mt-1 text-sm">{viaje.detalleCarga}</p>
+          {/* Datos generales del viaje en un bloque compacto (igual que Facturas/Liquidaciones). */}
+          {datos.length > 0 && (
+            <DatosCabecera>
+              {datos.map((d) => (
+                <Dato
+                  key={d.key}
+                  label={d.label}
+                  value={d.value}
+                  sub={d.sub}
+                  className={d.className}
+                />
+              ))}
+            </DatosCabecera>
+          )}
+          {((ver("detalleCarga") && viaje.detalleCarga) ||
+            (ver("observaciones") && viaje.observaciones)) && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {ver("detalleCarga") && viaje.detalleCarga && (
+                <div className="min-w-0">
+                  <p className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel">
+                    Detalle de carga
+                  </p>
+                  <p className="mt-0.5 whitespace-pre-line text-sm">{viaje.detalleCarga}</p>
+                </div>
+              )}
+              {ver("observaciones") && viaje.observaciones && (
+                <div className="min-w-0">
+                  <p className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel">
+                    Observaciones
+                  </p>
+                  <p className="mt-0.5 whitespace-pre-line text-sm">{viaje.observaciones}</p>
+                </div>
+              )}
             </div>
           )}
-          {isVisible("detalle_viaje", "observaciones") &&
-            viaje.observaciones && (
-              <div>
-                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                  Observaciones
-                </p>
-                <p className="mt-1 whitespace-pre-line text-sm">{viaje.observaciones}</p>
-              </div>
-            )}
+          {secciones.length > 0 && (
+            <div className={`grid items-start gap-4 ${SECCIONES_GRID[secciones.length] ?? ""}`}>
+              {secciones}
+            </div>
+          )}
         </div>
 
         {esMultiCliente && (
@@ -502,17 +808,7 @@ export function ViajeViewModal({
               emptyMessage="Sin clientes."
             />
             <p className="mt-2 text-right text-xs text-vialto-steel">
-              Total del viaje:{" "}
-              {Object.entries(
-                clientesDetalle.reduce<Record<string, number>>((acc, c) => {
-                  if (c.monto == null) return acc;
-                  const moneda = c.monedaMonto === "USD" ? "USD" : "ARS";
-                  acc[moneda] = (acc[moneda] ?? 0) + c.monto;
-                  return acc;
-                }, {}),
-              )
-                .map(([moneda, total]) => fmtMonto(total, moneda))
-                .join(" + ") || "—"}
+              Total del viaje: {totalMultiCliente}
             </p>
           </div>
         )}
