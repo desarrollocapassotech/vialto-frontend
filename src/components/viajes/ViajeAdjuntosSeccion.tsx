@@ -303,9 +303,6 @@ export function AgregarDocumentoViajeModal({
             </>
           }
         />
-        <p className="text-xs text-vialto-steel">
-          Quedan {fmtBytes(disponibles)} de los 10 MB del viaje.
-        </p>
       </div>
     </ViewModalShell>
   );
