@@ -678,7 +678,7 @@ export function FacturaEditModal({
             {!hasArca && (
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                  Número (opcional)
+                  Número de comprobante
                 </label>
                 <input
                   type="text"

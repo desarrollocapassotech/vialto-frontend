@@ -1731,7 +1731,7 @@ export function CrearLiquidacionManualModal({
                   {showComprobante && (
                     <div>
                       <label htmlFor="numeroComprobanteProveedor" className={labelClass}>
-                        N° de factura del proveedor
+                        Número de comprobante
                       </label>
                       <input
                         id="numeroComprobanteProveedor"

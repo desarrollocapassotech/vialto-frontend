@@ -1,5 +1,6 @@
 import { detectarTipoAdjunto } from '@/lib/adjuntoPreview';
 import { fetchRemitoAdjuntoBlob } from '@/lib/stockRemitoAdjunto';
+import { apiFetch } from '@/lib/api';
 
 /**
  * Cloudinary (raw/PDF) fuerza la descarga si se abre la URL directa. Traemos el archivo
@@ -48,7 +49,14 @@ function escribirEnPestana(win: Window, titulo: string, mensaje: string, esError
  * no, el navegador la bloquea como popup), muestra "Cargando…" y después el archivo.
  */
 export async function abrirAdjuntoEnPestana(
-  origen: { url?: string; file?: File; movimientoId?: string; tenantId?: string },
+  origen: {
+    url?: string;
+    file?: File;
+    movimientoId?: string;
+    tenantId?: string;
+    /** PDF que genera la API al pedirlo (ej. CVLP de una liquidación ARCA), con token. */
+    apiPath?: string;
+  },
   getToken: () => Promise<string | null>,
   titulo = 'Comprobante',
 ) {
@@ -60,6 +68,10 @@ export async function abrirAdjuntoEnPestana(
       objectUrl = URL.createObjectURL(origen.file);
     } else if (origen.url) {
       objectUrl = await fetchUrlComoBlob(origen.url);
+    } else if (origen.apiPath) {
+      const res = await apiFetch(origen.apiPath, getToken);
+      if (!res.ok) throw new Error('No se pudo generar el comprobante.');
+      objectUrl = URL.createObjectURL(await res.blob());
     } else if (origen.movimientoId) {
       objectUrl = (await fetchRemitoAdjuntoBlob(origen.movimientoId, getToken, origen.tenantId))
         .objectUrl;

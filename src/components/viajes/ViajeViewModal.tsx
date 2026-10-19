@@ -1,4 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
+import { useAuth } from "@clerk/clerk-react";
+import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
+import { ComprobanteAdjuntoClip } from "@/components/shared/ComprobanteAdjuntoClip";
 import { Banknote, Receipt } from "lucide-react";
 import {
   ViewModalShell,
@@ -41,6 +44,7 @@ import {
   BadgeEstadoViaje,
   FilaDetalleViaje,
   SeccionDetalleViaje,
+  VerComprobanteAdjunto,
 } from "@/components/viajes/ViajeDetalleSecciones";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import {
@@ -142,6 +146,36 @@ export function ViajeViewModal({
   const { isVisible } = useFieldConfig("viajes");
   const productoLabelsTenant = useProductoLabels();
   const { tenant: currentTenant } = useCurrentTenant();
+  const { getToken } = useAuth();
+  /** Comprobante adjunto en pestaña nueva (mismo helper que el resto del sistema). */
+  function verAdjunto(url: string | null | undefined) {
+    if (url?.trim()) void abrirAdjuntoEnPestana({ url }, () => getToken());
+  }
+  /** Valor de fila + clip clickeable si el comprobante tiene adjunto. */
+  function conAdjunto(abrir: (() => void) | undefined, children: ReactNode) {
+    if (!abrir) return <>{children}</>;
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <ComprobanteAdjuntoClip onClick={abrir} />
+        {children}
+      </span>
+    );
+  }
+  /**
+   * Comprobante de una liquidación: el adjunto si es manual, o el PDF del CVLP que
+   * genera la API si se emitió por ARCA (no tiene URL guardada).
+   */
+  function abrirComprobanteLiquidacion(l: {
+    id: string;
+    comprobanteUrl?: string | null;
+    cbteNro?: number | null;
+  }): (() => void) | undefined {
+    if (l.comprobanteUrl?.trim()) return () => verAdjunto(l.comprobanteUrl);
+    if (l.cbteNro == null) return undefined;
+    const q = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
+    const apiPath = `/api/integracion-arca/liquidaciones/${encodeURIComponent(l.id)}/pdf${q}`;
+    return () => void abrirAdjuntoEnPestana({ apiPath }, () => getToken(), "Liquidación");
+  }
   const mods = modulos ?? currentTenant?.modules ?? null;
   // Mismo criterio que la grilla de Viajes: Facturación (manual o ARCA) y Liquidaciones
   // (registro manual o CVLP por ARCA). Sin módulos conocidos, decide el dato del viaje.
@@ -273,7 +307,6 @@ export function ViajeViewModal({
               viaje.origen,
               etiquetasDestinosDesdeViaje(viaje),
             ),
-            className: "col-span-2",
           },
         ]),
     // Carga y descarga en un solo dato; si no hay carga, la descarga va sola.
@@ -399,14 +432,28 @@ export function ViajeViewModal({
           <FilaDetalleViaje
             key="factura"
             label="Factura"
-            value={`N° ${nroFactura}`}
+            value={conAdjunto(
+              factura?.comprobanteUrl?.trim()
+                ? () => verAdjunto(factura.comprobanteUrl)
+                : undefined,
+              `N° ${nroFactura}`,
+            )}
             sub={
-              [
-                factura?.fechaEmision ? `Emitida ${fmtDate(factura.fechaEmision)}` : null,
-                factura?.cae ? `CAE ${factura.cae}` : null,
-              ]
-                .filter(Boolean)
-                .join(" · ") || undefined
+              <>
+                {[
+                  factura?.fechaEmision ? `Emitida ${fmtDate(factura.fechaEmision)}` : null,
+                  factura?.cae ? `CAE ${factura.cae}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || null}
+                {factura?.comprobanteUrl?.trim() && (
+                  <span className="block">
+                    <VerComprobanteAdjunto
+                      onClick={() => verAdjunto(factura.comprobanteUrl)}
+                    />
+                  </span>
+                )}
+              </>
             }
           />
         ),
@@ -481,27 +528,59 @@ export function ViajeViewModal({
             />
           ),
           precioTransportistaFila,
-          ...(ver("liquidacionEstado") ? viaje.liquidacionesViaje ?? [] : []).map(
+          // Igual que Facturación: una fila con el comprobante ("Liquidación") y otra con
+          // el importe ("Liquidado").
+          // Ya liquidado: las liquidaciones anuladas (reemplazadas) no se listan.
+          ...(ver("liquidacionEstado") ? viaje.liquidacionesViaje ?? [] : [])
+            .filter(
+              (lv) =>
+                estadoLiq !== "liquidado" ||
+                (lv.liquidacion.estado !== "anulado" && !lv.liquidacion.anuladoAt),
+            )
+            .flatMap(
             (lv) => {
               const l = lv.liquidacion;
-              return (
+              const subComprobante =
+                [
+                  // Misma fecha que el PDF del CVLP (alta de la liquidación).
+                  l.createdAt
+                    ? `${l.cbteNro != null ? "Emitida" : "Cargada"} ${fmtDate(l.createdAt)}`
+                    : null,
+                  l.cae ? `CAE ${l.cae}` : null,
+                  l.anuladoAt ? "Anulada" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || null;
+              const abrirComprobante = abrirComprobanteLiquidacion(l);
+              return [
                 <FilaDetalleViaje
-                  key={lv.liquidacionId}
+                  key={`${lv.liquidacionId}-cbte`}
                   label="Liquidación"
-                  value={fmtMonto(lv.monto ?? l.liquido)}
+                  value={conAdjunto(
+                    abrirComprobante,
+                    l.cbteNro != null
+                      ? `N° ${nroComprobante(l.ptoVenta, l.cbteNro)}`
+                      : "Manual",
+                  )}
                   sub={
-                    [
-                      l.cbteNro != null
-                        ? `N° ${nroComprobante(l.ptoVenta, l.cbteNro)}`
-                        : null,
-                      l.cae ? `CAE ${l.cae}` : null,
-                      l.anuladoAt ? "Anulada" : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ") || undefined
+                    subComprobante || abrirComprobante ? (
+                      <>
+                        {subComprobante}
+                        {abrirComprobante && (
+                          <span className="block">
+                            <VerComprobanteAdjunto onClick={abrirComprobante} />
+                          </span>
+                        )}
+                      </>
+                    ) : undefined
                   }
-                />
-              );
+                />,
+                <FilaDetalleViaje
+                  key={`${lv.liquidacionId}-monto`}
+                  label="Liquidado"
+                  value={fmtMonto(lv.monto ?? l.liquido)}
+                />,
+              ];
             },
           ),
         ].filter(Boolean)
@@ -531,12 +610,18 @@ export function ViajeViewModal({
           ),
         ].filter(Boolean);
 
+  // El estado va embebido en la cabecera (bloque aparte a la derecha), no como sección.
+  const estadoCabecera =
+    filasEstado.length > 0 ? (
+      <div>
+        <p className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel">
+          Estado
+        </p>
+        <div className="mt-0.5">{filasEstado}</div>
+      </div>
+    ) : undefined;
+
   const secciones = [
-    filasEstado.length > 0 && (
-      <SeccionDetalleViaje key="estado" titulo="Estado">
-        {filasEstado}
-      </SeccionDetalleViaje>
-    ),
     filasFacturacion.length > 0 && (
       <SeccionDetalleViaje
         key="facturacion"
@@ -708,8 +793,8 @@ export function ViajeViewModal({
       <div className="flex flex-col divide-y divide-black/5">
         <div className="flex flex-col gap-4 pb-5">
           {/* Datos generales del viaje en un bloque compacto (igual que Facturas/Liquidaciones). */}
-          {datos.length > 0 && (
-            <DatosCabecera>
+          {(datos.length > 0 || estadoCabecera) && (
+            <DatosCabecera aside={estadoCabecera}>
               {datos.map((d) => (
                 <Dato
                   key={d.key}

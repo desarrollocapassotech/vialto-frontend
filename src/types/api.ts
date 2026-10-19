@@ -161,6 +161,8 @@ export interface Viaje {
     ptoVenta?: number | null;
     fechaEmision?: string;
     ivaPct?: number | null;
+    /** Comprobante adjunto (facturas manuales, Cloudinary). */
+    comprobanteUrl?: string | null;
   } | null;
   liquidacionesViaje?: {
     liquidacionId: string;
@@ -180,6 +182,10 @@ export interface Viaje {
       periodoHasta?: string;
       motivoAnulacion?: string | null;
       anuladoAt?: string | null;
+      /** Comprobante adjunto (liquidaciones manuales, Cloudinary). */
+      comprobanteUrl?: string | null;
+      /** Alta de la liquidación: es la fecha que lleva el PDF del CVLP. */
+      createdAt?: string;
     };
   }[];
   createdAt: string;

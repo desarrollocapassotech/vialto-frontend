@@ -8,10 +8,30 @@ import { Spinner } from "@/components/ui/Spinner";
  */
 
 /** Bloque de cabecera: destinatario, comprobante, fechas, CAE, anulación… en grilla compacta. */
-export function DatosCabecera({ children }: { children: ReactNode }) {
+export function DatosCabecera({
+  children,
+  aside,
+}: {
+  children: ReactNode;
+  /**
+   * Bloque aparte embebido a la derecha (abajo en mobile), separado por una línea
+   * (ej. el estado del viaje en su detalle).
+   */
+  aside?: ReactNode;
+}) {
+  const grid = "grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3";
+  const caja = "rounded border border-black/10 bg-vialto-mist/60 px-4 py-3";
+  if (!aside) return <div className={`${grid} ${caja}`}>{children}</div>;
+  // Con bloque aparte, los datos van en flex-wrap: cada uno se estira para llenar su
+  // fila, así no quedan huecos cuando la cantidad de datos no completa la grilla.
   return (
-    <div className="grid grid-cols-2 gap-x-6 gap-y-3 rounded border border-black/10 bg-vialto-mist/60 px-4 py-3 sm:grid-cols-3">
-      {children}
+    <div className={`flex flex-col gap-3 sm:flex-row sm:gap-0 ${caja}`}>
+      <div className="flex min-w-0 flex-1 flex-wrap content-start gap-x-6 gap-y-3 sm:pr-4 [&>*]:flex-[1_1_14rem]">
+        {children}
+      </div>
+      <div className="min-w-0 border-t border-black/10 pt-3 sm:w-56 sm:shrink-0 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+        {aside}
+      </div>
     </div>
   );
 }

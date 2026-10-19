@@ -1,3 +1,8 @@
+import {
+  AdjuntarComprobanteClip,
+  ComprobanteAdjuntoClip,
+} from "@/components/shared/ComprobanteAdjuntoClip";
+import { AdjuntarComprobanteModal } from "@/components/shared/AdjuntarComprobanteModal";
 import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
@@ -265,6 +270,8 @@ export function FacturacionTenantPage({
   const [marcarCobradaConfirm, setMarcarCobradaConfirm] =
     useState<Factura | null>(null);
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
+  /** Factura sin ARCA a la que se le adjunta el comprobante (modal). */
+  const [adjuntarFactura, setAdjuntarFactura] = useState<Factura | null>(null);
   /** Fila/card clickeada: abre el menú de acciones de esa factura en vez del modal de detalle. */
   const [accionesAbiertoFacturaId, setAccionesAbiertoFacturaId] = useState<string | null>(null);
   const [emittingFactura, setEmittingFactura] = useState<Factura | null>(null);
@@ -910,6 +917,33 @@ export function FacturacionTenantPage({
     }
   }
 
+  /**
+   * "Adjuntar comprobante" (sin ARCA, factura sin archivo): sube el archivo y guarda solo
+   * archivo + número. Si el número no cambió, el backend toma el camino corto (no recalcula).
+   */
+  async function guardarAdjuntoFactura(
+    f: Factura,
+    datos: { numero: string; file: File },
+  ) {
+    const comprobanteUrl = await uploadComprobante(
+      () => getToken(),
+      datos.file,
+      "facturacion",
+    );
+    const body: Record<string, unknown> = { comprobanteUrl };
+    if (datos.numero && datos.numero !== (f.numero ?? "")) body.numero = datos.numero;
+    const updated = await apiJson<Factura>(facturaUrl(f.id), () => getToken(), {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+    setFacturas((prev) =>
+      prev ? prev.map((r) => (r.id === f.id ? updated : r)) : prev,
+    );
+    setViewingFactura((v) => (v?.id === f.id ? updated : v));
+    setAdjuntarFactura(null);
+    showToast("Comprobante adjuntado", "success");
+  }
+
   async function confirmDeleteFactura() {
     const f = facturaDeleteConfirm;
     if (!f || deletingId) return;
@@ -1203,7 +1237,7 @@ export function FacturacionTenantPage({
 
   const facturasListadoFiltros = (
     <>
-      <ListadoFiltroCampo label="Número" active={!!numFiltro.trim()}>
+      <ListadoFiltroCampo label="Comprobante" active={!!numFiltro.trim()}>
         <div className="flex gap-1">
           <input
             type="text"
@@ -1435,7 +1469,7 @@ export function FacturacionTenantPage({
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
-                title="Número"
+                title="Comprobante"
                 filterActive={!!numFiltro.trim()}
                 filterSignature={numFiltro}
                 onClear={() => {
@@ -1631,11 +1665,39 @@ export function FacturacionTenantPage({
             onClick={() => setAccionesAbiertoFacturaId(f.id)}
           >
             <td className="h-8 px-3 py-1 font-medium tabular-nums">
-              <span
-                className="block max-w-[8rem] truncate"
-                title={f.numero || undefined}
-              >
-                {f.numero || "—"}
+              <span className="flex items-center gap-1.5">
+                {/* Sin número: con adjunto queda solo el clip; sin adjunto (y se puede
+                    adjuntar) va "Adjuntar comprobante" en vez de "—". */}
+                {(f.numero || (!f.comprobanteUrl?.trim() && !showComprobanteAdjunto)) && (
+                  <span
+                    className="block max-w-[8rem] truncate"
+                    title={f.numero || undefined}
+                  >
+                    {f.numero || "—"}
+                  </span>
+                )}
+                {f.comprobanteUrl?.trim() ? (
+                  <ComprobanteAdjuntoClip
+                    onClick={() => verComprobanteUrl(f.comprobanteUrl)}
+                    conTexto={!f.numero}
+                  />
+                ) : (
+                  showComprobanteAdjunto && (
+                    <AdjuntarComprobanteClip
+                      onClick={() => setAdjuntarFactura(f)}
+                      conTexto={!f.numero}
+                    />
+                  )
+                )}
+                {/* Anulada: segundo clip (rojo) con la nota de crédito, como "Ver Nota de Crédito". */}
+                {(f.arcaEstado === "anulado" || f.anulacionCae) &&
+                  (f.notaCreditoUrl?.trim() || f.anulacionCae) && (
+                    <ComprobanteAdjuntoClip
+                      onClick={() => verNotaCredito(f)}
+                      tono="anulacion"
+                      titulo="Ver nota de crédito"
+                    />
+                  )}
               </span>
             </td>
             <td className="h-8 px-3 py-1">
@@ -1695,6 +1757,9 @@ export function FacturacionTenantPage({
                 }
                 onEmitirArca={hasArca ? () => abrirEmitirArca(f) : undefined}
                 onAnular={hasArca ? () => abrirAnularFactura(f) : undefined}
+                onAdjuntarComprobante={
+                  showComprobanteAdjunto ? () => setAdjuntarFactura(f) : undefined
+                }
                 onVerComprobante={
                   f.comprobanteUrl
                     ? () => verComprobanteUrl(f.comprobanteUrl)
@@ -1712,7 +1777,16 @@ export function FacturacionTenantPage({
         renderMobileCard={(f) => (
           <ListadoCard
             onClick={() => setAccionesAbiertoFacturaId(f.id)}
-            primary={f.numero || "—"}
+            primary={
+              <span className="inline-flex items-center gap-1.5">
+                {f.numero || (f.comprobanteUrl?.trim() ? null : "—")}
+                {f.comprobanteUrl?.trim() && (
+                  <ComprobanteAdjuntoClip
+                    onClick={() => verComprobanteUrl(f.comprobanteUrl)}
+                  />
+                )}
+              </span>
+            }
             fields={[
               { label: "Cliente", value: nombreContraparte(f) },
               { label: "Emisión", value: fmtFecha(f.fechaEmision) },
@@ -1758,6 +1832,9 @@ export function FacturacionTenantPage({
                 }
                 onEmitirArca={hasArca ? () => abrirEmitirArca(f) : undefined}
                 onAnular={hasArca ? () => abrirAnularFactura(f) : undefined}
+                onAdjuntarComprobante={
+                  showComprobanteAdjunto ? () => setAdjuntarFactura(f) : undefined
+                }
                 onVerComprobante={
                   f.comprobanteUrl
                     ? () => verComprobanteUrl(f.comprobanteUrl)
@@ -1867,6 +1944,20 @@ export function FacturacionTenantPage({
               : undefined
           }
           onVolverAEmitir={() => void volverAEmitirFactura(viewingFactura.id)}
+          onAdjuntarComprobante={
+            showComprobanteAdjunto
+              ? () => setAdjuntarFactura(viewingFactura)
+              : undefined
+          }
+        />
+      )}
+
+      {adjuntarFactura && (
+        <AdjuntarComprobanteModal
+          titulo={`Factura a ${nombreContraparte(adjuntarFactura)}`}
+          numeroInicial={adjuntarFactura.numero}
+          onClose={() => setAdjuntarFactura(null)}
+          onGuardar={(datos) => guardarAdjuntoFactura(adjuntarFactura, datos)}
         />
       )}
 

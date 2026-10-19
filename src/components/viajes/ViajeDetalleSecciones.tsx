@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Paperclip } from "lucide-react";
 
 /**
  * Secciones del detalle de un viaje (Estado / Facturación / Liquidación): recuadro con
@@ -66,6 +67,20 @@ export function AccionSeccionViaje({
       className="text-[10px] uppercase tracking-[0.12em] text-vialto-fire hover:underline"
     >
       {children}
+    </button>
+  );
+}
+
+/** Botón sutil "Ver comprobante" (con clip) debajo de una fila de comprobante adjunto. */
+export function VerComprobanteAdjunto({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-vialto-steel hover:text-vialto-fire hover:underline"
+    >
+      <Paperclip className="h-3 w-3" strokeWidth={2} aria-hidden />
+      Ver comprobante
     </button>
   );
 }

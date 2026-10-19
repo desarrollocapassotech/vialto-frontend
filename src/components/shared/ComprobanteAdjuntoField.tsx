@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { Upload } from 'lucide-react';
 import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
 import { isComprobanteFile } from '@/lib/comprobanteUpload';
@@ -29,7 +29,7 @@ export function ComprobanteAdjuntoField({
   onFileChange: (file: File | null) => void;
   onClearExisting?: () => void;
   disabled?: boolean;
-  label?: string;
+  label?: ReactNode;
   error?: string | null;
 }) {
   const inputId = useId();
