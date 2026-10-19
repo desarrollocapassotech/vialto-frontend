@@ -31,6 +31,7 @@ import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import type {
   Liquidacion,
   LiquidacionConceptoLinea,
@@ -73,9 +74,7 @@ const CBTE_TIPO: Record<number, string> = {
 };
 
 function fmtDate(iso: string | null | undefined) {
-  if (!iso) return "—";
-  const [y, m, d] = iso.slice(0, 10).split("-");
-  return `${d}/${m}/${y}`;
+  return fmtDateUtc(iso);
 }
 
 function fmtDateTime(iso: string | null | undefined) {
@@ -83,6 +82,7 @@ function fmtDateTime(iso: string | null | undefined) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return fmtDate(iso);
   return d.toLocaleString("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
