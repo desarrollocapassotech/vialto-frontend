@@ -45,6 +45,7 @@ import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoF
 import { Spinner } from "@/components/ui/Spinner";
 import { ApiError, apiFetch, apiJson } from "@/lib/api";
 import {
+  facturaLetraFromCbteTipo,
   facturaLetraFromCondicionIva,
   facturaLetraLabel,
 } from "@/lib/arcaCbteTipo";
@@ -369,15 +370,17 @@ export function FacturaCreateModal({
   // selección en vez de dejarlo "pegado" por el fallback de `filteredClientes` — ese
   // fallback existe para no perder la selección mientras `clienteDetalle` todavía no
   // resolvió o mientras `viajes` sigue cargando, no para sostener indefinidamente un
-  // cliente sin nada para facturar.
+  // cliente sin nada para facturar. Con la factura ya emitida no se toca: el refetch de
+  // viajes deja al cliente sin pendientes y el resumen perdía cliente y letra (NyM).
   useEffect(() => {
+    if (step !== "form") return;
     if (viajesLoading || viajes.length === 0) return;
     if (!draft.clienteId) return;
     if (allAvailableClientes.some((c) => c.id === draft.clienteId)) return;
     setDraft((d) =>
       d.clienteId ? { ...d, clienteId: "", viajeIds: [] } : d,
     );
-  }, [viajesLoading, viajes.length, allAvailableClientes, draft.clienteId, setDraft]);
+  }, [step, viajesLoading, viajes.length, allAvailableClientes, draft.clienteId, setDraft]);
 
   const [datosReady, setDatosReady] = useState(false);
   const [arcaConfigMissing, setArcaConfigMissing] = useState(false);
@@ -1364,7 +1367,10 @@ export function FacturaCreateModal({
                     <div className="flex justify-between text-xs">
                       <span className="text-vialto-steel">Tipo</span>
                       <span className="tabular-nums text-vialto-charcoal">
-                        {facturaLetraLabel(letra)}
+                        {facturaLetraLabel(
+                          facturaLetraFromCbteTipo(facturaEmitida?.cbteTipo) ??
+                            letra,
+                        )}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
