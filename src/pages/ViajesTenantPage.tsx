@@ -1,3 +1,10 @@
+import {
+  AdjuntarComprobanteClip,
+  ComprobanteAdjuntoClip,
+} from "@/components/shared/ComprobanteAdjuntoClip";
+import { AgregarDocumentoViajeModal } from "@/components/viajes/ViajeAdjuntosSeccion";
+import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
+import { adjuntosActivosViaje } from "@/lib/viajesAdjuntos";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { createPortal } from "react-dom";
 import { useAuth, useUser } from "@clerk/clerk-react";
@@ -502,6 +509,8 @@ export function ViajesTenantPage({
 
   const [exportarViaje, setExportarViaje] = useState<Viaje | null>(null);
   const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
+  /** Viaje sin documentos al que se le agrega uno desde la grilla (clip o acciones). */
+  const [agregarDocViaje, setAgregarDocViaje] = useState<Viaje | null>(null);
   /** Fila/card clickeada: abre el menú de acciones de ese viaje en vez del modal de detalle. */
   const [accionesAbiertoViajeId, setAccionesAbiertoViajeId] = useState<
     string | null
@@ -2254,6 +2263,50 @@ export function ViajesTenantPage({
   // Columnas de la grilla en el orden configurado por superadmin
   // (`Tenant.viajesColumnasOrden`); cada una sigue con su propia visibilidad.
   const ordenColumnas = ordenColumnasViajes(tenantEfectivo);
+  /** Agregar/quitar documentos del viaje: admin de la empresa o superadmin (igual que el backend). */
+  const puedeEditarDocumentos =
+    platform || isOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
+  // Clip de documentos del viaje: va en la primera columna de ID visible (según el
+  // orden de columnas de la empresa).
+  const idColumnaConClip = ordenColumnas.find(
+    (id) =>
+      (id === "idSistema" && mostrarColumnaIdSistema) ||
+      (id === "idPropio1" && mostrarColumnaIdPropio1) ||
+      (id === "idPropio2" && mostrarColumnaIdPropio2),
+  );
+  /** Con 1 documento abre el archivo; con más, el detalle del viaje (sección Documentos). */
+  function clipDocumentosViaje(v: Viaje): ReactNode {
+    const docs = adjuntosActivosViaje(v);
+    if (!isViajeFieldVisible("detalle_viaje", "adjuntos")) return null;
+    if (docs.length === 0) {
+      // Sin documentos: clip casi transparente para agregar (igual que Facturas/Liquidaciones).
+      return puedeEditarDocumentos ? (
+        <AdjuntarComprobanteClip
+          titulo="Agregar documento"
+          onClick={() => setAgregarDocViaje(v)}
+        />
+      ) : null;
+    }
+    return (
+      <span className="inline-flex shrink-0 items-center">
+        <ComprobanteAdjuntoClip
+          titulo={docs.map((d) => d.titulo).join(" · ")}
+          onClick={() =>
+            docs.length === 1
+              ? void abrirAdjuntoEnPestana(
+                  { url: docs[0].url },
+                  () => getToken(),
+                  docs[0].titulo,
+                )
+              : setViewingViaje(v)
+          }
+        />
+        {docs.length > 1 && (
+          <span className="text-[10px] text-vialto-steel">{docs.length}</span>
+        )}
+      </span>
+    );
+  }
   const viajesHeaderColumnas: Record<ViajeColumnaId, ReactNode> = {
     idSistema: mostrarColumnaIdSistema && (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -3117,6 +3170,7 @@ export function ViajesTenantPage({
           </tr>
         }
         renderTableRow={(v) => {
+          const clip = clipDocumentosViaje(v);
           const clientesRuta = clientesRutaListadoViaje(v, clientes);
           const nombreCliente = clientesRuta[0].nombre;
           const nombreTransp = nombreTransportistaExternoListadoViaje(
@@ -3131,24 +3185,33 @@ export function ViajesTenantPage({
           const celdas: Record<ViajeColumnaId, ReactNode> = {
             idSistema: mostrarColumnaIdSistema && (
               <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
-                {/* IDs: se truncan por el principio, lo que distingue es el final. */}
-                <TruncarInicio className="max-w-[5rem]" title={`#${v.numero}`}>
-                  #{v.numero}
-                </TruncarInicio>
+                <span className="flex items-center gap-1.5">
+                  {/* IDs: se truncan por el principio, lo que distingue es el final. */}
+                  <TruncarInicio className="max-w-[5rem]" title={`#${v.numero}`}>
+                    #{v.numero}
+                  </TruncarInicio>
+                  {idColumnaConClip === "idSistema" && clip}
+                </span>
               </td>
             ),
             idPropio1: mostrarColumnaIdPropio1 && (
               <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
-                <TruncarInicio>
-                  {v.numeroIdentificacionPersonalizado?.trim() || "—"}
-                </TruncarInicio>
+                <span className="flex items-center gap-1.5">
+                  <TruncarInicio>
+                    {v.numeroIdentificacionPersonalizado?.trim() || "—"}
+                  </TruncarInicio>
+                  {idColumnaConClip === "idPropio1" && clip}
+                </span>
               </td>
             ),
             idPropio2: mostrarColumnaIdPropio2 && (
               <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
-                <TruncarInicio>
-                  {v.idPropio2?.trim() || "—"}
-                </TruncarInicio>
+                <span className="flex items-center gap-1.5">
+                  <TruncarInicio>
+                    {v.idPropio2?.trim() || "—"}
+                  </TruncarInicio>
+                  {idColumnaConClip === "idPropio2" && clip}
+                </span>
               </td>
             ),
             cliente: (
@@ -3393,6 +3456,9 @@ export function ViajesTenantPage({
                       : undefined;
                   })()}
                   onEliminar={() => requestDeleteViaje(v)}
+                  onAgregarDocumento={
+                    puedeEditarDocumentos ? () => setAgregarDocViaje(v) : undefined
+                  }
                 />
               </td>
             </tr>
@@ -3663,6 +3729,9 @@ export function ViajesTenantPage({
                       : undefined;
                   })()}
                   onEliminar={() => requestDeleteViaje(v)}
+                  onAgregarDocumento={
+                    puedeEditarDocumentos ? () => setAgregarDocViaje(v) : undefined
+                  }
                 />
               }
             />
@@ -3688,11 +3757,32 @@ export function ViajesTenantPage({
         />
       )}
 
+      {agregarDocViaje && (
+        <AgregarDocumentoViajeModal
+          viaje={agregarDocViaje}
+          tenantId={platform ? tid : undefined}
+          onClose={() => setAgregarDocViaje(null)}
+          onAgregado={(v) => {
+            setAgregarDocViaje(null);
+            setRows((prev) =>
+              prev ? prev.map((r) => (r.id === v.id ? v : r)) : prev,
+            );
+          }}
+        />
+      )}
+
       {viewingViaje && (
         <ViajeViewModal
           viaje={viewingViaje}
           tenantId={platform ? tid : undefined}
           modulos={platform ? tenantModules : currentTenant?.modules}
+          puedeEditarAdjuntos={puedeEditarDocumentos}
+          onViajeActualizado={(v) => {
+            setViewingViaje(v);
+            setRows((prev) =>
+              prev ? prev.map((r) => (r.id === v.id ? v : r)) : prev,
+            );
+          }}
           hasLiquidoProductoArca={hasLiquidoProductoArcaResuelto}
           editando={abriendoEditorViaje}
           onClose={() => setViewingViaje(null)}

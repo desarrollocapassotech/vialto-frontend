@@ -47,6 +47,7 @@ import {
   VerComprobanteAdjunto,
 } from "@/components/viajes/ViajeDetalleSecciones";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { ViajeAdjuntosSeccion } from "@/components/viajes/ViajeAdjuntosSeccion";
 import {
   canAccessEmisionFacturasArca,
   canAccessEmisionLiquidoProductoArca,
@@ -110,8 +111,14 @@ export function ViajeViewModal({
   liquidando = false,
   onRegistrarPago,
   modulos,
+  puedeEditarAdjuntos = false,
+  onViajeActualizado,
 }: {
   viaje: Viaje;
+  /** Admin/superadmin: puede agregar y quitar documentos del viaje (se guardan al momento). */
+  puedeEditarAdjuntos?: boolean;
+  /** El viaje cambió desde el detalle (ej. documentos): el host actualiza su listado. */
+  onViajeActualizado?: (viaje: Viaje) => void;
   /**
    * Módulos de la empresa del viaje. Desde superadmin pasar los de la empresa elegida
    * (`useCurrentTenant()` ahí resuelve la org del superadmin). Si no se pasa se usan los
@@ -833,6 +840,16 @@ export function ViajeViewModal({
             </div>
           )}
         </div>
+
+        {ver("adjuntos") && (
+          <ViajeAdjuntosSeccion
+            key={viaje.id}
+            viaje={viaje}
+            tenantId={tenantId}
+            puedeEditar={puedeEditarAdjuntos && !bloqueado}
+            onViajeActualizado={onViajeActualizado}
+          />
+        )}
 
         {esMultiCliente && (
           <div className="py-5">

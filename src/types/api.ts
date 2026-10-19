@@ -10,6 +10,24 @@ export interface PagoTransportista {
   createdAt?: string;
 }
 
+/** Documento adjunto de un viaje (máx. 3 y 10 MB entre todos, lo controla el backend). */
+export interface ViajeAdjunto {
+  id: string;
+  url: string;
+  titulo: string;
+  /** Nombre original del archivo. */
+  nombre: string;
+  bytes: number;
+  mimeType: string;
+  createdAt: string;
+  createdBy: string;
+  /** Borrado lógico (ver `adjuntosActivosViaje`): no se muestra. */
+  borradoAt?: string;
+  borradoPor?: string;
+  /** Si el archivo ya se borró de Cloudinary. */
+  archivoEliminado?: boolean;
+}
+
 export interface OtroGasto {
   descripcion: string;
   monto: number;
@@ -143,6 +161,7 @@ export interface Viaje {
   observaciones: string | null;
   otrosGastos?: OtroGasto[];
   pagosTransportista?: PagoTransportista[];
+  adjuntos?: ViajeAdjunto[];
   fechaFinalizado: string | null;
   facturaId?: string | null;
   /** Denormalizado en el viaje; si falta, usar `factura.numero` del include. */
