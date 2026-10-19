@@ -4311,27 +4311,6 @@ export function ViajesTenantPage({
                 },
               });
             }}
-            onVerNotaCredito={
-              viewingFactura.arcaEstado === "anulado"
-                ? () => {
-                    if (viewingFactura.notaCreditoUrl) {
-                      window.open(
-                        viewingFactura.notaCreditoUrl,
-                        "_blank",
-                        "noopener,noreferrer",
-                      );
-                    } else {
-                      setViewingFactura(null);
-                      navigate("/facturacion", {
-                        state: {
-                          ...facturacionNavExtras(),
-                          viewFacturaId: viewingFactura.id,
-                        },
-                      });
-                    }
-                  }
-                : undefined
-            }
           />
         )}
 

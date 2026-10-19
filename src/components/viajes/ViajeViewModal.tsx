@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
+import { verPdfFacturaArca } from "@/lib/facturaPdfArca";
 import { ComprobanteAdjuntoClip } from "@/components/shared/ComprobanteAdjuntoClip";
 import { Banknote, Receipt } from "lucide-react";
 import {
@@ -178,6 +179,23 @@ export function ViajeViewModal({
     const q = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
     const apiPath = `/api/integracion-arca/liquidaciones/${encodeURIComponent(l.id)}/pdf${q}`;
     return () => void abrirAdjuntoEnPestana({ apiPath }, () => getToken(), "Liquidación");
+  }
+  /**
+   * Comprobante de la factura: si se emitió en ARCA, el PDF se genera en el momento (mismo
+   * diseño que su nota de crédito, ver `verPdfFacturaArca`); si es manual, el adjunto.
+   */
+  function abrirComprobanteFactura(
+    f: { id: string; cae?: string | null; comprobanteUrl?: string | null } | null | undefined,
+  ): (() => void) | undefined {
+    if (!f) return undefined;
+    if (f.cae) {
+      return () =>
+        void verPdfFacturaArca(f.id, "factura", () => getToken(), tenantId || undefined).catch(
+          () => undefined,
+        );
+    }
+    if (f.comprobanteUrl?.trim()) return () => verAdjunto(f.comprobanteUrl);
+    return undefined;
   }
   const mods = modulos ?? currentTenant?.modules ?? null;
   // Mismo criterio que la grilla de Viajes: Facturación (manual o ARCA) y Liquidaciones
@@ -435,12 +453,7 @@ export function ViajeViewModal({
           <FilaDetalleViaje
             key="factura"
             label="Factura"
-            value={conAdjunto(
-              factura?.comprobanteUrl?.trim()
-                ? () => verAdjunto(factura.comprobanteUrl)
-                : undefined,
-              `N° ${nroFactura}`,
-            )}
+            value={conAdjunto(abrirComprobanteFactura(factura), `N° ${nroFactura}`)}
             sub={
               <>
                 {[
@@ -449,11 +462,9 @@ export function ViajeViewModal({
                 ]
                   .filter(Boolean)
                   .join(" · ") || null}
-                {factura?.comprobanteUrl?.trim() && (
+                {abrirComprobanteFactura(factura) && (
                   <span className="block">
-                    <VerComprobanteAdjunto
-                      onClick={() => verAdjunto(factura.comprobanteUrl)}
-                    />
+                    <VerComprobanteAdjunto onClick={abrirComprobanteFactura(factura)!} />
                   </span>
                 )}
               </>
