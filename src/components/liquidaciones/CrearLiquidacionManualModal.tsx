@@ -1164,7 +1164,7 @@ export function CrearLiquidacionManualModal({
 
   const getMultiplicador = (modo?: string) =>
     modo === "TODOS_LOS_VIAJES"
-      ? Math.max(1, selectedViajeIds.size + (viajeInicial ? 1 : 0))
+      ? Math.max(1, selectedViajes.length)
       : 1;
 
   const conceptosEfecto = conceptosCompletos.reduce(
