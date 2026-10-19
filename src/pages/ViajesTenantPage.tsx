@@ -1497,7 +1497,7 @@ export function ViajesTenantPage({
 
   const loteFacturarActivo = clienteIdFiltroActivo.trim() !== "";
   const loteLiquidarActivo =
-    hasLiquidaciones && transportistaIdFiltroActivo.trim() !== "";
+    hasLiquidacionesResuelto && transportistaIdFiltroActivo.trim() !== "";
 
   function esElegibleLiquidarLote(v: Viaje): boolean {
     const tid = transportistaIdFiltroActivo.trim();
@@ -1926,7 +1926,7 @@ export function ViajesTenantPage({
   }
 
   function liquidarViaje(v: Viaje) {
-    if (arcaBloqueaLiquidarUsd(hasLiquidoProductoArca, v.monedaPrecioTransportistaExterno)) {
+    if (arcaBloqueaLiquidarUsd(hasLiquidoProductoArcaResuelto, v.monedaPrecioTransportistaExterno)) {
       showToast(MSG_ARCA_NO_LIQUIDA_USD, "error");
       return;
     }
@@ -3226,7 +3226,7 @@ export function ViajesTenantPage({
                             hasArca={hasLiquidoProductoArcaResuelto}
                             onRegistrarPago={() => setRegistrarPagoViaje(v)}
                             onLiquidar={
-                              hasLiquidaciones ? () => liquidarViaje(v) : undefined
+                              hasLiquidacionesResuelto ? () => liquidarViaje(v) : undefined
                             }
                             onEmitir={
                               hasLiquidoProductoArcaResuelto
@@ -3357,7 +3357,7 @@ export function ViajesTenantPage({
                       : undefined
                   }
                   onLiquidar={
-                    hasLiquidaciones ? () => liquidarViaje(v) : undefined
+                    hasLiquidacionesResuelto ? () => liquidarViaje(v) : undefined
                   }
                   onExportar={() => setExportarViaje(v)}
                   onVerFactura={
@@ -3473,7 +3473,7 @@ export function ViajesTenantPage({
                         hasArca={hasLiquidoProductoArcaResuelto}
                         onRegistrarPago={() => setRegistrarPagoViaje(v)}
                         onLiquidar={
-                          hasLiquidaciones ? () => liquidarViaje(v) : undefined
+                          hasLiquidacionesResuelto ? () => liquidarViaje(v) : undefined
                         }
                         onEmitir={
                           hasLiquidoProductoArcaResuelto
@@ -3627,7 +3627,7 @@ export function ViajesTenantPage({
                       : undefined
                   }
                   onLiquidar={
-                    hasLiquidaciones ? () => liquidarViaje(v) : undefined
+                    hasLiquidacionesResuelto ? () => liquidarViaje(v) : undefined
                   }
                   onExportar={() => setExportarViaje(v)}
                   onVerFactura={
@@ -3781,7 +3781,7 @@ export function ViajesTenantPage({
                   : null
               }
               onLiquidar={
-                hasLiquidaciones
+                hasLiquidacionesResuelto
                   ? () => liquidarViaje(viajeDesdeEditor())
                   : undefined
               }
@@ -3957,8 +3957,10 @@ export function ViajesTenantPage({
         {crearLiqViaje && (
           <CrearLiquidacionManualModal
             viajeInicial={crearLiqViaje}
+            rutasPlataforma={platform}
+            tenantId={platform ? tid : undefined}
             transportistas={maestro.transportistas}
-            hasLiquidoProductoArca={hasLiquidoProductoArca}
+            hasLiquidoProductoArca={hasLiquidoProductoArcaResuelto}
             getToken={getToken}
             idSistemaHabilitado={idSistemaHabilitado(currentTenant)}
             idPropio1Habilitado={idPropio1Habilitado(currentTenant)}
@@ -3991,7 +3993,7 @@ export function ViajesTenantPage({
             rutasPlataforma={platform}
             tenantId={platform ? tid : undefined}
             transportistas={maestro.transportistas}
-            hasLiquidoProductoArca={hasLiquidoProductoArca}
+            hasLiquidoProductoArca={hasLiquidoProductoArcaResuelto}
             getToken={getToken}
             idSistemaHabilitado={idSistemaHabilitado(currentTenant)}
             idPropio1Habilitado={idPropio1Habilitado(currentTenant)}
@@ -4020,8 +4022,10 @@ export function ViajesTenantPage({
           <CrearLiquidacionManualModal
             transportistaIdInicial={liquidarLote.transportistaId}
             viajeIdsIniciales={liquidarLote.viajeIds}
+            rutasPlataforma={platform}
+            tenantId={platform ? tid : undefined}
             transportistas={maestro.transportistas}
-            hasLiquidoProductoArca={hasLiquidoProductoArca}
+            hasLiquidoProductoArca={hasLiquidoProductoArcaResuelto}
             getToken={getToken}
             idSistemaHabilitado={idSistemaHabilitado(currentTenant)}
             idPropio1Habilitado={idPropio1Habilitado(currentTenant)}
