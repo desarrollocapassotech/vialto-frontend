@@ -1,6 +1,12 @@
-import { AlertTriangle, BadgeCheck, CircleSlash, RotateCw, XCircle } from "lucide-react";
+import { BadgeCheck, CircleSlash, RotateCw, XCircle } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import type { PadronValidacionResultado } from "@/hooks/useValidacionPadronRegistro";
+import type { PadronActualizado, PadronValidacionResultado } from "@/hooks/useValidacionPadronRegistro";
+
+const CAMBIO_LABEL: Record<PadronActualizado["cambios"][number], string> = {
+  nombre: "la razón social",
+  condicionIva: "la condición IVA",
+  domicilio: "el domicilio",
+};
 
 function fmtFechaHora(iso: string) {
   return new Date(iso).toLocaleString("es-AR", {
@@ -30,7 +36,7 @@ export function PadronValidacionEstado({
   resultado: PadronValidacionResultado | null;
   /** true = ya hubo respuesta para este registro (con `resultado` null = falló la consulta). */
   consultado: boolean;
-  /** Abre el modal para revisar/corregir los datos. */
+  /** Abre el modal para revisar/editar los datos (CUIT rechazado, o datos actualizados desde ARCA). */
   onRevisar?: () => void;
   /** Vuelve a consultar cuando ARCA falló. */
   onReintentar?: () => void;
@@ -81,16 +87,28 @@ export function PadronValidacionEstado({
           <BadgeCheck className="h-3.5 w-3.5" aria-hidden /> Validado en ARCA
         </span>
       );
-    case "diferencias":
+    case "actualizado":
+      // Mismo tilde verde que "validado"; el detalle de qué se actualizó va en el tooltip.
       return (
-        <button
-          type="button"
-          onClick={onRevisar}
-          className={`${base} text-amber-700 underline decoration-dotted underline-offset-2 hover:text-amber-900`}
-          title="ARCA informa otra condición IVA o domicilio. Click para revisar."
+        <span
+          className={`${base} flex-wrap text-emerald-700`}
+          role="status"
+          title={`Se actualizó ${resultado.cambios.map((c) => CAMBIO_LABEL[c]).join(", ")} automáticamente con los datos del padrón de ARCA el ${fmtFechaHora(resultado.validadoAt)}.`}
         >
-          <AlertTriangle className="h-3.5 w-3.5" aria-hidden /> Revisar datos (ARCA)
-        </button>
+          <BadgeCheck className="h-3.5 w-3.5" aria-hidden /> Validado con ARCA
+          {onRevisar && (
+            <>
+              <span aria-hidden className="text-vialto-steel">·</span>
+              <button
+                type="button"
+                onClick={onRevisar}
+                className="font-normal text-vialto-steel underline decoration-dotted underline-offset-2 hover:text-vialto-charcoal"
+              >
+                Ver datos
+              </button>
+            </>
+          )}
+        </span>
       );
     case "rechazado":
       return (

@@ -22,6 +22,19 @@
   --animate-estado-atencion: estado-atencion 4s ease-in-out infinite;
   /* En curso — respiración apenas perceptible */
   --animate-estado-atencion-suave: estado-atencion-suave 5s ease-in-out infinite;
+  /* Datos que se actualizaron solos (ej. desde ARCA) — dos destellos suaves y se apaga */
+  --animate-dato-actualizado: dato-actualizado 1.4s ease-in-out 2;
+}
+
+@keyframes dato-actualizado {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  50% {
+    /* emerald-500 muy tenue, mismo verde que "Validado en ARCA" */
+    background-color: rgb(16 185 129 / 0.12);
+  }
 }
 
 @keyframes estado-atencion {

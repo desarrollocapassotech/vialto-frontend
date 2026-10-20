@@ -17,7 +17,10 @@ import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPre
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
-import { useValidacionPadronRegistro } from "@/hooks/useValidacionPadronRegistro";
+import {
+  aplicarCambiosPadronCliente,
+  useValidacionPadronRegistro,
+} from "@/hooks/useValidacionPadronRegistro";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { PadronValidacionEstado } from "@/components/shared/PadronValidacionEstado";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
@@ -431,8 +434,8 @@ export function FacturaCreateModal({
 
   // Al elegir el cliente se valida su CUIT contra el padrón de ARCA (opt-in por empresa,
   // mismo circuito que el transportista en "Nueva liquidación"): si ARCA informa otra
-  // condición IVA / domicilio, el modal se abre con eso precargado y al guardar queda la
-  // huella de validado (no se vuelve a consultar mientras esos datos no cambien).
+  // razón social / condición IVA / domicilio, el backend la guarda sola (sin confirmación,
+  // el CUIT no se toca) y acá se refresca el cliente. Solo un CUIT rechazado abre el modal.
   const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
   const validacionPadronHabilitada =
     unifiedArca && tenantEfectivo?.validacionCuitArcaHabilitada === true;
@@ -444,12 +447,15 @@ export function FacturaCreateModal({
     habilitado: validacionPadronHabilitada,
     tenantId,
     getToken,
+    onActualizado: ({ padron, cambios }) => {
+      setClienteDetalle((c) => (c ? aplicarCambiosPadronCliente(c, padron, cambios) : c));
+      onDataSaved?.();
+    },
   });
   const padronClienteAviso =
-    padronCliente.resultado?.resultado === "diferencias" ||
-    padronCliente.resultado?.resultado === "rechazado"
-      ? padronCliente.resultado
-      : null;
+    padronCliente.resultado?.resultado === "rechazado" ? padronCliente.resultado : null;
+  // Se actualizó solo: parpadeo suave en el receptor + "Ver datos" para revisarlo/editarlo.
+  const padronClienteActualizado = padronCliente.resultado?.resultado === "actualizado";
 
   // Zumbido del aviso del pie al tocar "Emitir a ARCA" con datos faltantes.
   const zumbidoAviso = useZumbidoAviso();
@@ -1312,6 +1318,7 @@ export function FacturaCreateModal({
                           />
                         ) : undefined
                       }
+                      receptorResaltado={padronClienteActualizado}
                       feedbackSlot={
                         <div ref={feedbackRef} className="space-y-2">
                           {arcaConfigMissing && (
@@ -1526,10 +1533,10 @@ export function FacturaCreateModal({
       </div>
 
       {clienteDetalle &&
-        (missingClienteFields.length > 0 || padronClienteAviso) && (
+        (missingClienteFields.length > 0 || padronClienteAviso || padronClienteActualizado) && (
           <DatosFiscalesFaltantesModal
             // Remonta al llegar la respuesta de ARCA para que el formulario tome lo precargado.
-            key={`${clienteDetalle.id}-${padronClienteAviso?.resultado ?? "sin-arca"}`}
+            key={`${clienteDetalle.id}-${padronCliente.resultado?.resultado ?? "sin-arca"}`}
             open={datosClienteModalOpen && step === "form"}
             entidad="cliente"
             id={clienteDetalle.id}
@@ -1538,32 +1545,26 @@ export function FacturaCreateModal({
               nombre: clienteDetalle.nombre ?? "",
               pais: clienteDetalle.pais ?? null,
               idFiscal: clienteDetalle.idFiscal ?? null,
-              condicionIva:
-                padronClienteAviso?.resultado === "diferencias" &&
-                padronClienteAviso.diferencias.includes("condicionIva")
-                  ? padronClienteAviso.padron.condicionIva
-                  : (clienteDetalle.condicionIva ?? null),
+              condicionIva: clienteDetalle.condicionIva ?? null,
               condicionTributaria: clienteDetalle.condicionTributaria ?? null,
-              direccion:
-                padronClienteAviso?.resultado === "diferencias" &&
-                padronClienteAviso.diferencias.includes("domicilio")
-                  ? padronClienteAviso.padron.domicilio
-                  : (clienteDetalle.direccion ?? null),
+              direccion: clienteDetalle.direccion ?? null,
             }}
             missingFields={missingClienteFields}
             padron={padronClienteAviso}
+            actualizadoDesdeArca={padronClienteActualizado}
             accion="emitir una factura"
             tenantId={tenantId}
             getToken={getToken}
             onSaved={(c) => {
+              const mismoCuit = (c as Cliente).idFiscal === clienteDetalle.idFiscal;
               setClienteDetalle(c as Cliente);
               onDataSaved?.();
-              if (padronClienteAviso) {
-                // Revisó y guardó contra lo de ARCA: se guarda la huella de validado.
+              if (padronClienteActualizado && mismoCuit) {
+                // Editó a mano lo que vino de ARCA: se respeta (no se vuelve a pisar).
                 void padronCliente.confirmar();
               } else {
-                // Completó datos que faltaban (ej. el CUIT): se valida ahora; si ARCA
-                // coincide se guarda la huella, si no, el modal se reabre precargado.
+                // Completó datos o corrigió el CUIT: se valida de nuevo contra ARCA (lo que
+                // difiera se actualiza solo; si el CUIT sigue rechazado, el modal se reabre).
                 datosClienteAvisadoRef.current = null;
                 void padronCliente.revalidar();
               }

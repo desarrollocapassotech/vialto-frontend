@@ -58,6 +58,8 @@ export type FacturaArcaPreviewPanelProps = {
   avisoFaltantesExterno?: boolean;
   /** Línea debajo del nombre del receptor (ej. estado de la validación contra ARCA). */
   estadoReceptor?: ReactNode;
+  /** Los datos del receptor se acaban de actualizar solos (desde ARCA): parpadeo suave. */
+  receptorResaltado?: boolean;
   feedbackSlot?: ReactNode;
 };
 
@@ -80,6 +82,7 @@ export function FacturaArcaPreviewPanel({
   onClienteUpdated,
   avisoFaltantesExterno = false,
   estadoReceptor,
+  receptorResaltado = false,
   feedbackSlot,
 }: FacturaArcaPreviewPanelProps) {
   // Empresa efectiva (propia u override de superadmin) para armar el detalle como en el PDF.
@@ -135,6 +138,7 @@ export function FacturaArcaPreviewPanel({
               : undefined
           }
           estado={estadoReceptor}
+          resaltado={receptorResaltado}
         />
       </div>
 

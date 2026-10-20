@@ -6,7 +6,6 @@ import {
 } from "@/components/shared/CompletarDatosFiscalesInline";
 import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
 import { MODAL_Z_STACKED } from "@/lib/modalLayers";
-import { condicionIvaLabel } from "@/lib/arcaCbteTipo";
 import type { PadronValidacionResultado } from "@/hooks/useValidacionPadronRegistro";
 import type { Cliente, Transportista } from "@/types/api";
 
@@ -20,7 +19,7 @@ const ENTIDAD_LABEL: Record<Entidad, string> = {
 /**
  * Se abre sobre "Nueva factura" / "Nueva liquidación" cuando el cliente o transportista
  * elegido no tiene los datos fiscales que ARCA exige para emitir, o cuando el padrón de
- * ARCA informa otros datos (`padron`). Permite completarlos/corregirlos ahí mismo; si
+ * ARCA rechaza su CUIT (`padron`). Permite completarlos/corregirlos ahí mismo; si
  * alguno es un campo oculto para la empresa, solo informa.
  */
 export function DatosFiscalesFaltantesModal({
@@ -31,6 +30,7 @@ export function DatosFiscalesFaltantesModal({
   initial,
   missingFields,
   padron,
+  actualizadoDesdeArca = false,
   accion,
   tenantId,
   getToken,
@@ -45,10 +45,12 @@ export function DatosFiscalesFaltantesModal({
   /** Campos faltantes de esta entidad, con prefijo "Cliente: ..." / "Transportista: ...". */
   missingFields: string[];
   /**
-   * Resultado de validar el registro contra el padrón de ARCA, si hay algo para mostrar.
-   * Con "diferencias", el caller ya precarga `initial` con lo de ARCA.
+   * CUIT rechazado por el padrón de ARCA (inactivo o inexistente). Las diferencias de
+   * razón social / condición IVA / domicilio no pasan por acá: se actualizan solas.
    */
-  padron?: Extract<PadronValidacionResultado, { resultado: "diferencias" | "rechazado" }> | null;
+  padron?: Extract<PadronValidacionResultado, { resultado: "rechazado" }> | null;
+  /** Se abrió desde "Ver datos" tras la actualización automática desde ARCA: lo aclara arriba. */
+  actualizadoDesdeArca?: boolean;
   /** Qué se quiere hacer: "emitir una factura", "emitir una liquidación"... */
   accion: string;
   tenantId?: string;
@@ -116,25 +118,13 @@ export function DatosFiscalesFaltantesModal({
                 </ul>
               </>
             )}
-            {padron?.resultado === "diferencias" && (
-              <div className="mt-2 rounded border border-sky-300/60 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-                <p className="font-medium">
-                  ARCA informa otros datos para el CUIT {padron.padron.cuit}. Ya los precargamos:
-                  revisalos y guardá.
-                </p>
-                <ul className="mt-1 list-disc pl-4">
-                  {padron.diferencias.includes("condicionIva") && (
-                    <li>
-                      Condición frente al IVA: {condicionIvaLabel(padron.padron.condicionIva)}
-                    </li>
-                  )}
-                  {padron.diferencias.includes("domicilio") && (
-                    <li>Domicilio: {padron.padron.domicilio}</li>
-                  )}
-                </ul>
-              </div>
+            {actualizadoDesdeArca && missingFields.length === 0 && !padron && (
+              <p className="mt-1 text-xs text-vialto-steel">
+                Estos datos se actualizaron automáticamente con lo que informa ARCA. Podés
+                corregirlos si hace falta.
+              </p>
             )}
-            {padron?.resultado === "rechazado" && (
+            {padron && (
               <p
                 className="mt-2 rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900"
                 role="alert"
