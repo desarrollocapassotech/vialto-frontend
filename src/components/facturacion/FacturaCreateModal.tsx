@@ -459,7 +459,7 @@ export function FacturaCreateModal({
   const padronClienteActualizado = padronCliente.resultado?.resultado === "actualizado";
 
   // CUIT del cliente (receptor de la factura) dado de baja / apócrifo en ARCA: no se
-  // puede emitir. Se avisa en el panel de previsualización y se bloquea la emisión.
+  // puede emitir. Se avisa en el pie, igual que los datos faltantes.
   const receptorCliente = useReceptorPadronBloqueado({
     entidad: "clientes",
     id: open ? clienteElegidoId : null,
@@ -1343,7 +1343,6 @@ export function FacturaCreateModal({
                         ) : undefined
                       }
                       receptorResaltado={padronClienteActualizado}
-                      receptorBloqueadoMensaje={receptorCliente.bloqueado ? receptorCliente.mensaje : null}
                       feedbackSlot={
                         <div ref={feedbackRef} className="space-y-2">
                           {arcaConfigMissing && (
@@ -1464,23 +1463,35 @@ export function FacturaCreateModal({
           {step === "form" && (
             <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
               <ErrorPieModal error={displayError} />
-              {/* Faltantes para emitir: fijo en el pie, al lado de "Emitir a ARCA", para que se vea siempre. */}
-              {unifiedArca && datosEmitIncompletos && (
-                <AvisoFaltantesEmision
-                  mensaje={
-                    missingClienteFields.length === missingEmitFields.length
-                      ? "Faltan datos del cliente para poder facturar."
-                      : "Faltan datos para poder facturar."
-                  }
-                  hayOcultos={missingHiddenClienteFields.length > 0}
-                  onCompletar={
-                    clienteDetalle && missingClienteFields.length > 0
-                      ? () => setDatosClienteModalOpen(true)
-                      : undefined
-                  }
-                  zumbando={zumbidoAviso.zumbando}
-                  onZumbidoEnd={zumbidoAviso.terminar}
-                />
+              {/* Faltantes para emitir o CUIT bloqueado: fijo en el pie, al lado de "Emitir a ARCA", para que se vea siempre. */}
+              {unifiedArca && (
+                datosEmitIncompletos ? (
+                  <AvisoFaltantesEmision
+                    mensaje={
+                      missingClienteFields.length === missingEmitFields.length
+                        ? "Faltan datos del cliente para poder facturar."
+                        : "Faltan datos para poder facturar."
+                    }
+                    hayOcultos={missingHiddenClienteFields.length > 0}
+                    onCompletar={
+                      clienteDetalle && missingClienteFields.length > 0
+                        ? () => setDatosClienteModalOpen(true)
+                        : undefined
+                    }
+                    zumbando={zumbidoAviso.zumbando}
+                    onZumbidoEnd={zumbidoAviso.terminar}
+                  />
+                ) : (
+                  receptorCliente.mensaje && (
+                    <AvisoFaltantesEmision
+                      mensaje={receptorCliente.mensaje}
+                      hayOcultos={false}
+                      bloqueante
+                      zumbando={zumbidoAviso.zumbando}
+                      onZumbidoEnd={zumbidoAviso.terminar}
+                    />
+                  )
+                )
               )}
               <button
                 type="button"

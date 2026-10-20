@@ -11,7 +11,7 @@ import {
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
-import { AlertTriangle, Receipt } from "lucide-react";
+import { Receipt } from "lucide-react";
 import { useLockBodyScroll } from "@/hooks/useLockBodyScroll";
 import { SinConfigArcaAviso } from "@/components/facturacion/SinConfigArcaAviso";
 import { EmisorArcaResumen } from "@/components/facturacion/EmisorArcaResumen";
@@ -457,18 +457,6 @@ export function EmitirFacturaModal({
                       }
                     />
                   </div>
-
-                  {receptorCliente.bloqueado && receptorCliente.mensaje && (
-                    <div
-                      className="rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900 flex items-start gap-2"
-                      role="alert"
-                    >
-                      <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" aria-hidden />
-                      <p className="min-w-0 flex-1 font-medium leading-relaxed">
-                        {receptorCliente.mensaje}
-                      </p>
-                    </div>
-                  )}
 
                   {/* Campos ocultos: el aviso de abajo no aparece en este caso, así que se avisa acá. */}
                   {missingHiddenFields.length > 0 && (
