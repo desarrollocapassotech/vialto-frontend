@@ -53,8 +53,9 @@ export function ComprobanteAdjuntoClip({
   /**
    * `anulacion`: comprobante que anula al original (nota de crédito/débito, anulación
    * manual), en rojo para distinguirlo cuando hay más de un clip en la celda.
+   * `pdf`: PDF que genera Vialto (ej. "PDF de liquidación" sin ARCA), en azul.
    */
-  tono?: "comprobante" | "anulacion";
+  tono?: "comprobante" | "anulacion" | "pdf";
   /** Tooltip; por defecto "Ver comprobante adjunto". */
   titulo?: string;
 }) {
@@ -71,7 +72,9 @@ export function ComprobanteAdjuntoClip({
       className={`inline-flex shrink-0 items-center gap-1 ${
         tono === "anulacion"
           ? "text-red-600/80 hover:text-red-800"
-          : "text-vialto-steel hover:text-vialto-charcoal"
+          : tono === "pdf"
+            ? "text-sky-700/80 hover:text-sky-900"
+            : "text-vialto-steel hover:text-vialto-charcoal"
       } ${conTexto ? "text-xs font-normal" : ""}`}
     >
       <Paperclip className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />

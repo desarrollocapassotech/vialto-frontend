@@ -1308,6 +1308,13 @@ export function LiquidacionesTenantPage() {
                     />
                   )
                 )}
+                {!hasArca && (
+                  <ComprobanteAdjuntoClip
+                    onClick={() => verPdfLiquidacionFila(liq)}
+                    tono="pdf"
+                    titulo="PDF de liquidación"
+                  />
+                )}
                 {abrirAnulacionClip(liq) && (
                   <ComprobanteAdjuntoClip
                     onClick={abrirAnulacionClip(liq)!}
