@@ -181,6 +181,14 @@ import type { FacturaDraft } from "@/components/facturacion/FacturaEditModal";
 /** Un campo de `ListadoCard` (tarjeta mobile de la grilla). */
 type ListadoCardCampo = { label: ReactNode; value: ReactNode };
 
+function normalizarTextoBusqueda(s: string): string {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 // ─── COMPONENTE DE BUSCADOR CON COMBOBOX (AUTOCOMPLETE) ────────────────────
 function AutocompleteInput({
   value,
@@ -438,6 +446,7 @@ export function ViajesTenantPage({
   // Tenant efectivo (propio u override de superadmin): el superadmin ve la
   // grilla con el orden de columnas de la empresa elegida.
   const { tenant: tenantEfectivo } = useTenantPaisFijo(tid || undefined);
+  const mostrarColumnaObservaciones = Boolean(tenantEfectivo?.viajesObservaciones);
 
   // "Nueva factura" desde Viajes: el modal necesita TODOS los viajes del cliente, no
   // la página visible de la grilla (`rows`, paginada y con los filtros del listado).
@@ -544,6 +553,7 @@ export function ViajesTenantPage({
     numero: "",
     ctg: "",
     idPropio2: "",
+    observaciones: "",
     clienteId: "",
     transportistaId: "",
     choferId: "",
@@ -563,6 +573,7 @@ export function ViajesTenantPage({
   const [numeroFiltroActivo, setNumeroFiltroActivo] = useState("");
   const [ctgFiltroActivo, setCtgFiltroActivo] = useState("");
   const [idPropio2FiltroActivo, setIdPropio2FiltroActivo] = useState("");
+  const [observacionesFiltroActivo, setObservacionesFiltroActivo] = useState("");
   const [clienteIdFiltroActivo, setClienteIdFiltroActivo] = useState("");
   const [transportistaIdFiltroActivo, setTransportistaIdFiltroActivo] =
     useState("");
@@ -722,6 +733,37 @@ export function ViajesTenantPage({
           .filter((x) => x.toLowerCase().includes(qClean));
 
         return Array.from(new Set(matches));
+      } catch {
+        return [];
+      }
+    },
+    [platform, tid],
+  );
+
+  const searchObservaciones = useCallback(
+    async (q: string) => {
+      const qClean = normalizarTextoBusqueda(q);
+      if (!qClean) return [];
+
+      const params = new URLSearchParams();
+      if (platform && tid) params.set("tenantId", tid);
+      params.set("page", "1");
+      params.set("pageSize", "1000");
+
+      const url = platform
+        ? `/api/platform/viajes/paginated?${params.toString()}`
+        : `/api/viajes/paginated?${params.toString()}`;
+
+      try {
+        const res = await apiJson<ViajesPaginatedResponse>(url, () =>
+          getTokenRef.current(),
+        );
+
+        const matches = res.items
+          .map((v) => v.observaciones?.trim() || "")
+          .filter((x) => Boolean(x) && normalizarTextoBusqueda(x).includes(qClean));
+
+        return Array.from(new Set(matches)).slice(0, 10);
       } catch {
         return [];
       }
@@ -912,6 +954,7 @@ export function ViajesTenantPage({
           numero: numF,
           ctg: ctgF,
           idPropio2: idp2F,
+          observaciones: obsF,
           clienteId: cid,
           transportistaId: transpFiltro,
           choferId: choferFiltro,
@@ -979,7 +1022,11 @@ export function ViajesTenantPage({
           ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}&` : "&"}`
           : `/api/viajes/paginated${filtrosQs ? `?${filtrosQs}&` : "?"}`;
 
-        const isLocalSearch = !!numF.trim() || !!ctgF.trim() || !!idp2F.trim();
+        const isLocalSearch =
+          !!numF.trim() ||
+          !!ctgF.trim() ||
+          !!idp2F.trim() ||
+          (mostrarColumnaObservaciones && !!obsF?.trim());
         const pageApi = isLocalSearch ? 1 : Math.max(1, Math.floor(page));
         // Traemos de a muchos si es búsqueda local para garantizar encontrarlo
         const pageSizeApi = isLocalSearch ? 1000 : pageSizeApiValido(pageSize);
@@ -1034,6 +1081,9 @@ export function ViajesTenantPage({
           const qNum = numF.replace(/#/g, "").trim().toLowerCase();
           const qCtg = ctgF.trim().toLowerCase();
           const qIdPropio2 = idp2F.trim().toLowerCase();
+          const qObs = mostrarColumnaObservaciones
+            ? normalizarTextoBusqueda(obsF)
+            : "";
 
           let filteredItems = items;
           if (qNum) {
@@ -1051,6 +1101,11 @@ export function ViajesTenantPage({
           if (qIdPropio2) {
             filteredItems = filteredItems.filter((v) =>
               (v.idPropio2 || "").toLowerCase().includes(qIdPropio2),
+            );
+          }
+          if (qObs) {
+            filteredItems = filteredItems.filter((v) =>
+              normalizarTextoBusqueda(v.observaciones || "").includes(qObs),
             );
           }
 
@@ -1142,6 +1197,18 @@ export function ViajesTenantPage({
     };
     setListadoRefetching(true);
     setIdPropio2FiltroActivo(idp2);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  function aplicarFiltroColumnaObservaciones(val: string) {
+    const obs = val.trim();
+    filtrosAplicadosRef.current = {
+      ...filtrosAplicadosRef.current,
+      observaciones: obs,
+    };
+    setListadoRefetching(true);
+    setObservacionesFiltroActivo(obs);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
   }
@@ -1410,6 +1477,7 @@ export function ViajesTenantPage({
       numero: "",
       ctg: "",
       idPropio2: "",
+      observaciones: "",
       clienteId: "",
       transportistaId: "",
       choferId: "",
@@ -1428,6 +1496,7 @@ export function ViajesTenantPage({
     setNumeroFiltroActivo("");
     setCtgFiltroActivo("");
     setIdPropio2FiltroActivo("");
+    setObservacionesFiltroActivo("");
     setClienteIdFiltroActivo("");
     setTransportistaIdFiltroActivo("");
     setChoferIdFiltroActivo("");
@@ -1454,6 +1523,7 @@ export function ViajesTenantPage({
     !!numeroFiltroActivo.trim() ||
     !!ctgFiltroActivo.trim() ||
     !!idPropio2FiltroActivo.trim() ||
+    (mostrarColumnaObservaciones && !!observacionesFiltroActivo.trim()) ||
     !!clienteIdFiltroActivo.trim() ||
     !!transportistaIdFiltroActivo.trim() ||
     !!choferIdFiltroActivo.trim() ||
@@ -1471,6 +1541,7 @@ export function ViajesTenantPage({
     if (numeroFiltroActivo.trim()) n += 1;
     if (ctgFiltroActivo.trim()) n += 1;
     if (idPropio2FiltroActivo.trim()) n += 1;
+    if (mostrarColumnaObservaciones && observacionesFiltroActivo.trim()) n += 1;
     if (clienteIdFiltroActivo.trim()) n += 1;
     if (transportistaIdFiltroActivo.trim()) n += 1;
     if (choferIdFiltroActivo.trim()) n += 1;
@@ -1486,6 +1557,8 @@ export function ViajesTenantPage({
     numeroFiltroActivo,
     ctgFiltroActivo,
     idPropio2FiltroActivo,
+    observacionesFiltroActivo,
+    mostrarColumnaObservaciones,
     clienteIdFiltroActivo,
     transportistaIdFiltroActivo,
     choferIdFiltroActivo,
@@ -1703,6 +1776,8 @@ export function ViajesTenantPage({
       const {
         numero: numF,
         ctg: ctgF,
+        idPropio2: idp2F,
+        observaciones: obsF,
         clienteId: cid,
         transportistaId: transpFiltro,
         choferId: choferFiltro,
@@ -1807,10 +1882,18 @@ export function ViajesTenantPage({
       }
 
       // Filtros locales si aplican
-      const isLocalSearch = !!numF.trim() || !!ctgF.trim();
+      const isLocalSearch =
+        !!numF.trim() ||
+        !!ctgF.trim() ||
+        !!idp2F?.trim() ||
+        (mostrarColumnaObservaciones && !!obsF?.trim());
       if (isLocalSearch) {
         const qNum = numF.replace(/#/g, "").trim().toLowerCase();
         const qCtg = ctgF.trim().toLowerCase();
+        const qIdp2 = idp2F?.trim().toLowerCase();
+        const qObs = mostrarColumnaObservaciones
+          ? normalizarTextoBusqueda(obsF)
+          : "";
         if (qNum)
           itemsExport = itemsExport.filter((v) =>
             String(v.numero).toLowerCase().includes(qNum),
@@ -1820,6 +1903,14 @@ export function ViajesTenantPage({
             (v.numeroIdentificacionPersonalizado || "")
               .toLowerCase()
               .includes(qCtg),
+          );
+        if (qIdp2)
+          itemsExport = itemsExport.filter((v) =>
+            (v.idPropio2 || "").toLowerCase().includes(qIdp2),
+          );
+        if (qObs)
+          itemsExport = itemsExport.filter((v) =>
+            normalizarTextoBusqueda(v.observaciones || "").includes(qObs),
           );
       }
 
@@ -2201,8 +2292,6 @@ export function ViajesTenantPage({
     Boolean(tenantEfectivo?.viajesColumnaProductosHabilitada) &&
     isViajeFieldVisible("edicion_viaje", "productoItems");
   const productoLabelsTenant = productoLabels(tenantEfectivo);
-  // Columna opcional de observaciones (switch de superadmin).
-  const mostrarColumnaObservaciones = Boolean(tenantEfectivo?.viajesObservaciones);
   // Mismo criterio que la columna/badge de la grilla: si el tenant tiene el
   // campo oculto, tampoco se ofrece como columna en la exportación a Excel.
   const viajesExportColumnsDisponibles = VIAJES_EXPORT_COLUMNS.filter((c) => {
@@ -2250,6 +2339,11 @@ export function ViajesTenantPage({
       aplicarFiltroColumnaTransportista("");
     }
   }, [mostrarColumnaTransporte]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!mostrarColumnaObservaciones && observacionesFiltroActivo.trim()) {
+      aplicarFiltroColumnaObservaciones("");
+    }
+  }, [mostrarColumnaObservaciones]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mostrarCargandoListado = !error && (rows === null || listadoRefetching);
   const elegiblesEnPagina = (rows ?? []).filter(esElegibleLote);
@@ -2683,7 +2777,21 @@ export function ViajesTenantPage({
     ),
     observaciones: mostrarColumnaObservaciones && (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
-        Observaciones
+        <ViajesListadoHeaderFiltro
+          title="Observaciones"
+          filterActive={!!observacionesFiltroActivo.trim()}
+          filterSignature={observacionesFiltroActivo}
+          onClear={() => aplicarFiltroColumnaObservaciones("")}
+          minWidthClass="min-w-0"
+        >
+          <AutocompleteInput
+            value={observacionesFiltroActivo}
+            onChange={(val) => aplicarFiltroColumnaObservaciones(val)}
+            onSearch={searchObservaciones}
+            disabled={listadoRefetching}
+            placeholder="Buscar observación..."
+          />
+        </ViajesListadoHeaderFiltro>
       </th>
     ),
   };
@@ -2748,6 +2856,20 @@ export function ViajesTenantPage({
             onSearch={searchIdPropio2}
             disabled={listadoRefetching}
             placeholder="Buscar valor..."
+          />
+        </ListadoFiltroCampo>
+      )}
+      {mostrarColumnaObservaciones && (
+        <ListadoFiltroCampo
+          label="Observaciones"
+          active={!!observacionesFiltroActivo.trim()}
+        >
+          <AutocompleteInput
+            value={observacionesFiltroActivo}
+            onChange={(val) => aplicarFiltroColumnaObservaciones(val)}
+            onSearch={searchObservaciones}
+            disabled={listadoRefetching}
+            placeholder="Buscar observación..."
           />
         </ListadoFiltroCampo>
       )}
