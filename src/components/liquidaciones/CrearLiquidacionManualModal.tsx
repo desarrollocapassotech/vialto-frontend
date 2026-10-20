@@ -58,6 +58,7 @@ import {
   signedMontoNetoConcepto,
 } from "@/lib/liquidacionConceptosIva";
 import { useToast } from "@/lib/toast";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import {
   formatViajeImporteForListado,
   numeroVisibleViaje,
@@ -108,10 +109,8 @@ type ViajeItem = Pick<
   | "cliente"
 >;
 
-function fmtDate(iso: string | null) {
-  if (!iso) return "—";
-  const [y, m, d] = iso.slice(0, 10).split("-");
-  return `${d}/${m}/${y}`;
+function fmtDate(iso: string | null | undefined) {
+  return fmtDateUtc(iso);
 }
 
 /** Valor para `<input type="date">` a partir de un ISO en medianoche UTC, sin corrimiento por zona horaria. */
