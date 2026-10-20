@@ -16,9 +16,10 @@ import {
   LiquidacionViewModal,
   type LiquidacionConTransportista,
 } from "@/components/liquidaciones/LiquidacionViewModal";
-import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
+import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
 import { apiFetch, apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { verPdfLiquidacion } from "@/lib/liquidacionContratoPdf";
 import { useToast } from "@/lib/toast";
 import type { Viaje } from "@/types/api";
 
@@ -84,7 +85,6 @@ export function ViajeLiquidacionIndicador({
   const [cargando, setCargando] = useState(false);
   const [liquidacionCompleta, setLiquidacionCompleta] =
     useState<LiquidacionConTransportista | null>(null);
-  const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
 
   if (viaje.liquidacionEstado == null) return null;
   const estado = viaje.liquidacionEstado as LiquidacionEstado;
@@ -108,6 +108,12 @@ export function ViajeLiquidacionIndicador({
     } finally {
       setCargando(false);
     }
+  }
+
+  /** Adjunto guardado (comprobante o anulación manual) en pestaña nueva, abierta en el click. */
+  function verAdjunto(url: string | null | undefined, titulo = "Comprobante") {
+    const u = url?.trim();
+    if (u) void abrirAdjuntoEnPestana({ url: u }, () => getToken(), titulo);
   }
 
   async function verPdf(kind: "pdf" | "pdf-anulacion", errorMsg: string) {
@@ -199,11 +205,11 @@ export function ViajeLiquidacionIndicador({
             liquidacionCompleta.cbteNro != null
               ? () => void verPdf("pdf", "Error al generar el PDF")
               : liquidacionCompleta.comprobanteUrl?.trim()
-                ? () =>
-                    setComprobanteUrl(
-                      liquidacionCompleta.comprobanteUrl ?? null,
-                    )
+                ? () => verAdjunto(liquidacionCompleta.comprobanteUrl)
                 : undefined
+          }
+          onVerPdfLiquidacion={() =>
+            void verPdfLiquidacion(liquidacionCompleta.id, () => getToken(), tenantId)
           }
           onVerAnulacion={
             liquidacionCompleta.estado === "anulado" &&
@@ -220,20 +226,12 @@ export function ViajeLiquidacionIndicador({
             liquidacionCompleta.anulacionMetodo === "manual" &&
             liquidacionCompleta.anulacionManualComprobanteUrl
               ? () =>
-                  window.open(
-                    liquidacionCompleta.anulacionManualComprobanteUrl as string,
-                    "_blank",
-                    "noopener,noreferrer",
+                  verAdjunto(
+                    liquidacionCompleta.anulacionManualComprobanteUrl,
+                    "Comprobante de anulación",
                   )
               : undefined
           }
-        />
-      )}
-      {comprobanteUrl && (
-        <AdjuntoPreviewModal
-          url={comprobanteUrl}
-          title="Comprobante"
-          onClose={() => setComprobanteUrl(null)}
         />
       )}
     </>

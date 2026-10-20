@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
+import { verPdfLiquidacion } from "@/lib/liquidacionContratoPdf";
 import { verPdfFacturaArca } from "@/lib/facturaPdfArca";
 import { ComprobanteAdjuntoClip } from "@/components/shared/ComprobanteAdjuntoClip";
 import { Banknote, Receipt } from "lucide-react";
@@ -47,6 +48,7 @@ import {
   FilaDetalleViaje,
   SeccionDetalleViaje,
   VerComprobanteAdjunto,
+  VerPdfLiquidacionLink,
 } from "@/components/viajes/ViajeDetalleSecciones";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { ViajeAdjuntosSeccion } from "@/components/viajes/ViajeAdjuntosSeccion";
@@ -566,6 +568,11 @@ export function ViajeViewModal({
                   .filter(Boolean)
                   .join(" · ") || null;
               const abrirComprobante = abrirComprobanteLiquidacion(l);
+              // Sin ARCA el comprobante es el adjunto: el PDF que arma Vialto va aparte.
+              const verPdfLiq =
+                !tieneLiqArca && l.cbteNro == null
+                  ? () => void verPdfLiquidacion(l.id, () => getToken(), tenantId || undefined)
+                  : undefined;
               return [
                 <FilaDetalleViaje
                   key={`${lv.liquidacionId}-cbte`}
@@ -577,12 +584,17 @@ export function ViajeViewModal({
                       : "Manual",
                   )}
                   sub={
-                    subComprobante || abrirComprobante ? (
+                    subComprobante || abrirComprobante || verPdfLiq ? (
                       <>
                         {subComprobante}
                         {abrirComprobante && (
                           <span className="block">
                             <VerComprobanteAdjunto onClick={abrirComprobante} />
+                          </span>
+                        )}
+                        {verPdfLiq && (
+                          <span className="block">
+                            <VerPdfLiquidacionLink onClick={verPdfLiq} />
                           </span>
                         )}
                       </>

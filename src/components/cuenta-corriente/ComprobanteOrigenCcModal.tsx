@@ -6,11 +6,12 @@ import {
   LiquidacionViewModal,
   type LiquidacionConTransportista,
 } from '@/components/liquidaciones/LiquidacionViewModal';
-import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
+import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
 import { ViewModalShell } from '@/components/ui/ViewModalShell';
 import { Loader2 } from 'lucide-react';
 import { apiFetch, apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { verPdfLiquidacion } from '@/lib/liquidacionContratoPdf';
 import { useToast } from '@/lib/toast';
 import type { Factura } from '@/types/api';
 
@@ -46,7 +47,6 @@ export function ComprobanteOrigenCcModal({
   const { showToast } = useToast();
   const [factura, setFactura] = useState<Factura | null>(null);
   const [liquidacion, setLiquidacion] = useState<LiquidacionConTransportista | null>(null);
-  const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
   // El host suele pasar una arrow nueva en cada render: no debe volver a disparar el fetch.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -95,14 +95,10 @@ export function ComprobanteOrigenCcModal({
     }
   }
 
-  if (comprobanteUrl) {
-    return (
-      <AdjuntoPreviewModal
-        url={comprobanteUrl}
-        title="Comprobante"
-        onClose={() => setComprobanteUrl(null)}
-      />
-    );
+  /** Adjunto guardado (comprobante o anulación manual) en pestaña nueva, abierta en el click. */
+  function verAdjunto(url: string | null | undefined, titulo = 'Comprobante') {
+    const u = url?.trim();
+    if (u) void abrirAdjuntoEnPestana({ url: u }, () => getToken(), titulo);
   }
 
   if (factura) {
@@ -117,7 +113,7 @@ export function ComprobanteOrigenCcModal({
         }
         onVerComprobante={
           factura.comprobanteUrl?.trim()
-            ? () => setComprobanteUrl(factura.comprobanteUrl ?? null)
+            ? () => verAdjunto(factura.comprobanteUrl)
             : undefined
         }
       />
@@ -137,9 +133,10 @@ export function ComprobanteOrigenCcModal({
           liquidacion.cbteNro != null
             ? () => void verPdf('pdf', 'Error al generar el PDF')
             : liquidacion.comprobanteUrl?.trim()
-              ? () => setComprobanteUrl(liquidacion.comprobanteUrl ?? null)
+              ? () => verAdjunto(liquidacion.comprobanteUrl)
               : undefined
         }
+        onVerPdfLiquidacion={() => void verPdfLiquidacion(liquidacion.id, () => getToken())}
         onVerAnulacion={
           liquidacion.estado === 'anulado' && liquidacion.anulacionMetodo !== 'manual'
             ? () => void verPdf('pdf-anulacion', 'Error al generar el PDF de la anulación')
@@ -149,12 +146,7 @@ export function ComprobanteOrigenCcModal({
           liquidacion.estado === 'anulado' &&
           liquidacion.anulacionMetodo === 'manual' &&
           liquidacion.anulacionManualComprobanteUrl
-            ? () =>
-                window.open(
-                  liquidacion.anulacionManualComprobanteUrl as string,
-                  '_blank',
-                  'noopener,noreferrer',
-                )
+            ? () => verAdjunto(liquidacion.anulacionManualComprobanteUrl, 'Comprobante de anulación')
             : undefined
         }
       />

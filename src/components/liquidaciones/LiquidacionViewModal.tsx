@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
-import { Ban, FileText, Paperclip, Receipt, RotateCw, Trash2 } from "lucide-react";
+import { Ban, FileDown, FileText, Paperclip, Receipt, RotateCw, Trash2 } from "lucide-react";
 import { anulacionComprobanteLabel, nroComprobante } from "@/lib/arcaCbteTipo";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import {
@@ -134,6 +134,7 @@ export function LiquidacionViewModal({
   onConfirmarAnulacionManual,
   onVerComprobante,
   onAdjuntarComprobante,
+  onVerPdfLiquidacion,
   onVerAnulacion,
   onVerComprobanteAnulacionManual,
   onVolverAEmitir,
@@ -166,6 +167,11 @@ export function LiquidacionViewModal({
   onVerComprobante?: () => void;
   /** Sin ARCA: botón "Adjuntar comprobante" si la liquidación todavía no tiene archivo. */
   onAdjuntarComprobante?: () => void;
+  /**
+   * Sin ARCA: "PDF de liquidación" (resumen que genera Vialto), distinto de "Ver comprobante"
+   * (el adjunto manual). Con ARCA no se muestra: el comprobante ya es el PDF del CVLP.
+   */
+  onVerPdfLiquidacion?: () => void;
   /** Ver el PDF de la Nota de Crédito/Débito de anulación. Solo tiene sentido si `estado === 'anulado'` y anulacionMetodo = 'nota_credito_debito'. */
   onVerAnulacion?: () => void;
   /** Ver el comprobante pre-impreso adjunto en la anulación manual. Solo si `anulacionMetodo === 'manual'`. */
@@ -428,6 +434,16 @@ export function LiquidacionViewModal({
               >
                 <FileText className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
                 {verAnulacion ? "Ver comprobante original" : "Ver comprobante"}
+              </button>
+            )}
+            {onVerPdfLiquidacion && !hasArca && (
+              <button
+                type="button"
+                onClick={onVerPdfLiquidacion}
+                className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+              >
+                <FileDown className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                PDF de liquidación
               </button>
             )}
             {onAdjuntarComprobante && !hasArca && !source.comprobanteUrl?.trim() && (

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Paperclip } from "lucide-react";
+import { FileDown, Paperclip } from "lucide-react";
 
 /**
  * Secciones del detalle de un viaje (Estado / Facturación / Liquidación): recuadro con
@@ -81,6 +81,20 @@ export function VerComprobanteAdjunto({ onClick }: { onClick: () => void }) {
     >
       <Paperclip className="h-3 w-3" strokeWidth={2} aria-hidden />
       Ver comprobante
+    </button>
+  );
+}
+
+/** Botón sutil "PDF de liquidación" (el que genera Vialto; sin ARCA, aparte del adjunto). */
+export function VerPdfLiquidacionLink({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-vialto-steel hover:text-vialto-fire hover:underline"
+    >
+      <FileDown className="h-3 w-3" strokeWidth={2} aria-hidden />
+      PDF de liquidación
     </button>
   );
 }

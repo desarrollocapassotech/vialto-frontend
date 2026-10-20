@@ -54,6 +54,7 @@ import {
 } from "@/lib/arcaCbteTipo";
 import { apiJson, apiFetch, ApiError } from "@/lib/api";
 import { hoyArgentinaIso, vencimientoPorDefecto } from "@/lib/facturaFechaEmision";
+import { verPdfLiquidacion } from "@/lib/liquidacionContratoPdf";
 import { useToast } from "@/lib/toast";
 import { friendlyError } from "@/lib/friendlyError";
 import {
@@ -4266,12 +4267,11 @@ export function ViajesTenantPage({
             hasArca={true}
             onClose={() => setViewingFactura(null)}
             onVerComprobante={
-              viewingFactura.comprobanteUrl
+              viewingFactura.comprobanteUrl?.trim()
                 ? () =>
-                    window.open(
-                      viewingFactura.comprobanteUrl!,
-                      "_blank",
-                      "noopener,noreferrer",
+                    void abrirAdjuntoEnPestana(
+                      { url: viewingFactura.comprobanteUrl!.trim() },
+                      () => getToken(),
                     )
                 : undefined
             }
@@ -4331,6 +4331,13 @@ export function ViajesTenantPage({
               navigate(`/liquidaciones?${params.toString()}`);
             }}
             onClose={() => setViewingLiquidacion(null)}
+            onVerPdfLiquidacion={() =>
+              void verPdfLiquidacion(
+                viewingLiquidacion.id,
+                () => getToken(),
+                platform && tid ? tid : undefined,
+              )
+            }
             onEmitir={
               hasLiquidoProductoArca
                 ? () => {
@@ -4370,10 +4377,9 @@ export function ViajesTenantPage({
                   }
                 : viewingLiquidacion.comprobanteUrl?.trim()
                   ? () =>
-                      window.open(
-                        viewingLiquidacion.comprobanteUrl,
-                        "_blank",
-                        "noopener,noreferrer",
+                      void abrirAdjuntoEnPestana(
+                        { url: viewingLiquidacion.comprobanteUrl!.trim() },
+                        () => getToken(),
                       )
                   : undefined
             }
