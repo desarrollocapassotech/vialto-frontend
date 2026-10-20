@@ -1,5 +1,6 @@
 import { FacturaLineaDetalle } from "@/components/facturacion/FacturaLineaDetalle";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import { AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   FacturaLineasEditor,
@@ -61,6 +62,8 @@ export type FacturaArcaPreviewPanelProps = {
   /** Los datos del receptor se acaban de actualizar solos (desde ARCA): parpadeo suave. */
   receptorResaltado?: boolean;
   feedbackSlot?: ReactNode;
+  /** Mensaje de bloqueo si el CUIT del receptor está dado de baja / apócrifo en ARCA. */
+  receptorBloqueadoMensaje?: string | null;
 };
 
 export function FacturaArcaPreviewPanel({
@@ -83,6 +86,7 @@ export function FacturaArcaPreviewPanel({
   avisoFaltantesExterno = false,
   estadoReceptor,
   receptorResaltado = false,
+  receptorBloqueadoMensaje = null,
   feedbackSlot,
 }: FacturaArcaPreviewPanelProps) {
   // Empresa efectiva (propia u override de superadmin) para armar el detalle como en el PDF.
@@ -141,6 +145,18 @@ export function FacturaArcaPreviewPanel({
           resaltado={receptorResaltado}
         />
       </div>
+
+      {receptorBloqueadoMensaje && (
+        <div
+          className="rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900 flex items-start gap-2"
+          role="alert"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" aria-hidden />
+          <p className="min-w-0 flex-1 font-medium leading-relaxed">
+            {receptorBloqueadoMensaje}
+          </p>
+        </div>
+      )}
 
       {datosEmitIncompletos && !avisoFaltantesExterno && missingHiddenFields.length > 0 && (
         <div className="rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900" role="alert">

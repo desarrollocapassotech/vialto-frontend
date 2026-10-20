@@ -17,6 +17,7 @@ import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPre
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
+import { useReceptorPadronBloqueado } from "@/hooks/useReceptorPadronBloqueado";
 import {
   aplicarCambiosPadronCliente,
   useValidacionPadronRegistro,
@@ -457,6 +458,18 @@ export function FacturaCreateModal({
   // Se actualizó solo: parpadeo suave en el receptor + "Ver datos" para revisarlo/editarlo.
   const padronClienteActualizado = padronCliente.resultado?.resultado === "actualizado";
 
+  // CUIT del cliente (receptor de la factura) dado de baja / apócrifo en ARCA: no se
+  // puede emitir. Se avisa en el panel de previsualización y se bloquea la emisión.
+  const receptorCliente = useReceptorPadronBloqueado({
+    entidad: "clientes",
+    id: open ? clienteElegidoId : null,
+    habilitado: unifiedArca,
+    tenantId,
+    getToken,
+    datosKey: clienteDetalle?.idFiscal ?? null,
+  });
+  const emisionBloqueada = datosEmitIncompletos || receptorCliente.bloqueado;
+
   // Zumbido del aviso del pie al tocar "Emitir a ARCA" con datos faltantes.
   const zumbidoAviso = useZumbidoAviso();
   useEffect(() => {
@@ -685,6 +698,14 @@ export function FacturaCreateModal({
     }
 
     if (action === "emitir") {
+      if (emisionBloqueada) {
+        if (datosEmitIncompletos) {
+          notifyError(missingEmitMessage ?? "Faltan datos para emitir.");
+        } else if (receptorCliente.mensaje) {
+          notifyError(receptorCliente.mensaje);
+        }
+        return;
+      }
       if (bloqueadoUsd) {
         notifyError(MSG_ARCA_NO_FACTURA_USD);
         return;
@@ -754,8 +775,11 @@ export function FacturaCreateModal({
       // Se creó pero falló ARCA: refrescar y cerrar
       if (facturaCreada) {
         onFacturaGuardada?.(facturaCreada);
+        const msg = friendlyError(err, "arca");
         showToast(
-          "La factura quedó en borrador pero no se pudo emitir a ARCA. Podés reintentar desde el listado.",
+          msg && msg !== "No pudimos conectar con ARCA / AFIP SDK. Revisá la configuración e intentá de nuevo."
+            ? msg
+            : "La factura quedó en borrador pero no se pudo emitir a ARCA. Podés reintentar desde el listado.",
           "error",
         );
         onClose();
@@ -1319,6 +1343,7 @@ export function FacturaCreateModal({
                         ) : undefined
                       }
                       receptorResaltado={padronClienteActualizado}
+                      receptorBloqueadoMensaje={receptorCliente.bloqueado ? receptorCliente.mensaje : null}
                       feedbackSlot={
                         <div ref={feedbackRef} className="space-y-2">
                           {arcaConfigMissing && (
@@ -1480,22 +1505,28 @@ export function FacturaCreateModal({
                       ? "Guardando…"
                       : "Guardar borrador"}
                   </button>
-                  {/* Con datos faltantes no se usa `disabled` (no dispararía el click): se ve
+                  {/* Con datos faltantes o CUIT bloqueado no se usa `disabled` (no dispararía el click): se ve
                       deshabilitado y el click hace zumbar el aviso del pie. */}
                   <button
                     type="button"
-                    disabled={busy || monedaInvalida || bloqueadoUsd || montoCero}
+                    disabled={
+                      busy ||
+                      monedaInvalida ||
+                      bloqueadoUsd ||
+                      montoCero ||
+                      receptorCliente.verificando
+                    }
                     title={montoCero ? MSG_EMITIR_MONTO_CERO : undefined}
-                    aria-disabled={datosEmitIncompletos || undefined}
+                    aria-disabled={emisionBloqueada || undefined}
                     onClick={() => {
-                      if (datosEmitIncompletos) {
+                      if (emisionBloqueada) {
                         zumbidoAviso.disparar();
                         return;
                       }
                       setConfirmarEmision(true);
                     }}
                     className={`inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white disabled:opacity-60 ${
-                      datosEmitIncompletos
+                      emisionBloqueada
                         ? "cursor-not-allowed opacity-60"
                         : "hover:bg-vialto-graphite"
                     }`}
