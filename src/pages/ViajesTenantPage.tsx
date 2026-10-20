@@ -2201,6 +2201,8 @@ export function ViajesTenantPage({
     Boolean(tenantEfectivo?.viajesColumnaProductosHabilitada) &&
     isViajeFieldVisible("edicion_viaje", "productoItems");
   const productoLabelsTenant = productoLabels(tenantEfectivo);
+  // Columna opcional de observaciones (switch de superadmin).
+  const mostrarColumnaObservaciones = Boolean(tenantEfectivo?.viajesObservaciones);
   // Mismo criterio que la columna/badge de la grilla: si el tenant tiene el
   // campo oculto, tampoco se ofrece como columna en la exportación a Excel.
   const viajesExportColumnsDisponibles = VIAJES_EXPORT_COLUMNS.filter((c) => {
@@ -2218,6 +2220,7 @@ export function ViajesTenantPage({
     (mostrarColumnaTransporte ? 0 : -1) +
     (mostrarColumnaIdPropio2 ? 1 : 0) +
     (mostrarColumnaProductos ? 1 : 0) +
+    (mostrarColumnaObservaciones ? 1 : 0) +
     (mostrarColumnaIdSistema ? 0 : -1) +
     (mostrarColumnaIdPropio1 ? 0 : -1);
   const tableColSpan = mostrarColumnaSeleccionLote
@@ -2676,6 +2679,11 @@ export function ViajesTenantPage({
     productos: mostrarColumnaProductos && (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
         {productoLabelsTenant.plural}
+      </th>
+    ),
+    observaciones: mostrarColumnaObservaciones && (
+      <th scope="col" className={`${listadoTablaThClass} align-top`}>
+        Observaciones
       </th>
     ),
   };
@@ -3370,6 +3378,18 @@ export function ViajesTenantPage({
                 </span>
               </td>
             ),
+            observaciones: mostrarColumnaObservaciones && (
+              <td className="h-8 px-3 py-1 text-vialto-steel">
+                {v.observaciones?.trim() ? (
+                  <span
+                    className="block max-w-[14rem] truncate"
+                    title={v.observaciones.trim()}
+                  >
+                    {v.observaciones.trim()}
+                  </span>
+                ) : null}
+              </td>
+            ),
           };
           return (
             <tr
@@ -3640,6 +3660,15 @@ export function ViajesTenantPage({
                   },
                 ]
               : [],
+            observaciones:
+              mostrarColumnaObservaciones && v.observaciones?.trim()
+                ? [
+                    {
+                      label: "Observaciones",
+                      value: v.observaciones.trim(),
+                    },
+                  ]
+                : [],
           };
           return (
             <ListadoCard

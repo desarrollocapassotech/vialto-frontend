@@ -24,6 +24,7 @@ type Props = {
     | "idPropio2Habilitado"
     | "tipoFlota"
     | "viajesColumnaProductosHabilitada"
+    | "viajesObservaciones"
   >;
   /** Labels propios de la empresa (ej. ID propio 1 = "CTG"). */
   labels?: Partial<Record<ViajeColumnaId, string>>;
