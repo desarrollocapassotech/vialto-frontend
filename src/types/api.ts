@@ -431,6 +431,8 @@ export interface Tenant {
   viajesColumnasOrden?: string[];
   /** true = la grilla de Viajes muestra la columna de productos. Default false; solo lo cambia superadmin. */
   viajesColumnaProductosHabilitada?: boolean;
+  /** true = la grilla de Viajes muestra la columna de observaciones. Default false; solo lo cambia superadmin. */
+  viajesObservaciones?: boolean;
   /** Label que reemplaza a "Producto" fuera de Stock (ej. "Grano"). Leer con `useProductoLabels`. */
   productoLabel?: string | null;
   /** Plural de productoLabel (ej. "Granos"); lo genera la IA al guardar el singular. */
