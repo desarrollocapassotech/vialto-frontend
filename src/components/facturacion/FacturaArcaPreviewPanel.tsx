@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import {
   FacturaLineasEditor,
   computeFacturaTotales,
+  computeIvaPorAlicuota,
+  labelIvaAlicuota,
   type FacturaLineaDraft,
 } from "@/components/facturacion/FacturaLineasEditor";
 import {
@@ -90,6 +92,7 @@ export function FacturaArcaPreviewPanel({
   const condicionIva = clienteDetalle?.condicionIva ?? null;
   const letra = facturaLetraFromCondicionIva(condicionIva);
   const totales = computeFacturaTotales(lineas, ivaPctDefault);
+  const ivaPorAlicuota = computeIvaPorAlicuota(lineas, ivaPctDefault);
   const missingClienteFields = missingEmitFields.filter((f) =>
     f.startsWith("Cliente:")
   );
@@ -199,8 +202,15 @@ export function FacturaArcaPreviewPanel({
       </section>
 
       <div className="space-y-1 border-t border-black/10 pt-2">
-        <Row label="Neto" value={fmtMoney(totales.neto)} />
-        <Row label="IVA" value={fmtMoney(totales.iva)} />
+        <Row label="Subtotal" value={fmtMoney(totales.neto)} />
+        {/* IVA desagregado por alícuota, igual que Cuenta corriente. */}
+        {ivaPorAlicuota.length === 0 ? (
+          <Row label="IVA" value={fmtMoney(totales.iva)} />
+        ) : (
+          ivaPorAlicuota.map(({ pct, iva }) => (
+            <Row key={pct} label={labelIvaAlicuota(pct)} value={fmtMoney(iva)} />
+          ))
+        )}
         <div className="flex justify-between gap-3 text-xs font-semibold text-vialto-charcoal pt-1">
           <span>Total a facturar</span>
           <span className="whitespace-nowrap tabular-nums">{fmtMoney(totales.total)}</span>

@@ -296,6 +296,29 @@ export function computeFacturaTotales(
   );
 }
 
+/**
+ * IVA desagregado por alícuota (de mayor a menor), misma cuenta que `computeFacturaTotales`:
+ * base agrupada por alícuota y redondeo por alícuota, así los renglones suman el IVA total.
+ */
+export function computeIvaPorAlicuota(
+  lineas: FacturaLineaDraft[],
+  ivaPctDefault: number,
+): { pct: number; iva: number }[] {
+  const basePorPct = new Map<number, number>();
+  for (const l of lineas.filter(isFacturaLineaCompleta)) {
+    const pct = l.ivaPct ?? ivaPctDefault;
+    basePorPct.set(pct, roundMoney2((basePorPct.get(pct) ?? 0) + roundMoney2(l.importe)));
+  }
+  return [...basePorPct.entries()]
+    .sort(([a], [b]) => b - a)
+    .map(([pct, base]) => ({ pct, iva: roundMoney2((base * pct) / 100) }));
+}
+
+/** "IVA 21%", "IVA 10,5%". */
+export function labelIvaAlicuota(pct: number): string {
+  return `IVA ${pct.toLocaleString('es-AR', { maximumFractionDigits: 2 })}%`;
+}
+
 interface Props {
   lineas: FacturaLineaDraft[];
   onChange: (next: FacturaLineaDraft[]) => void;
@@ -342,17 +365,10 @@ export function FacturaLineasEditor({
   );
   const lineasCompletas = lineas.every(isFacturaLineaCompleta);
 
-  /** IVA desagregado por alícuota, misma cuenta que el total (base agrupada, redondeo por alícuota). */
-  const ivaPorAlicuota = useMemo(() => {
-    const basePorPct = new Map<number, number>();
-    for (const l of lineas.filter(isFacturaLineaCompleta)) {
-      const pct = l.ivaPct ?? ivaPctDefault;
-      basePorPct.set(pct, roundMoney2((basePorPct.get(pct) ?? 0) + roundMoney2(l.importe)));
-    }
-    return [...basePorPct.entries()]
-      .sort(([a], [b]) => b - a)
-      .map(([pct, base]) => ({ pct, iva: roundMoney2((base * pct) / 100) }));
-  }, [lineas, ivaPctDefault]);
+  const ivaPorAlicuota = useMemo(
+    () => computeIvaPorAlicuota(lineas, ivaPctDefault),
+    [lineas, ivaPctDefault],
+  );
 
   const botonAgregar = (
     <button
@@ -536,7 +552,7 @@ export function FacturaLineasEditor({
           ) : (
             ivaPorAlicuota.map(({ pct, iva }) => (
               <p key={pct}>
-                IVA {pct.toLocaleString('es-AR', { maximumFractionDigits: 2 })}%:{' '}
+                {labelIvaAlicuota(pct)}:{' '}
                 <span className="font-medium tabular-nums text-vialto-charcoal">
                   {fmtMoney(iva)}
                 </span>
