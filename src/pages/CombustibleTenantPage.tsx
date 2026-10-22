@@ -48,6 +48,12 @@ import type {
   Vehiculo,
 } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import {
+  FiltroCargasSospechosas,
+  PERIODOS_SOSPECHOSAS,
+  type ConteoSospechosas,
+  type PeriodoSospechosas,
+} from "@/components/combustible/FiltroCargasSospechosas";
 
 type CombustibleTab = "cargas" | "asignaciones";
 
@@ -61,6 +67,8 @@ const TAB_OPCIONES: SelectorOpcion[] = TABS.map((t) => ({ id: t.id, label: t.lab
 type CombustibleListResponse = {
   cargas: CargaCombustible[];
   total: number;
+  /** Cargas sospechosas por período con el resto de los filtros: contadores del filtro rápido. */
+  sospechosas?: ConteoSospechosas;
   page: number;
   limit: number;
 };
@@ -150,6 +158,9 @@ export function CombustibleTenantPage({
 
   const [rows, setRows] = useState<CargaCombustible[] | null>(null);
   const [total, setTotal] = useState(0);
+  const [conteoSospechosas, setConteoSospechosas] = useState<ConteoSospechosas | undefined>(
+    undefined,
+  );
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [error, setError] = useState<string | null>(null);
@@ -179,6 +190,12 @@ export function CombustibleTenantPage({
   const [choferId, setChoferId] = useState(initialChoferId);
   const [estacion, setEstacion] = useState(initialEstacion);
   const [formaPago, setFormaPago] = useState(initialFormaPago);
+  // Filtro rápido "Cargas sospechosas" por período. Va aparte de los filtros por columna,
+  // como los filtros rápidos de Viajes: "Limpiar filtros" no lo toca.
+  const [periodoSospechosas, setPeriodoSospechosas] = useState<PeriodoSospechosas | "">(
+    () =>
+      PERIODOS_SOSPECHOSAS.find((p) => p.id === searchParams.get("sospechosas"))?.id ?? "",
+  );
   const [sortBy, setSortBy] = useState<CombustibleSortField>(initialSortBy);
   const [sortDir, setSortDir] = useState<CombustibleSortDir>(initialSortDir);
 
@@ -211,6 +228,7 @@ export function CombustibleTenantPage({
       setChoferId("");
       setEstacion("");
       setFormaPago("");
+      setPeriodoSospechosas("");
       setRows(null);
       setError(null);
     }
@@ -238,6 +256,8 @@ export function CombustibleTenantPage({
         else qs.delete("estacion");
         if (formaPago) qs.set("formaPago", formaPago);
         else qs.delete("formaPago");
+        if (periodoSospechosas) qs.set("sospechosas", periodoSospechosas);
+        else qs.delete("sospechosas");
         appendCombustibleSortQuery(qs, sortBy, sortDir);
         return qs;
       },
@@ -250,6 +270,7 @@ export function CombustibleTenantPage({
     choferId,
     estacion,
     formaPago,
+    periodoSospechosas,
     sortBy,
     sortDir,
     setSearchParams,
@@ -304,6 +325,7 @@ export function CombustibleTenantPage({
     if (choferId) qs.set("choferId", choferId);
     if (estacion) qs.set("estacion", estacion);
     if (formaPago) qs.set("formaPago", formaPago);
+    if (periodoSospechosas) qs.set("sospechoso", periodoSospechosas);
     appendCombustibleSortQuery(qs, sortBy, sortDir);
     return qs;
   }
@@ -372,6 +394,7 @@ export function CombustibleTenantPage({
         if (!cancelled) {
           setRows(data.cargas);
           setTotal(data.total);
+          setConteoSospechosas(data.sospechosas);
           setError(null);
         }
       } catch (e) {
@@ -397,6 +420,7 @@ export function CombustibleTenantPage({
     choferId,
     estacion,
     formaPago,
+    periodoSospechosas,
     sortBy,
     sortDir,
     reloadKey,
@@ -455,6 +479,7 @@ export function CombustibleTenantPage({
     choferId,
     estacion,
     formaPago,
+    periodoSospechosas,
     getToken,
   ]);
 
@@ -659,6 +684,17 @@ export function CombustibleTenantPage({
           </h1>
         )}
 
+        {/* Filtro rápido de cargas sospechosas: el embudo palpita si hay alguna este mes. */}
+        {tab === "cargas" && activeTenantId && (
+          <FiltroCargasSospechosas
+            value={periodoSospechosas}
+            conteos={conteoSospechosas}
+            onChange={(v) => {
+              setPeriodoSospechosas(v);
+              resetPage();
+            }}
+          />
+        )}
         {/* La pestaña Asignación de vehículos portalea acá su "Limpiar filtros". */}
         <div ref={setLimpiarFiltrosSlot} className="empty:hidden" />
         {tab === "cargas" && activeTenantId && hayFiltros && (

@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import { selectorTabClass } from "@/components/ui/SelectorOpcionesSheet";
 
 type Props = {
@@ -6,6 +7,8 @@ type Props = {
   onClick: () => void;
   /** Cantidad de registros que trae el filtro. Sin dato o en 0 no se muestra. */
   count?: number;
+  /** Abre un menú de opciones (ej. período): muestra una flecha y `aria-haspopup`. */
+  desplegable?: { abierto: boolean };
 };
 
 const ACTIVE_CLASS =
@@ -16,13 +19,15 @@ function formatCount(n: number) {
 }
 
 /** Chip de filtro rápido (Viajes, Facturas, Liquidaciones), con la cantidad al lado. */
-export function FiltroRapidoChip({ label, active, onClick, count }: Props) {
+export function FiltroRapidoChip({ label, active, onClick, count, desplegable }: Props) {
   const mostrarCount = typeof count === "number" && count > 0;
   return (
     <button
       type="button"
-      role="tab"
-      aria-selected={active}
+      role={desplegable ? undefined : "tab"}
+      aria-selected={desplegable ? undefined : active}
+      aria-haspopup={desplegable ? "menu" : undefined}
+      aria-expanded={desplegable?.abierto}
       onClick={onClick}
       className={`shrink-0 ${active ? ACTIVE_CLASS : selectorTabClass(false)}`}
     >
@@ -40,6 +45,12 @@ export function FiltroRapidoChip({ label, active, onClick, count }: Props) {
           >
             {formatCount(count)}
           </span>
+        )}
+        {desplegable && (
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 transition-transform ${desplegable.abierto ? "rotate-180" : ""}`}
+            aria-hidden
+          />
         )}
       </span>
     </button>
