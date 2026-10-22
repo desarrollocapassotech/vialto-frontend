@@ -74,7 +74,6 @@ export function MovimientoCcFormModal({
 }: Props) {
   const { getToken } = useAuth();
   const [tipo, setTipo] = useState<TipoMovimientoCc>(permiteCargo ? tipoInicial : 'pago');
-  const [concepto, setConcepto] = useState('');
   const [importeStr, setImporteStr] = useState('');
   const [ivaPctStr, setIvaPctStr] = useState('');
   const [moneda, setMoneda] = useState<ViajeMonedaCodigo>('ARS');
@@ -140,8 +139,7 @@ export function MovimientoCcFormModal({
           ? { clienteId: contraparteId }
           : { proveedorId: contraparteId }),
         tipo,
-        // El cobro/pago no lleva concepto libre: el backend pone "COBRO"/"PAGO".
-        concepto: esCargo ? concepto.trim() || undefined : undefined,
+        // Sin `concepto`: el backend lo pone solo (VENTA/COMPRA/COBRO/PAGO).
         imputarACargoIds: !esCargo && imputarA.length > 0 ? imputarA : undefined,
         importe,
         ivaPct: ivaPct ?? undefined,
@@ -238,21 +236,7 @@ export function MovimientoCcFormModal({
         </div>
         )}
 
-        {esCargo ? (
-          <div>
-            <label className={labelClass} htmlFor="cc-concepto">
-              Concepto
-            </label>
-            <input
-              id="cc-concepto"
-              type="text"
-              className={inputClass}
-              value={concepto}
-              onChange={(e) => setConcepto(e.target.value)}
-              placeholder="Ej. Factura 0001-00001234"
-            />
-          </div>
-        ) : (
+        {esCargo ? null : (
           <fieldset>
             <legend className={labelClass}>
               {esCliente ? 'Facturas que cobra' : 'Liquidaciones que paga'}

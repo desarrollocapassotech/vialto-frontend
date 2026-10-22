@@ -208,7 +208,7 @@ export function CuentaContraparteView({
 
   const [desdeFiltro, setDesdeFiltro] = useState('');
   const [hastaFiltro, setHastaFiltro] = useState('');
-  const [conceptoFiltro, setConceptoFiltro] = useState('');
+  const [tipoFiltro, setTipoFiltro] = useState('');
   const [comprobanteFiltro, setComprobanteFiltro] = useState('');
   // Se elige tocando la tarjeta de saldo de esa moneda (solo si la cuenta tiene más de una).
   const [monedaFiltro, setMonedaFiltro] = useState('');
@@ -217,11 +217,11 @@ export function CuentaContraparteView({
   const activeFilterCount = useMemo(() => {
     let n = 0;
     if (desdeFiltro || hastaFiltro) n += 1;
-    if (conceptoFiltro.trim()) n += 1;
+    if (tipoFiltro.trim()) n += 1;
     if (comprobanteFiltro.trim()) n += 1;
     if (monedaFiltro) n += 1;
     return n;
-  }, [desdeFiltro, hastaFiltro, conceptoFiltro, comprobanteFiltro, monedaFiltro]);
+  }, [desdeFiltro, hastaFiltro, tipoFiltro, comprobanteFiltro, monedaFiltro]);
   const anyFiltroActivo = activeFilterCount > 0;
 
   // Filtro solo de despliegue: se aplica sobre `movimientosConSaldo` (ya calculado con
@@ -234,7 +234,7 @@ export function CuentaContraparteView({
       const fecha = fechaDiaYmd(m.fecha) ?? '';
       if (desdeFiltro && fecha < desdeFiltro) return false;
       if (hastaFiltro && fecha > hastaFiltro) return false;
-      if (conceptoFiltro.trim() && !m.concepto.toLowerCase().includes(conceptoFiltro.trim().toLowerCase()))
+      if (tipoFiltro.trim() && !m.concepto.toLowerCase().includes(tipoFiltro.trim().toLowerCase()))
         return false;
       if (
         comprobanteFiltro.trim() &&
@@ -245,13 +245,13 @@ export function CuentaContraparteView({
         return false;
       return true;
     });
-  }, [movimientosConSaldo, monedaFiltro, desdeFiltro, hastaFiltro, conceptoFiltro, comprobanteFiltro]);
+  }, [movimientosConSaldo, monedaFiltro, desdeFiltro, hastaFiltro, tipoFiltro, comprobanteFiltro]);
 
   function limpiarFiltros() {
     setMonedaFiltro('');
     setDesdeFiltro('');
     setHastaFiltro('');
-    setConceptoFiltro('');
+    setTipoFiltro('');
     setComprobanteFiltro('');
   }
 
@@ -432,14 +432,14 @@ export function CuentaContraparteView({
     </div>
   );
 
-  const conceptoFiltroInput = (
+  const tipoFiltroInput = (
     <input
       type="text"
-      value={conceptoFiltro}
-      onChange={(e) => setConceptoFiltro(e.target.value)}
+      value={tipoFiltro}
+      onChange={(e) => setTipoFiltro(e.target.value)}
       placeholder="Buscar…"
-      className={`${filtroInputClass} ${conceptoFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'}`}
-      aria-label="Filtrar por concepto"
+      className={`${filtroInputClass} ${tipoFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'}`}
+      aria-label="Filtrar por tipo"
     />
   );
 
@@ -590,19 +590,9 @@ export function CuentaContraparteView({
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: 'concepto',
-            header: 'Concepto',
-            cell: (m: MovimientoConSaldo) => (
-              <span>
-                {m.concepto}
-                {m.ivaPct != null && m.importeNeto != null && m.ivaMonto != null && (
-                  <span className="block text-xs text-vialto-steel tabular-nums">
-                    {formatCurrencyArFromNumber(m.importeNeto)} + IVA{' '}
-                    {String(m.ivaPct).replace('.', ',')}% {formatCurrencyArFromNumber(m.ivaMonto)}
-                  </span>
-                )}
-              </span>
-            ),
+            id: 'tipo',
+            header: 'Tipo',
+            cell: (m: MovimientoConSaldo) => <span>{m.concepto}</span>,
             tdClassName: listadoTablaTdClass,
           },
           // Número de factura o liquidación (o de la nota de crédito/débito en una anulación).
@@ -676,8 +666,8 @@ export function CuentaContraparteView({
             <ListadoFiltroCampo label="Fecha" active={!!desdeFiltro || !!hastaFiltro}>
               {fechaFiltroCampos}
             </ListadoFiltroCampo>
-            <ListadoFiltroCampo label="Concepto" active={!!conceptoFiltro.trim()}>
-              {conceptoFiltroInput}
+            <ListadoFiltroCampo label="Tipo" active={!!tipoFiltro.trim()}>
+              {tipoFiltroInput}
             </ListadoFiltroCampo>
             <ListadoFiltroCampo label="Comprobante" active={!!comprobanteFiltro.trim()}>
               {comprobanteFiltroInput}
@@ -704,12 +694,12 @@ export function CuentaContraparteView({
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
-                title="Concepto"
-                filterActive={!!conceptoFiltro.trim()}
-                filterSignature={conceptoFiltro}
-                onClear={() => setConceptoFiltro('')}
+                title="Tipo"
+                filterActive={!!tipoFiltro.trim()}
+                filterSignature={tipoFiltro}
+                onClear={() => setTipoFiltro('')}
               >
-                {conceptoFiltroInput}
+                {tipoFiltroInput}
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
