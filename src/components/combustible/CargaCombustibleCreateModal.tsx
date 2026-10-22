@@ -12,6 +12,8 @@ import {
 import { useCombustibleValidation } from "@/lib/combustibleValidation";
 import type { CargaCombustible } from "@/types/api";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
+import { marcarModalModificado } from "@/lib/descarteModal";
 
 function fmtVehiculoLabel(v: {
   patente: string;
@@ -107,6 +109,7 @@ function SearchableSelect({
               type="text"
               className="w-full bg-gray-50 border border-black/10 px-2 py-1.5 text-sm focus:outline-none focus:border-vialto-fire focus:bg-white"
               placeholder="Buscar..."
+              data-descarte-ignorar
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               autoFocus
@@ -123,6 +126,7 @@ function SearchableSelect({
                       : "text-vialto-charcoal"
                   }`}
                   onClick={() => {
+                    if (opt.value !== value) marcarModalModificado();
                     onChange(name, opt.value);
                     setIsOpen(false);
                     setSearchTerm("");
@@ -172,6 +176,7 @@ export function CargaCombustibleCreateModal({
   const { showToast } = useToast();
 
   const [loading, setLoading] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -525,7 +530,7 @@ export function CargaCombustibleCreateModal({
             <ErrorPieModal error={error} />
             <button
               type="button"
-              onClick={onClose}
+              onClick={descarte.solicitarCierre}
               disabled={loading}
               className="inline-flex h-10 items-center px-4 border border-black/15 bg-white text-sm uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50"
             >
@@ -541,6 +546,7 @@ export function CargaCombustibleCreateModal({
           </div>
         </form>
       </div>
+      {descarte.dialogo}
     </div>
   );
 }

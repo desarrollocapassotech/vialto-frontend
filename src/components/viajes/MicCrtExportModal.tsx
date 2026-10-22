@@ -23,6 +23,7 @@ import { hasEditableViajeExportGroups, type ViajeExportMissingGroup, VIAJE_EXPOR
 import { ViajeExportMissingFieldsPanel } from '@/components/viajes/ViajeExportMissingFieldsPanel';
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
 import { useFieldConfig } from '@/hooks/useFieldConfig';
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
@@ -238,6 +239,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
   const tid = tenantId?.trim() ?? '';
   const platform = Boolean(tid);
   const [viajeLocal, setViajeLocal] = useState(viaje);
+  const descarte = useConfirmarDescarte(onClose);
 
   useEffect(() => {
     setViajeLocal(viaje);
@@ -338,6 +340,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
     try {
       saveMicCrtBorrador(viaje.id, normalizeMicCrtPayload(form));
       setBorradorGuardado(true);
+      descarte.marcarGuardado();
       setError(null);
     } finally {
       setGuardandoBorrador(false);
@@ -431,7 +434,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
             </h2>
             <p className="mt-0.5 text-xs text-vialto-steel">Viaje #{numeroVisibleViaje(viaje)}</p>
           </div>
-          <button type="button" onClick={onClose} disabled={ocupado}
+          <button type="button" onClick={descarte.solicitarCierre} disabled={ocupado}
             className="text-vialto-steel hover:text-vialto-charcoal disabled:opacity-40" aria-label="Cerrar">✕</button>
         </div>
 
@@ -790,7 +793,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
                 : null
             }
           />
-          <button type="button" disabled={ocupado} onClick={onClose}
+          <button type="button" disabled={ocupado} onClick={descarte.solicitarCierre}
             className="inline-flex min-h-11 w-full items-center justify-center text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50 sm:w-auto">
             Cancelar
           </button>
@@ -808,6 +811,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
           </button>
         </div>
       </div>
+      {descarte.dialogo}
     </div>
   );
 }

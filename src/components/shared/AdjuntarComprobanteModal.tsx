@@ -7,6 +7,7 @@ import {
 import { CrudFieldLabel, CrudInput } from "@/components/crud/CrudFields";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 
 /**
  * "Adjuntar comprobante" de una factura o liquidación sin ARCA que todavía no tiene
@@ -30,6 +31,7 @@ export function AdjuntarComprobanteModal({
   const [numero, setNumero] = useState(numeroInicial ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -55,13 +57,14 @@ export function AdjuntarComprobanteModal({
   return (
     <ViewModalShell
       title="Adjuntar comprobante"
-      onClose={saving ? () => {} : onClose}
+      onClose={saving ? () => {} : descarte.solicitarCierre}
+      descarte={descarte}
       footer={
         <>
           <ErrorPieModal error={error} fieldErrors={fieldErrors} />
           <button
             type="button"
-            onClick={onClose}
+            onClick={descarte.solicitarCierre}
             disabled={saving}
             className={`${viewModalBtnGhost} disabled:opacity-50`}
           >

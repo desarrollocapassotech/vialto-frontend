@@ -37,14 +37,15 @@ export function ConfirmDialog({
 
   useEffect(() => {
     if (!open) return;
+    // Captura + stopImmediatePropagation: Escape cierra solo este diálogo, no el modal de atrás.
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !busy) {
-        e.preventDefault();
-        onCancel();
-      }
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!busy) onCancel();
     }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [open, busy, onCancel]);
 
   if (!open) return null;
@@ -56,11 +57,8 @@ export function ConfirmDialog({
 
   return (
     <div
-      className={modalOverlayClass.replace('z-50', 'z-[120]')}
+      className={modalOverlayClass.replace('z-50', 'z-[130]')}
       role="presentation"
-      onClick={() => {
-        if (!busy) onCancel();
-      }}
     >
       <div
         role="dialog"

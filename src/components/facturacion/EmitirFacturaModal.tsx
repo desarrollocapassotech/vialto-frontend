@@ -5,7 +5,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type MouseEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
@@ -106,7 +105,6 @@ export function EmitirFacturaModal({
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
   const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
   const [datosReady, setDatosReady] = useState(false);
-  const overlayRef = useRef<HTMLDivElement>(null);
   const feedbackRef = useRef<HTMLDivElement>(null);
 
   useLockBodyScroll(true);
@@ -333,11 +331,6 @@ export function EmitirFacturaModal({
     }
   }
 
-  function handleOverlayClick(e: MouseEvent) {
-    // Mientras se emite contra ARCA no se puede cerrar.
-    if (e.target === overlayRef.current && !busyArca) onClose();
-  }
-
   function renderPortal(content: ReactNode) {
     if (typeof document === "undefined") return content;
     return createPortal(content, document.body);
@@ -347,11 +340,7 @@ export function EmitirFacturaModal({
     return (
       <>
         {renderPortal(
-          <div
-            ref={overlayRef}
-            onClick={handleOverlayClick}
-            className={modalOverlayClass}
-          >
+          <div className={modalOverlayClass}>
             <div
               className="w-full max-w-md bg-white shadow-xl border border-black/20 p-6 space-y-4 sm:rounded"
               onClick={(e) => e.stopPropagation()}
@@ -389,11 +378,7 @@ export function EmitirFacturaModal({
   return (
     <>
       {renderPortal(
-        <div
-          ref={overlayRef}
-          onClick={handleOverlayClick}
-          className={modalOverlayClass}
-        >
+        <div className={modalOverlayClass}>
           <div
             className="relative w-full max-w-lg bg-white shadow-xl border border-black/20 flex flex-col max-h-[90dvh] sm:rounded"
             onClick={(e) => e.stopPropagation()}

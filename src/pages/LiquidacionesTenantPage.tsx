@@ -1546,7 +1546,6 @@ export function LiquidacionesTenantPage() {
         <div
           className={modalOverlayClass}
           role="presentation"
-          onClick={() => setActionError(null)}
         >
           <div
             role="alertdialog"

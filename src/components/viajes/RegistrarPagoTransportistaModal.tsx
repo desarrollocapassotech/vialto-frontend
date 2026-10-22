@@ -20,6 +20,7 @@ import {
   PAGO_TRANSPORTISTA_SALDO_ERROR,
   calcularSaldoTransportista,
 } from "@/lib/viajesTransportistaPagos";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import type { Viaje } from "@/types/api";
 
 type Props = {
@@ -47,6 +48,7 @@ export function RegistrarPagoTransportistaModal({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showPagosAnteriores, setShowPagosAnteriores] = useState(false);
+  const descarte = useConfirmarDescarte(() => handleClose(), open && viaje != null);
 
   if (!open || viaje == null) return null;
   const viajeActual = viaje;
@@ -282,7 +284,7 @@ export function RegistrarPagoTransportistaModal({
           <button
             type="button"
             disabled={saving}
-            onClick={handleClose}
+            onClick={descarte.solicitarCierre}
             className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
           >
             Cancelar
@@ -298,6 +300,7 @@ export function RegistrarPagoTransportistaModal({
           </button>
         </div>
       </div>
+      {descarte.dialogo}
     </div>
   );
 }

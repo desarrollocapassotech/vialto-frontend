@@ -21,6 +21,7 @@ import { fmtDateUtc } from '@/lib/fmtDateUtc';
 import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
 import { computeFacturaTotalesFromBases } from '@/lib/facturaTotales';
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
@@ -82,6 +83,7 @@ export function MovimientoCcFormModal({
   const [numeroComprobante, setNumeroComprobante] = useState('');
   const [formaPago, setFormaPago] = useState('');
   const [saving, setSaving] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
 
   const esCargo = tipo === 'cargo';
@@ -186,14 +188,15 @@ export function MovimientoCcFormModal({
             ? 'Registrar cobro'
             : 'Registrar pago'
       } — ${contraparteNombre}`}
-      onClose={onClose}
+      onClose={descarte.solicitarCierre}
+      descarte={descarte}
       // Cobro/pago: más ancho y alto para la lista de facturas a imputar.
       maxWidthClass={esCargo ? undefined : 'sm:max-w-3xl'}
       scrollBody={!esCargo}
       footer={
         <>
           <ErrorPieModal error={error} />
-          <button type="button" className={viewModalBtnGhost} onClick={onClose}>
+          <button type="button" className={viewModalBtnGhost} onClick={descarte.solicitarCierre}>
             Cancelar
           </button>
           <button

@@ -1101,7 +1101,6 @@ export function CombustibleTenantPage({
               role="dialog"
               aria-modal="true"
               aria-labelledby="confirmar-eliminar-titulo"
-              onClick={() => !deleting && setDeleteTarget(null)}
             >
               <div
                 className="w-full max-w-md border border-black/15 bg-white p-6 shadow-xl"

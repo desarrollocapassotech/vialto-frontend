@@ -4,6 +4,7 @@ import type { OpcionProducto } from '@/lib/productosViaje';
 import { PRODUCTO_LABELS_DEFAULT, labelEnFrase } from '@/lib/productoLabel';
 import { useProductoLabels } from '@/hooks/useProductoLabels';
 import { ordenarAlfabetico } from '@/lib/ordenAlfabetico';
+import { marcarModalModificado } from '@/lib/descarteModal';
 
 function filaLabel(o: OpcionProducto) {
   return o.nombre;
@@ -114,6 +115,14 @@ export function ProductoSearchableSelect({
     if (open) setSearch('');
   }, [open]);
 
+  function elegir(productoId: string) {
+    if (productoId !== value) marcarModalModificado();
+    onChange(productoId);
+    setOpen(false);
+    setSearch('');
+    setRect(null);
+  }
+
   const listId = id ? `${id}-listbox` : 'producto-listbox';
   const btnId = id ?? 'producto-combobox';
 
@@ -132,6 +141,7 @@ export function ProductoSearchableSelect({
           <input
             ref={searchRef}
             type="search"
+            data-descarte-ignorar
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={`Buscar ${labelEnFrase(singular)}…`}
@@ -147,7 +157,7 @@ export function ProductoSearchableSelect({
               role="option"
               aria-selected={!value}
               className="flex w-full px-2 py-1.5 text-left text-sm hover:bg-vialto-mist/80"
-              onClick={() => { onChange(''); setOpen(false); setSearch(''); setRect(null); }}
+              onClick={() => elegir('')}
             >
               {sinValor}
             </button>
@@ -164,7 +174,7 @@ export function ProductoSearchableSelect({
                   role="option"
                   aria-selected={value === o.id}
                   className={`flex w-full px-2 py-1.5 text-left text-sm hover:bg-vialto-mist/80 ${value === o.id ? 'bg-vialto-mist/60 font-medium' : ''}`}
-                  onClick={() => { onChange(o.id); setOpen(false); setSearch(''); setRect(null); }}
+                  onClick={() => elegir(o.id)}
                 >
                   {filaLabel(o)}
                 </button>

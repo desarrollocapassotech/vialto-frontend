@@ -1,15 +1,14 @@
 import {
   useEffect,
   useMemo,
-  useRef,
   useState,
-  type MouseEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Ban } from "lucide-react";
 import { useLockBodyScroll } from "@/hooks/useLockBodyScroll";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import {
   computeFacturaTotales,
   defaultFacturaLineas,
@@ -104,7 +103,7 @@ export function AnularFacturaModal({
     clienteInicial,
   );
   const [datosReady, setDatosReady] = useState(false);
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const descarte = useConfirmarDescarte(onClose);
 
   useLockBodyScroll(true);
 
@@ -259,10 +258,6 @@ export function AnularFacturaModal({
     }
   }
 
-  function handleOverlayClick(e: MouseEvent) {
-    if (e.target === overlayRef.current && !busy) onClose();
-  }
-
   function renderPortal(content: ReactNode) {
     if (typeof document === "undefined") return content;
     return createPortal(content, document.body);
@@ -272,11 +267,7 @@ export function AnularFacturaModal({
     return (
       <>
         {renderPortal(
-          <div
-            ref={overlayRef}
-            onClick={handleOverlayClick}
-            className={modalOverlayClass}
-          >
+          <div className={modalOverlayClass}>
             <div
               className="w-full max-w-md bg-white shadow-xl border border-black/20 p-6 space-y-4 sm:rounded"
               onClick={(e) => e.stopPropagation()}
@@ -316,11 +307,7 @@ export function AnularFacturaModal({
   return (
     <>
       {renderPortal(
-        <div
-          ref={overlayRef}
-          onClick={handleOverlayClick}
-          className={modalOverlayClass}
-        >
+        <div className={modalOverlayClass}>
           <div
             className="relative w-full max-w-4xl bg-white shadow-xl border border-black/20 flex flex-col max-h-[90dvh] sm:rounded"
             onClick={(e) => e.stopPropagation()}
@@ -343,7 +330,7 @@ export function AnularFacturaModal({
               </div>
               <button
                 type="button"
-                onClick={onClose}
+                onClick={descarte.solicitarCierre}
                 disabled={busy}
                 className="text-vialto-steel hover:text-vialto-charcoal text-xl leading-none disabled:opacity-50"
               >
@@ -546,7 +533,7 @@ export function AnularFacturaModal({
                 <ErrorPieModal error={error} fieldErrors={motivoErrors} />
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={descarte.solicitarCierre}
                   disabled={busy}
                   className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist disabled:opacity-50"
                 >
@@ -576,6 +563,7 @@ export function AnularFacturaModal({
               </div>
             )}
           </div>
+          {descarte.dialogo}
         </div>,
       )}
     </>

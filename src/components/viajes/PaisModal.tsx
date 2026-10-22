@@ -5,6 +5,7 @@ import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Pais } from '@/types/api';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 
 export function PaisModal({
   getToken,
@@ -27,6 +28,7 @@ export function PaisModal({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const { solicitarCierre, dialogo } = useConfirmarDescarte(onClose);
 
   async function submit() {
     const errs: Record<string, string> = {};
@@ -86,7 +88,7 @@ export function PaisModal({
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={solicitarCierre}
             className="h-8 w-8 flex items-center justify-center text-vialto-steel hover:bg-vialto-mist text-xl leading-none"
           >
             ×
@@ -128,7 +130,7 @@ export function PaisModal({
           <button
             type="button"
             disabled={saving}
-            onClick={onClose}
+            onClick={solicitarCierre}
             className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50"
           >
             Cancelar
@@ -144,6 +146,7 @@ export function PaisModal({
           </button>
         </div>
       </div>
+      {dialogo}
     </div>
   );
 }

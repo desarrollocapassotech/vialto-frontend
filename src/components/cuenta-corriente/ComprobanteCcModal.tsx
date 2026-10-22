@@ -11,6 +11,7 @@ import { actualizarComprobanteMovimiento, type MovimientoCc } from '@/lib/cuenta
 import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
 import { ComprobanteAdjuntoField } from '@/components/shared/ComprobanteAdjuntoField';
 import { uploadComprobante } from '@/lib/comprobanteUpload';
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
@@ -34,6 +35,7 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
   const [numero, setNumero] = useState(movimiento.numeroComprobante ?? '');
   const [vencimiento, setVencimiento] = useState(fechaDiaYmd(movimiento.fechaVencimiento) ?? '');
   const [saving, setSaving] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
   const esLiquidacion = movimiento.origen === 'liquidacion';
   const esFactura = movimiento.origen === 'factura';
@@ -82,11 +84,12 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
   return (
     <ViewModalShell
       title={`Comprobante — ${movimiento.concepto}`}
-      onClose={onClose}
+      onClose={descarte.solicitarCierre}
+      descarte={descarte}
       footer={
         <>
           <ErrorPieModal error={error} />
-          <button type="button" className={viewModalBtnGhost} onClick={onClose}>
+          <button type="button" className={viewModalBtnGhost} onClick={descarte.solicitarCierre}>
             Cancelar
           </button>
           <button

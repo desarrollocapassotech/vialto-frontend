@@ -17,6 +17,7 @@ import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPre
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { useReceptorPadronBloqueado } from "@/hooks/useReceptorPadronBloqueado";
 import {
   aplicarCambiosPadronCliente,
@@ -395,7 +396,7 @@ export function FacturaCreateModal({
   const busy = saving || submitAction != null;
   const displayError = unifiedArca ? localError : localError || error;
 
-  useEscapeKey(open, busy, onClose);
+  const descarte = useConfirmarDescarte(onClose, open);
 
   const configUrl = platform
     ? `/api/platform/arca/config?tenantId=${encodeURIComponent(tenantId!)}`
@@ -431,6 +432,12 @@ export function FacturaCreateModal({
   );
   const missingHiddenClienteFields = useHiddenFiscalFields(missingClienteFields);
   const [datosClienteModalOpen, setDatosClienteModalOpen] = useState(false);
+  // Con un modal anidado abierto, Escape lo cierra a él (no a este).
+  useEscapeKey(
+    open && !datosClienteModalOpen && !confirmarEmision,
+    busy,
+    descarte.solicitarCierre,
+  );
   const datosClienteAvisadoRef = useRef<string | null>(null);
 
   // Al elegir el cliente se valida su CUIT contra el padrón de ARCA (opt-in por empresa,
@@ -769,6 +776,7 @@ export function FacturaCreateModal({
       setFacturaEmitida(updated);
       setFrozenLineas(lineas);
       setStep("autorizada");
+      descarte.marcarGuardado();
       onFacturaEmitida?.(updated);
       showToast("Factura emitida a ARCA.", "success");
     } catch (err) {
@@ -1209,15 +1217,7 @@ export function FacturaCreateModal({
         ].join(" ")}
         role="presentation"
       >
-        <button
-          type="button"
-          className="absolute inset-0 bg-black/40"
-          aria-label="Cerrar"
-          disabled={busy}
-          onClick={() => {
-            if (!busy) onClose();
-          }}
-        />
+        <div className="absolute inset-0 bg-black/40" aria-hidden />
         <div
           role="dialog"
           aria-modal="true"
@@ -1284,7 +1284,7 @@ export function FacturaCreateModal({
             <button
               type="button"
               disabled={busy}
-              onClick={onClose}
+              onClick={descarte.solicitarCierre}
               className="inline-flex h-9 shrink-0 items-center justify-center border border-black/15 bg-white px-3 text-sm text-vialto-steel hover:bg-vialto-mist disabled:opacity-50"
               aria-label="Cerrar"
             >
@@ -1495,7 +1495,7 @@ export function FacturaCreateModal({
               )}
               <button
                 type="button"
-                onClick={onClose}
+                onClick={descarte.solicitarCierre}
                 disabled={busy}
                 className="text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-60"
               >
@@ -1624,6 +1624,7 @@ export function FacturaCreateModal({
           void handleUnifiedSubmit("emitir");
         }}
       />
+      {descarte.dialogo}
     </>
   );
 }

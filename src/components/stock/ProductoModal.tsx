@@ -5,6 +5,7 @@ import { ApiError, apiJson } from "@/lib/api";
 import { Spinner } from "@/components/ui/Spinner";
 import { friendlyError } from "@/lib/friendlyError";
 import { modalOverlayClass } from "@/lib/modalLayers";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { canAccessStock } from "@/lib/tenantModules";
 import { useToast } from "@/lib/toast";
@@ -108,6 +109,7 @@ export function ProductoModal({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const descarte = useConfirmarDescarte(onClose, modo !== "view");
 
   const loadPresentaciones = useCallback(async () => {
     setPresentacionesLoading(true);
@@ -256,7 +258,7 @@ export function ProductoModal({
             </h2>
             <button
               type="button"
-              onClick={onClose}
+              onClick={descarte.solicitarCierre}
               aria-label="Cerrar"
               className="h-8 w-8 flex items-center justify-center text-vialto-steel hover:bg-vialto-mist text-xl leading-none"
             >
@@ -476,7 +478,7 @@ export function ProductoModal({
             <button
               type="button"
               disabled={saving}
-              onClick={onClose}
+              onClick={descarte.solicitarCierre}
               className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50"
             >
               {readOnly ? "Cerrar" : "Cancelar"}
@@ -528,9 +530,11 @@ export function ProductoModal({
               ),
             );
             setNewPpRowIdx(null);
+            descarte.marcarModificado();
           }}
         />
       )}
+      {descarte.dialogo}
     </>
   );
 }

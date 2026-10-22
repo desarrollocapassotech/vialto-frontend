@@ -17,6 +17,7 @@ import {
   type MovimientoCc,
 } from '@/lib/cuentaCorriente';
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
@@ -106,6 +107,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
   const [nuevaFormaPago, setNuevaFormaPago] = useState('');
 
   const [saving, setSaving] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
@@ -200,11 +202,12 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
   return (
     <ViewModalShell
       title={`${esCliente ? 'Imputar cobro' : 'Imputar pago'} — ${cargo.concepto}`}
-      onClose={onClose}
+      onClose={descarte.solicitarCierre}
+      descarte={descarte}
       footer={
         <>
           <ErrorPieModal error={error} />
-          <button type="button" className={viewModalBtnGhost} onClick={onClose}>
+          <button type="button" className={viewModalBtnGhost} onClick={descarte.solicitarCierre}>
             Cancelar
           </button>
           <button

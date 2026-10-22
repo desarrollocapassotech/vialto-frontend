@@ -44,6 +44,7 @@ import type {
   TipoOrden,
   VehiculoPlanAsignado,
 } from "@/types/mantenimiento";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 
 export type OrdenModalEstado =
   | { modo: "crear"; precarga?: PrecargaOrden }
@@ -130,6 +131,7 @@ export function OrdenTrabajoModal({
     [fieldErrors, lineaErrors],
   );
   const [guardando, setGuardando] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
 
   const cargarFormDesde = useCallback((o: OrdenTrabajoDetalle) => {
     setVehiculoId(o.vehiculoId);
@@ -284,7 +286,7 @@ export function OrdenTrabajoModal({
     modo === "ver" ? (
       <>
         <ErrorPieModal error={error} />
-        <button type="button" onClick={onClose} className={viewModalBtnGhost}>
+        <button type="button" onClick={descarte.solicitarCierre} className={viewModalBtnGhost}>
           Cerrar
         </button>
         {!soloLectura && orden && orden.estado !== "anulada" && (
@@ -327,7 +329,7 @@ export function OrdenTrabajoModal({
     );
 
   return (
-    <ViewModalShell title={titulo} onClose={onClose} footer={footer} maxWidthClass="sm:max-w-3xl" scrollBody onOverlayClick={() => {}}>
+    <ViewModalShell title={titulo} onClose={descarte.solicitarCierre} descarte={descarte} footer={footer} maxWidthClass="sm:max-w-3xl" scrollBody>
       {cargando ? (
         <p className="text-sm text-vialto-steel">Cargando…</p>
       ) : modo === "ver" && orden ? (

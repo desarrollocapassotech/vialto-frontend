@@ -420,6 +420,27 @@ setFieldErrors({});
 </div>
 ```
 
+### Click afuera nunca cierra un modal (oct 2026)
+
+**Regla global para todos los modales**, también los de solo lectura y las confirmaciones: el overlay no tiene `onClick`/`onMouseDown` de cierre. Se cierran solo con ×, los botones del pie (Cancelar/Cerrar) o Escape. `ViewModalShell` ya no acepta `onOverlayClick`. **Excepción**: menús y hojas de opciones (`AccionesOpcionesSheet`, `SelectorOpcionesSheet`, `ListadoFiltrosSheet`, menús de ordenamiento, el panel mobile de `SearchableEntitySelect`) y `VisorFotos` sí cierran al tocar afuera.
+
+### Modales con formulario: confirmar antes de descartar (oct 2026)
+
+**Regla global para todo modal donde se carga algo** (alta/edición, anulación con motivo, adjuntos, MIC/CRT…). Hook único: `useConfirmarDescarte(onClose, activo?)` (`hooks/useConfirmarDescarte.tsx`).
+
+- **×, Cancelar y Escape** llaman a `solicitarCierre`: si el usuario cargó algo, aparece "¿Descartar lo cargado?" (Seguir editando / Descartar y cerrar); si no tocó nada, cierra directo.
+- **El click afuera no hace nada**: ni cierra ni pregunta. Sacar el `onClick` del overlay (o el `<button>` de fondo).
+- Renderizar `{dialogo}` dentro del overlay del modal, **sin portal**, para que quede en la misma capa (la grilla de Viajes mete sus modales en un contenedor `zIndex: 9999`).
+- Con `ViewModalShell`: `onClose={descarte.solicitarCierre} descarte={descarte}` (dibuja el diálogo). El "Cancelar" del footer también va con `solicitarCierre`.
+- Cerrar tras guardar con éxito sigue usando `onClose` directo. Si el modal queda abierto después de guardar (factura/liquidación "autorizada", borrador MIC/CRT), llamar `marcarGuardado()`.
+- Modal montado aunque esté cerrado (prop `open`): pasar `activo = open`; cada apertura arranca sin cambios. Modo "ver" + "editar" en el mismo componente: `activo = modo !== 'view'`.
+- **Cómo sabe que hubo cambios** (`lib/descarteModal.ts`): pila de modales con guardia; mientras haya alguno, se escuchan `input`/`change` en el documento y se marca el de arriba. No hay que calcular el "dirty" a mano.
+  - Controles custom que eligen con click (sin evento nativo) llaman `marcarModalModificado()` al elegir. Ya lo hacen `SearchableSelect`, `SearchableEntitySelect`, `ProductoSearchableSelect`, `ComprobanteAdjuntoField` y el select de `CargaCombustibleCreateModal`. Un control custom nuevo tiene que hacer lo mismo.
+  - Inputs que no son dato (buscador de un select) llevan `data-descarte-ignorar`.
+  - Alta rápida anidada que completa un campo del modal padre (cliente/transportista/chofer/país desde `ViajeEditModal`, presentación desde `ProductoModal`): en su `onSaved` llamar `marcarModificado()` del padre.
+- Con un modal anidado abierto (datos fiscales, alta rápida, confirmar emisión), el Escape del padre se desactiva para que cierre solo el de arriba. `ConfirmDialog` corta el Escape en captura (`stopImmediatePropagation`).
+- **Sin confirmación a propósito** (no hay nada que perder; igual no cierran con click afuera): modales de solo lectura (`*ViewModal`), confirmaciones sí/no, filtros/orden/selectores tipo sheet, opciones de exportación (`ExcelExportModal`, `ExportarEstadoCuentaModal`, `ExportarViajeModal`), período del dashboard, `FacturarSelectorMultiClienteModal`, `TomarFotoRemitoModal`.
+
 ---
 
 ## CUIT de Cliente/Transportista: validación contra ARCA (`useArcaPadron`)
@@ -606,6 +627,7 @@ Historia: sep 2026 — vencimiento de póliza un día antes (`VehiculoViewModal`
 - Mantener textos y UX consistentes con el resto del producto.
 - **Aplicar el patrón VER → modal read-only → EDITAR** en la columna de acciones de toda grilla nueva.
 - **Campos obligatorios con asterisco rojo; campos opcionales sin ningún indicador.**
+- **Si el modal carga datos**, usar `useConfirmarDescarte` (× / Cancelar / Escape piden confirmación, click afuera no cierra) — ver "Modales con formulario: confirmar antes de descartar".
 - **Si el módulo agrega una sección al dashboard del tenant**, sumarla a `moduloTabs` en `TenantOwnerDashboard.tsx` en vez de apilarla — ver "Panel del tenant: pestañas por módulo en el dashboard".
 - **Si la pantalla muestra estado de un comprobante o viaje (Facturas/Liquidaciones/Viajes)**, los ejes independientes (cobro, ambiente de prueba) van en badges aditivos, nunca reemplazando al badge de ciclo de vida — ver "Badges de estado: ejes aditivos, nunca se reemplazan".
 - **Si se toca el flujo de importación masiva**, extender `ImportWizard.tsx`/`useImportWizard.ts` (compartidos entre tenant-admin y superadmin) en vez de crear un modal o una copia por rol — ver "Importación masiva desde Excel".

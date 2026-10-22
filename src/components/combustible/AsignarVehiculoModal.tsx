@@ -7,6 +7,7 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fmtTipoVehiculo } from "@/lib/combustibleLabels";
 import type { AsignacionVehiculo, Chofer, ConEmpresa, Vehiculo } from "@/types/api";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 
 function fmtVehiculoLabel(v: {
   patente: string;
@@ -41,6 +42,7 @@ export function AsignarVehiculoModal({
   const [choferId, setChoferId] = useState(chofer?.id ?? "");
   const [vehiculoId, setVehiculoId] = useState("");
   const [loading, setLoading] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
 
   const choferOptions = useMemo(
@@ -85,7 +87,6 @@ export function AsignarVehiculoModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="asignar-vehiculo-titulo"
-      onClick={() => !loading && onClose()}
     >
       <form
         className="w-full max-w-md border border-black/15 bg-white p-6 shadow-xl"
@@ -139,7 +140,7 @@ export function AsignarVehiculoModal({
           <ErrorPieModal error={error} />
           <button
             type="button"
-            onClick={onClose}
+            onClick={descarte.solicitarCierre}
             disabled={loading}
             className="inline-flex h-10 items-center px-4 border border-black/15 bg-white text-sm uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50"
           >
@@ -154,6 +155,7 @@ export function AsignarVehiculoModal({
           </button>
         </div>
       </form>
+      {descarte.dialogo}
     </div>
   );
 }

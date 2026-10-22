@@ -96,6 +96,7 @@ import {
   type ViajeDestinoRowDraft,
 } from "@/lib/viajesDestinos";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 import {
   ViajeClientesFieldset,
@@ -530,17 +531,20 @@ export function ViajeEditModal({
     });
   }, [open, draft?.numero, desgloseActivo, snapshotViaje, setDraft]);
 
+  const descarte = useConfirmarDescarte(onClose, open);
+  const { solicitarCierre } = descarte;
+
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !saving) {
+      if (e.key === "Escape" && !saving && !quickCreate) {
         e.preventDefault();
-        onClose();
+        solicitarCierre();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, saving, onClose]);
+  }, [open, saving, quickCreate, solicitarCierre]);
 
   if (!open) return null;
 
@@ -602,15 +606,7 @@ export function ViajeEditModal({
         className="fixed inset-0 z-[45] flex items-stretch justify-center sm:items-center sm:p-4 md:p-6"
         role="presentation"
       >
-        <button
-          type="button"
-          className="absolute inset-0 bg-black/40"
-          aria-label="Cerrar edición"
-          disabled={saving}
-          onClick={() => {
-            if (!saving) onClose();
-          }}
-        />
+        <div className="absolute inset-0 bg-black/40" aria-hidden />
         <div
           role="dialog"
           aria-modal="true"
@@ -636,7 +632,7 @@ export function ViajeEditModal({
             <button
               type="button"
               disabled={saving}
-              onClick={onClose}
+              onClick={solicitarCierre}
               className="inline-flex h-9 shrink-0 items-center justify-center border border-black/15 bg-white px-3 text-sm text-vialto-steel hover:bg-vialto-mist disabled:opacity-50"
               aria-label="Cerrar"
             >
@@ -1779,7 +1775,7 @@ export function ViajeEditModal({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={solicitarCierre}
                 disabled={saving}
                 className="text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-60"
               >
@@ -1799,6 +1795,7 @@ export function ViajeEditModal({
           </footer>
         </div>
       </div>
+      {descarte.dialogo}
 
       {quickCreate === "pais" && getToken && (
         <PaisModal
@@ -1811,6 +1808,7 @@ export function ViajeEditModal({
           }}
           onSaved={(p) => {
             setSessionPaises((prev) => [...prev, p]);
+            descarte.marcarModificado();
             const codigo = p.codigo || p.id;
             const target = paisQuickCreateTarget;
             if (target.kind === "origen") {
@@ -1877,6 +1875,7 @@ export function ViajeEditModal({
           onSaved={(c) => {
             setLocalClientes((prev) => [...prev, c]);
             onClienteCreado?.(c);
+            descarte.marcarModificado();
             setDraft((p) => (p ? { ...p, clienteId: c.id } : p));
             setQuickCreate(null);
           }}
@@ -1891,6 +1890,7 @@ export function ViajeEditModal({
           onSaved={(t) => {
             setLocalTransportistas((prev) => [...prev, t]);
             onTransportistaCreado?.(t);
+            descarte.marcarModificado();
             setDraft((p) => (p ? { ...p, transportistaId: t.id } : p));
             setQuickCreate(null);
           }}
@@ -1906,6 +1906,7 @@ export function ViajeEditModal({
             onSaved={(c) => {
               setLocalChoferes((prev) => [...prev, c]);
               onChoferCreado?.(c);
+              descarte.marcarModificado();
               if (quickCreate === "chofer-ext") {
                 setDraft((p) => (p ? { ...p, choferExternoId: c.id } : p));
               } else {

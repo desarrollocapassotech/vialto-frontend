@@ -1,5 +1,6 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -96,18 +97,20 @@ function UsuarioModal({
   const user = modal.user;
   const nombre = getFullName(user);
   const esMismoUsuario = user.userId === currentUserId;
+  const descarte = useConfirmarDescarte(onClose, modal.mode === "edit-role");
 
   if (modal.mode === "edit-role") {
     return (
       <ViewModalShell
         title={nombre}
-        onClose={onClose}
+        onClose={descarte.solicitarCierre}
+        descarte={descarte}
         maxWidthClass="sm:max-w-sm"
         footer={
           <>
             <button
               type="button"
-              onClick={onClose}
+              onClick={descarte.solicitarCierre}
               className={viewModalBtnGhost}
               disabled={busy}
             >
@@ -244,6 +247,7 @@ function CreateUserModal({
     "admin" | "member" | "stock_viewer" | "stock_operator"
   >("member");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const descarte = useConfirmarDescarte(onClose);
 
   function handleSubmit() {
     const errors: Record<string, string> = {};
@@ -265,13 +269,14 @@ function CreateUserModal({
   return (
     <ViewModalShell
       title="Crear usuario"
-      onClose={onClose}
+      onClose={descarte.solicitarCierre}
+      descarte={descarte}
       maxWidthClass="sm:max-w-sm"
       footer={
         <>
           <button
             type="button"
-            onClick={onClose}
+            onClick={descarte.solicitarCierre}
             disabled={busy}
             className={viewModalBtnGhost}
           >

@@ -26,6 +26,7 @@ import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { ConfirmarEmisionArcaDialog } from "@/components/shared/ConfirmarEmisionArcaDialog";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import {
   aplicarCambiosPadronCliente,
   aplicarCambiosPadronTransportista,
@@ -243,7 +244,7 @@ export function CrearLiquidacionManualModal({
   const showComprobante = !hasLiquidoProductoArca;
   const { showToast } = useToast();
 
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const { solicitarCierre, marcarGuardado, dialogo } = useConfirmarDescarte(onClose);
 
   const existente = liquidacionExistente ?? null;
   /** De dónde se precargan los datos: la liquidación a emitir o la anulada que se vuelve a emitir. */
@@ -649,14 +650,6 @@ export function CrearLiquidacionManualModal({
     };
   }, [viajeInicial, selectedViajeIds, viajes, tenantId, getToken]);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !submitting) onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [submitting, onClose]);
-
   const selectedViajes = useMemo(() => {
     if (viajeInicial) return [viajeInicial as ViajeItem];
     return viajes.filter((v) => selectedViajeIds.has(v.id));
@@ -734,6 +727,16 @@ export function CrearLiquidacionManualModal({
   const [modalDatos, setModalDatos] = useState<
     "transportista" | "cliente" | null
   >(null);
+
+  // Con un modal anidado abierto, Escape lo cierra a él (no a este).
+  useEffect(() => {
+    if (modalDatos || confirmarEmision) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !submitting) solicitarCierre();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [submitting, solicitarCierre, modalDatos, confirmarEmision]);
   const datosAvisadosRef = useRef(new Set<string>());
   const transportistaSeleccionadoId = transportistaSeleccionado?.id;
 
@@ -1143,6 +1146,7 @@ export function CrearLiquidacionManualModal({
         );
         setLiquidacionEmitida(liq);
         setStep("autorizada");
+        marcarGuardado();
 
         if (onLiquidacionEmitida) {
           onLiquidacionEmitida(liq);
@@ -1270,13 +1274,6 @@ export function CrearLiquidacionManualModal({
 
   return (
     <div
-      ref={overlayRef}
-      onClick={(e) => {
-        if (e.target === overlayRef.current && !submitting) {
-          if (step === "autorizada") onSuccess(liquidacionEmitida!);
-          else onClose();
-        }
-      }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     >
       <div
@@ -1405,7 +1402,7 @@ export function CrearLiquidacionManualModal({
               {!submitting && (
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={solicitarCierre}
                   className="text-xl leading-none text-vialto-steel hover:text-vialto-charcoal"
                 >
                   ×
@@ -1999,7 +1996,7 @@ export function CrearLiquidacionManualModal({
               <button
                 type="button"
                 disabled={submitting}
-                onClick={onClose}
+                onClick={solicitarCierre}
                 className="h-9 px-4 rounded border border-black/20 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist disabled:opacity-50"
               >
                 Cancelar
@@ -2178,6 +2175,7 @@ export function CrearLiquidacionManualModal({
             onClose={() => setModalDatos(null)}
           />
         )}
+      {dialogo}
     </div>
   );
 }

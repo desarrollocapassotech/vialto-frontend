@@ -3,6 +3,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 're
 import { createPortal } from 'react-dom';
 import { useIsMobileViewport } from '@/hooks/useIsMobileViewport';
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
+import { marcarModalModificado } from '@/lib/descarteModal';
 import { ordenarAlfabetico } from '@/lib/ordenAlfabetico';
 
 export type SearchableEntitySelectProps<T extends { id: string }> = {
@@ -178,11 +179,9 @@ export function SearchableEntitySelect<T extends { id: string }>({
   function pickRow(i: number) {
     const r = rows[i];
     if (!r) return;
-    if (r.kind === 'empty') {
-      onChange('');
-    } else {
-      onChange(getItemId(r.item));
-    }
+    const nuevo = r.kind === 'empty' ? '' : getItemId(r.item);
+    if (nuevo !== value) marcarModalModificado();
+    onChange(nuevo);
     setOpen(false);
   }
 
@@ -232,6 +231,7 @@ export function SearchableEntitySelect<T extends { id: string }>({
           id={searchId}
           type="text"
           autoComplete="off"
+          data-descarte-ignorar
           placeholder={placeholderBuscar}
           aria-label={searchAriaLabel}
           className="h-10 w-full border border-black/15 bg-white px-3 text-base outline-none focus:border-black/25"

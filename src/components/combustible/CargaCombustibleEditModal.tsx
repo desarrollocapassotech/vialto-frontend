@@ -17,6 +17,7 @@ import { useCombustibleValidation } from "@/lib/combustibleValidation";
 import type { CargaCombustible } from "@/types/api";
 import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 
 function toUtcDateString(isoDate: string | null | undefined) {
   if (!isoDate) return "";
@@ -50,6 +51,7 @@ export function CargaCombustibleEditModal({
   const { getToken } = useAuth();
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
 
   const [choferes, setChoferes] = useState<{ id: string; nombre: string }[]>(
@@ -194,13 +196,14 @@ export function CargaCombustibleEditModal({
     // ... Todo el return se mantiene exactamente igual ...
     <ViewModalShell
       title="Editar Carga de Combustible"
-      onClose={saving ? () => {} : onClose}
+      onClose={saving ? () => {} : descarte.solicitarCierre}
+      descarte={descarte}
       footer={
         <div className="flex flex-wrap w-full items-center justify-end gap-3">
           <ErrorPieModal error={error} />
           <button
             type="button"
-            onClick={onClose}
+            onClick={descarte.solicitarCierre}
             disabled={saving}
             className={viewModalBtnGhost}
           >

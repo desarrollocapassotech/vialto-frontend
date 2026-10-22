@@ -7,6 +7,7 @@ import {
   useCallback,
 } from "react";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import {
   FacturaTramosEditor,
@@ -477,7 +478,8 @@ export function FacturaEditModal({
   idPropio2Label = "ID Propio 2",
   unidadCantidad = "TN",
 }: FacturaEditModalProps) {
-  useEscapeKey(open, saving, onClose);
+  const descarte = useConfirmarDescarte(onClose, open);
+  useEscapeKey(open, saving, descarte.solicitarCierre);
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [tramosLocalError, setTramosLocalError] = useState<string | null>(null);
 
@@ -603,15 +605,7 @@ export function FacturaEditModal({
       className="fixed inset-0 z-[110] flex items-stretch justify-center sm:items-center sm:p-4 md:p-6"
       role="presentation"
     >
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/40"
-        aria-label="Cerrar edición"
-        disabled={saving}
-        onClick={() => {
-          if (!saving) onClose();
-        }}
-      />
+      <div className="absolute inset-0 bg-black/40" aria-hidden />
       <div
         role="dialog"
         aria-modal="true"
@@ -665,7 +659,7 @@ export function FacturaEditModal({
           <button
             type="button"
             disabled={saving}
-            onClick={onClose}
+            onClick={descarte.solicitarCierre}
             className="inline-flex h-9 shrink-0 items-center justify-center border border-black/15 bg-white px-3 text-sm text-vialto-steel hover:bg-vialto-mist disabled:opacity-50"
             aria-label="Cerrar"
           >
@@ -845,7 +839,7 @@ export function FacturaEditModal({
           <ErrorPieModal error={displayError} />
           <button
             type="button"
-            onClick={onClose}
+            onClick={descarte.solicitarCierre}
             disabled={saving}
             className="text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-60"
           >
@@ -866,6 +860,7 @@ export function FacturaEditModal({
           </button>
         </footer>
       </div>
+      {descarte.dialogo}
     </div>
   );
 }

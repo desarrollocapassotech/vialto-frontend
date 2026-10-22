@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 import { Minus, Plus } from 'lucide-react';
 import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
 import { Spinner } from '@/components/ui/Spinner';
@@ -66,13 +67,16 @@ export function DivisionBultosModal({
     ? `/api/platform/stock/divisiones?tenantId=${encodeURIComponent(tenantId)}`
     : '/api/stock/divisiones';
 
+  const descarte = useConfirmarDescarte(onClose);
+  const { solicitarCierre } = descarte;
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !saving) onClose();
+      if (e.key === 'Escape' && !saving) solicitarCierre();
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose, saving]);
+  }, [solicitarCierre, saving]);
 
   async function handleSubmit() {
     setFormError(null);
@@ -115,9 +119,6 @@ export function DivisionBultosModal({
   const modal = (
     <div
       className={modalQuickCreateOverlayClass(true)}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !saving) onClose();
-      }}
       role="presentation"
     >
       <div
@@ -136,7 +137,7 @@ export function DivisionBultosModal({
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={solicitarCierre}
             disabled={saving}
             className="text-vialto-steel hover:text-vialto-charcoal text-xl leading-none disabled:opacity-50"
             aria-label="Cerrar"
@@ -244,7 +245,7 @@ export function DivisionBultosModal({
             <ErrorPieModal error={formError} />
             <button
               type="button"
-              onClick={onClose}
+              onClick={solicitarCierre}
               disabled={saving}
               className="px-4 py-2 text-sm border border-black/20 rounded hover:bg-vialto-mist/60 disabled:opacity-50"
             >
@@ -262,6 +263,7 @@ export function DivisionBultosModal({
           </div>
         </div>
       </div>
+      {descarte.dialogo}
     </div>
   );
 

@@ -16,6 +16,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
 import { adjuntosActivosViaje } from "@/lib/viajesAdjuntos";
 import type { Viaje, ViajeAdjunto } from "@/types/api";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 
 /** Mismo tope que valida el backend (`ViajesService.addAdjunto`). */
 const MAX_ADJUNTOS_VIAJE = 3;
@@ -246,6 +247,7 @@ export function AgregarDocumentoViajeModal({
   const [titulo, setTitulo] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -275,13 +277,14 @@ export function AgregarDocumentoViajeModal({
   return (
     <ViewModalShell
       title="Agregar documento"
-      onClose={saving ? () => {} : onClose}
+      onClose={saving ? () => {} : descarte.solicitarCierre}
+      descarte={descarte}
       footer={
         <>
           <ErrorPieModal error={error} fieldErrors={fieldErrors} />
           <button
             type="button"
-            onClick={onClose}
+            onClick={descarte.solicitarCierre}
             disabled={saving}
             className={`${viewModalBtnGhost} disabled:opacity-50`}
           >

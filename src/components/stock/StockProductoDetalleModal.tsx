@@ -56,7 +56,6 @@ export function StockProductoDetalleModal({
     <ViewModalShell
       title={productoNombre}
       onClose={onClose}
-      onOverlayClick={onClose}
       maxWidthClass="sm:max-w-2xl"
       footer={
         <div className="flex justify-end">

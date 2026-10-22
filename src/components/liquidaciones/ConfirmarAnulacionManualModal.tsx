@@ -3,6 +3,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { modalOverlayClass } from "@/lib/modalLayers";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
 
 const btnGhost =
@@ -50,18 +51,19 @@ export function ConfirmarAnulacionManualModal({
   }, [open]);
 
   const isBusy = busy || uploading;
+  const { solicitarCierre, dialogo } = useConfirmarDescarte(onCancel, open);
 
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape" && !isBusy) {
         e.preventDefault();
-        onCancel();
+        solicitarCierre();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, isBusy, onCancel]);
+  }, [open, isBusy, solicitarCierre]);
 
   if (!open) return null;
 
@@ -98,9 +100,6 @@ export function ConfirmarAnulacionManualModal({
     <div
       className={modalOverlayClass.replace("z-50", "z-[120]")}
       role="presentation"
-      onClick={() => {
-        if (!isBusy) onCancel();
-      }}
     >
       <div
         role="dialog"
@@ -156,7 +155,7 @@ export function ConfirmarAnulacionManualModal({
 
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           <ErrorPieModal error={uploadError ?? error} fieldErrors={fieldErrors} />
-          <button type="button" disabled={isBusy} onClick={onCancel} className={btnGhost}>
+          <button type="button" disabled={isBusy} onClick={solicitarCierre} className={btnGhost}>
             Cancelar
           </button>
           <button
@@ -170,6 +169,7 @@ export function ConfirmarAnulacionManualModal({
           </button>
         </div>
       </div>
+      {dialogo}
     </div>
   );
 }

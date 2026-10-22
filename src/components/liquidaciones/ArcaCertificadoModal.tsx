@@ -7,6 +7,7 @@ import {
 import { Spinner } from '@/components/ui/Spinner';
 import { CUIT_TEST_HOMOLOGACION } from '@/lib/arcaCbteTipo';
 import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 
 const labelClass =
   'font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-vialto-steel';
@@ -120,13 +121,16 @@ export function ArcaCertificadoModal({
 
   const dirty = certProd !== produccion.cert || keyProd !== produccion.key;
 
+  const descarte = useConfirmarDescarte(onClose);
+  const { solicitarCierre } = descarte;
+
   useEffect(() => {
     function handler(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !saving) onClose();
+      if (e.key === 'Escape' && !saving) solicitarCierre();
     }
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [onClose, saving]);
+  }, [solicitarCierre, saving]);
 
   async function handleApply() {
     setSaving(true);
@@ -148,14 +152,15 @@ export function ArcaCertificadoModal({
   return (
     <ViewModalShell
       title="Certificado y clave privada"
-      onClose={saving ? () => {} : onClose}
+      onClose={saving ? () => {} : solicitarCierre}
+      descarte={descarte}
       maxWidthClass="sm:max-w-3xl"
       footer={
         <>
           <ErrorPieModal error={error} />
           <button
             type="button"
-            onClick={onClose}
+            onClick={solicitarCierre}
             disabled={saving}
             className={`${viewModalBtnGhost} disabled:opacity-50`}
           >

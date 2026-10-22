@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
@@ -386,13 +387,16 @@ export function LiquidacionEditModal({
       .map((v) => ({ id: v.id, numero: numeroVisibleViaje(v) }));
   }, [canEditViajes, viajesTransportista, selectedViajeIds, viajesDisponibles]);
 
+  const descarte = useConfirmarDescarte(onClose);
+  const { solicitarCierre } = descarte;
+
   useEffect(() => {
     function handler(e: KeyboardEvent) {
-      if (e.key === "Escape" && !saving) onClose();
+      if (e.key === "Escape" && !saving) solicitarCierre();
     }
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onClose, saving]);
+  }, [solicitarCierre, saving]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -502,7 +506,8 @@ export function LiquidacionEditModal({
   return (
     <ViewModalShell
       title="Editar liquidación"
-      onClose={saving ? () => {} : onClose}
+      onClose={saving ? () => {} : solicitarCierre}
+      descarte={descarte}
       scrollBody
       maxWidthClass={canEditViajes ? "sm:max-w-4xl" : "sm:max-w-xl"}
       footer={
@@ -511,7 +516,7 @@ export function LiquidacionEditModal({
           <button
             type="button"
             disabled={saving}
-            onClick={onClose}
+            onClick={solicitarCierre}
             className={viewModalBtnGhost}
           >
             Cancelar

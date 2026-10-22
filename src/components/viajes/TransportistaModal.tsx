@@ -9,6 +9,7 @@ import { useTenantPaisFijo } from '@/hooks/useTenantPaisFijo';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { Transportista } from '@/types/api';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 import { useArcaPadron } from '@/hooks/useArcaPadron';
 import { ArcaPadronStatus } from '@/components/shared/ArcaPadronStatus';
 
@@ -35,6 +36,7 @@ export function TransportistaModal({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const { solicitarCierre, dialogo } = useConfirmarDescarte(onClose);
 
   const { paisFijo, loading: paisFijoLoading, tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
 
@@ -129,7 +131,7 @@ export function TransportistaModal({
           <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">Nuevo transportista</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={solicitarCierre}
             className="h-8 w-8 flex items-center justify-center text-vialto-steel hover:bg-vialto-mist text-xl leading-none"
           >
             ×
@@ -215,7 +217,7 @@ export function TransportistaModal({
           <button
             type="button"
             disabled={saving}
-            onClick={onClose}
+            onClick={solicitarCierre}
             className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50"
           >
             Cancelar
@@ -231,6 +233,7 @@ export function TransportistaModal({
           </button>
         </div>
       </div>
+      {dialogo}
     </div>
   );
 }

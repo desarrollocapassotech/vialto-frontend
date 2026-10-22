@@ -63,7 +63,6 @@ export function StockOperacionViewModal({
     <ViewModalShell
       title={titulo}
       onClose={onClose}
-      onOverlayClick={onClose}
       scrollBody
       maxWidthClass="sm:max-w-3xl"
       footer={

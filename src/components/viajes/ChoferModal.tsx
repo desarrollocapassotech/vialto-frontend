@@ -6,6 +6,7 @@ import { friendlyError } from '@/lib/friendlyError';
 import { choferWritePayloadFromForm, validarDniForm, type ChoferFormState } from '@/lib/choferForm';
 import type { Chofer } from '@/types/api';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 
 export function ChoferModal({
   getToken,
@@ -36,6 +37,7 @@ export function ChoferModal({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const { solicitarCierre, dialogo } = useConfirmarDescarte(onClose);
 
   function patch(p: Partial<ChoferFormState>) {
     setForm((prev) => ({ ...prev, ...p }));
@@ -85,7 +87,7 @@ export function ChoferModal({
           <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">Nuevo chofer</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={solicitarCierre}
             className="h-8 w-8 flex items-center justify-center text-vialto-steel hover:bg-vialto-mist text-xl leading-none"
           >
             ×
@@ -135,7 +137,7 @@ export function ChoferModal({
           <button
             type="button"
             disabled={saving}
-            onClick={onClose}
+            onClick={solicitarCierre}
             className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50"
           >
             Cancelar
@@ -151,6 +153,7 @@ export function ChoferModal({
           </button>
         </div>
       </div>
+      {dialogo}
     </div>
   );
 }

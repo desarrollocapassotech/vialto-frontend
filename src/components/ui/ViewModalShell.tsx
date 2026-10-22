@@ -10,7 +10,12 @@ type ViewModalShellProps = {
   footer?: ReactNode;
   maxWidthClass?: string;
   scrollBody?: boolean;
-  onOverlayClick?: () => void;
+  /**
+   * Modal con formulario: resultado de `useConfirmarDescarte`; se renderiza el
+   * diálogo de confirmación. `onClose` y los botones "Cancelar" del footer
+   * deben ser `descarte.solicitarCierre`.
+   */
+  descarte?: { dialogo: ReactNode };
 };
 
 export function ViewModalShell({
@@ -20,7 +25,7 @@ export function ViewModalShell({
   footer,
   maxWidthClass = 'sm:max-w-xl',
   scrollBody = false,
-  onOverlayClick,
+  descarte,
 }: ViewModalShellProps) {
   useLockBodyScroll(true);
 
@@ -32,12 +37,9 @@ export function ViewModalShell({
     maxWidthClass,
   ].join(' ');
 
+  // El click afuera no cierra: solo ×, los botones del footer o Escape.
   const modal = (
-    <div
-      className={modalOverlayClass}
-      role="presentation"
-      onClick={onOverlayClick ?? onClose}
-    >
+    <div className={modalOverlayClass} role="presentation">
       <div
         role="dialog"
         aria-modal="true"
@@ -73,6 +75,7 @@ export function ViewModalShell({
           </div>
         )}
       </div>
+      {descarte?.dialogo}
     </div>
   );
 

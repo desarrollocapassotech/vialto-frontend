@@ -2004,12 +2004,7 @@ function EtapaModulo({
       )}
 
       {p && ciudadesModalOpen && (
-        <div
-          className={modalEditOverlayClass}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setCiudadesModalOpen(false);
-          }}
-        >
+        <div className={modalEditOverlayClass}>
           <div className={modalEditPanelClass}>
             <div className="flex items-center justify-between border-b border-black/10 px-6 py-4">
               <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
