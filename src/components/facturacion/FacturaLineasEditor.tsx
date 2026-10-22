@@ -11,6 +11,7 @@ import {
   maskCurrencyArInput,
   parseCurrencyAr,
 } from '@/lib/currencyMask';
+import { marcarModalModificado } from '@/lib/descarteModal';
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
 import {
   computeFacturaTotalesFromBases,
@@ -386,6 +387,8 @@ export function FacturaLineasEditor({
   }
 
   function addLinea() {
+    // Agregar/quitar es solo un click (sin input/change): avisar al modal que hubo cambios.
+    marcarModalModificado();
     onChange([
       ...lineas,
       { descripcion: '', importe: 0, importeStr: '', ivaPct: ivaPctDefault },
@@ -393,6 +396,7 @@ export function FacturaLineasEditor({
   }
 
   function removeLinea(index: number) {
+    marcarModalModificado();
     onChange(lineas.filter((_, i) => i !== index));
   }
 

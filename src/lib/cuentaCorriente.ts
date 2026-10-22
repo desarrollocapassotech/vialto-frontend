@@ -233,6 +233,35 @@ export function createMovimiento(getToken: GetToken, input: CreateMovimientoCcIn
   });
 }
 
+/**
+ * Edita una venta/compra/cobro/pago manual. Cada campo solo se toca si viene. Importe,
+ * líneas y moneda solo se aceptan sin imputaciones (el backend lo valida).
+ */
+export function actualizarMovimiento(
+  getToken: GetToken,
+  id: string,
+  datos: {
+    numeroComprobante?: string;
+    fecha?: string;
+    /** `null` quita el vencimiento. */
+    fechaVencimiento?: string | null;
+    moneda?: string;
+    importe?: number;
+    lineas?: { descripcion: string; importe: number; ivaPct: number }[];
+    formaPago?: string;
+  },
+) {
+  return apiJson<MovimientoCc>(`/api/cuenta-corriente/movimientos/${encodeURIComponent(id)}`, getToken, {
+    method: 'PATCH',
+    body: JSON.stringify(datos),
+  });
+}
+
+/** Color del monto de un cobro (entra plata: verde) o de un pago (sale plata: rojo). */
+export function claseMontoCobroPago(esCobro: boolean): string {
+  return esCobro ? 'text-emerald-700' : 'text-red-700';
+}
+
 export function eliminarMovimiento(getToken: GetToken, id: string) {
   return apiJson<void>(`/api/cuenta-corriente/movimientos/${encodeURIComponent(id)}`, getToken, {
     method: 'DELETE',

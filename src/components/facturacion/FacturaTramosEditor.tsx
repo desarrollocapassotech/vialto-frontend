@@ -9,6 +9,7 @@ import {
   roundMoney2,
 } from "@/lib/facturaTotales";
 import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
+import { marcarModalModificado } from "@/lib/descarteModal";
 import {
   formatCurrencyArFromNumber,
   maskCurrencyArInput,
@@ -163,10 +164,13 @@ export function FacturaTramosEditor({
     if (viajeIds.length === 0) return;
     const defaultViajeId =
       vinculados.length === 1 ? vinculados[0].id : viajeIds[0] ?? "";
+    // Agregar/quitar es solo un click (sin input/change): avisar al modal que hubo cambios.
+    marcarModalModificado();
     onChange([...tramos, emptyFacturaTramoDraft(ivaPctDefault, defaultViajeId)]);
   }
 
   function removeTramo(index: number) {
+    marcarModalModificado();
     onChange(tramos.filter((_, i) => i !== index));
   }
 

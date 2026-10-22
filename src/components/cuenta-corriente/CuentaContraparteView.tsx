@@ -9,7 +9,6 @@ import {
   FileSpreadsheet,
   FileText,
   Filter,
-  Hash,
   ListChecks,
   X,
 } from 'lucide-react';
@@ -45,6 +44,7 @@ import { ComprobanteCcModal } from './ComprobanteCcModal';
 import { ComprobanteOrigenCcModal, type ComprobanteOrigenCc } from './ComprobanteOrigenCcModal';
 import { ImputacionesCobroModal } from './ImputacionesCobroModal';
 import { ImputacionesCargoModal, imputacionesDeCargo } from './ImputacionesCargoModal';
+import { MovimientoCcDetalleModal, nombreMovimientoCc } from './MovimientoCcDetalleModal';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import {
   canAccessEmisionLiquidoProductoArca,
@@ -66,6 +66,7 @@ type ModalState =
   | { kind: 'origen'; comprobante: ComprobanteOrigenCc }
   | { kind: 'imputaciones'; pago: MovimientoCc }
   | { kind: 'imputacionesCargo'; cargo: MovimientoCc }
+  | { kind: 'detalle'; movimiento: MovimientoCc }
   | { kind: 'exportar'; formato: 'pdf' | 'excel' }
   | null;
 
@@ -351,6 +352,17 @@ export function CuentaContraparteView({
   /** Acciones de una fila: las usan el botón de Acciones y el click en la fila. */
   function accionesDe(m: MovimientoConSaldo): AccionOpcion[] {
     const opciones: AccionOpcion[] = [];
+    // "Ver venta/compra/cobro/pago" siempre primero: detalle completo, y la edición
+    // (comprobante, fechas, importes) se hace desde ahí, ya no hay un botón suelto de
+    // "Editar comprobante".
+    if (m.tipo === 'cargo' || m.tipo === 'pago') {
+      opciones.push({
+        id: 'ver-detalle',
+        label: `Ver ${nombreMovimientoCc(m)}`,
+        icon: Eye,
+        onClick: () => setModal({ kind: 'detalle', movimiento: m }),
+      });
+    }
     const puedeImputar =
       m.tipo === 'cargo' &&
       (m.estadoDisponibilidad === 'pendiente' || m.estadoDisponibilidad === 'parcial');
@@ -369,19 +381,6 @@ export function CuentaContraparteView({
         label: 'Ver imputación',
         icon: ListChecks,
         onClick: () => setModal({ kind: 'imputacionesCargo', cargo: m }),
-      });
-    }
-    if (m.comprobanteEditable || m.vencimientoEditable) {
-      opciones.push({
-        id: 'comprobante',
-        // Con ARCA el número no se toca: la acción queda solo para el vencimiento.
-        label: !m.comprobanteEditable
-          ? 'Editar vencimiento'
-          : m.numeroComprobante
-            ? 'Editar comprobante'
-            : 'Cargar comprobante',
-        icon: Hash,
-        onClick: () => setModal({ kind: 'comprobante', movimiento: m }),
       });
     }
     const origen = comprobanteOrigenDe(m);
@@ -404,7 +403,7 @@ export function CuentaContraparteView({
           : origen.tipo === 'factura'
             ? 'Ver factura'
             : 'Ver liquidación',
-        icon: esAsociada ? FileSearch : Eye,
+        icon: esAsociada ? FileSearch : FileText,
         onClick: () => setModal({ kind: 'origen', comprobante: origen }),
       });
     }
@@ -849,10 +848,29 @@ export function CuentaContraparteView({
           onClose={() => setModal(null)}
         />
       )}
+      {modal?.kind === 'detalle' && (
+        <MovimientoCcDetalleModal
+          // Al saltar de un comprobante a su asociado, el modal arranca de cero (sin la edición del anterior).
+          key={modal.movimiento.id}
+          movimiento={modal.movimiento}
+          movimientos={movimientos ?? []}
+          onClose={() => setModal(null)}
+          onSaved={cargarDatos}
+          // Factura/liquidación: su edición de siempre (número y vencimiento).
+          onEditarAutomatico={
+            modal.movimiento.origen !== 'manual' &&
+            (modal.movimiento.comprobanteEditable || modal.movimiento.vencimientoEditable)
+              ? () => setModal({ kind: 'comprobante', movimiento: modal.movimiento })
+              : null
+          }
+          onVerMovimiento={(otro) => setModal({ kind: 'detalle', movimiento: otro })}
+        />
+      )}
       {modal?.kind === 'imputacionesCargo' && (
         <ImputacionesCargoModal
           cargo={modal.cargo}
           movimientos={movimientos ?? []}
+          onVerMovimiento={(otro) => setModal({ kind: 'detalle', movimiento: otro })}
           onClose={() => setModal(null)}
         />
       )}

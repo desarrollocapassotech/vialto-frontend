@@ -2,7 +2,7 @@ import { ChevronRight } from 'lucide-react';
 import { ViewModalShell, viewModalBtnGhost } from '@/components/ui/ViewModalShell';
 import { formatCurrencyArFromNumber } from '@/lib/currencyMask';
 import { fmtDateUtc } from '@/lib/fmtDateUtc';
-import type { MovimientoCc } from '@/lib/cuentaCorriente';
+import { claseMontoCobroPago, type MovimientoCc } from '@/lib/cuentaCorriente';
 
 type Props = {
   /** El cobro/pago imputado a varios cargos. */
@@ -65,7 +65,8 @@ export function ImputacionesCobroModal({ pago, movimientos, onVerCargo, onClose 
               </span>
               <span className="shrink-0 text-right tabular-nums">
                 <span className="block text-vialto-charcoal">
-                  Imputado {monto(importe, pago.moneda)}
+                  Imputado{' '}
+                  <span className={claseMontoCobroPago(esCobro)}>{monto(importe, pago.moneda)}</span>
                 </span>
                 {saldo != null && (
                   <span className={`block text-xs ${saldo > 0.005 ? 'text-vialto-fire' : 'text-vialto-steel'}`}>
