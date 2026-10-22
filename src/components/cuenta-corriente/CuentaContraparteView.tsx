@@ -10,6 +10,7 @@ import {
   FileText,
   Filter,
   Hash,
+  ListChecks,
   X,
 } from 'lucide-react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
@@ -43,6 +44,7 @@ import { ImputarPagoModal } from './ImputarPagoModal';
 import { ComprobanteCcModal } from './ComprobanteCcModal';
 import { ComprobanteOrigenCcModal, type ComprobanteOrigenCc } from './ComprobanteOrigenCcModal';
 import { ImputacionesCobroModal } from './ImputacionesCobroModal';
+import { ImputacionesCargoModal, imputacionesDeCargo } from './ImputacionesCargoModal';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import {
   canAccessEmisionLiquidoProductoArca,
@@ -63,6 +65,7 @@ type ModalState =
   | { kind: 'comprobante'; movimiento: MovimientoCc }
   | { kind: 'origen'; comprobante: ComprobanteOrigenCc }
   | { kind: 'imputaciones'; pago: MovimientoCc }
+  | { kind: 'imputacionesCargo'; cargo: MovimientoCc }
   | { kind: 'exportar'; formato: 'pdf' | 'excel' }
   | null;
 
@@ -357,6 +360,15 @@ export function CuentaContraparteView({
         label: m.clienteId ? 'Imputar cobro' : 'Imputar pago',
         icon: Banknote,
         onClick: () => setModal({ kind: 'imputar', cargo: m }),
+      });
+    }
+    // Venta/compra con cobros/pagos imputados: ver cuáles y cuánto aplicó cada uno.
+    if (m.tipo === 'cargo' && imputacionesDeCargo(m, movimientos ?? []).length > 0) {
+      opciones.push({
+        id: 'ver-imputacion',
+        label: 'Ver imputación',
+        icon: ListChecks,
+        onClick: () => setModal({ kind: 'imputacionesCargo', cargo: m }),
       });
     }
     if (m.comprobanteEditable || m.vencimientoEditable) {
@@ -834,6 +846,13 @@ export function CuentaContraparteView({
             const origen = origenDeCargo(cargo);
             return origen ? () => setModal({ kind: 'origen', comprobante: origen }) : null;
           }}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === 'imputacionesCargo' && (
+        <ImputacionesCargoModal
+          cargo={modal.cargo}
+          movimientos={movimientos ?? []}
           onClose={() => setModal(null)}
         />
       )}
