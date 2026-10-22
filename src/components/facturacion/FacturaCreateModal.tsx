@@ -120,6 +120,8 @@ function validateFacturaDraft(
   viajes: Viaje[],
   hasArca: boolean,
 ): string | null {
+  // Sin ARCA el número es obligatorio (con ARCA lo asigna AFIP al emitir).
+  if (!hasArca && !draft.numero.trim()) return "Ingresá el número de comprobante.";
   if (!draft.fechaEmision) return "Ingresá la fecha de emisión.";
   if (monedaUnicaDeViajes(draft.viajeIds, viajes) === null) {
     return "Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.";
@@ -839,6 +841,10 @@ export function FacturaCreateModal({
   async function handleManualSave() {
     if (busy) return;
 
+    if (!hasArca && !draft.numero.trim()) {
+      notifyError("Ingresá el número de comprobante.");
+      return;
+    }
     const tramosCheck = validateFacturaDraftTramos(draft);
     if (!tramosCheck.ok) {
       setTramosIncomplete(tramosCheck.indices);
@@ -947,7 +953,9 @@ export function FacturaCreateModal({
       <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
         {!hasArca && (
           <div className="flex flex-col gap-1">
-            <label className={compactLabelClass}>Número de comprobante</label>
+            <label className={compactLabelClass}>
+              Número de comprobante <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               value={draft.numero}
@@ -1078,7 +1086,7 @@ export function FacturaCreateModal({
         {!hasArca && (
           <div className="flex flex-col gap-1">
             <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-              Número de comprobante
+              Número de comprobante <span className="text-red-500">*</span>
             </label>
             <input
               type="text"

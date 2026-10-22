@@ -25,8 +25,8 @@ type Props = {
 /**
  * Carga o corrige el N° de comprobante y el vencimiento de un movimiento: una factura de
  * cliente (se guarda en la factura; el número solo sin ARCA), la factura del proveedor en
- * una liquidación (el número solo sin CVLP; se guarda en la liquidación) o una
- * venta/compra manual.
+ * una liquidación (el número solo sin CVLP; se guarda en la liquidación), una
+ * venta/compra manual o un cobro/pago manual (su recibo / orden de pago).
  */
 export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
   const { getToken } = useAuth();
@@ -122,7 +122,7 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
                 value={numero}
                 onChange={(e) => setNumero(e.target.value)}
                 placeholder="Ej. 0001-00001234"
-                required={esFactura}
+                required={esFactura || movimiento.origen === 'manual'}
                 autoFocus
               />
               {esLiquidacion && (

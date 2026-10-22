@@ -70,9 +70,9 @@ type MovimientoConSaldo = MovimientoCc & {
   saldoAcumulado: number;
   /** Cobro/pago imputado a un solo cargo: ese cargo (su factura/liquidación). */
   cargoUnico: MovimientoCc | null;
-  /** Columna Comprobante: en un cobro de una sola factura, el número de esa factura. */
+  /** Columna Comprobante: el número propio del movimiento (en un cobro/pago, el del recibo/orden de pago). */
   comprobanteMostrado: string | null;
-  /** Cobro/pago imputado a varios cargos: el número de cada uno. */
+  /** Cobro/pago imputado: el número de cada factura/liquidación que cancela (tooltip y filtro). */
   comprobantesImputados: string[];
 };
 
@@ -186,21 +186,20 @@ export function CuentaContraparteView({
         m.tipo === 'pago' && m.cargosImputadosIds?.length === 1
           ? porId.get(m.cargosImputadosIds[0]) ?? null
           : null;
-      // Cobro/pago imputado a varios cargos: sus números (la columna muestra "…" y el
-      // tooltip los lista todos).
+      // Cobro/pago imputado: los números de lo que cancela (solo tooltip y filtro; la
+      // columna muestra el comprobante del cobro/pago).
       const comprobantesImputados =
-        m.tipo === 'pago' && (m.cargosImputadosIds?.length ?? 0) > 1
-          ? m.cargosImputadosIds!.map((id) => porId.get(id)?.numeroComprobante?.trim() || 'Sin número')
+        m.tipo === 'pago'
+          ? (m.cargosImputadosIds ?? []).map(
+              (id) => porId.get(id)?.numeroComprobante?.trim() || 'Sin número',
+            )
           : [];
       conSaldo.push({
         ...m,
         saldoAcumulado: acumulado,
         cargoUnico,
         comprobantesImputados,
-        // Un pago con número propio (ej. orden de pago) muestra el suyo; si no, el de la
-        // factura/liquidación que cancela.
-        comprobanteMostrado:
-          m.numeroComprobante?.trim() || cargoUnico?.numeroComprobante || null,
+        comprobanteMostrado: m.numeroComprobante?.trim() || null,
       });
     }
     return conSaldo.reverse();
@@ -234,8 +233,7 @@ export function CuentaContraparteView({
       const fecha = fechaDiaYmd(m.fecha) ?? '';
       if (desdeFiltro && fecha < desdeFiltro) return false;
       if (hastaFiltro && fecha > hastaFiltro) return false;
-      if (tipoFiltro.trim() && !m.concepto.toLowerCase().includes(tipoFiltro.trim().toLowerCase()))
-        return false;
+      if (tipoFiltro && m.concepto !== tipoFiltro) return false;
       if (
         comprobanteFiltro.trim() &&
         ![m.comprobanteMostrado ?? '', ...m.comprobantesImputados].some((n) =>
@@ -432,15 +430,26 @@ export function CuentaContraparteView({
     </div>
   );
 
+  // Opciones: los tipos (conceptos) que hay en esta cuenta, sin repetir.
+  const tiposDisponibles = useMemo(
+    () => [...new Set((movimientos ?? []).map((m) => m.concepto))].sort((a, b) => a.localeCompare(b, 'es')),
+    [movimientos],
+  );
+
   const tipoFiltroInput = (
-    <input
-      type="text"
+    <select
       value={tipoFiltro}
       onChange={(e) => setTipoFiltro(e.target.value)}
-      placeholder="Buscar…"
-      className={`${filtroInputClass} ${tipoFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'}`}
+      className={`${filtroInputClass} ${tipoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'}`}
       aria-label="Filtrar por tipo"
-    />
+    >
+      <option value="">Todos</option>
+      {tiposDisponibles.map((t) => (
+        <option key={t} value={t}>
+          {t}
+        </option>
+      ))}
+    </select>
   );
 
   const comprobanteFiltroInput = (
@@ -452,6 +461,28 @@ export function CuentaContraparteView({
       className={`${filtroInputClass} ${comprobanteFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'}`}
       aria-label="Filtrar por comprobante"
     />
+  );
+
+  // Opciones: las monedas que hay en esta cuenta.
+  const monedasDisponibles = useMemo(
+    () => [...new Set((movimientos ?? []).map((m) => m.moneda))].sort(),
+    [movimientos],
+  );
+
+  const monedaFiltroInput = (
+    <select
+      value={monedaFiltro}
+      onChange={(e) => setMonedaFiltro(e.target.value)}
+      className={`${filtroInputClass} ${monedaFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'}`}
+      aria-label="Filtrar por moneda"
+    >
+      <option value="">Todas</option>
+      {monedasDisponibles.map((m) => (
+        <option key={m} value={m}>
+          {m}
+        </option>
+      ))}
+    </select>
   );
 
   // Una tarjeta chica por moneda. Con más de una moneda, tocarla filtra la grilla.
@@ -601,14 +632,14 @@ export function CuentaContraparteView({
             header: 'Comprobante',
             cell: (m: MovimientoConSaldo) => (
               <span className="flex items-center gap-1.5 whitespace-nowrap">
-                {m.comprobantesImputados.length > 1 ? (
-                  // Varias facturas: su número propio (o "…") y el tooltip (oscuro, de
-                  // ListadoDatos) lista a cuáles se imputó.
+                {m.comprobantesImputados.length > 0 ? (
+                  // Cobro/pago: su propio comprobante; el tooltip (oscuro, de ListadoDatos)
+                  // lista las facturas/liquidaciones a las que se imputó.
                   <span
                     className="cursor-help"
                     title={`Imputado a:\n${m.comprobantesImputados.join('\n')}`}
                   >
-                    {m.numeroComprobante?.trim() || '…'}
+                    {m.comprobanteMostrado ?? '—'}
                   </span>
                 ) : (
                   m.comprobanteMostrado ?? '—'
@@ -672,6 +703,9 @@ export function CuentaContraparteView({
             <ListadoFiltroCampo label="Comprobante" active={!!comprobanteFiltro.trim()}>
               {comprobanteFiltroInput}
             </ListadoFiltroCampo>
+            <ListadoFiltroCampo label="Moneda" active={!!monedaFiltro}>
+              {monedaFiltroInput}
+            </ListadoFiltroCampo>
           </>
         }
         tableHead={
@@ -721,8 +755,16 @@ export function CuentaContraparteView({
             <th scope="col" className={listadoTablaThClass}>
               Saldo
             </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Saldo acumulado
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              {/* Mismo filtro que las tarjetas de saldo: un solo estado de moneda. */}
+              <ViajesListadoHeaderFiltro
+                title="Saldo acumulado"
+                filterActive={!!monedaFiltro}
+                filterSignature={monedaFiltro}
+                onClear={() => setMonedaFiltro('')}
+              >
+                {monedaFiltroInput}
+              </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Acciones
