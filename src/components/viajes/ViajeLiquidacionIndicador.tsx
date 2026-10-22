@@ -16,7 +16,7 @@ import {
   LiquidacionViewModal,
   type LiquidacionConTransportista,
 } from "@/components/liquidaciones/LiquidacionViewModal";
-import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
+import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
 import { apiFetch, apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { verPdfLiquidacion } from "@/lib/liquidacionContratoPdf";
@@ -81,6 +81,7 @@ export function ViajeLiquidacionIndicador({
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
   const [open, setOpen] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [liquidacionCompleta, setLiquidacionCompleta] =
@@ -110,10 +111,10 @@ export function ViajeLiquidacionIndicador({
     }
   }
 
-  /** Adjunto guardado (comprobante o anulación manual) en pestaña nueva, abierta en el click. */
+  /** Adjunto guardado (comprobante o anulación manual): foto en el visor, documento en pestaña nueva. */
   function verAdjunto(url: string | null | undefined, titulo = "Comprobante") {
     const u = url?.trim();
-    if (u) void abrirAdjuntoEnPestana({ url: u }, () => getToken(), titulo);
+    if (u) abrirAdjunto({ url: u }, titulo);
   }
 
   async function verPdf(kind: "pdf" | "pdf-anulacion", errorMsg: string) {
@@ -234,6 +235,7 @@ export function ViajeLiquidacionIndicador({
           }
         />
       )}
+      {visorAdjunto}
     </>
   );
 }

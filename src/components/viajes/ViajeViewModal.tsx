@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
+import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
 import { verPdfLiquidacion } from "@/lib/liquidacionContratoPdf";
 import { verPdfFacturaArca } from "@/lib/facturaPdfArca";
 import { ComprobanteAdjuntoClip } from "@/components/shared/ComprobanteAdjuntoClip";
@@ -153,9 +154,10 @@ export function ViajeViewModal({
   const productoLabelsTenant = useProductoLabels();
   const { tenant: currentTenant } = useCurrentTenant();
   const { getToken } = useAuth();
-  /** Comprobante adjunto en pestaña nueva (mismo helper que el resto del sistema). */
+  const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
+  /** Comprobante adjunto: foto en el visor, documento en pestaña nueva. */
   function verAdjunto(url: string | null | undefined) {
-    if (url?.trim()) void abrirAdjuntoEnPestana({ url }, () => getToken());
+    if (url?.trim()) abrirAdjunto({ url });
   }
   /** Valor de fila + clip clickeable si el comprobante tiene adjunto. */
   function conAdjunto(abrir: (() => void) | undefined, children: ReactNode) {
@@ -1040,6 +1042,7 @@ export function ViajeViewModal({
             </div>
           )}
       </div>
+      {visorAdjunto}
     </ViewModalShell>
   );
 }

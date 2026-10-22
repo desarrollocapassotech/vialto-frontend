@@ -3,7 +3,7 @@ import {
   ComprobanteAdjuntoClip,
 } from "@/components/shared/ComprobanteAdjuntoClip";
 import { AgregarDocumentoViajeModal } from "@/components/viajes/ViajeAdjuntosSeccion";
-import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
+import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
 import { adjuntosActivosViaje } from "@/lib/viajesAdjuntos";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { createPortal } from "react-dom";
@@ -372,6 +372,7 @@ export function ViajesTenantPage({
   filtroRapidoPortalTarget?: HTMLElement | null;
 } = {}) {
   const { getToken, isLoaded, isSignedIn, orgRole } = useAuth();
+  const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
   const { user } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
@@ -2391,11 +2392,7 @@ export function ViajesTenantPage({
           titulo={docs.map((d) => d.titulo).join(" · ")}
           onClick={() =>
             docs.length === 1
-              ? void abrirAdjuntoEnPestana(
-                  { url: docs[0].url },
-                  () => getToken(),
-                  docs[0].titulo,
-                )
+              ? abrirAdjunto({ url: docs[0].url }, docs[0].titulo)
               : setViewingViaje(v)
           }
         />
@@ -3144,6 +3141,7 @@ export function ViajesTenantPage({
     // Label de "Producto" de la empresa (también la elegida por superadmin) para los modales de abajo.
     <ProductoLabelsProvider tenant={tenantEfectivo}>
     <div className="w-full">
+      {visorAdjunto}
       {filtroRapidoPortalTarget
         ? createPortal(filtroRapidoContent, filtroRapidoPortalTarget)
         : null}
@@ -4419,11 +4417,7 @@ export function ViajesTenantPage({
             onClose={() => setViewingFactura(null)}
             onVerComprobante={
               viewingFactura.comprobanteUrl?.trim()
-                ? () =>
-                    void abrirAdjuntoEnPestana(
-                      { url: viewingFactura.comprobanteUrl!.trim() },
-                      () => getToken(),
-                    )
+                ? () => abrirAdjunto({ url: viewingFactura.comprobanteUrl!.trim() })
                 : undefined
             }
             onEditar={() => {
@@ -4527,11 +4521,7 @@ export function ViajesTenantPage({
                       });
                   }
                 : viewingLiquidacion.comprobanteUrl?.trim()
-                  ? () =>
-                      void abrirAdjuntoEnPestana(
-                        { url: viewingLiquidacion.comprobanteUrl!.trim() },
-                        () => getToken(),
-                      )
+                  ? () => abrirAdjunto({ url: viewingLiquidacion.comprobanteUrl!.trim() })
                   : undefined
             }
           />

@@ -34,7 +34,7 @@ import {
   type LiquidacionConTransportista,
 } from "@/components/liquidaciones/LiquidacionViewModal";
 import { LiquidacionEditModal } from "@/components/liquidaciones/LiquidacionEditModal";
-import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
+import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
 import { AccionesFila } from "@/components/ui/AccionesFila";
 import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 
@@ -316,6 +316,7 @@ function LiquidacionAccionesMenu({
 
 export function LiquidacionesTenantPage() {
   const { getToken, isLoaded, isSignedIn, sessionClaims, orgId } = useAuth();
+  const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
   const { user } = useUser();
   const { showToast } = useToast();
   const location = useLocation();
@@ -864,7 +865,7 @@ export function LiquidacionesTenantPage() {
   /** Adjunto guardado (comprobante o anulación manual) en pestaña nueva, abierta en el click. */
   function verAdjunto(url: string | null | undefined, titulo = "Comprobante") {
     const u = url?.trim();
-    if (u) void abrirAdjuntoEnPestana({ url: u }, () => getToken(), titulo);
+    if (u) abrirAdjunto({ url: u }, titulo);
   }
 
   function abrirComprobanteClip(liq: LiquidacionConTransportista): (() => void) | undefined {
@@ -1073,6 +1074,7 @@ export function LiquidacionesTenantPage() {
 
   return (
     <div className="w-full">
+      {visorAdjunto}
       {/* Título + badges ARCA a la izquierda; acciones a la derecha, en la misma línea. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide text-vialto-charcoal">

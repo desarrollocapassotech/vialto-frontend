@@ -35,6 +35,8 @@ import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { apiJson } from "@/lib/api";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
 import { friendlyError } from "@/lib/friendlyError";
+import { esImagenAdjunto } from "@/lib/abrirAdjunto";
+import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { canAccessEmisionFacturasArca } from "@/lib/tenantModules";
@@ -147,6 +149,7 @@ export function FacturacionTenantPage({
   embeddedInSuperadmin?: boolean;
 } = {}) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const maestro = useMaestroData();
@@ -1118,7 +1121,9 @@ export function FacturacionTenantPage({
       return;
     }
     if (f.comprobanteUrl?.trim()) {
-      window.open(f.comprobanteUrl, "_blank", "noopener,noreferrer");
+      // Foto → visor; PDF → igual que antes, pestaña nueva con la URL directa.
+      if (esImagenAdjunto({ url: f.comprobanteUrl })) abrirAdjunto({ url: f.comprobanteUrl.trim() });
+      else window.open(f.comprobanteUrl, "_blank", "noopener,noreferrer");
     }
   }
 
@@ -1396,6 +1401,7 @@ export function FacturacionTenantPage({
 
   return (
     <div className="w-full">
+      {visorAdjunto}
       {/* Título + badges ARCA a la izquierda; acciones a la derecha, en la misma línea. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         {!embeddedInSuperadmin && (

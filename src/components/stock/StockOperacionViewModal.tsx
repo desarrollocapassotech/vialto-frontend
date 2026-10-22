@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react';
-import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
+import { VisorFotos } from '@/components/ui/VisorFotos';
 import { DivisionImpactoLinea } from '@/components/stock/DivisionImpactoLinea';
 import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
 import { StockOperacionTipoCelda } from '@/components/stock/StockOperacionTipoCelda';
@@ -269,9 +269,9 @@ export function StockOperacionViewModal({
       </div>
 
       {previewFotoIdx !== null && fotosUrls[previewFotoIdx] && (
-        <AdjuntoPreviewModal
-          url={fotosUrls[previewFotoIdx]}
-          title={`Foto del producto ${previewFotoIdx + 1}`}
+        <VisorFotos
+          fotos={fotosUrls.map((url, idx) => ({ url, titulo: `Foto del producto ${idx + 1}` }))}
+          indiceInicial={previewFotoIdx}
           onClose={() => setPreviewFotoIdx(null)}
         />
       )}

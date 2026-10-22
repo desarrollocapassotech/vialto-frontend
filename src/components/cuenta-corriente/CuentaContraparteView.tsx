@@ -53,6 +53,7 @@ import { ExportarEstadoCuentaModal } from './ExportarEstadoCuentaModal';
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { ComprobanteAdjuntoClip } from '@/components/shared/ComprobanteAdjuntoClip';
 import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
+import { useAbrirAdjunto } from '@/hooks/useAbrirAdjunto';
 import { verPdfFacturaArca } from '@/lib/facturaPdfArca';
 import { verPdfLiquidacion } from '@/lib/liquidacionContratoPdf';
 
@@ -110,6 +111,7 @@ export function CuentaContraparteView({
   limpiarFiltrosSlot,
 }: Props) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
   const { tenant } = useCurrentTenant();
   // Venta/compra manual solo si la empresa no tiene el módulo que la genera (con
   // Facturación las ventas salen de las facturas; con Liquidaciones, las compras de las
@@ -281,7 +283,7 @@ export function CuentaContraparteView({
     const tk = () => getToken();
     const adjunto = (url: string | null | undefined, titulo: string) => {
       const u = url?.trim();
-      return u ? () => void abrirAdjuntoEnPestana({ url: u }, tk, titulo) : undefined;
+      return u ? () => abrirAdjunto({ url: u }, titulo) : undefined;
     };
     const pdfLiq = (id: string, kind: 'pdf' | 'pdf-anulacion', titulo: string) => () =>
       void abrirAdjuntoEnPestana(
@@ -506,6 +508,7 @@ export function CuentaContraparteView({
 
   return (
     <div>
+      {visorAdjunto}
       {saldosSlot ? createPortal(saldosNode, saldosSlot) : null}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">

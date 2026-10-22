@@ -1,11 +1,14 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useRef } from 'react';
-import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
+import { useEffect, useMemo, useRef } from 'react';
+import { VisorFotos } from '@/components/ui/VisorFotos';
+import { abrirAdjuntoEnPestana, esImagenAdjunto } from '@/lib/abrirAdjunto';
 
 /**
- * Lo montan los "Ver comprobante" de todo el sistema al hacer click. Ya no es un modal
- * (regla del sistema): abre el adjunto en una pestaña nueva (`abrirAdjuntoEnPestana`) y
- * se cierra solo. Para un botón nuevo, llamar `abrirAdjuntoEnPestana` directo.
+ * Lo montan los "Ver comprobante" de todo el sistema al hacer click.
+ * - Foto/imagen → `VisorFotos` en pantalla completa (zoom, cerrar con Esc).
+ * - Documento (PDF, remito por `movimientoId`, desconocido) → pestaña nueva
+ *   (`abrirAdjuntoEnPestana`) y se cierra solo.
+ * Para un botón nuevo sin componente que montar, usar `useAbrirAdjunto`.
  */
 export function AdjuntoPreviewModal({
   movimientoId,
@@ -29,12 +32,25 @@ export function AdjuntoPreviewModal({
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
+  const esImagen = !movimientoId && esImagenAdjunto({ url, file });
+  const urlImagen = useMemo(
+    () => (esImagen ? (file ? URL.createObjectURL(file) : (url ?? null)) : null),
+    [esImagen, file, url],
+  );
+
   useEffect(() => {
+    if (!urlImagen?.startsWith('blob:')) return;
+    return () => URL.revokeObjectURL(urlImagen);
+  }, [urlImagen]);
+
+  useEffect(() => {
+    if (esImagen) return;
     void abrirAdjuntoEnPestana({ url, file, movimientoId, tenantId }, getToken, title);
     onCloseRef.current();
     // Una vez por montaje: cada click vuelve a montar el componente.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return null;
+  if (!urlImagen) return null;
+  return <VisorFotos fotos={[{ url: urlImagen, titulo: title }]} onClose={onClose} />;
 }
