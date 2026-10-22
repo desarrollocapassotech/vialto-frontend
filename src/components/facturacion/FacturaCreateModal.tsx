@@ -13,10 +13,19 @@ import { Receipt } from "lucide-react";
 import { useHiddenFiscalFields } from "@/hooks/useHiddenFiscalFields";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { BloqueoModal } from "@/components/ui/BloqueoModal";
-import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPreviewPanel";
+import {
+  FacturaArcaPreviewPanel,
+  totalesResumenFactura,
+} from "@/components/facturacion/FacturaArcaPreviewPanel";
+import {
+  DetalleComprobanteEncabezado,
+  ResumenTotalesBarra,
+  VerDetalleButton,
+} from "@/components/facturacion/ResumenDetalleColapsable";
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { useReceptorPadronBloqueado } from "@/hooks/useReceptorPadronBloqueado";
 import {
   aplicarCambiosPadronCliente,
@@ -111,6 +120,8 @@ function validateFacturaDraft(
   viajes: Viaje[],
   hasArca: boolean,
 ): string | null {
+  // Sin ARCA el número es obligatorio (con ARCA lo asigna AFIP al emitir).
+  if (!hasArca && !draft.numero.trim()) return "Ingresá el número de comprobante.";
   if (!draft.fechaEmision) return "Ingresá la fecha de emisión.";
   if (monedaUnicaDeViajes(draft.viajeIds, viajes) === null) {
     return "Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.";
@@ -395,7 +406,7 @@ export function FacturaCreateModal({
   const busy = saving || submitAction != null;
   const displayError = unifiedArca ? localError : localError || error;
 
-  useEscapeKey(open, busy, onClose);
+  const descarte = useConfirmarDescarte(onClose, open);
 
   const configUrl = platform
     ? `/api/platform/arca/config?tenantId=${encodeURIComponent(tenantId!)}`
@@ -423,6 +434,17 @@ export function FacturaCreateModal({
   const datosEmitIncompletos = datosReady && missingEmitFields.length > 0;
   const sinConfigArca = datosReady && !arcaConfig;
 
+  // Panel de detalle oculto por defecto (debajo queda la barra de totales). Si aparece
+  // un aviso que solo vive en el panel, se abre solo para que no pase desapercibido.
+  const [detalleAbierto, setDetalleAbierto] = useState(false);
+  const avisoEnPanel = bloqueadoUsd || sinConfigArca || arcaConfigMissing;
+  useEffect(() => {
+    if (avisoEnPanel) setDetalleAbierto(true);
+  }, [avisoEnPanel]);
+  useEffect(() => {
+    if (open) setDetalleAbierto(false);
+  }, [open]);
+
   // Al elegir un cliente sin los datos fiscales que ARCA exige, se abre un modal para
   // completarlos — una sola vez por cliente; después se reabre desde el aviso del panel.
   const missingClienteFields = useMemo(
@@ -431,6 +453,12 @@ export function FacturaCreateModal({
   );
   const missingHiddenClienteFields = useHiddenFiscalFields(missingClienteFields);
   const [datosClienteModalOpen, setDatosClienteModalOpen] = useState(false);
+  // Con un modal anidado abierto, Escape lo cierra a él (no a este).
+  useEscapeKey(
+    open && !datosClienteModalOpen && !confirmarEmision,
+    busy,
+    descarte.solicitarCierre,
+  );
   const datosClienteAvisadoRef = useRef<string | null>(null);
 
   // Al elegir el cliente se valida su CUIT contra el padrón de ARCA (opt-in por empresa,
@@ -769,6 +797,7 @@ export function FacturaCreateModal({
       setFacturaEmitida(updated);
       setFrozenLineas(lineas);
       setStep("autorizada");
+      descarte.marcarGuardado();
       onFacturaEmitida?.(updated);
       showToast("Factura emitida a ARCA.", "success");
     } catch (err) {
@@ -812,6 +841,10 @@ export function FacturaCreateModal({
   async function handleManualSave() {
     if (busy) return;
 
+    if (!hasArca && !draft.numero.trim()) {
+      notifyError("Ingresá el número de comprobante.");
+      return;
+    }
     const tramosCheck = validateFacturaDraftTramos(draft);
     if (!tramosCheck.ok) {
       setTramosIncomplete(tramosCheck.indices);
@@ -920,7 +953,9 @@ export function FacturaCreateModal({
       <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
         {!hasArca && (
           <div className="flex flex-col gap-1">
-            <label className={compactLabelClass}>Número de comprobante</label>
+            <label className={compactLabelClass}>
+              Número de comprobante <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               value={draft.numero}
@@ -977,9 +1012,8 @@ export function FacturaCreateModal({
         {!hasArca && <div className="sm:col-span-2">{compactIvaField}</div>}
       </div>
       <div className="flex min-h-[14rem] flex-1 flex-col gap-1 overflow-hidden">
-        {/* Mismo título que "Nueva liquidación" (sin asterisco: en facturas los viajes son opcionales). */}
         <p className={compactLabelClass}>
-          Viajes a incluir
+          Viajes <span className="text-red-500">*</span>
           {draft.viajeIds.length > 0 && (
             <span className="ml-1 normal-case text-vialto-charcoal">
               ({draft.viajeIds.length} seleccionado
@@ -1002,6 +1036,8 @@ export function FacturaCreateModal({
             idPropio2Habilitado={idPropio2Habilitado}
             idPropio2Label={idPropio2Label}
             unidadCantidad={unidadCantidadViajes(tenantEfectivo)}
+            ivaPct={ivaPctDefault}
+            tramos={draft.facturarPorTramo ? draft.tramos : undefined}
           />
         </div>
       </div>
@@ -1050,7 +1086,7 @@ export function FacturaCreateModal({
         {!hasArca && (
           <div className="flex flex-col gap-1">
             <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-              Número de comprobante
+              Número de comprobante <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -1209,15 +1245,7 @@ export function FacturaCreateModal({
         ].join(" ")}
         role="presentation"
       >
-        <button
-          type="button"
-          className="absolute inset-0 bg-black/40"
-          aria-label="Cerrar"
-          disabled={busy}
-          onClick={() => {
-            if (!busy) onClose();
-          }}
-        />
+        <div className="absolute inset-0 bg-black/40" aria-hidden />
         <div
           role="dialog"
           aria-modal="true"
@@ -1284,7 +1312,7 @@ export function FacturaCreateModal({
             <button
               type="button"
               disabled={busy}
-              onClick={onClose}
+              onClick={descarte.solicitarCierre}
               className="inline-flex h-9 shrink-0 items-center justify-center border border-black/15 bg-white px-3 text-sm text-vialto-steel hover:bg-vialto-mist disabled:opacity-50"
               aria-label="Cerrar"
             >
@@ -1296,17 +1324,33 @@ export function FacturaCreateModal({
             className={[
               "min-h-0 flex-1 overflow-hidden",
               step === "form" && unifiedArca
-                ? "flex flex-col lg:min-h-0 lg:flex-row"
+                ? "flex flex-col"
                 : "overflow-y-auto",
             ].join(" ")}
           >
             {step === "form" ? (
               unifiedArca ? (
                 <>
-                  <div className="flex min-h-0 flex-col overflow-y-auto border-b border-black/10 px-4 py-4 sm:px-5 lg:w-[68%] lg:max-w-[68%] lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+                <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+                  <div
+                    className={[
+                      "relative flex min-h-0 flex-col overflow-y-auto px-4 py-4 sm:px-5",
+                      detalleAbierto
+                        ? "border-b border-black/10 lg:w-[68%] lg:max-w-[68%] lg:shrink-0 lg:border-b-0 lg:border-r"
+                        : "flex-1",
+                    ].join(" ")}
+                  >
+                    {/* En desktop va en el hueco a la derecha del IVA; en mobile, arriba del formulario. */}
+                    {!detalleAbierto && (
+                      <div className="mb-3 flex justify-end lg:absolute lg:right-5 lg:top-[2.4rem] lg:mb-0">
+                        <VerDetalleButton onClick={() => setDetalleAbierto(true)} />
+                      </div>
+                    )}
                     {compactFields}
                   </div>
-                  <div className="min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:w-[32%] lg:max-w-[32%] lg:shrink-0 lg:min-w-0">
+                  {detalleAbierto && (
+                  <div className="min-h-0 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:w-[32%] lg:max-w-[32%] lg:shrink-0 lg:min-w-0">
+                    <DetalleComprobanteEncabezado onOcultar={() => setDetalleAbierto(false)} />
                     <FacturaArcaPreviewPanel
                       arcaConfig={arcaConfig}
                       clienteDetalle={clienteDetalle}
@@ -1367,6 +1411,11 @@ export function FacturaCreateModal({
                       }
                     />
                   </div>
+                  )}
+                </div>
+                {!detalleAbierto && (
+                  <ResumenTotalesBarra {...totalesResumenFactura(lineas, ivaPctDefault)} />
+                )}
                 </>
               ) : (
                 <div className="overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
@@ -1495,7 +1544,7 @@ export function FacturaCreateModal({
               )}
               <button
                 type="button"
-                onClick={onClose}
+                onClick={descarte.solicitarCierre}
                 disabled={busy}
                 className="text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-60"
               >
@@ -1624,6 +1673,7 @@ export function FacturaCreateModal({
           void handleUnifiedSubmit("emitir");
         }}
       />
+      {descarte.dialogo}
     </>
   );
 }

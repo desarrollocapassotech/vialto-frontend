@@ -2,6 +2,12 @@ import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Receipt, HelpCircle } from "lucide-react";
 import {
+  DetalleComprobanteEncabezado,
+  ResumenTotalesBarra,
+  VerDetalleButton,
+} from "@/components/facturacion/ResumenDetalleColapsable";
+import { labelIvaAlicuota } from "@/components/facturacion/FacturaLineasEditor";
+import {
   ConceptosLiquidacionLineasEditor,
   isConceptoLineaCompleta,
   toConceptosLineasPayload,
@@ -26,6 +32,7 @@ import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { ConfirmarEmisionArcaDialog } from "@/components/shared/ConfirmarEmisionArcaDialog";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import {
   aplicarCambiosPadronCliente,
   aplicarCambiosPadronTransportista,
@@ -243,7 +250,7 @@ export function CrearLiquidacionManualModal({
   const showComprobante = !hasLiquidoProductoArca;
   const { showToast } = useToast();
 
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const { solicitarCierre, marcarGuardado, dialogo } = useConfirmarDescarte(onClose);
 
   const existente = liquidacionExistente ?? null;
   /** De dónde se precargan los datos: la liquidación a emitir o la anulada que se vuelve a emitir. */
@@ -649,14 +656,6 @@ export function CrearLiquidacionManualModal({
     };
   }, [viajeInicial, selectedViajeIds, viajes, tenantId, getToken]);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !submitting) onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [submitting, onClose]);
-
   const selectedViajes = useMemo(() => {
     if (viajeInicial) return [viajeInicial as ViajeItem];
     return viajes.filter((v) => selectedViajeIds.has(v.id));
@@ -734,6 +733,16 @@ export function CrearLiquidacionManualModal({
   const [modalDatos, setModalDatos] = useState<
     "transportista" | "cliente" | null
   >(null);
+
+  // Con un modal anidado abierto, Escape lo cierra a él (no a este).
+  useEffect(() => {
+    if (modalDatos || confirmarEmision) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !submitting) solicitarCierre();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [submitting, solicitarCierre, modalDatos, confirmarEmision]);
   const datosAvisadosRef = useRef(new Set<string>());
   const transportistaSeleccionadoId = transportistaSeleccionado?.id;
 
@@ -1143,6 +1152,7 @@ export function CrearLiquidacionManualModal({
         );
         setLiquidacionEmitida(liq);
         setStep("autorizada");
+        marcarGuardado();
 
         if (onLiquidacionEmitida) {
           onLiquidacionEmitida(liq);
@@ -1232,20 +1242,63 @@ export function CrearLiquidacionManualModal({
     netoGravado !== null ? netoGravado + conceptosNeto : null;
   const ivaTotalPdf =
     ivaMonto !== null ? ivaMonto + (conceptosEfecto - conceptosNeto) : null;
-  // Si todo va a la misma alícuota se muestra (ej. "IVA 21%"); si hay mezcla, solo "IVA".
-  const alicuotasResumen = new Set<number>([
-    ...selectedViajes.map((v) => v.precioTransportistaIvaIncluidoPct || ivaPctNum),
-    ...(comisionMonto > 0 ? [ivaPctNum] : []),
-    ...conceptosCompletos.map((l) => Number(l.ivaPct ?? ivaPctNum)),
-  ]);
-  const ivaResumenLabel =
-    alicuotasResumen.size === 1 ? `IVA ${[...alicuotasResumen][0]}%` : "IVA";
+  // IVA desagregado por alícuota (como en Facturas). Misma cuenta que `ivaTotalPdf`:
+  // fletes − comisión (con su %) + el IVA propio de cada concepto.
+  const ivaPorAlicuota = (() => {
+    const porPct = new Map<number, number>();
+    const sumar = (pct: number, iva: number) => {
+      if (iva !== 0) porPct.set(pct, (porPct.get(pct) ?? 0) + iva);
+    };
+    if (selectedViajes.length > 0) {
+      for (const v of selectedViajes) {
+        const pct = v.precioTransportistaIvaIncluidoPct || ivaPctNum;
+        if (pct > 0) sumar(pct, ((v.precioTransportistaExterno ?? 0) * pct) / 100);
+      }
+      if (ivaPctNum > 0) sumar(ivaPctNum, -(comisionMonto * ivaPctNum) / 100);
+    } else {
+      sumar(ivaPctNum, ((bruto - comisionMonto) * ivaPctNum) / 100);
+    }
+    for (const l of conceptosCompletos) {
+      const mult = getMultiplicador(l.modoAplicacion);
+      const monto = Number(l.monto) || 0;
+      sumar(
+        Number(l.ivaPct ?? ivaPctNum),
+        (signedMontoConIvaConcepto(l.signo, monto, l.ivaPct) -
+          signedMontoNetoConcepto(l.signo, monto)) *
+          mult,
+      );
+    }
+    return [...porPct.entries()]
+      .sort(([a], [b]) => b - a)
+      .map(([pct, iva]) => ({ pct, iva }));
+  })();
   const totalALiquidar =
     netoGravado !== null && ivaMonto !== null
       ? netoGravado + ivaMonto + conceptosEfecto
       : null;
   const showSummary =
     anyHasPrice && (viajeInicial != null || selectedViajeIds.size > 0);
+  // Panel de detalle oculto por defecto: mientras tanto se ven los totales en una barra fija.
+  const [detalleAbierto, setDetalleAbierto] = useState(false);
+  const totalesBarra = showSummary
+    ? {
+        filas: [
+          netoGravadoPdf !== null
+            ? { label: "Importe neto gravado", value: `${fmtLiquidacionMoney(netoGravadoPdf)} ${monedaResumen}` }
+            : { label: "Bruto", value: `${fmtLiquidacionMoney(bruto)} ${monedaResumen}` },
+          ...(ivaTotalPdf !== null
+            ? ivaPorAlicuota.map(({ pct, iva }) => ({
+                label: labelIvaAlicuota(pct),
+                value: `${fmtLiquidacionMoney(iva)} ${monedaResumen}`,
+              }))
+            : []),
+        ],
+        total:
+          totalALiquidar !== null
+            ? { label: "Importe total", value: `${fmtLiquidacionMoney(totalALiquidar)} ${monedaResumen}` }
+            : null,
+      }
+    : { filas: [], total: null };
   // ARCA no admite un comprobante por $0: no se deja emitir (el borrador sí se puede guardar).
   const montoCero = !(totalALiquidar != null && totalALiquidar > 0);
 
@@ -1270,13 +1323,6 @@ export function CrearLiquidacionManualModal({
 
   return (
     <div
-      ref={overlayRef}
-      onClick={(e) => {
-        if (e.target === overlayRef.current && !submitting) {
-          if (step === "autorizada") onSuccess(liquidacionEmitida!);
-          else onClose();
-        }
-      }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     >
       <div
@@ -1402,15 +1448,21 @@ export function CrearLiquidacionManualModal({
                   <AmbienteTestBadge ambiente={resolvedConfig?.ambiente} />
                 )}
               </div>
-              {!submitting && (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="text-xl leading-none text-vialto-steel hover:text-vialto-charcoal"
-                >
-                  ×
-                </button>
-              )}
+              <div className="flex items-center gap-4">
+                {/* En liquidación la primera fila del formulario ocupa todo el ancho: el botón va acá. */}
+                {!detalleAbierto && !isFieldConfigLoading && (
+                  <VerDetalleButton onClick={() => setDetalleAbierto(true)} />
+                )}
+                {!submitting && (
+                  <button
+                    type="button"
+                    onClick={solicitarCierre}
+                    className="text-xl leading-none text-vialto-steel hover:text-vialto-charcoal"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
 
             <form
@@ -1422,8 +1474,17 @@ export function CrearLiquidacionManualModal({
                   <Spinner className="h-6 w-6 text-vialto-fire" />
                 </div>
               ) : (
-                <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]">
-                <div className="min-h-0 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4 lg:border-r lg:border-black/10">
+                <>
+                <div
+                  className={`grid min-h-0 flex-1 grid-cols-1 ${
+                    detalleAbierto ? "lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]" : ""
+                  }`}
+                >
+                <div
+                  className={`min-h-0 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4 ${
+                    detalleAbierto ? "lg:border-r lg:border-black/10" : ""
+                  }`}
+                >
                   {/* Transportista, comisión e IVA en una sola fila. */}
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
                     <div>
@@ -1689,7 +1750,7 @@ export function CrearLiquidacionManualModal({
                   {!viajeInicial && transportistaId && (
                     <div>
                       <p className={labelClass}>
-                        Viajes a incluir <span className="text-red-500">*</span>
+                        Viajes <span className="text-red-500">*</span>
                         {selectedViajeIds.size > 0 && (
                           <span className="ml-1 normal-case text-vialto-charcoal">
                             ({selectedViajeIds.size} seleccionado
@@ -1710,6 +1771,12 @@ export function CrearLiquidacionManualModal({
                         mostrarTransporte={false}
                         monedaDe={monedaViaje}
                         montoSinIva
+                        ivaSubtotal={{
+                          importeDe: (v) => v.precioTransportistaExterno,
+                          ivaPctDe: (v) => v.precioTransportistaIvaIncluidoPct || ivaPctNum,
+                          formatMonto: (n, v, conMoneda) =>
+                            fmtMoney(n, v.monedaPrecioTransportistaExterno, conMoneda),
+                        }}
                         renderMonto={(v, conMoneda) =>
                           fmtMoney(
                             v.precioTransportistaExterno,
@@ -1806,8 +1873,10 @@ export function CrearLiquidacionManualModal({
                 </div>
 
                 {/* Panel derecho con el mismo formato que "Nueva factura" (FacturaArcaPreviewPanel). */}
+                {detalleAbierto && (
                 <aside className="flex min-h-0 flex-col border-t border-black/10 bg-white lg:border-t-0">
                   <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+                    <DetalleComprobanteEncabezado onOcultar={() => setDetalleAbierto(false)} />
                     <div className="grid grid-cols-2 gap-4">
                       {hasLiquidoProductoArca && (
                         <>
@@ -1923,45 +1992,38 @@ export function CrearLiquidacionManualModal({
                       )}
                     </section>
 
+                    {/* La comisión va aparte; abajo quedan solo neto gravado, IVA por alícuota y total. */}
+                    {showSummary && comisionMonto > 0 && (
+                      <section className="space-y-1">
+                        <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
+                          Comisión
+                        </p>
+                        <ResumenRow
+                          label={`Comisión por flete ${comisionNum}%`}
+                          value={`${fmtSignedLiquidacionMoney(comisionMonto, "minus")} ${monedaResumen}`}
+                        />
+                      </section>
+                    )}
+
                     {showSummary && (
                       <div className="space-y-1 border-t border-black/10 pt-2">
-                        <ResumenRow
-                          label="Bruto"
-                          value={`${fmtLiquidacionMoney(bruto)} ${monedaResumen}`}
-                        />
-                        {comisionMonto > 0 && (
-                          <ResumenRow
-                            label={`Comisión ${comisionNum}%`}
-                            value={`${fmtSignedLiquidacionMoney(comisionMonto, "minus")} ${monedaResumen}`}
-                          />
-                        )}
-                        {conceptosCompletos.map((l, idx) => {
-                          const mult = getMultiplicador(l.modoAplicacion);
-                          const neto =
-                            signedMontoNetoConcepto(l.signo, Number(l.monto) || 0) * mult;
-                          return (
-                            <ResumenRow
-                              key={`${l.conceptoLiquidacionId}-${idx}`}
-                              label={`${l.nombre || "Concepto"}${mult > 1 ? ` (×${mult} viajes)` : ""}${l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ""}`}
-                              value={`${fmtSignedLiquidacionMoney(Math.abs(neto), neto >= 0 ? "plus" : "minus")} ${monedaResumen}`}
-                            />
-                          );
-                        })}
                         {netoGravadoPdf !== null && (
                           <ResumenRow
-                            label="Neto gravado"
+                            label="Importe neto gravado"
                             value={`${fmtLiquidacionMoney(netoGravadoPdf)} ${monedaResumen}`}
                           />
                         )}
-                        {ivaTotalPdf !== null && (
-                          <ResumenRow
-                            label={ivaResumenLabel}
-                            value={`${fmtSignedLiquidacionMoney(ivaTotalPdf, "plus")} ${monedaResumen}`}
-                          />
-                        )}
+                        {ivaTotalPdf !== null &&
+                          ivaPorAlicuota.map(({ pct, iva }) => (
+                            <ResumenRow
+                              key={pct}
+                              label={labelIvaAlicuota(pct)}
+                              value={`${fmtSignedLiquidacionMoney(Math.abs(iva), iva >= 0 ? "plus" : "minus")} ${monedaResumen}`}
+                            />
+                          ))}
                         {totalALiquidar !== null && (
                           <div className="flex justify-between pt-1 text-xs font-semibold text-vialto-charcoal">
-                            <span>Total a liquidar</span>
+                            <span>Importe total</span>
                             <span className="tabular-nums">
                               {fmtLiquidacionMoney(totalALiquidar)} {monedaResumen}
                             </span>
@@ -1971,7 +2033,12 @@ export function CrearLiquidacionManualModal({
                     )}
                   </div>
                 </aside>
+                )}
               </div>
+              {!detalleAbierto && (
+                <ResumenTotalesBarra {...totalesBarra} />
+              )}
+              </>
               )}
             </form>
 
@@ -1999,7 +2066,7 @@ export function CrearLiquidacionManualModal({
               <button
                 type="button"
                 disabled={submitting}
-                onClick={onClose}
+                onClick={solicitarCierre}
                 className="h-9 px-4 rounded border border-black/20 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist disabled:opacity-50"
               >
                 Cancelar
@@ -2178,6 +2245,7 @@ export function CrearLiquidacionManualModal({
             onClose={() => setModalDatos(null)}
           />
         )}
+      {dialogo}
     </div>
   );
 }

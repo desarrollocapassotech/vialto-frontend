@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { PresentacionFormModal } from "@/components/stock/PresentacionFormModal";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { Spinner } from "@/components/ui/Spinner";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { ApiError, apiJson } from "@/lib/api";
@@ -73,13 +74,16 @@ export function AsignarPresentacionProductoModal({
     void loadCatalogo();
   }, [loadCatalogo]);
 
+  const descarte = useConfirmarDescarte(onClose);
+  const { solicitarCierre } = descarte;
+
   useEffect(() => {
     function handler(e: KeyboardEvent) {
-      if (e.key === "Escape" && !crearCatalogo) onClose();
+      if (e.key === "Escape" && !crearCatalogo) solicitarCierre();
     }
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onClose, crearCatalogo]);
+  }, [solicitarCierre, crearCatalogo]);
 
   async function submit() {
     const errs: Record<string, string> = {};
@@ -174,7 +178,7 @@ export function AsignarPresentacionProductoModal({
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={solicitarCierre}
               aria-label="Cerrar"
               className="h-8 w-8 flex items-center justify-center text-vialto-steel hover:bg-vialto-mist text-xl leading-none"
             >
@@ -232,7 +236,7 @@ export function AsignarPresentacionProductoModal({
             <button
               type="button"
               disabled={saving}
-              onClick={onClose}
+              onClick={solicitarCierre}
               className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50"
             >
               Cancelar
@@ -250,6 +254,7 @@ export function AsignarPresentacionProductoModal({
         </div>
       </div>
 
+      {descarte.dialogo}
       {crearCatalogo && (
         <PresentacionFormModal
           modo="create"
@@ -263,6 +268,7 @@ export function AsignarPresentacionProductoModal({
             );
             setPresentacionId(p.id);
             setCrearCatalogo(false);
+            descarte.marcarModificado();
           }}
         />
       )}

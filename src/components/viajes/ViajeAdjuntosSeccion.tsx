@@ -9,12 +9,14 @@ import {
 import { CrudFieldLabel, CrudInput } from "@/components/crud/CrudFields";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { VisorFotos, type FotoVisor } from "@/components/ui/VisorFotos";
 import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
 import { adjuntosActivosViaje } from "@/lib/viajesAdjuntos";
 import type { Viaje, ViajeAdjunto } from "@/types/api";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 
 /** Mismo tope que valida el backend (`ViajesService.addAdjunto`). */
 const MAX_ADJUNTOS_VIAJE = 3;
@@ -55,6 +57,12 @@ export function ViajeAdjuntosSeccion({
   const [agregando, setAgregando] = useState(false);
   const [quitandoId, setQuitandoId] = useState<string | null>(null);
   const [confirmarQuitarId, setConfirmarQuitarId] = useState<string | null>(null);
+  const [visorUrl, setVisorUrl] = useState<string | null>(null);
+
+  // Las fotos se ven en el visor (pasando entre todas las del viaje); los documentos en pestaña nueva.
+  const fotos: FotoVisor[] = adjuntos
+    .filter((a) => a.mimeType?.startsWith("image/"))
+    .map((a) => ({ url: a.url, titulo: a.titulo }));
 
   const usados = adjuntos.reduce((acc, a) => acc + (a.bytes || 0), 0);
   const disponibles = MAX_BYTES_ADJUNTOS_VIAJE - usados;
@@ -128,7 +136,9 @@ export function ViajeAdjuntosSeccion({
                 <button
                   type="button"
                   onClick={() =>
-                    void abrirAdjuntoEnPestana({ url: a.url }, () => getToken(), a.titulo)
+                    esImagen
+                      ? setVisorUrl(a.url)
+                      : void abrirAdjuntoEnPestana({ url: a.url }, () => getToken(), a.titulo)
                   }
                   className="min-w-0 flex-1 text-left"
                 >
@@ -173,6 +183,14 @@ export function ViajeAdjuntosSeccion({
             );
           })}
         </ul>
+      )}
+
+      {visorUrl && (
+        <VisorFotos
+          fotos={fotos}
+          indiceInicial={Math.max(0, fotos.findIndex((f) => f.url === visorUrl))}
+          onClose={() => setVisorUrl(null)}
+        />
       )}
 
       {agregando && (
@@ -229,6 +247,7 @@ export function AgregarDocumentoViajeModal({
   const [titulo, setTitulo] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -258,13 +277,14 @@ export function AgregarDocumentoViajeModal({
   return (
     <ViewModalShell
       title="Agregar documento"
-      onClose={saving ? () => {} : onClose}
+      onClose={saving ? () => {} : descarte.solicitarCierre}
+      descarte={descarte}
       footer={
         <>
           <ErrorPieModal error={error} fieldErrors={fieldErrors} />
           <button
             type="button"
-            onClick={onClose}
+            onClick={descarte.solicitarCierre}
             disabled={saving}
             className={`${viewModalBtnGhost} disabled:opacity-50`}
           >

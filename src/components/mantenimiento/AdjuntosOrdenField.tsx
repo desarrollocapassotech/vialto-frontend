@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
-import { FileText, Paperclip, X } from "lucide-react";
+import { FileText, Image as ImageIcon, Paperclip, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { VisorFotos, type FotoVisor } from "@/components/ui/VisorFotos";
+import { esImagenAdjunto } from "@/lib/abrirAdjunto";
 import { apiJson } from "@/lib/api";
 import { isComprobanteFile } from "@/lib/comprobanteUpload";
 import { friendlyError } from "@/lib/friendlyError";
@@ -30,6 +32,12 @@ export function AdjuntosOrdenField({
   const inputRef = useRef<HTMLInputElement>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [visorUrl, setVisorUrl] = useState<string | null>(null);
+
+  // Las fotos se ven en el visor (pasando entre todas las de la orden); los PDF en pestaña nueva.
+  const fotos: FotoVisor[] = value
+    .filter((url) => esImagenAdjunto({ url }))
+    .map((url) => ({ url, titulo: nombreAdjunto(url) }));
 
   async function subir(files: FileList | null) {
     if (!files || files.length === 0 || !onChange) return;
@@ -72,15 +80,30 @@ export function AdjuntosOrdenField({
         <ul className="grid gap-1.5">
           {value.map((url) => (
             <li key={url} className="flex items-center gap-2 text-sm">
-              <FileText className="h-4 w-4 shrink-0 text-vialto-steel" strokeWidth={1.75} />
-              <a
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-                className="min-w-0 truncate text-vialto-charcoal underline decoration-black/20 hover:decoration-vialto-fire"
-              >
-                {nombreAdjunto(url)}
-              </a>
+              {esImagenAdjunto({ url }) ? (
+                <>
+                  <ImageIcon className="h-4 w-4 shrink-0 text-vialto-steel" strokeWidth={1.75} />
+                  <button
+                    type="button"
+                    onClick={() => setVisorUrl(url)}
+                    className="min-w-0 truncate text-left text-vialto-charcoal underline decoration-black/20 hover:decoration-vialto-fire"
+                  >
+                    {nombreAdjunto(url)}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4 shrink-0 text-vialto-steel" strokeWidth={1.75} />
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="min-w-0 truncate text-vialto-charcoal underline decoration-black/20 hover:decoration-vialto-fire"
+                  >
+                    {nombreAdjunto(url)}
+                  </a>
+                </>
+              )}
               {!readOnly && onChange && (
                 <button
                   type="button"
@@ -117,6 +140,13 @@ export function AdjuntosOrdenField({
         </div>
       )}
       {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+      {visorUrl && (
+        <VisorFotos
+          fotos={fotos}
+          indiceInicial={Math.max(0, fotos.findIndex((f) => f.url === visorUrl))}
+          onClose={() => setVisorUrl(null)}
+        />
+      )}
     </div>
   );
 }

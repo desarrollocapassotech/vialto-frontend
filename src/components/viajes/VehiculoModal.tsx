@@ -5,6 +5,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
 import { vehiculoCreatePayloadFromForm, type VehiculoFormState } from '@/lib/vehiculoForm';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 import type { Vehiculo } from '@/types/api';
 
 const TIPOS = ['camion', 'semirremolque', 'tractor', 'utilitario', 'otro'] as const;
@@ -41,6 +42,7 @@ export function VehiculoModal({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const { solicitarCierre, dialogo } = useConfirmarDescarte(onClose);
 
   function patch(p: Partial<VehiculoFormState>) {
     setForm((prev) => ({ ...prev, ...p }));
@@ -86,7 +88,7 @@ export function VehiculoModal({
           <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">Nuevo vehículo</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={solicitarCierre}
             className="h-8 w-8 flex items-center justify-center text-vialto-steel hover:bg-vialto-mist text-xl leading-none"
           >
             ×
@@ -141,7 +143,7 @@ export function VehiculoModal({
           <button
             type="button"
             disabled={saving}
-            onClick={onClose}
+            onClick={solicitarCierre}
             className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50"
           >
             Cancelar
@@ -157,6 +159,7 @@ export function VehiculoModal({
           </button>
         </div>
       </div>
+      {dialogo}
     </div>
   );
 }

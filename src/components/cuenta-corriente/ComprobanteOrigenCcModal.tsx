@@ -6,7 +6,7 @@ import {
   LiquidacionViewModal,
   type LiquidacionConTransportista,
 } from '@/components/liquidaciones/LiquidacionViewModal';
-import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
+import { useAbrirAdjunto } from '@/hooks/useAbrirAdjunto';
 import { ViewModalShell } from '@/components/ui/ViewModalShell';
 import { Loader2 } from 'lucide-react';
 import { apiFetch, apiJson } from '@/lib/api';
@@ -45,6 +45,7 @@ export function ComprobanteOrigenCcModal({
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
   const [factura, setFactura] = useState<Factura | null>(null);
   const [liquidacion, setLiquidacion] = useState<LiquidacionConTransportista | null>(null);
   // El host suele pasar una arrow nueva en cada render: no debe volver a disparar el fetch.
@@ -95,14 +96,16 @@ export function ComprobanteOrigenCcModal({
     }
   }
 
-  /** Adjunto guardado (comprobante o anulación manual) en pestaña nueva, abierta en el click. */
+  /** Adjunto guardado (comprobante o anulación manual): foto en el visor, documento en pestaña nueva. */
   function verAdjunto(url: string | null | undefined, titulo = 'Comprobante') {
     const u = url?.trim();
-    if (u) void abrirAdjuntoEnPestana({ url: u }, () => getToken(), titulo);
+    if (u) abrirAdjunto({ url: u }, titulo);
   }
 
   if (factura) {
     return (
+      <>
+      {visorAdjunto}
       <FacturaViewModal
         getToken={getToken}
         factura={factura}
@@ -117,11 +120,14 @@ export function ComprobanteOrigenCcModal({
             : undefined
         }
       />
+      </>
     );
   }
 
   if (liquidacion) {
     return (
+      <>
+      {visorAdjunto}
       <LiquidacionViewModal
         liq={liquidacion}
         ivaPct={liquidacion.ivaPct ?? undefined}
@@ -150,6 +156,7 @@ export function ComprobanteOrigenCcModal({
             : undefined
         }
       />
+      </>
     );
   }
 

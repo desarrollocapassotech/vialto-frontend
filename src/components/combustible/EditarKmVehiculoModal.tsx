@@ -4,6 +4,7 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 
 export function EditarKmVehiculoModal({
   tenantId,
@@ -24,6 +25,7 @@ export function EditarKmVehiculoModal({
   const { showToast } = useToast();
   const [km, setKm] = useState(String(kmActual));
   const [loading, setLoading] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
 
   const kmNumero = Number(km);
@@ -56,7 +58,6 @@ export function EditarKmVehiculoModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="editar-km-titulo"
-      onClick={() => !loading && onClose()}
     >
       <form
         className="w-full max-w-sm border border-black/15 bg-white p-6 shadow-xl"
@@ -87,7 +88,7 @@ export function EditarKmVehiculoModal({
           <ErrorPieModal error={error} />
           <button
             type="button"
-            onClick={onClose}
+            onClick={descarte.solicitarCierre}
             disabled={loading}
             className="inline-flex h-10 items-center px-4 border border-black/15 bg-white text-sm uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50"
           >
@@ -102,6 +103,7 @@ export function EditarKmVehiculoModal({
           </button>
         </div>
       </form>
+      {descarte.dialogo}
     </div>
   );
 }

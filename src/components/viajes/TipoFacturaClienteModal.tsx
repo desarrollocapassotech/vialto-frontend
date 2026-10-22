@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ARCA_CBTE_OVERRIDE_WARNING,
   condicionIvaLabel,
@@ -18,7 +18,6 @@ interface Props {
 }
 
 export function TipoFacturaClienteModal({ viaje, clienteAfacturar, onClose, onConfirm, busy = false }: Props) {
-  const overlayRef = useRef<HTMLDivElement>(null);
   const targetCliente = clienteAfacturar ?? viaje.cliente;
   const condicionIva = targetCliente?.condicionIva ?? null;
   const sugerido = facturaLetraFromCondicionIva(condicionIva);
@@ -35,10 +34,6 @@ export function TipoFacturaClienteModal({ viaje, clienteAfacturar, onClose, onCo
 
   return (
     <div
-      ref={overlayRef}
-      onClick={(e) => {
-        if (e.target === overlayRef.current && !busy) onClose();
-      }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     >
       <div

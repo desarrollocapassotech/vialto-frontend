@@ -86,7 +86,6 @@ export function MovimientoStockViewModal({
         </span>
       }
       onClose={onClose}
-      onOverlayClick={onClose}
       scrollBody
       footer={
         <div className="flex flex-wrap items-center justify-end gap-2">

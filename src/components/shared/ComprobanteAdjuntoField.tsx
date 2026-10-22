@@ -2,6 +2,7 @@ import { useId, useRef, useState, type ReactNode } from 'react';
 import { Upload } from 'lucide-react';
 import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
 import { isComprobanteFile } from '@/lib/comprobanteUpload';
+import { marcarModalModificado } from '@/lib/descarteModal';
 
 const LABEL =
   'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
@@ -45,6 +46,7 @@ export function ComprobanteAdjuntoField({
   }
 
   function handleSelect(next: File | null) {
+    marcarModalModificado();
     setLocalError(null);
     if (!next) {
       onFileChange(null);
@@ -66,6 +68,7 @@ export function ComprobanteAdjuntoField({
   }
 
   function handleQuitar() {
+    marcarModalModificado();
     setLocalError(null);
     setPreviewOpen(false);
     if (file) {

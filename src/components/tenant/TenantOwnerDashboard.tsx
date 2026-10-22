@@ -647,7 +647,6 @@ export function AlertsPanel({
         <div
           className={`${modalOverlayClass} lg:hidden`}
           role="presentation"
-          onClick={closePanel}
         >
           <div
             role="dialog"
@@ -870,7 +869,6 @@ export function TenantOwnerDashboard({
           <div
             className={modalOverlayClass}
             role="presentation"
-            onClick={() => setPeriodModalOpen(false)}
           >
             <div
               role="dialog"

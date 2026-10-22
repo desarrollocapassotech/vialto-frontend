@@ -20,7 +20,7 @@ export function generarEstadoCuentaExcel(
   const rows = data.movimientos.map((m) => {
     const row: Record<string, string | number> = {
       Fecha: fmtFecha(m.fecha),
-      Concepto: m.concepto,
+      Tipo: m.concepto,
     };
     row.Comprobante = m.numeroComprobante ?? '';
     row.Debe = esDebeCc(m) ? m.importe : '';

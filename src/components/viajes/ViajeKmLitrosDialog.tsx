@@ -1,4 +1,5 @@
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 
 type ViajeKmLitrosDialogProps = {
   open: boolean;
@@ -25,6 +26,7 @@ export function ViajeKmLitrosDialog({
   onConfirm,
   onCancel,
 }: ViajeKmLitrosDialogProps) {
+  const descarte = useConfirmarDescarte(onCancel, open);
   if (!open) return null;
 
   const sinValoresKmLitros =
@@ -83,7 +85,7 @@ export function ViajeKmLitrosDialog({
           <button
             type="button"
             disabled={busy}
-            onClick={onCancel}
+            onClick={descarte.solicitarCierre}
             className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
           >
             Cancelar
@@ -98,6 +100,7 @@ export function ViajeKmLitrosDialog({
           </button>
         </div>
       </div>
+      {descarte.dialogo}
     </div>
   );
 }

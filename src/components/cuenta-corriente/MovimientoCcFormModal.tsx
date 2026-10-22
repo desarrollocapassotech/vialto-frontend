@@ -19,11 +19,20 @@ import {
 } from '@/lib/cuentaCorriente';
 import { fmtDateUtc } from '@/lib/fmtDateUtc';
 import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
-import { computeFacturaTotalesFromBases } from '@/lib/facturaTotales';
+import {
+  FacturaLineasEditor,
+  toFacturaLineasPayload,
+  validateFacturaLineasDraft,
+  type FacturaLineaDraft,
+} from '@/components/facturacion/FacturaLineasEditor';
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
+
+/** IVA con el que arranca cada línea de una venta/compra, igual que en Facturas. */
+const IVA_PCT_DEFAULT = 21;
 
 type Props = {
   tipoContraparte: TipoContraparte;
@@ -72,16 +81,21 @@ export function MovimientoCcFormModal({
   onCreated,
 }: Props) {
   const { getToken } = useAuth();
-  const [tipo, setTipo] = useState<TipoMovimientoCc>(permiteCargo ? tipoInicial : 'pago');
-  const [concepto, setConcepto] = useState('');
+  // Fijo según el botón que abrió el modal (Nueva venta/compra o Registrar cobro/pago).
+  const tipo: TipoMovimientoCc = permiteCargo ? tipoInicial : 'pago';
   const [importeStr, setImporteStr] = useState('');
-  const [ivaPctStr, setIvaPctStr] = useState('');
+  // Venta/compra: líneas como en una factura, cada una con su importe neto e IVA.
+  const [lineas, setLineas] = useState<FacturaLineaDraft[]>([
+    { descripcion: '', importe: 0, importeStr: '', ivaPct: IVA_PCT_DEFAULT },
+  ]);
+  const [lineasIncompletas, setLineasIncompletas] = useState<number[]>([]);
   const [moneda, setMoneda] = useState<ViajeMonedaCodigo>('ARS');
   const [fecha, setFecha] = useState(() => hoyArgentinaIso());
   const [fechaVencimiento, setFechaVencimiento] = useState('');
   const [numeroComprobante, setNumeroComprobante] = useState('');
   const [formaPago, setFormaPago] = useState('');
   const [saving, setSaving] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
 
   const esCargo = tipo === 'cargo';
@@ -90,17 +104,35 @@ export function MovimientoCcFormModal({
   // Cobro/pago: a qué facturas/liquidaciones imputarlo. Vacío = "No imputar" (queda a cuenta).
   const [imputarA, setImputarA] = useState<string[]>([]);
   const listaRef = useRef<HTMLDivElement>(null);
-  const opcionesImputar = [...cargosPendientes].sort(porAntiguedad);
+  // Solo los de la moneda del cobro/pago: no se imputa entre monedas.
+  const opcionesImputar = cargosPendientes.filter((c) => c.moneda === moneda).sort(porAntiguedad);
   const elegidos = opcionesImputar.filter((c) => imputarA.includes(c.id));
   const totalElegido = elegidos.reduce((s, c) => s + (c.pendiente ?? c.importe), 0);
+  // Filtro de la lista por lo que se ve (concepto, comprobante, fecha, importes). Lo elegido
+  // se conserva aunque quede oculto por el filtro.
+  const [filtroCargos, setFiltroCargos] = useState('');
+  const opcionesFiltradas = (() => {
+    const q = filtroCargos.trim().toLowerCase();
+    if (!q) return opcionesImputar;
+    return opcionesImputar.filter((c) =>
+      [
+        c.concepto,
+        c.numeroComprobante ?? '',
+        fmtDateUtc(c.fecha),
+        formatCurrencyArFromNumber(c.pendiente ?? c.importe),
+        formatCurrencyArFromNumber(c.importe),
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(q),
+    );
+  })();
 
   /** Recalcula el importe a cobrar con la suma de lo elegido (después se puede editar). */
   function cambiarImputacion(ids: string[]) {
     setImputarA(ids);
     const nuevos = opcionesImputar.filter((c) => ids.includes(c.id));
     if (nuevos.length === 0) return;
-    // Las facturas elegidas fijan la moneda del cobro (no se mezclan monedas).
-    setMoneda(nuevos[0].moneda as ViajeMonedaCodigo);
     const suma = nuevos.reduce((s, c) => s + (c.pendiente ?? c.importe), 0);
     setImporteStr(formatCurrencyArFromNumber(suma));
   }
@@ -109,25 +141,29 @@ export function MovimientoCcFormModal({
     cambiarImputacion(imputarA.includes(id) ? imputarA.filter((x) => x !== id) : [...imputarA, id]);
   }
 
-  // IVA solo en ventas/compras, mismo campo que Facturas: vacío = sin IVA. El importe
-  // cargado es sin IVA y se registra por el total, calculado igual que una factura.
-  const ivaPctNum = ivaPctStr.trim() !== '' ? Number(ivaPctStr) : 0;
-  const ivaPct = esCargo && Number.isFinite(ivaPctNum) && ivaPctNum > 0 ? ivaPctNum : null;
-  const importeNeto = parseCurrencyAr(importeStr) ?? 0;
-  const totales =
-    ivaPct != null && importeNeto > 0
-      ? computeFacturaTotalesFromBases([{ importe: importeNeto, ivaPct }])
-      : null;
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const importe = parseCurrencyAr(importeStr);
-    if (!importe || importe <= 0) {
-      setError('Ingresá un importe mayor a 0.');
+    // Venta/compra: el total (neto + IVA de cada línea) lo calcula el backend igual que el pie del editor.
+    const importe = esCargo ? undefined : parseCurrencyAr(importeStr);
+    // Todo movimiento manual (venta, compra, cobro, pago) se identifica por su comprobante.
+    if (!numeroComprobante.trim()) {
+      setError('Ingresá el número de comprobante.');
       return;
     }
-    if (esCargo && (!Number.isFinite(ivaPctNum) || ivaPctNum < 0 || ivaPctNum > 100)) {
-      setError('El IVA tiene que ser un porcentaje entre 0 y 100.');
+    if (esCargo) {
+      const v = validateFacturaLineasDraft(lineas);
+      if (!v.ok) {
+        setLineasIncompletas(v.indices);
+        setError(v.message);
+        return;
+      }
+      setLineasIncompletas([]);
+      if (lineas.some((l) => (l.ivaPct ?? IVA_PCT_DEFAULT) < 0 || (l.ivaPct ?? IVA_PCT_DEFAULT) > 100)) {
+        setError('El IVA tiene que ser un porcentaje entre 0 y 100.');
+        return;
+      }
+    } else if (!importe || importe <= 0) {
+      setError('Ingresá un importe mayor a 0.');
       return;
     }
     setSaving(true);
@@ -138,11 +174,16 @@ export function MovimientoCcFormModal({
           ? { clienteId: contraparteId }
           : { proveedorId: contraparteId }),
         tipo,
-        // El cobro/pago no lleva concepto libre: el backend pone "COBRO"/"PAGO".
-        concepto: esCargo ? concepto.trim() || undefined : undefined,
+        // Sin `concepto`: el backend lo pone solo (VENTA/COMPRA/COBRO/PAGO).
         imputarACargoIds: !esCargo && imputarA.length > 0 ? imputarA : undefined,
         importe,
-        ivaPct: ivaPct ?? undefined,
+        lineas: esCargo
+          ? toFacturaLineasPayload(lineas).map((l) => ({
+              descripcion: l.descripcion,
+              importe: l.importe,
+              ivaPct: l.ivaPct ?? IVA_PCT_DEFAULT,
+            }))
+          : undefined,
         moneda,
         fecha,
         fechaVencimiento: fechaVencimiento || undefined,
@@ -158,11 +199,11 @@ export function MovimientoCcFormModal({
     }
   }
 
-  // Va junto a la moneda (cobro/pago) o junto al vencimiento (venta/compra).
+  // Va junto al medio de cobro (cobro/pago) o junto al vencimiento (venta/compra).
   const campoFecha = (
     <div>
       <label className={labelClass} htmlFor="cc-fecha">
-        Fecha
+        {esCargo ? 'Emisión' : 'Fecha de emisión'}
       </label>
       <input
         id="cc-fecha"
@@ -186,14 +227,15 @@ export function MovimientoCcFormModal({
             ? 'Registrar cobro'
             : 'Registrar pago'
       } — ${contraparteNombre}`}
-      onClose={onClose}
-      // Cobro/pago: más ancho y alto para la lista de facturas a imputar.
-      maxWidthClass={esCargo ? undefined : 'sm:max-w-3xl'}
-      scrollBody={!esCargo}
+      onClose={descarte.solicitarCierre}
+      descarte={descarte}
+      // Más ancho y alto: líneas de la venta/compra o lista de facturas a imputar del cobro/pago.
+      maxWidthClass={esCargo ? 'sm:max-w-5xl' : 'sm:max-w-3xl'}
+      scrollBody
       footer={
         <>
           <ErrorPieModal error={error} />
-          <button type="button" className={viewModalBtnGhost} onClick={onClose}>
+          <button type="button" className={viewModalBtnGhost} onClick={descarte.solicitarCierre}>
             Cancelar
           </button>
           <button
@@ -208,52 +250,128 @@ export function MovimientoCcFormModal({
       }
     >
       <form id="movimiento-cc-form" onSubmit={handleSubmit} className="space-y-4">
-        {permiteCargo && (
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setTipo('cargo')}
-            className={`flex-1 h-10 text-sm uppercase tracking-wider border ${
-              esCargo
-                ? 'bg-vialto-charcoal text-white border-vialto-charcoal'
-                : 'border-black/20 text-vialto-steel hover:bg-vialto-mist'
-            }`}
-          >
-            {esCliente ? 'Venta' : 'Compra'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setTipo('pago')}
-            className={`flex-1 h-10 text-sm uppercase tracking-wider border ${
-              !esCargo
-                ? 'bg-vialto-charcoal text-white border-vialto-charcoal'
-                : 'border-black/20 text-vialto-steel hover:bg-vialto-mist'
-            }`}
-          >
-            {esCliente ? 'Cobro' : 'Pago'}
-          </button>
-        </div>
-        )}
-
+        {/* Venta/compra: número de comprobante y moneda primero, debajo emisión y vencimiento. */}
         {esCargo ? (
-          <div>
-            <label className={labelClass} htmlFor="cc-concepto">
-              Concepto
-            </label>
-            <input
-              id="cc-concepto"
-              type="text"
-              className={inputClass}
-              value={concepto}
-              onChange={(e) => setConcepto(e.target.value)}
-              placeholder="Ej. Factura 0001-00001234"
-            />
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass} htmlFor="cc-comprobante">
+                  Número de comprobante <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="cc-comprobante"
+                  type="text"
+                  maxLength={64}
+                  className={inputClass}
+                  value={numeroComprobante}
+                  onChange={(e) => setNumeroComprobante(e.target.value)}
+                  placeholder="Ej. 0001-00001234"
+                  required
+                />
+              </div>
+              <div>
+                <label className={labelClass} htmlFor="cc-moneda">
+                  Moneda
+                </label>
+                <MonedaSelect id="cc-moneda" value={moneda} onChange={setMoneda} className={inputClass} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {campoFecha}
+              <div>
+                <label className={labelClass} htmlFor="cc-vencimiento">
+                  Vencimiento
+                </label>
+                <input
+                  id="cc-vencimiento"
+                  type="date"
+                  className={inputClass}
+                  value={fechaVencimiento}
+                  onChange={(e) => setFechaVencimiento(e.target.value)}
+                />
+              </div>
+            </div>
+          </>
         ) : (
+          <>
+          {/* Cobro/pago: comprobante, importe y moneda arriba; debajo emisión y medio de cobro. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem]">
+            {/* Comprobante propio del cobro/pago (recibo, orden de pago): es lo que muestra la grilla. */}
+            <div>
+              <label className={labelClass} htmlFor="cc-comprobante-pago">
+                Número de comprobante <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="cc-comprobante-pago"
+                type="text"
+                maxLength={64}
+                className={inputClass}
+                value={numeroComprobante}
+                onChange={(e) => setNumeroComprobante(e.target.value)}
+                placeholder={esCliente ? 'Ej. Recibo 0001-00000123' : 'Ej. Orden de pago 0001-00000123'}
+                required
+              />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="cc-importe">
+                Importe
+              </label>
+              <input
+                id="cc-importe"
+                type="text"
+                inputMode="decimal"
+                className={inputClass}
+                value={importeStr}
+                onChange={(e) => setImporteStr(maskCurrencyArInput(e.target.value))}
+                placeholder="0,00"
+                required
+              />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="cc-moneda">
+                Moneda
+              </label>
+              {/* La moneda filtra los comprobantes a imputar: al cambiarla se desmarcan los elegidos. */}
+              <MonedaSelect
+                id="cc-moneda"
+                value={moneda}
+                onChange={(m) => {
+                  setMoneda(m);
+                  setImputarA([]);
+                }}
+                className={inputClass}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {campoFecha}
+            <div>
+              <label className={labelClass} htmlFor="cc-forma-pago">
+                Medio de {esCliente ? 'cobro' : 'pago'} / referencia
+              </label>
+              <input
+                id="cc-forma-pago"
+                type="text"
+                className={inputClass}
+                value={formaPago}
+                onChange={(e) => setFormaPago(e.target.value)}
+                placeholder="Ej. Transferencia, cheque N° 123"
+              />
+            </div>
+          </div>
           <fieldset>
-            <legend className={labelClass}>
-              {esCliente ? 'Facturas que cobra' : 'Liquidaciones que paga'}
-            </legend>
+            <legend className={labelClass}>Comprobantes sin imputar</legend>
+            {opcionesImputar.length > 0 && (
+              <input
+                type="search"
+                data-descarte-ignorar
+                className={`${inputClass} mb-2`}
+                value={filtroCargos}
+                onChange={(e) => setFiltroCargos(e.target.value)}
+                placeholder="Buscar por comprobante, fecha o importe…"
+                aria-label={esCliente ? 'Filtrar facturas' : 'Filtrar liquidaciones'}
+              />
+            )}
             <TooltipsDelegados contenedorRef={listaRef} />
             <div
               ref={listaRef}
@@ -270,31 +388,36 @@ export function MovimientoCcFormModal({
               </label>
               {opcionesImputar.length === 0 ? (
                 <p className="px-2 py-1.5 text-xs text-vialto-steel">
-                  No hay {esCliente ? 'facturas' : 'liquidaciones'} con saldo pendiente.
+                  No hay comprobantes en {moneda} con saldo pendiente.
                 </p>
+              ) : opcionesFiltradas.length === 0 ? (
+                <p className="px-2 py-1.5 text-xs text-vialto-steel">Sin coincidencias.</p>
               ) : (
-                opcionesImputar.map((c) => {
+                opcionesFiltradas.map((c) => {
                   const checked = imputarA.includes(c.id);
-                  // Una vez elegida una, solo se ofrecen las de su misma moneda.
-                  const otraMoneda = elegidos.length > 0 && c.moneda !== elegidos[0].moneda;
                   const pendiente = c.pendiente ?? c.importe;
                   return (
                     <label
                       key={c.id}
-                      className={`flex items-center gap-2 px-2 py-1.5 ${
-                        otraMoneda ? 'cursor-not-allowed opacity-40' : 'cursor-pointer hover:bg-vialto-mist'
-                      }`}
+                      className="flex cursor-pointer items-center gap-2 px-2 py-1.5 hover:bg-vialto-mist"
                     >
                       <input
                         type="checkbox"
                         checked={checked}
-                        disabled={otraMoneda}
                         onChange={() => toggleCargo(c.id)}
                       />
+                      {/* Primero el número de comprobante; concepto y fecha como dato secundario. */}
                       <span className="min-w-0 flex-1 truncate">
-                        {c.concepto}
-                        {c.numeroComprobante ? ` ${c.numeroComprobante}` : ''}
-                        <span className="ml-1 text-xs text-vialto-steel">{fmtDateUtc(c.fecha)}</span>
+                        <span
+                          className={
+                            c.numeroComprobante?.trim() ? 'font-medium' : 'italic text-vialto-steel'
+                          }
+                        >
+                          {c.numeroComprobante?.trim() || 'Sin comprobante'}
+                        </span>
+                        <span className="ml-2 text-xs text-vialto-steel">
+                          {c.concepto} · {fmtDateUtc(c.fecha)}
+                        </span>
                       </span>
                       <span className="shrink-0 text-right tabular-nums">
                         $ {formatCurrencyArFromNumber(pendiente)} {c.moneda}
@@ -330,157 +453,25 @@ export function MovimientoCcFormModal({
               </p>
             )}
           </fieldset>
+          </>
         )}
 
-        {/* Cobro/pago: importe, moneda y fecha en una fila; el importe toma el ancho que sobra. */}
-        <div
-          className={
-            esCargo
-              ? 'grid grid-cols-2 gap-3'
-              : 'grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_10.5rem]'
-          }
-        >
-          <div>
-            <label className={labelClass} htmlFor="cc-importe">
-              Importe
-            </label>
-            <input
-              id="cc-importe"
-              type="text"
-              inputMode="decimal"
-              className={inputClass}
-              value={importeStr}
-              onChange={(e) => setImporteStr(maskCurrencyArInput(e.target.value))}
-              placeholder="0,00"
-              required
-            />
-          </div>
-          <div>
-            <label className={labelClass} htmlFor="cc-moneda">
-              Moneda
-            </label>
-            {/* Con facturas elegidas, la moneda es la de ellas. */}
-            <MonedaSelect
-              id="cc-moneda"
-              value={moneda}
-              onChange={setMoneda}
-              className={inputClass}
-              disabled={!esCargo && elegidos.length > 0}
-            />
-          </div>
-          {!esCargo && campoFecha}
-        </div>
-
+        {/* Venta/compra: el importe sale de las líneas (total = neto + IVA de cada una). */}
         {esCargo && (
-          <div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass} htmlFor="cc-iva">
-                  IVA (%)
-                </label>
-                <input
-                  id="cc-iva"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  className={inputClass}
-                  value={ivaPctStr}
-                  onChange={(e) => setIvaPctStr(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
-              {totales && (
-                <div>
-                  <label className={labelClass} htmlFor="cc-total">
-                    Total con IVA
-                  </label>
-                  <input
-                    id="cc-total"
-                    type="text"
-                    className={`${inputClass} bg-vialto-mist tabular-nums`}
-                    value={`${formatCurrencyArFromNumber(totales.total)} ${moneda}`}
-                    readOnly
-                    tabIndex={-1}
-                  />
-                </div>
-              )}
-            </div>
-            {totales && (
-              <p className="mt-1 text-xs text-vialto-steel tabular-nums">
-                {formatCurrencyArFromNumber(totales.neto)} + IVA{' '}
-                {formatCurrencyArFromNumber(totales.iva)} = {formatCurrencyArFromNumber(totales.total)}{' '}
-                {moneda}. Se registra por el total.
-              </p>
-            )}
-          </div>
-        )}
-
-        {esCargo && (
-          <div className="grid grid-cols-2 gap-3">
-            {campoFecha}
-            <div>
-              <label className={labelClass} htmlFor="cc-vencimiento">
-                Vencimiento
-              </label>
-              <input
-                id="cc-vencimiento"
-                type="date"
-                className={inputClass}
-                value={fechaVencimiento}
-                onChange={(e) => setFechaVencimiento(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-
-        {esCargo ? (
-          <div>
-            <label className={labelClass} htmlFor="cc-comprobante">
-              Número de comprobante
-            </label>
-            <input
-              id="cc-comprobante"
-              type="text"
-              className={inputClass}
-              value={numeroComprobante}
-              onChange={(e) => setNumeroComprobante(e.target.value)}
-              placeholder="Si no factura desde Vialto, el número de tu comprobante externo"
-            />
-          </div>
-        ) : (
-          <div className={esCliente ? '' : 'grid grid-cols-1 gap-3 sm:grid-cols-2'}>
-            {/* Pago a proveedor: número del comprobante del pago (orden de pago, recibo). */}
-            {!esCliente && (
-              <div>
-                <label className={labelClass} htmlFor="cc-comprobante-pago">
-                  Número de comprobante
-                </label>
-                <input
-                  id="cc-comprobante-pago"
-                  type="text"
-                  maxLength={64}
-                  className={inputClass}
-                  value={numeroComprobante}
-                  onChange={(e) => setNumeroComprobante(e.target.value)}
-                  placeholder="Ej. Orden de pago 0001-00000123"
-                />
-              </div>
-            )}
-            <div>
-              <label className={labelClass} htmlFor="cc-forma-pago">
-                Medio de {esCliente ? 'cobro' : 'pago'} / referencia
-              </label>
-              <input
-                id="cc-forma-pago"
-                type="text"
-                className={inputClass}
-                value={formaPago}
-                onChange={(e) => setFormaPago(e.target.value)}
-                placeholder="Ej. Transferencia, cheque N° 123"
-              />
-            </div>
-          </div>
+          <FacturaLineasEditor
+            lineas={lineas}
+            onChange={(next) => {
+              setLineas(next);
+              setLineasIncompletas([]);
+              setError(null);
+            }}
+            ivaPctDefault={IVA_PCT_DEFAULT}
+            incompleteIndices={lineasIncompletas}
+            agregarAbajo
+            totalesALaDerecha
+            labelImporte="Importe"
+            mostrarSubtotal
+          />
         )}
 
       </form>

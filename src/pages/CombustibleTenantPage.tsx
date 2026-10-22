@@ -10,10 +10,16 @@ import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { AccionesFila } from "@/components/ui/AccionesFila";
 import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
-import { Eye, Trash2 } from "lucide-react";
+import { ChevronDown, Eye, Fuel, Trash2, UserRoundCog } from "lucide-react";
+import {
+  SelectorOpcionesSheet,
+  selectorTriggerClass,
+  type SelectorOpcion,
+} from "@/components/ui/SelectorOpcionesSheet";
 import { CargaCombustibleCreateModal } from "@/components/combustible/CargaCombustibleCreateModal";
 import { CargaCombustibleViewModal } from "@/components/combustible/CargaCombustibleViewModal";
 import { AsignacionVehiculoSection } from "@/components/combustible/AsignacionVehiculoSection";
+import { motivoSospechaLabel } from "@/components/combustible/SospechaBadge";
 import { CombustiblesOrdenamientoMenu } from "@/components/combustible/CombustibleOrdenamientoMenu";
 import {
   COMBUSTIBLE_SORT_DEFAULT,
@@ -42,10 +48,27 @@ import type {
   Vehiculo,
 } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import {
+  FiltroCargasSospechosas,
+  PERIODOS_SOSPECHOSAS,
+  type ConteoSospechosas,
+  type PeriodoSospechosas,
+} from "@/components/combustible/FiltroCargasSospechosas";
+
+type CombustibleTab = "cargas" | "asignaciones";
+
+const TABS: { id: CombustibleTab; label: string; icon: typeof Fuel }[] = [
+  { id: "cargas", label: "Cargas", icon: Fuel },
+  { id: "asignaciones", label: "Asignación de vehículos", icon: UserRoundCog },
+];
+
+const TAB_OPCIONES: SelectorOpcion[] = TABS.map((t) => ({ id: t.id, label: t.label }));
 
 type CombustibleListResponse = {
   cargas: CargaCombustible[];
   total: number;
+  /** Cargas sospechosas por período con el resto de los filtros: contadores del filtro rápido. */
+  sospechosas?: ConteoSospechosas;
   page: number;
   limit: number;
 };
@@ -126,12 +149,18 @@ export function CombustibleTenantPage({
     return isOrgMember({ orgRole, publicMetadata: user?.publicMetadata });
   }, [orgRole, user?.publicMetadata]);
 
-  const [tab, setTab] = useState<"cargas" | "asignaciones">("cargas");
+  const [tab, setTab] = useState<CombustibleTab>("cargas");
+  const [tabSheetOpen, setTabSheetOpen] = useState(false);
+  const tabActivaDef = TABS.find((t) => t.id === tab);
+  const TabActivaIcon = tabActivaDef?.icon;
   const [limpiarFiltrosSlot, setLimpiarFiltrosSlot] =
     useState<HTMLDivElement | null>(null);
 
   const [rows, setRows] = useState<CargaCombustible[] | null>(null);
   const [total, setTotal] = useState(0);
+  const [conteoSospechosas, setConteoSospechosas] = useState<ConteoSospechosas | undefined>(
+    undefined,
+  );
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [error, setError] = useState<string | null>(null);
@@ -161,6 +190,12 @@ export function CombustibleTenantPage({
   const [choferId, setChoferId] = useState(initialChoferId);
   const [estacion, setEstacion] = useState(initialEstacion);
   const [formaPago, setFormaPago] = useState(initialFormaPago);
+  // Filtro rápido "Cargas sospechosas" por período. Va aparte de los filtros por columna,
+  // como los filtros rápidos de Viajes: "Limpiar filtros" no lo toca.
+  const [periodoSospechosas, setPeriodoSospechosas] = useState<PeriodoSospechosas | "">(
+    () =>
+      PERIODOS_SOSPECHOSAS.find((p) => p.id === searchParams.get("sospechosas"))?.id ?? "",
+  );
   const [sortBy, setSortBy] = useState<CombustibleSortField>(initialSortBy);
   const [sortDir, setSortDir] = useState<CombustibleSortDir>(initialSortDir);
 
@@ -193,6 +228,7 @@ export function CombustibleTenantPage({
       setChoferId("");
       setEstacion("");
       setFormaPago("");
+      setPeriodoSospechosas("");
       setRows(null);
       setError(null);
     }
@@ -220,6 +256,8 @@ export function CombustibleTenantPage({
         else qs.delete("estacion");
         if (formaPago) qs.set("formaPago", formaPago);
         else qs.delete("formaPago");
+        if (periodoSospechosas) qs.set("sospechosas", periodoSospechosas);
+        else qs.delete("sospechosas");
         appendCombustibleSortQuery(qs, sortBy, sortDir);
         return qs;
       },
@@ -232,6 +270,7 @@ export function CombustibleTenantPage({
     choferId,
     estacion,
     formaPago,
+    periodoSospechosas,
     sortBy,
     sortDir,
     setSearchParams,
@@ -286,6 +325,7 @@ export function CombustibleTenantPage({
     if (choferId) qs.set("choferId", choferId);
     if (estacion) qs.set("estacion", estacion);
     if (formaPago) qs.set("formaPago", formaPago);
+    if (periodoSospechosas) qs.set("sospechoso", periodoSospechosas);
     appendCombustibleSortQuery(qs, sortBy, sortDir);
     return qs;
   }
@@ -354,6 +394,7 @@ export function CombustibleTenantPage({
         if (!cancelled) {
           setRows(data.cargas);
           setTotal(data.total);
+          setConteoSospechosas(data.sospechosas);
           setError(null);
         }
       } catch (e) {
@@ -379,6 +420,7 @@ export function CombustibleTenantPage({
     choferId,
     estacion,
     formaPago,
+    periodoSospechosas,
     sortBy,
     sortDir,
     reloadKey,
@@ -437,6 +479,7 @@ export function CombustibleTenantPage({
     choferId,
     estacion,
     formaPago,
+    periodoSospechosas,
     getToken,
   ]);
 
@@ -580,9 +623,9 @@ export function CombustibleTenantPage({
         cell: (r) =>
           r.sospechoso ? (
             <span
-              title={r.motivoSospecha ?? "Carga marcada como sospechosa"}
+              title={motivoSospechaLabel(r.motivoSospecha)}
               className="text-vialto-fire cursor-help"
-              aria-label="Carga sospechosa"
+              aria-label={motivoSospechaLabel(r.motivoSospecha)}
             >
               ⚠
             </span>
@@ -633,7 +676,7 @@ export function CombustibleTenantPage({
 
   return (
     <div className="w-full">
-      {/* Título + pestañas a la izquierda; acciones de "Cargas" a la derecha, en la misma línea. */}
+      {/* Título a la izquierda; acciones de "Cargas" a la derecha, en la misma línea. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         {!embeddedInSuperadmin && (
           <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
@@ -641,33 +684,17 @@ export function CombustibleTenantPage({
           </h1>
         )}
 
-        <div
-          className="flex flex-wrap gap-2"
-          role="tablist"
-          aria-label="Vista de combustible"
-        >
-          {(
-            [
-              { id: "cargas", label: "Cargas" },
-              { id: "asignaciones", label: "Asignación de vehículos" },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
-              className={`inline-flex items-center gap-1.5 rounded border px-3 py-1.5 text-xs font-[family-name:var(--font-ui)] uppercase tracking-wider transition-colors ${
-                tab === t.id
-                  ? "border-vialto-fire bg-vialto-charcoal text-vialto-fire"
-                  : "border-vialto-steel/40 bg-white text-vialto-steel hover:border-vialto-fire/50"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {/* Filtro rápido de cargas sospechosas: el embudo palpita si hay alguna este mes. */}
+        {tab === "cargas" && activeTenantId && (
+          <FiltroCargasSospechosas
+            value={periodoSospechosas}
+            conteos={conteoSospechosas}
+            onChange={(v) => {
+              setPeriodoSospechosas(v);
+              resetPage();
+            }}
+          />
+        )}
         {/* La pestaña Asignación de vehículos portalea acá su "Limpiar filtros". */}
         <div ref={setLimpiarFiltrosSlot} className="empty:hidden" />
         {tab === "cargas" && activeTenantId && hayFiltros && (
@@ -786,6 +813,73 @@ export function CombustibleTenantPage({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Pestañas con el mismo estilo que Mantenimiento: subrayado en desktop, selector en mobile. */}
+      <div className="mt-6 border-b border-black/15">
+        <div className="pb-3 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setTabSheetOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={tabSheetOpen}
+            className={selectorTriggerClass}
+          >
+            <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+              Sección
+            </span>
+            <span className="flex min-w-0 flex-1 items-center justify-end gap-2">
+              {TabActivaIcon && (
+                <TabActivaIcon
+                  className="h-4 w-4 shrink-0 text-vialto-steel"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+              )}
+              <span className="truncate font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-vialto-charcoal">
+                {tabActivaDef?.label}
+              </span>
+              <ChevronDown
+                className="h-4 w-4 shrink-0 text-vialto-steel"
+                strokeWidth={2}
+                aria-hidden
+              />
+            </span>
+          </button>
+          <SelectorOpcionesSheet
+            open={tabSheetOpen}
+            onClose={() => setTabSheetOpen(false)}
+            title="Elegir sección"
+            options={TAB_OPCIONES}
+            activeId={tab}
+            onSelect={(id) => {
+              setTab(id as CombustibleTab);
+              setTabSheetOpen(false);
+            }}
+          />
+        </div>
+
+        <nav
+          className="-mb-px hidden gap-1 overflow-x-auto lg:flex"
+          aria-label="Secciones de combustible"
+        >
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={[
+                "flex shrink-0 whitespace-nowrap items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
+                tab === t.id
+                  ? "border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal"
+                  : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
+              ].join(" ")}
+            >
+              <t.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+              {t.label}
+            </button>
+          ))}
+        </nav>
       </div>
 
       {tab === "asignaciones" && (
@@ -973,6 +1067,7 @@ export function CombustibleTenantPage({
             columns={columns}
             rows={!activeTenantId || error ? [] : rows}
             rowKey={(r) => r.id}
+            onRowClick={(r) => setViewTargetId(r.id)}
             emptyMessage={
               !activeTenantId
                 ? embeddedInSuperadmin
@@ -1006,7 +1101,6 @@ export function CombustibleTenantPage({
               role="dialog"
               aria-modal="true"
               aria-labelledby="confirmar-eliminar-titulo"
-              onClick={() => !deleting && setDeleteTarget(null)}
             >
               <div
                 className="w-full max-w-md border border-black/15 bg-white p-6 shadow-xl"

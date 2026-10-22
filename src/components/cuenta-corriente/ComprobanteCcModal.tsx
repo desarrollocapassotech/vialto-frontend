@@ -11,6 +11,7 @@ import { actualizarComprobanteMovimiento, type MovimientoCc } from '@/lib/cuenta
 import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
 import { ComprobanteAdjuntoField } from '@/components/shared/ComprobanteAdjuntoField';
 import { uploadComprobante } from '@/lib/comprobanteUpload';
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
@@ -24,8 +25,8 @@ type Props = {
 /**
  * Carga o corrige el N° de comprobante y el vencimiento de un movimiento: una factura de
  * cliente (se guarda en la factura; el número solo sin ARCA), la factura del proveedor en
- * una liquidación (el número solo sin CVLP; se guarda en la liquidación) o una
- * venta/compra manual.
+ * una liquidación (el número solo sin CVLP; se guarda en la liquidación), una
+ * venta/compra manual o un cobro/pago manual (su recibo / orden de pago).
  */
 export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
   const { getToken } = useAuth();
@@ -34,6 +35,7 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
   const [numero, setNumero] = useState(movimiento.numeroComprobante ?? '');
   const [vencimiento, setVencimiento] = useState(fechaDiaYmd(movimiento.fechaVencimiento) ?? '');
   const [saving, setSaving] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
   const esLiquidacion = movimiento.origen === 'liquidacion';
   const esFactura = movimiento.origen === 'factura';
@@ -82,11 +84,12 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
   return (
     <ViewModalShell
       title={`Comprobante — ${movimiento.concepto}`}
-      onClose={onClose}
+      onClose={descarte.solicitarCierre}
+      descarte={descarte}
       footer={
         <>
           <ErrorPieModal error={error} />
-          <button type="button" className={viewModalBtnGhost} onClick={onClose}>
+          <button type="button" className={viewModalBtnGhost} onClick={descarte.solicitarCierre}>
             Cancelar
           </button>
           <button
@@ -119,7 +122,7 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
                 value={numero}
                 onChange={(e) => setNumero(e.target.value)}
                 placeholder="Ej. 0001-00001234"
-                required={esFactura}
+                required={esFactura || movimiento.origen === 'manual'}
                 autoFocus
               />
               {esLiquidacion && (

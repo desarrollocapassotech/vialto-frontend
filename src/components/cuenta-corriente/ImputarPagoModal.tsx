@@ -17,6 +17,9 @@ import {
   type MovimientoCc,
 } from '@/lib/cuentaCorriente';
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
+import { useToast } from '@/lib/toast';
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
@@ -37,20 +40,34 @@ function disponiblePago(p: MovimientoCc): number {
   return p.pendiente ?? p.importe;
 }
 
+/** Comprobante del cobro/pago (recibo, orden de pago); los viejos pueden no tenerlo. */
+function comprobantePago(p: MovimientoCc): string {
+  return p.numeroComprobante?.trim() || 'Sin comprobante';
+}
+
 function etiquetaPago(p: MovimientoCc): string {
   const disponible = disponiblePago(p);
   const usado = Math.abs(disponible - p.importe) > EPS;
   return (
-    `${fmtDateUtc(p.fecha)} — ${formatCurrencyArFromNumber(disponible)} ${p.moneda}` +
-    (usado ? ` disponibles de ${formatCurrencyArFromNumber(p.importe)} ${p.moneda}` : '') +
-    (p.concepto ? ` (${p.concepto})` : '')
+    `${comprobantePago(p)} — ${fmtDateUtc(p.fecha)} — ${formatCurrencyArFromNumber(disponible)} ${p.moneda}` +
+    (usado ? ` disponibles de ${formatCurrencyArFromNumber(p.importe)} ${p.moneda}` : '')
   );
+}
+
+/** Filtro de los selects: por el texto que se ve (comprobante, fecha, importe). */
+function filtrarPagos(items: MovimientoCc[], query: string): MovimientoCc[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return items;
+  return items.filter((p) => etiquetaPago(p).toLowerCase().includes(q));
 }
 
 export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: Props) {
   const { getToken } = useAuth();
   const esCliente = !!cargo.clienteId;
   const pendienteCargo = cargo.pendiente ?? cargo.importe;
+  // Vencimiento = medianoche UTC del día: se compara el día contra hoy en Argentina.
+  const vencido =
+    !!cargo.fechaVencimiento && cargo.fechaVencimiento.slice(0, 10) < hoyArgentinaIso();
 
   // Un cobro ya usado por completo no se ofrece, aunque llegue en la lista.
   const pagos = useMemo(
@@ -67,7 +84,6 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
   const [importeStr, setImporteStr] = useState(() => formatCurrencyArFromNumber(sugeridoPara(pagos[0])));
   const pagoSeleccionado = useMemo(() => pagos.find((p) => p.id === pagoId) ?? null, [pagos, pagoId]);
   const disponibleSeleccionado = pagoSeleccionado ? disponiblePago(pagoSeleccionado) : 0;
-  const importeIngresado = parseCurrencyAr(importeStr) ?? 0;
 
   // Segundo cobro opcional ('' = ninguno). Con dos, el reparto sigue la regla fija
   // (primero el de menor disponible) y no se ingresa importe a mano.
@@ -94,9 +110,13 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
   }, [pagoSeleccionado, pagoSeleccionado2, pendienteCargo]);
   const totalReparto = reparto ? reparto.reduce((s, r) => s + r.importe, 0) : 0;
 
+  // Con un cobro que cubre todo lo pendiente no hace falta un segundo.
+  const primeroAlcanza = !!pagoSeleccionado && disponiblePago(pagoSeleccionado) >= pendienteCargo - EPS;
+
   function elegirPago(id: string) {
     setPagoId(id);
-    if (id === pagoId2) setPagoId2('');
+    const nuevo = pagos.find((p) => p.id === id);
+    if (id === pagoId2 || (nuevo && disponiblePago(nuevo) >= pendienteCargo - EPS)) setPagoId2('');
     setImporteStr(formatCurrencyArFromNumber(sugeridoPara(pagos.find((p) => p.id === id))));
   }
 
@@ -104,8 +124,23 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
   const [nuevoImporteStr, setNuevoImporteStr] = useState(() => formatCurrencyArFromNumber(pendienteCargo));
   const [nuevaFecha, setNuevaFecha] = useState(() => hoyArgentinaIso());
   const [nuevaFormaPago, setNuevaFormaPago] = useState('');
+  const [nuevoComprobante, setNuevoComprobante] = useState('');
 
   const [saving, setSaving] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
+  const { showToast } = useToast();
+
+  /** Aviso de éxito: imputar no agrega filas a la grilla, así que sin esto no se nota. */
+  function avisarImputado(importe: number, nuevo = false) {
+    const que = esCliente ? 'Cobro' : 'Pago';
+    const destino = cargo.numeroComprobante?.trim()
+      ? ` ${cargo.numeroComprobante.trim()}`
+      : '';
+    showToast(
+      `${que} ${nuevo ? 'registrado e imputado' : 'imputado'}: $ ${formatCurrencyArFromNumber(importe)} ${cargo.moneda} a la ${esCliente ? 'venta' : 'compra'}${destino}.`,
+      'success',
+    );
+  }
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
@@ -128,6 +163,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
             cargoId: cargo.id,
             pagoIds: [pagoId, pagoId2],
           });
+          avisarImputado(totalReparto);
           onDone();
           onClose();
         } catch (err) {
@@ -157,6 +193,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
       setSaving(true);
       try {
         await crearImputacion(() => getToken(), { pagoId, cargoId: cargo.id, importe });
+        avisarImputado(importe);
         onDone();
         onClose();
       } catch (err) {
@@ -173,6 +210,10 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
       setError('Ingresá un importe mayor a 0.');
       return;
     }
+    if (!nuevoComprobante.trim()) {
+      setError(`Ingresá el número de comprobante ${esCliente ? 'del cobro' : 'del pago'}.`);
+      return;
+    }
     setSaving(true);
     try {
       const pagoCreado = await createMovimiento(() => getToken(), {
@@ -181,6 +222,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
         importe: importeNuevo,
         moneda: cargo.moneda,
         fecha: nuevaFecha,
+        numeroComprobante: nuevoComprobante.trim(),
         formaPago: nuevaFormaPago.trim() || undefined,
       });
       await crearImputacion(() => getToken(), {
@@ -188,6 +230,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
         cargoId: cargo.id,
         importe: Math.min(importeNuevo, pendienteCargo),
       });
+      avisarImputado(Math.min(importeNuevo, pendienteCargo), true);
       onDone();
       onClose();
     } catch (err) {
@@ -199,12 +242,16 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
 
   return (
     <ViewModalShell
-      title={`${esCliente ? 'Imputar cobro' : 'Imputar pago'} — ${cargo.concepto}`}
-      onClose={onClose}
+      // Al lado del título, el comprobante de la venta/compra que se imputa.
+      title={`${esCliente ? 'Imputar cobro' : 'Imputar pago'}${
+        cargo.numeroComprobante?.trim() ? ` — ${cargo.numeroComprobante.trim()}` : ''
+      }`}
+      onClose={descarte.solicitarCierre}
+      descarte={descarte}
       footer={
         <>
           <ErrorPieModal error={error} />
-          <button type="button" className={viewModalBtnGhost} onClick={onClose}>
+          <button type="button" className={viewModalBtnGhost} onClick={descarte.solicitarCierre}>
             Cancelar
           </button>
           <button
@@ -219,43 +266,58 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
       }
     >
       <form id="imputar-pago-form" onSubmit={handleSubmit} className="space-y-4">
-        <p className="text-sm text-vialto-steel">
-          {esCliente ? 'Venta' : 'Compra'} por{' '}
-          <strong>{formatCurrencyArFromNumber(cargo.importe)} {cargo.moneda}</strong>
-          {cargo.pendiente != null && cargo.pendiente !== cargo.importe && (
-            <> (pendiente {formatCurrencyArFromNumber(cargo.pendiente)} {cargo.moneda})</>
-          )}
-          , vence{' '}
-          {cargo.fechaVencimiento
-            ? fmtDateUtc(cargo.fechaVencimiento)
-            : 'sin fecha configurada'}
-          .
-        </p>
+        {/* Resumen de la venta/compra: total, lo que falta y el vencimiento (en rojo si ya pasó). */}
+        <dl className="grid grid-cols-3 divide-x divide-black/10 border border-black/10 bg-vialto-mist/40 text-sm">
+          <div className="px-3 py-2">
+            <dt className="text-[11px] uppercase tracking-wider text-vialto-steel">Total</dt>
+            <dd className="tabular-nums text-vialto-charcoal">
+              $ {formatCurrencyArFromNumber(cargo.importe)} {cargo.moneda}
+            </dd>
+          </div>
+          <div className="px-3 py-2">
+            <dt className="text-[11px] uppercase tracking-wider text-vialto-steel">
+              {esCliente ? 'Falta cobrar' : 'Falta pagar'}
+            </dt>
+            <dd className="font-semibold tabular-nums text-vialto-charcoal">
+              $ {formatCurrencyArFromNumber(pendienteCargo)} {cargo.moneda}
+            </dd>
+          </div>
+          <div className="px-3 py-2">
+            <dt className="text-[11px] uppercase tracking-wider text-vialto-steel">Vence</dt>
+            <dd className={vencido ? 'font-semibold text-red-700' : 'text-vialto-charcoal'}>
+              {cargo.fechaVencimiento ? fmtDateUtc(cargo.fechaVencimiento) : '—'}
+              {vencido && <span className="ml-1 text-xs font-normal">(vencida)</span>}
+            </dd>
+          </div>
+        </dl>
 
         {pagos.length > 0 && (
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setModo('existente')}
-              className={`flex-1 h-9 text-xs uppercase tracking-wider border ${
-                modo === 'existente'
-                  ? 'bg-vialto-charcoal text-white border-vialto-charcoal'
-                  : 'border-black/20 text-vialto-steel hover:bg-vialto-mist'
-              }`}
-            >
-              Usar {esCliente ? 'un cobro' : 'un pago'} existente
-            </button>
-            <button
-              type="button"
-              onClick={() => setModo('nuevo')}
-              className={`flex-1 h-9 text-xs uppercase tracking-wider border ${
-                modo === 'nuevo'
-                  ? 'bg-vialto-charcoal text-white border-vialto-charcoal'
-                  : 'border-black/20 text-vialto-steel hover:bg-vialto-mist'
-              }`}
-            >
-              Registrar {esCliente ? 'un cobro' : 'un pago'} nuevo
-            </button>
+          // Pestañas con el mismo estilo que las secciones de Mantenimiento.
+          <div className="border-b border-black/15">
+            <nav className="-mb-px flex gap-1 overflow-x-auto" role="tablist">
+              {(
+                [
+                  { id: 'existente', label: 'Existente' },
+                  { id: 'nuevo', label: 'Nuevo' },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={modo === tab.id}
+                  onClick={() => setModo(tab.id)}
+                  className={[
+                    'flex shrink-0 whitespace-nowrap items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border',
+                    modo === tab.id
+                      ? 'border-black/15 border-t-2 border-t-vialto-fire border-b-white bg-white text-vialto-charcoal'
+                      : 'border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]',
+                  ].join(' ')}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
           </div>
         )}
 
@@ -265,40 +327,39 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
               <label className={labelClass} htmlFor="cc-pago-select">
                 {esCliente ? 'Cobro' : 'Pago'} a imputar <span className="text-red-500">*</span>
               </label>
-              <select
+              <SearchableEntitySelect
                 id="cc-pago-select"
-                className={inputClass}
+                items={pagos}
                 value={pagoId}
-                onChange={(e) => elegirPago(e.target.value)}
-              >
-                {pagos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {etiquetaPago(p)}
-                  </option>
-                ))}
-              </select>
+                onChange={elegirPago}
+                filterItems={filtrarPagos}
+                getPrimaryLabel={etiquetaPago}
+                inputClassName={inputClass}
+                placeholderBuscar="Buscar por comprobante, fecha o importe…"
+                aria-label={`${esCliente ? 'Cobro' : 'Pago'} a imputar`}
+              />
             </div>
 
-            {pagos.length > 1 && (
+            {/* Segundo cobro solo si el primero no alcanza para cancelar lo pendiente. */}
+            {pagos.length > 1 && !primeroAlcanza && (
               <div>
                 <label className={labelClass} htmlFor="cc-pago-select-2">
                   Segundo {esCliente ? 'cobro' : 'pago'}
                 </label>
-                <select
+                <SearchableEntitySelect
                   id="cc-pago-select-2"
-                  className={inputClass}
+                  items={pagos.filter((p) => p.id !== pagoId)}
                   value={pagoId2}
-                  onChange={(e) => setPagoId2(e.target.value)}
-                >
-                  <option value="">Ninguno</option>
-                  {pagos
-                    .filter((p) => p.id !== pagoId)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {etiquetaPago(p)}
-                      </option>
-                    ))}
-                </select>
+                  onChange={setPagoId2}
+                  filterItems={filtrarPagos}
+                  getPrimaryLabel={etiquetaPago}
+                  inputClassName={inputClass}
+                  allowEmptyValue
+                  emptyListChoiceLabel="Ninguno"
+                  placeholderCerrado="Ninguno"
+                  placeholderBuscar="Buscar por comprobante, fecha o importe…"
+                  aria-label={`Segundo ${esCliente ? 'cobro' : 'pago'}`}
+                />
               </div>
             )}
 
@@ -320,8 +381,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
                     {reparto.map((r) => (
                       <tr key={r.pagoId}>
                         <td className="py-0.5">
-                          {fmtDateUtc(r.pago.fecha)}
-                          {r.pago.concepto ? ` (${r.pago.concepto})` : ''}
+                          {comprobantePago(r.pago)} — {fmtDateUtc(r.pago.fecha)}
                         </td>
                         <td className="py-0.5 text-right">
                           {formatCurrencyArFromNumber(disponiblePago(r.pago))}
@@ -365,25 +425,26 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
                 onChange={(e) => setImporteStr(maskCurrencyArInput(e.target.value))}
                 required
               />
-              {pagoSeleccionado && (
-                <p className="mt-1 text-xs text-vialto-steel">
-                  {esCliente ? 'Al cobro' : 'Al pago'} le quedan{' '}
-                  {formatCurrencyArFromNumber(disponibleSeleccionado)} {pagoSeleccionado.moneda} disponibles
-                  {Math.abs(disponibleSeleccionado - pagoSeleccionado.importe) > EPS &&
-                    ` de ${formatCurrencyArFromNumber(pagoSeleccionado.importe)} ${pagoSeleccionado.moneda}`}
-                  .
-                  {importeIngresado > EPS &&
-                    importeIngresado < disponibleSeleccionado - EPS &&
-                    ` El sobrante (${formatCurrencyArFromNumber(disponibleSeleccionado - importeIngresado)} ${pagoSeleccionado.moneda}) queda a cuenta.`}
-                  {pagoSeleccionado.moneda !== cargo.moneda &&
-                    ` Atención: distinta moneda que ${esCliente ? 'la venta' : 'la compra'}, el servidor lo va a rechazar.`}
-                </p>
-              )}
             </div>
             )}
           </>
         ) : (
           <>
+            <div>
+              <label className={labelClass} htmlFor="cc-nuevo-comprobante">
+                Número de comprobante <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="cc-nuevo-comprobante"
+                type="text"
+                maxLength={64}
+                className={inputClass}
+                value={nuevoComprobante}
+                onChange={(e) => setNuevoComprobante(e.target.value)}
+                placeholder={esCliente ? 'Ej. Recibo 0001-00000123' : 'Ej. Orden de pago 0001-00000123'}
+                required
+              />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelClass} htmlFor="cc-nuevo-importe">

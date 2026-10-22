@@ -7,11 +7,13 @@ import {
   useCallback,
 } from "react";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import {
   FacturaTramosEditor,
   computeTotalesFacturaPorTramo,
   emptyFacturaTramoDraft,
+  isFacturaTramoCompleto,
   toFacturaTramosPayload,
   validateFacturaTramosDraft,
   type FacturaTramoDraft,
@@ -20,6 +22,7 @@ import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoF
 import {
   ViajesSeleccionTabla,
   type CantidadTarifaColumnas,
+  type IvaSubtotalColumnas,
 } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
@@ -29,7 +32,7 @@ import {
   textoImporteFacturaSeleccion,
   textoMontoFacturarListado,
 } from "@/lib/viajesFlota";
-import { normalizeViajeMoneda } from "@/lib/currencyMask";
+import { formatCurrencyArFromNumber, normalizeViajeMoneda } from "@/lib/currencyMask";
 import {
   computeFacturaTotalesFromBases,
   importeNetoViajeParaFactura,
@@ -160,7 +163,7 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
       viajeId: t.viajeId,
       detalle: t.detalle,
       monto: t.monto,
-      montoStr: t.monto > 0 ? String(t.monto) : "",
+      montoStr: t.monto > 0 ? formatCurrencyArFromNumber(t.monto) : "",
       ivaPct: t.ivaPct,
       ivaPctStr: String(t.ivaPct),
     }));
@@ -296,6 +299,8 @@ export function ViajesVinculadosEditor({
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
   unidadCantidad = "TN",
+  ivaPct,
+  tramos,
 }: {
   viajes: Viaje[];
   disponibles: Viaje[];
@@ -315,8 +320,26 @@ export function ViajesVinculadosEditor({
   idPropio2Label?: string;
   /** Encabezado de la columna de cantidad ("TN"/"UD", ver `unidadCantidadViajes`). */
   unidadCantidad?: string;
+  /** % de IVA de la factura: con él la tabla suma las columnas IVA y Subtotal. */
+  ivaPct?: number;
+  /** Tramos de "Facturar por tramo" (solo si está tildado): esos viajes muestran el total de sus tramos. */
+  tramos?: FacturaTramoDraft[];
 }) {
   const showContraparteHint = !clienteId.trim();
+  const tramosCompletos = (tramos ?? []).filter(isFacturaTramoCompleto);
+  const ivaSubtotal: IvaSubtotalColumnas<Viaje> | undefined =
+    ivaPct == null
+      ? undefined
+      : {
+          importeDe: (v) =>
+            (v.cantidadFactura != null && v.precioUnitarioFactura != null) || v.monto != null
+              ? importeNetoViajeParaFactura(v)
+              : null,
+          ivaPctDe: () => ivaPct,
+          formatMonto: (n, v, conMoneda) => formatViajeImporteForListado(n, v.monedaMonto, conMoneda),
+          tramosDe: (v) =>
+            selected.includes(v.id) ? tramosCompletos.filter((t) => t.viajeId === v.id) : null,
+        };
   const cantidadTarifa: CantidadTarifaColumnas<Viaje> = {
     unidad: unidadCantidad,
     cantidadDe: (v) => v.cantidadFactura,
@@ -366,6 +389,7 @@ export function ViajesVinculadosEditor({
           renderMonto={(v, conMoneda) => textoMontoFacturarListado(v, conMoneda)}
           monedaDe={(v) => normalizeViajeMoneda(v.monedaMonto)}
           cantidadTarifa={cantidadTarifa}
+          ivaSubtotal={ivaSubtotal}
           loading={loading}
           fillHeight
           emptyMessage="No hay viajes disponibles para vincular."
@@ -388,6 +412,7 @@ export function ViajesVinculadosEditor({
       renderMonto={(v, conMoneda) => textoMontoFacturarListado(v, conMoneda)}
       monedaDe={(v) => normalizeViajeMoneda(v.monedaMonto)}
       cantidadTarifa={cantidadTarifa}
+      ivaSubtotal={ivaSubtotal}
       loading={loading}
       maxHeightClass="max-h-72"
       emptyMessage="No hay viajes disponibles para vincular."
@@ -477,7 +502,8 @@ export function FacturaEditModal({
   idPropio2Label = "ID Propio 2",
   unidadCantidad = "TN",
 }: FacturaEditModalProps) {
-  useEscapeKey(open, saving, onClose);
+  const descarte = useConfirmarDescarte(onClose, open);
+  useEscapeKey(open, saving, descarte.solicitarCierre);
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [tramosLocalError, setTramosLocalError] = useState<string | null>(null);
 
@@ -603,15 +629,7 @@ export function FacturaEditModal({
       className="fixed inset-0 z-[110] flex items-stretch justify-center sm:items-center sm:p-4 md:p-6"
       role="presentation"
     >
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/40"
-        aria-label="Cerrar edición"
-        disabled={saving}
-        onClick={() => {
-          if (!saving) onClose();
-        }}
-      />
+      <div className="absolute inset-0 bg-black/40" aria-hidden />
       <div
         role="dialog"
         aria-modal="true"
@@ -665,7 +683,7 @@ export function FacturaEditModal({
           <button
             type="button"
             disabled={saving}
-            onClick={onClose}
+            onClick={descarte.solicitarCierre}
             className="inline-flex h-9 shrink-0 items-center justify-center border border-black/15 bg-white px-3 text-sm text-vialto-steel hover:bg-vialto-mist disabled:opacity-50"
             aria-label="Cerrar"
           >
@@ -768,6 +786,8 @@ export function FacturaEditModal({
                 idPropio2Habilitado={idPropio2Habilitado}
                 idPropio2Label={idPropio2Label}
                 unidadCantidad={unidadCantidad}
+                ivaPct={draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0}
+                tramos={draft.facturarPorTramo ? draft.tramos : undefined}
               />
             </div>
 
@@ -845,7 +865,7 @@ export function FacturaEditModal({
           <ErrorPieModal error={displayError} />
           <button
             type="button"
-            onClick={onClose}
+            onClick={descarte.solicitarCierre}
             disabled={saving}
             className="text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-60"
           >
@@ -866,6 +886,7 @@ export function FacturaEditModal({
           </button>
         </footer>
       </div>
+      {descarte.dialogo}
     </div>
   );
 }

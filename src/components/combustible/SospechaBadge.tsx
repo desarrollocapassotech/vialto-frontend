@@ -1,13 +1,24 @@
 const MOTIVO_LABELS: Record<string, string> = {
-  litros_extremo: "Litros marcados como sospechosos (posible error de carga)",
-  importe_invalido: "Monto marcado como sospechoso (posible error de carga)",
+  litros_extremo:
+    "Cantidad de litros fuera de lo normal. Revisá que esté bien cargada.",
+  importe_invalido:
+    "El monto está en cero o es inválido. Revisá que esté bien cargado.",
   precio_litro_fuera_de_rango:
-    "Precio por litro marcado como sospechoso (posible error en litros o en el monto)",
+    "El precio por litro (monto ÷ litros) no es razonable. Revisá los litros o el monto.",
   km_delta_invalido:
-    "Kilometraje marcado como sospechoso (posible error de carga)",
+    "El kilometraje no coincide con las cargas anteriores del vehículo. Revisá el km cargado.",
   costo_km_invalido:
-    "Costo por km marcado como sospechoso (posible error en monto o kilometraje)",
+    "El costo por km no es razonable. Revisá el monto o el kilometraje.",
 };
+
+const MOTIVO_LABEL_DEFAULT =
+  "Carga marcada como sospechosa. Revisá los datos cargados.";
+
+// Texto explicativo para tooltips (columna de alerta de la grilla y badges del detalle).
+export function motivoSospechaLabel(motivo: string | null): string {
+  if (!motivo) return MOTIVO_LABEL_DEFAULT;
+  return MOTIVO_LABELS[motivo] ?? MOTIVO_LABEL_DEFAULT;
+}
 
 // Etiqueta corta para columnas/listas (los MOTIVO_LABELS de arriba son para tooltips).
 const MOTIVO_SHORT_LABELS: Record<string, string> = {
@@ -50,9 +61,7 @@ export function SospechaBadge({
   /** Si se pasa, el badge se vuelve clickeable (ej. abrir el detalle de la carga). */
   onClick?: () => void;
 }) {
-  const label = motivo
-    ? (MOTIVO_LABELS[motivo] ?? "Dato marcado como sospechoso")
-    : "Dato marcado como sospechoso";
+  const label = motivoSospechaLabel(motivo);
   const className =
     "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold leading-none text-amber-700";
 

@@ -399,7 +399,6 @@ export function AsignacionVehiculoSection({
           role="dialog"
           aria-modal="true"
           aria-labelledby="quitar-asignacion-titulo"
-          onClick={() => !quitando && setQuitarTarget(null)}
         >
           <div
             className="w-full max-w-md border border-black/15 bg-white p-6 shadow-xl"

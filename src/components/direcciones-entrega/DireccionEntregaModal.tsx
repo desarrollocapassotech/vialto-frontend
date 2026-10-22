@@ -6,6 +6,7 @@ import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
 import { friendlyError } from '@/lib/friendlyError';
 import type { DireccionEntrega } from '@/types/api';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 
 export function DireccionEntregaModal({
   getToken,
@@ -25,6 +26,7 @@ export function DireccionEntregaModal({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
 
   async function submit() {
     const errs: Record<string, string> = {};
@@ -59,7 +61,6 @@ export function DireccionEntregaModal({
   return (
     <div
       className={modalQuickCreateOverlayClass(stacked)}
-      onClick={onClose}
       role="presentation"
     >
       <div
@@ -75,7 +76,7 @@ export function DireccionEntregaModal({
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={descarte.solicitarCierre}
             className="text-vialto-steel hover:text-vialto-charcoal text-xl leading-none"
             aria-label="Cerrar"
           >
@@ -104,7 +105,7 @@ export function DireccionEntregaModal({
             <ErrorPieModal error={error} fieldErrors={fieldErrors} />
             <button
               type="button"
-              onClick={onClose}
+              onClick={descarte.solicitarCierre}
               className="px-4 py-2 text-sm border border-black/20 rounded hover:bg-vialto-mist/60"
             >
               Cancelar
@@ -120,6 +121,7 @@ export function DireccionEntregaModal({
           </div>
         </form>
       </div>
+      {descarte.dialogo}
     </div>
   );
 }

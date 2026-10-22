@@ -27,6 +27,8 @@ export type MovimientoCc = {
   importeNeto?: number | null;
   ivaPct?: number | null;
   ivaMonto?: number | null;
+  /** Solo ventas/compras manuales cargadas por líneas (con alícuotas distintas, `ivaPct` es null). */
+  lineas?: { descripcion: string; importe: number; ivaPct: number }[] | null;
   moneda: string;
   fecha: string;
   fechaVencimiento: string | null;
@@ -208,10 +210,12 @@ export type CreateMovimientoCcInput = {
   proveedorId?: string;
   tipo: TipoMovimientoCc;
   concepto?: string;
-  /** Con `ivaPct`, es el importe SIN IVA: el backend registra el total (neto + IVA). */
-  importe: number;
+  /** Con `ivaPct`, es el importe SIN IVA: el backend registra el total (neto + IVA). Con `lineas`, se omite. */
+  importe?: number;
   /** % de IVA, solo ventas/compras. Omitido = sin IVA. */
   ivaPct?: number;
+  /** Solo ventas/compras: líneas como en una factura (importe neto + IVA %); el backend registra el total. */
+  lineas?: { descripcion: string; importe: number; ivaPct: number }[];
   moneda?: string;
   fecha: string;
   fechaVencimiento?: string;
@@ -227,6 +231,35 @@ export function createMovimiento(getToken: GetToken, input: CreateMovimientoCcIn
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+/**
+ * Edita una venta/compra/cobro/pago manual. Cada campo solo se toca si viene. Importe,
+ * líneas y moneda solo se aceptan sin imputaciones (el backend lo valida).
+ */
+export function actualizarMovimiento(
+  getToken: GetToken,
+  id: string,
+  datos: {
+    numeroComprobante?: string;
+    fecha?: string;
+    /** `null` quita el vencimiento. */
+    fechaVencimiento?: string | null;
+    moneda?: string;
+    importe?: number;
+    lineas?: { descripcion: string; importe: number; ivaPct: number }[];
+    formaPago?: string;
+  },
+) {
+  return apiJson<MovimientoCc>(`/api/cuenta-corriente/movimientos/${encodeURIComponent(id)}`, getToken, {
+    method: 'PATCH',
+    body: JSON.stringify(datos),
+  });
+}
+
+/** Color del monto de un cobro (entra plata: verde) o de un pago (sale plata: rojo). */
+export function claseMontoCobroPago(esCobro: boolean): string {
+  return esCobro ? 'text-emerald-700' : 'text-red-700';
 }
 
 export function eliminarMovimiento(getToken: GetToken, id: string) {

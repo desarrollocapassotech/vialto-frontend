@@ -5,6 +5,7 @@ import {
   type CompletarDatosFiscalesInitial,
 } from "@/components/shared/CompletarDatosFiscalesInline";
 import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { MODAL_Z_STACKED } from "@/lib/modalLayers";
 import type { PadronValidacionResultado } from "@/hooks/useValidacionPadronRegistro";
 import type { Cliente, Transportista } from "@/types/api";
@@ -63,17 +64,19 @@ export function DatosFiscalesFaltantesModal({
   const hayOcultos = missingHiddenFields.length > 0;
   const label = ENTIDAD_LABEL[entidad];
 
+  const { solicitarCierre, dialogo } = useConfirmarDescarte(onClose, open);
+
   // Escape cierra solo este modal: se corta en captura para que no llegue al de abajo.
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
       e.stopPropagation();
-      onClose();
+      solicitarCierre();
     }
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [open, onClose]);
+  }, [open, solicitarCierre]);
 
   if (!open) return null;
 
@@ -85,10 +88,8 @@ export function DatosFiscalesFaltantesModal({
       className={`fixed inset-0 ${MODAL_Z_STACKED} flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4`}
       role="presentation"
       // stopPropagation: el click no tiene que llegar al overlay del modal de abajo.
-      onClick={(e) => {
-        e.stopPropagation();
-        onClose();
-      }}
+      // El click afuera no cierra (se perdería lo cargado).
+      onClick={(e) => e.stopPropagation()}
     >
       <div
         role="dialog"
@@ -138,7 +139,7 @@ export function DatosFiscalesFaltantesModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={solicitarCierre}
             aria-label="Cerrar"
             className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-vialto-steel hover:bg-vialto-mist"
           >
@@ -174,7 +175,7 @@ export function DatosFiscalesFaltantesModal({
               getToken={getToken}
               forceArcaFields
               initial={initial}
-              onCancel={onClose}
+              onCancel={solicitarCierre}
               cancelLabel="Completar después"
               saveLabel="Guardar"
               onSaved={(updated) => {
@@ -185,6 +186,7 @@ export function DatosFiscalesFaltantesModal({
           )}
         </div>
       </div>
+      {dialogo}
     </div>
   );
 }

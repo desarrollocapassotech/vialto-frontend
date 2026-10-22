@@ -3,6 +3,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { modalOverlayClass } from "@/lib/modalLayers";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 
 const btnGhost =
   "inline-flex min-h-11 items-center text-xs uppercase tracking-wider px-3 py-2 border border-black/20 hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none md:min-h-0 md:py-1.5";
@@ -36,6 +37,7 @@ export function AnularLiquidacionModal({
   const [motivo, setMotivo] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{ motivo?: string }>({});
   const fieldError = fieldErrors.motivo;
+  const { solicitarCierre, dialogo } = useConfirmarDescarte(onCancel, open);
 
   useEffect(() => {
     if (!open) return;
@@ -48,12 +50,12 @@ export function AnularLiquidacionModal({
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape" && !busy) {
         e.preventDefault();
-        onCancel();
+        solicitarCierre();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, busy, onCancel]);
+  }, [open, busy, solicitarCierre]);
 
   if (!open) return null;
 
@@ -71,9 +73,6 @@ export function AnularLiquidacionModal({
     <div
       className={modalOverlayClass.replace("z-50", "z-[120]")}
       role="presentation"
-      onClick={() => {
-        if (!busy) onCancel();
-      }}
     >
       <div
         role="dialog"
@@ -125,7 +124,7 @@ export function AnularLiquidacionModal({
           <button
             type="button"
             disabled={busy}
-            onClick={onCancel}
+            onClick={solicitarCierre}
             className={btnGhost}
           >
             Cancelar
@@ -141,6 +140,7 @@ export function AnularLiquidacionModal({
           </button>
         </div>
       </div>
+      {dialogo}
     </div>
   );
 }

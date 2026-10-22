@@ -27,7 +27,7 @@ import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { apiFetch, apiJson } from "@/lib/api";
-import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
+import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
@@ -193,6 +193,7 @@ export function LiquidacionViewModal({
   const mostrarIdPropio2 = idPropio2HabilitadoProp ?? idPropio2HabilitadoTenant(tenantPropio);
   const labelIdPropio2 = idPropio2LabelProp ?? idPropio2LabelTenant(tenantPropio);
   const { getToken: getAuthToken } = useAuth();
+  const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantIdUrl = searchParams.get("tenantId")?.trim() ?? "";
@@ -316,9 +317,8 @@ export function LiquidacionViewModal({
             onClick:
               onVerComprobanteAnulacionManual ??
               (() =>
-                void abrirAdjuntoEnPestana(
+                abrirAdjunto(
                   { url: source.anulacionManualComprobanteUrl!.trim() },
-                  () => getAuthToken(),
                   "Comprobante de anulación",
                 )),
           }
@@ -727,6 +727,7 @@ export function LiquidacionViewModal({
           }}
         />
       )}
+      {visorAdjunto}
     </>
   );
 }

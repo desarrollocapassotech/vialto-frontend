@@ -15,6 +15,7 @@ import { modalOverlayClass } from '@/lib/modalLayers';
 import { formatViajeImporteForListado, numeroVisibleViaje } from '@/lib/viajesFlota';
 import { OtroGastoAutorDisplay } from '@/components/viajes/OtrosGastosFieldset';
 import { useOrgUserLabels } from '@/hooks/useOrgUserLabels';
+import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 import type { OtroGasto, Viaje } from '@/types/api';
 
 type Props = {
@@ -38,6 +39,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showGastosAnteriores, setShowGastosAnteriores] = useState(false);
+  const descarte = useConfirmarDescarte(() => handleClose(), open && viaje != null);
 
   if (!open || viaje == null) return null;
   const viajeActual = viaje;
@@ -250,7 +252,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
           <button
             type="button"
             disabled={saving}
-            onClick={handleClose}
+            onClick={descarte.solicitarCierre}
             className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
           >
             Cancelar
@@ -266,6 +268,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
           </button>
         </div>
       </div>
+      {descarte.dialogo}
     </div>
   );
 }

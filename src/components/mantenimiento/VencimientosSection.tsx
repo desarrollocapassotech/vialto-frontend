@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Wrench } from "lucide-react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
+import { FiltrosRapidos, type FiltroRapidoOpcion } from "@/components/listado/FiltrosRapidos";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { filtrarVehiculos } from "@/components/forms/maestroSearchFilters";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
@@ -26,12 +28,9 @@ import {
 import type { Vehiculo } from "@/types/api";
 import type { EstadoVencimiento, FilaVencimiento, PrecargaOrden } from "@/types/mantenimiento";
 
-const CONTADOR_ACTIVO: Record<EstadoVencimiento, string> = {
-  vencido: "border-red-300 bg-red-50",
-  proximo: "border-amber-300 bg-amber-50",
-  sin_datos: "border-gray-300 bg-gray-100",
-  ok: "border-emerald-300 bg-emerald-50",
-};
+/** Filtros rápidos junto al título (como en Viajes): solo lo que requiere atención. */
+const ESTADOS_FILTRO_RAPIDO = ["vencido", "proximo"] as const;
+type EstadoFiltroRapido = (typeof ESTADOS_FILTRO_RAPIDO)[number];
 
 /**
  * Pestaña Vencimientos (default de Mantenimiento): el semáforo que calcula el backend
@@ -86,6 +85,12 @@ export function VencimientosSection({
     return c;
   }, [filas]);
 
+  const opcionesRapidas: FiltroRapidoOpcion<EstadoFiltroRapido>[] = ESTADOS_FILTRO_RAPIDO.map((e) => ({
+    id: e,
+    label: ESTADO_VENCIMIENTO[e].contador,
+    count: filas ? contadores[e] : undefined,
+  }));
+
   const hayFiltros = !!estado || !!vehiculoId || !!categoria;
   const filtradas = useMemo(() => {
     if (!filas) return null;
@@ -113,6 +118,16 @@ export function VencimientosSection({
 
   return (
     <div>
+      {limpiarFiltrosSlot &&
+        createPortal(
+          <FiltrosRapidos<EstadoFiltroRapido>
+            opciones={opcionesRapidas}
+            value={estado === "vencido" || estado === "proximo" ? estado : ""}
+            onChange={(v) => setEstado(v)}
+            ariaLabel="Filtrar vencimientos por estado"
+          />,
+          limpiarFiltrosSlot,
+        )}
       <LimpiarFiltrosPortal
         slot={limpiarFiltrosSlot}
         visible={hayFiltros}
@@ -127,31 +142,7 @@ export function VencimientosSection({
         <p className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
       )}
 
-      {/* Contadores: un click filtra por ese estado; otro click lo saca. */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {ESTADOS_VENCIMIENTO_ORDEN.map((e) => (
-          <button
-            key={e}
-            type="button"
-            onClick={() => setEstado(estado === e ? "" : e)}
-            aria-pressed={estado === e}
-            className={[
-              "flex flex-col items-start rounded border px-4 py-3 text-left transition-colors",
-              estado === e ? CONTADOR_ACTIVO[e] : "border-black/10 bg-white hover:bg-vialto-mist",
-            ].join(" ")}
-          >
-            <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.16em] text-vialto-steel">
-              {ESTADO_VENCIMIENTO[e].contador}
-            </span>
-            <span className="mt-1 font-[family-name:var(--font-display)] text-3xl tabular-nums">
-              {filas ? contadores[e] : "–"}
-            </span>
-          </button>
-        ))}
-      </div>
-
       <ListadoDatos<FilaVencimiento>
-        className="mt-6"
         tableColSpan={soloLectura ? 7 : 8}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>

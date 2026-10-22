@@ -71,8 +71,8 @@ export function MantenimientoTenantPage({
     <div className="w-full">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">Mantenimiento</h1>
-        {/* Cada sección portalea acá su "Limpiar filtros". */}
-        <div ref={setLimpiarFiltrosSlot} className="empty:hidden" />
+        {/* Cada sección portalea acá sus filtros rápidos y su "Limpiar filtros" (como en Viajes). */}
+        <div ref={setLimpiarFiltrosSlot} className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 empty:hidden" />
         {!soloLectura && (
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <button

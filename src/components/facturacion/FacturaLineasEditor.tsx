@@ -6,10 +6,17 @@ import {
   type FacturaTramoDraft,
 } from '@/components/facturacion/FacturaTramosEditor';
 import type { Factura, Viaje } from '@/types/api';
+import {
+  formatCurrencyArFromNumber,
+  maskCurrencyArInput,
+  parseCurrencyAr,
+} from '@/lib/currencyMask';
+import { marcarModalModificado } from '@/lib/descarteModal';
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
 import {
   computeFacturaTotalesFromBases,
   importeNetoViajeParaFactura,
+  roundMoney2,
 } from '@/lib/facturaTotales';
 
 export type FacturaLineaDraft = {
@@ -17,6 +24,8 @@ export type FacturaLineaDraft = {
   importe: number;
   importeStr?: string;
   ivaPct?: number;
+  /** Texto del input de IVA mientras se edita (permite dejarlo vacío para reescribirlo). */
+  ivaPctStr?: string;
   /**
    * Presentes solo en líneas 1:1 con un viaje vinculado (no en líneas por tramo ni en
    * la línea única de fallback que consolida varios viajes) — permiten reconstruir el
@@ -38,14 +47,8 @@ function fmtMoney(n: number) {
   return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function parseImporte(raw: string): number {
-  if (raw.trim() === '') return 0;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : 0;
-}
-
 function displayImporteStr(linea: FacturaLineaDraft): string {
-  return linea.importeStr ?? (linea.importe > 0 ? String(linea.importe) : '');
+  return linea.importeStr ?? (linea.importe > 0 ? formatCurrencyArFromNumber(linea.importe) : '');
 }
 
 export function isFacturaLineaCompleta(l: FacturaLineaDraft): boolean {
@@ -292,12 +295,53 @@ export function computeFacturaTotales(
   );
 }
 
+/**
+ * IVA desagregado por alícuota (de mayor a menor), misma cuenta que `computeFacturaTotales`:
+ * base agrupada por alícuota y redondeo por alícuota, así los renglones suman el IVA total.
+ */
+export function computeIvaPorAlicuota(
+  lineas: FacturaLineaDraft[],
+  ivaPctDefault: number,
+): { pct: number; iva: number }[] {
+  const basePorPct = new Map<number, number>();
+  for (const l of lineas.filter(isFacturaLineaCompleta)) {
+    const pct = l.ivaPct ?? ivaPctDefault;
+    basePorPct.set(pct, roundMoney2((basePorPct.get(pct) ?? 0) + roundMoney2(l.importe)));
+  }
+  return [...basePorPct.entries()]
+    .sort(([a], [b]) => b - a)
+    .map(([pct, base]) => ({ pct, iva: roundMoney2((base * pct) / 100) }));
+}
+
+/** "IVA 21%", "IVA 10,5%". */
+export function labelIvaAlicuota(pct: number): string {
+  return `IVA ${pct.toLocaleString('es-AR', { maximumFractionDigits: 2 })}%`;
+}
+
 interface Props {
   lineas: FacturaLineaDraft[];
   onChange: (next: FacturaLineaDraft[]) => void;
   ivaPctDefault: number;
   disabled?: boolean;
   incompleteIndices?: number[];
+  /**
+   * "+ Agregar línea" debajo de la última línea, habilitado solo cuando todas las
+   * anteriores están completas (en vez de arriba a la derecha, siempre habilitado).
+   */
+  agregarAbajo?: boolean;
+  /** Totales en renglones alineados a la derecha, como el modal de nueva factura. */
+  totalesALaDerecha?: boolean;
+  /** Título de la columna del importe sin IVA (ej. "Importe" en Cuenta corriente). */
+  labelImporte?: string;
+  /** Columna "Subtotal" de solo lectura por línea: importe + su IVA. */
+  mostrarSubtotal?: boolean;
+}
+
+/** Importe de la línea con su IVA (2 decimales); solo para mostrar. */
+function subtotalLinea(l: FacturaLineaDraft, ivaPctDefault: number): number {
+  const base = Math.round((Number(l.importe) || 0) * 100) / 100;
+  const iva = Math.round(((base * (l.ivaPct ?? ivaPctDefault)) / 100) * 100) / 100;
+  return Math.round((base + iva) * 100) / 100;
 }
 
 export function FacturaLineasEditor({
@@ -306,10 +350,36 @@ export function FacturaLineasEditor({
   ivaPctDefault,
   disabled,
   incompleteIndices = [],
+  agregarAbajo = false,
+  totalesALaDerecha = false,
+  labelImporte = 'Importe neto',
+  mostrarSubtotal = false,
 }: Props) {
   const totales = useMemo(
     () => computeFacturaTotales(lineas, ivaPctDefault),
     [lineas, ivaPctDefault],
+  );
+  const lineasCompletas = lineas.every(isFacturaLineaCompleta);
+
+  const ivaPorAlicuota = useMemo(
+    () => computeIvaPorAlicuota(lineas, ivaPctDefault),
+    [lineas, ivaPctDefault],
+  );
+
+  const botonAgregar = (
+    <button
+      type="button"
+      disabled={disabled || (agregarAbajo && !lineasCompletas)}
+      title={
+        agregarAbajo && !lineasCompletas
+          ? 'Completá descripción e importe de las líneas antes de agregar otra.'
+          : undefined
+      }
+      onClick={addLinea}
+      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      + Agregar línea
+    </button>
   );
 
   function updateLinea(index: number, patch: Partial<FacturaLineaDraft>) {
@@ -317,6 +387,8 @@ export function FacturaLineasEditor({
   }
 
   function addLinea() {
+    // Agregar/quitar es solo un click (sin input/change): avisar al modal que hubo cambios.
+    marcarModalModificado();
     onChange([
       ...lineas,
       { descripcion: '', importe: 0, importeStr: '', ivaPct: ivaPctDefault },
@@ -324,6 +396,7 @@ export function FacturaLineasEditor({
   }
 
   function removeLinea(index: number) {
+    marcarModalModificado();
     onChange(lineas.filter((_, i) => i !== index));
   }
 
@@ -333,14 +406,7 @@ export function FacturaLineasEditor({
         <p className="text-xs uppercase tracking-wider text-vialto-steel">
           Conceptos / líneas
         </p>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={addLinea}
-          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
-        >
-          + Agregar línea
-        </button>
+        {!agregarAbajo && botonAgregar}
       </div>
 
       {lineas.length === 0 && (
@@ -355,7 +421,9 @@ export function FacturaLineasEditor({
           <div
             key={index}
             className={[
-              'grid gap-2 sm:grid-cols-[1fr_120px_80px_auto] items-end border p-3',
+              mostrarSubtotal
+                ? 'grid gap-2 sm:grid-cols-[1fr_140px_80px_140px_auto] items-end border p-3'
+                : 'grid gap-2 sm:grid-cols-[1fr_120px_80px_auto] items-end border p-3',
               incomplete ? 'border-red-300 bg-red-50/40' : 'border-black/10 bg-vialto-mist/30',
             ].join(' ')}
           >
@@ -371,21 +439,22 @@ export function FacturaLineasEditor({
               />
             </div>
             <div>
-              <CrudFieldLabel required>Importe neto</CrudFieldLabel>
+              <CrudFieldLabel required>{labelImporte}</CrudFieldLabel>
+              {/* Miles con "." y decimales con ",". */}
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 disabled={disabled}
                 value={displayImporteStr(linea)}
                 onChange={(e) => {
-                  const importeStr = e.target.value;
+                  const importeStr = maskCurrencyArInput(e.target.value);
                   updateLinea(index, {
                     importeStr,
-                    importe: parseImporte(importeStr),
+                    importe: parseCurrencyAr(importeStr) ?? 0,
                   });
                 }}
                 className={inputClass}
+                placeholder="0,00"
               />
             </div>
             <div>
@@ -396,13 +465,37 @@ export function FacturaLineasEditor({
                 max="100"
                 step="0.01"
                 disabled={disabled}
-                value={linea.ivaPct ?? ivaPctDefault}
-                onChange={(e) =>
-                  updateLinea(index, { ivaPct: Number(e.target.value) || ivaPctDefault })
-                }
+                value={linea.ivaPctStr ?? String(linea.ivaPct ?? ivaPctDefault)}
+                onChange={(e) => {
+                  // 0 es válido (exento). Vacío se permite mientras se escribe (cuenta como el
+                  // default) y al salir del campo vuelve al default.
+                  const ivaPctStr = e.target.value;
+                  const n = Number(ivaPctStr);
+                  updateLinea(index, {
+                    ivaPctStr,
+                    ivaPct: ivaPctStr.trim() === '' || !Number.isFinite(n) ? undefined : n,
+                  });
+                }}
+                onBlur={() => {
+                  if (linea.ivaPct == null) {
+                    updateLinea(index, { ivaPctStr: undefined, ivaPct: ivaPctDefault });
+                  }
+                }}
                 className={inputClass}
               />
             </div>
+            {mostrarSubtotal && (
+              <div>
+                <CrudFieldLabel>Subtotal</CrudFieldLabel>
+                <input
+                  type="text"
+                  readOnly
+                  tabIndex={-1}
+                  value={fmtMoney(subtotalLinea(linea, ivaPctDefault))}
+                  className={`${inputClass} bg-vialto-mist tabular-nums text-right`}
+                />
+              </div>
+            )}
             <button
               type="button"
               disabled={disabled}
@@ -413,15 +506,51 @@ export function FacturaLineasEditor({
               Quitar
             </button>
             {incomplete && (
-              <div className="sm:col-span-4">
-                <CrudFieldError message="Completá descripción e importe neto." />
+              <div className={mostrarSubtotal ? 'sm:col-span-5' : 'sm:col-span-4'}>
+                <CrudFieldError message={`Completá descripción y ${labelImporte.toLowerCase()}.`} />
               </div>
             )}
           </div>
         );
       })}
 
-      {lineas.length > 0 && (
+      {agregarAbajo && <div>{botonAgregar}</div>}
+
+      {lineas.length > 0 && totalesALaDerecha && (
+        <div className="space-y-1 text-xs text-right text-vialto-steel">
+          <p>
+            Subtotal:{' '}
+            <span className="font-medium tabular-nums text-vialto-charcoal">
+              {fmtMoney(totales.neto)}
+            </span>
+          </p>
+          {ivaPorAlicuota.length === 0 ? (
+            <p>
+              IVA:{' '}
+              <span className="font-medium tabular-nums text-vialto-charcoal">
+                {fmtMoney(totales.iva)}
+              </span>
+            </p>
+          ) : (
+            ivaPorAlicuota.map(({ pct, iva }) => (
+              <p key={pct}>
+                {labelIvaAlicuota(pct)}:{' '}
+                <span className="font-medium tabular-nums text-vialto-charcoal">
+                  {fmtMoney(iva)}
+                </span>
+              </p>
+            ))
+          )}
+          <p>
+            Total con IVA:{' '}
+            <span className="font-medium tabular-nums text-vialto-charcoal">
+              {fmtMoney(totales.total)}
+            </span>
+          </p>
+        </div>
+      )}
+
+      {lineas.length > 0 && !totalesALaDerecha && (
         <div className="bg-vialto-mist/50 px-3 py-2 space-y-1 text-xs">
           <div className="flex justify-between">
             <span className="text-vialto-steel">Neto gravado</span>

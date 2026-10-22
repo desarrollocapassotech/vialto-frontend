@@ -58,7 +58,6 @@ export function HistorialAsignacionModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="historial-asignacion-titulo"
-      onClick={onClose}
     >
       <div
         className="w-full max-w-lg border border-black/15 bg-white p-6 shadow-xl"

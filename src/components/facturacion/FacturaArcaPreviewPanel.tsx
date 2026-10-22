@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import {
   FacturaLineasEditor,
   computeFacturaTotales,
+  computeIvaPorAlicuota,
+  labelIvaAlicuota,
   type FacturaLineaDraft,
 } from "@/components/facturacion/FacturaLineasEditor";
 import {
@@ -17,6 +19,7 @@ import { DatosFiscalesFaltantesAlerta } from "@/components/shared/DatosFiscalesF
 import { SinConfigArcaAviso } from "@/components/facturacion/SinConfigArcaAviso";
 import { EmisorArcaResumen } from "@/components/facturacion/EmisorArcaResumen";
 import { ParteFacturaResumen } from "@/components/facturacion/ParteFacturaResumen";
+import type { ResumenTotalFila } from "@/components/facturacion/ResumenDetalleColapsable";
 import type { ArcaConfig, Cliente } from "@/types/api";
 import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
 import { paisCodigoDesdeTexto, idFiscalPorPais } from "@/lib/ciudades/paises";
@@ -36,6 +39,27 @@ function fmtMoney(n: number) {
 
 // Fecha sin hora: siempre en UTC, si no en Argentina se ve un día antes (ver CLAUDE.md del frontend).
 const fmtDate = fmtDateUtc;
+
+/** Subtotal, IVA desagregado por alícuota (igual que Cuenta corriente) y total. */
+export function totalesResumenFactura(
+  lineas: FacturaLineaDraft[],
+  ivaPctDefault: number,
+): { filas: ResumenTotalFila[]; total: ResumenTotalFila } {
+  const totales = computeFacturaTotales(lineas, ivaPctDefault);
+  const ivaPorAlicuota = computeIvaPorAlicuota(lineas, ivaPctDefault);
+  return {
+    filas: [
+      { label: "Subtotal", value: fmtMoney(totales.neto) },
+      ...(ivaPorAlicuota.length === 0
+        ? [{ label: "IVA", value: fmtMoney(totales.iva) }]
+        : ivaPorAlicuota.map(({ pct, iva }) => ({
+            label: labelIvaAlicuota(pct),
+            value: fmtMoney(iva),
+          }))),
+    ],
+    total: { label: "Total a facturar", value: fmtMoney(totales.total) },
+  };
+}
 
 export type FacturaArcaPreviewPanelProps = {
   arcaConfig: ArcaConfig | null;
@@ -89,7 +113,7 @@ export function FacturaArcaPreviewPanel({
   const { tenant: tenantPdf } = useTenantPaisFijo(tenantId);
   const condicionIva = clienteDetalle?.condicionIva ?? null;
   const letra = facturaLetraFromCondicionIva(condicionIva);
-  const totales = computeFacturaTotales(lineas, ivaPctDefault);
+  const resumenTotales = totalesResumenFactura(lineas, ivaPctDefault);
   const missingClienteFields = missingEmitFields.filter((f) =>
     f.startsWith("Cliente:")
   );
@@ -199,11 +223,12 @@ export function FacturaArcaPreviewPanel({
       </section>
 
       <div className="space-y-1 border-t border-black/10 pt-2">
-        <Row label="Neto" value={fmtMoney(totales.neto)} />
-        <Row label="IVA" value={fmtMoney(totales.iva)} />
+        {resumenTotales.filas.map((f) => (
+          <Row key={f.label} label={f.label} value={f.value} />
+        ))}
         <div className="flex justify-between gap-3 text-xs font-semibold text-vialto-charcoal pt-1">
-          <span>Total a facturar</span>
-          <span className="whitespace-nowrap tabular-nums">{fmtMoney(totales.total)}</span>
+          <span>{resumenTotales.total.label}</span>
+          <span className="whitespace-nowrap tabular-nums">{resumenTotales.total.value}</span>
         </div>
       </div>
 

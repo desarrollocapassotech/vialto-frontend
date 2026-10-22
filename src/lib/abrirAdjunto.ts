@@ -27,6 +27,17 @@ async function fetchUrlComoBlob(url: string): Promise<string> {
   return URL.createObjectURL(blob);
 }
 
+/**
+ * ¿El adjunto es una foto/imagen? Las imágenes se ven en `VisorFotos` (pantalla completa,
+ * zoom); el resto (PDF, desconocido, remitos por `movimientoId`, PDFs de la API) sigue
+ * abriéndose en pestaña nueva con `abrirAdjuntoEnPestana`.
+ */
+export function esImagenAdjunto(origen: { url?: string | null; file?: File | null }): boolean {
+  if (origen.file) return origen.file.type.startsWith('image/');
+  if (origen.url) return detectarTipoAdjunto(origen.url) === 'imagen';
+  return false;
+}
+
 /** Página mínima en la pestaña nueva mientras carga o si falla. */
 function escribirEnPestana(win: Window, titulo: string, mensaje: string, esError = false) {
   try {

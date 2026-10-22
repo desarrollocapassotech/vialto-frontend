@@ -24,6 +24,7 @@ import {
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Presentacion } from "@/types/api";
 import { ConfirmDialog } from "@/components/crud/ConfirmDialog";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
@@ -39,6 +40,10 @@ export function PresentacionesSuperadminPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const descarteForm = useConfirmarDescarte(() => {
+    setIsFormOpen(false);
+    setFieldErrors({});
+  }, isFormOpen);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>({ nombre: "", activo: true });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -453,10 +458,7 @@ export function PresentacionesSuperadminPage() {
               <button
                 type="button"
                 disabled={saving}
-                onClick={() => {
-                  setIsFormOpen(false);
-                  setFieldErrors({});
-                }}
+                onClick={descarteForm.solicitarCierre}
                 className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
               >
                 Cancelar
@@ -470,6 +472,7 @@ export function PresentacionesSuperadminPage() {
               </button>
             </div>
           </form>
+          {descarteForm.dialogo}
         </div>
       )}
       <ConfirmDialog

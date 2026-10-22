@@ -10,6 +10,12 @@ export function maskCurrencyArInput(raw: string): string {
     s = s.replace('.', ',');
   }
 
+  // Punto tipeado al final (ej. el del teclado numérico) → coma decimal. Los puntos de
+  // miles que pone esta máscara nunca quedan al final, así que no se confunden.
+  if (!s.includes(',') && s.endsWith('.')) {
+    s = `${s.slice(0, -1)},`;
+  }
+
   const parts = s.split(',');
   const intRaw = parts[0] ?? '';
   let intDigits = intRaw.replace(/\D/g, '');

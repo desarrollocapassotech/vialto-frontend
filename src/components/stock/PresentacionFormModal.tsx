@@ -4,6 +4,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { friendlyError } from "@/lib/friendlyError";
 import type { Presentacion } from "@/types/api";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 
 export function PresentacionFormModal({
   modo,
@@ -26,6 +27,7 @@ export function PresentacionFormModal({
   const [nombre, setNombre] = useState(presentacionInicial?.nombre ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const descarte = useConfirmarDescarte(onClose);
 
   async function submit() {
     if (!nombre.trim()) {
@@ -77,7 +79,7 @@ export function PresentacionFormModal({
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={descarte.solicitarCierre}
             aria-label="Cerrar"
             className="h-8 w-8 flex items-center justify-center text-vialto-steel hover:bg-vialto-mist text-xl leading-none"
           >
@@ -104,7 +106,7 @@ export function PresentacionFormModal({
           <button
             type="button"
             disabled={saving}
-            onClick={onClose}
+            onClick={descarte.solicitarCierre}
             className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50"
           >
             Cancelar
@@ -120,6 +122,7 @@ export function PresentacionFormModal({
           </button>
         </div>
       </div>
+      {descarte.dialogo}
     </div>
   );
 }

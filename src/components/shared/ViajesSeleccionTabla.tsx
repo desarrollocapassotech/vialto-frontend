@@ -29,6 +29,51 @@ export type CantidadTarifaColumnas<T> = {
   renderTarifa: (v: T, conMoneda: boolean) => ReactNode;
 };
 
+/** Columnas IVA y Subtotal (importe + IVA) después del importe sin IVA. */
+export type IvaSubtotalColumnas<T> = {
+  importeDe: (v: T) => number | null | undefined;
+  ivaPctDe: (v: T) => number;
+  /** `conMoneda` igual que en `renderMonto`. */
+  formatMonto: (n: number, v: T, conMoneda: boolean) => ReactNode;
+  /**
+   * Tramos con los que se factura el viaje ("Facturar por tramo"). Si devuelve alguno,
+   * importe, IVA y subtotal salen de los tramos y la fila lleva el distintivo "Por tramo".
+   */
+  tramosDe?: (v: T) => Array<{ monto: number; ivaPct: number }> | null | undefined;
+};
+
+function fmtPct(n: number): string {
+  return `${n.toLocaleString("es-AR", { maximumFractionDigits: 2 })}%`;
+}
+
+const ivaDe = (importe: number, pct: number) => Math.round(importe * pct) / 100;
+
+function desgloseIvaSubtotal<T>(cols: IvaSubtotalColumnas<T>, v: T) {
+  const tramos = cols.tramosDe?.(v);
+  if (tramos && tramos.length > 0) {
+    const importe = tramos.reduce((s, t) => s + t.monto, 0);
+    const iva = tramos.reduce((s, t) => s + ivaDe(t.monto, t.ivaPct), 0);
+    const pcts = [...new Set(tramos.map((t) => t.ivaPct))];
+    return {
+      porTramo: true,
+      cantidadTramos: tramos.length,
+      importe,
+      pctLabel: pcts.map(fmtPct).join(" / "),
+      subtotal: importe + iva,
+    };
+  }
+  const importe = cols.importeDe(v);
+  if (importe == null) return null;
+  const pct = cols.ivaPctDe(v);
+  return {
+    porTramo: false,
+    cantidadTramos: 0,
+    importe,
+    pctLabel: fmtPct(pct),
+    subtotal: importe + ivaDe(importe, pct),
+  };
+}
+
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
   const [y, m, d] = iso.slice(0, 10).split("-");
@@ -72,6 +117,7 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
   mostrarTransporte = true,
   monedaDe,
   cantidadTarifa,
+  ivaSubtotal,
 }: {
   viajes: T[];
   selectedIds: string[];
@@ -107,13 +153,14 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
    * encabezado ("Monto (ARS)") y `renderMonto` recibe `conMoneda: false` (solo "$").
    */
   monedaDe?: (v: T) => string;
-  /** true = el monto es sin IVA: el encabezado dice "Monto (s/IVA)", sin la moneda. */
+  /** true = el monto es sin IVA: el encabezado dice "Importe", sin la moneda. */
   montoSinIva?: boolean;
   /**
    * Columnas de cantidad (TN/UD) y tarifa unitaria antes del monto. La factura usa
    * `cantidadFactura`/`precioUnitarioFactura` y la liquidación los `*Transportista`.
    */
   cantidadTarifa?: CantidadTarifaColumnas<T>;
+  ivaSubtotal?: IvaSubtotalColumnas<T>;
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
@@ -316,9 +363,15 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                 )}
                 <th className="whitespace-nowrap px-2 py-2 text-right">
                   {montoSinIva
-                    ? "Monto (s/IVA)"
+                    ? "Importe"
                     : `Monto${monedaUnica ? ` (${monedaUnica})` : ""}`}
                 </th>
+                {ivaSubtotal && (
+                  <>
+                    <th className="whitespace-nowrap px-2 py-2 text-right">IVA</th>
+                    <th className="whitespace-nowrap px-2 py-2 text-right">Subtotal</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-black/5 bg-white">
@@ -398,9 +451,42 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                         </td>
                       </>
                     )}
-                    <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-vialto-steel">
-                      {renderMonto(v, !monedaUnica)}
-                    </td>
+                    {(() => {
+                      const desglose = ivaSubtotal ? desgloseIvaSubtotal(ivaSubtotal, v) : null;
+                      return (
+                        <>
+                          <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-vialto-steel">
+                            {desglose?.porTramo ? (
+                              <span
+                                className="inline-flex items-center gap-1.5"
+                                title={`Se factura por tramo (${desglose.cantidadTramos} tramo${desglose.cantidadTramos !== 1 ? "s" : ""}): importe e IVA salen de los tramos.`}
+                              >
+                                <span className="rounded border border-amber-400/60 bg-amber-50 px-1.5 py-px text-[10px] uppercase tracking-wider text-amber-800">
+                                  Por tramo
+                                </span>
+                                <span className="text-vialto-charcoal">
+                                  {ivaSubtotal!.formatMonto(desglose.importe, v, !monedaUnica)}
+                                </span>
+                              </span>
+                            ) : (
+                              renderMonto(v, !monedaUnica)
+                            )}
+                          </td>
+                          {ivaSubtotal && (
+                            <>
+                              <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-vialto-steel">
+                                {desglose ? desglose.pctLabel : "—"}
+                              </td>
+                              <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-vialto-charcoal">
+                                {desglose
+                                  ? ivaSubtotal.formatMonto(desglose.subtotal, v, !monedaUnica)
+                                  : "—"}
+                              </td>
+                            </>
+                          )}
+                        </>
+                      );
+                    })()}
                   </tr>
                 );
               })}

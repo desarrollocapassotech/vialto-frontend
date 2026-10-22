@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { marcarModalModificado } from "@/lib/descarteModal";
 import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 
 export type SearchableSelectOption = { value: string; label: string };
@@ -122,6 +123,7 @@ export function SearchableSelect({
   }, [open]);
 
   function elegir(v: string) {
+    if (v !== value) marcarModalModificado();
     onChange(v);
     setOpen(false);
     setSearch("");
@@ -151,6 +153,7 @@ export function SearchableSelect({
           <input
             ref={searchRef}
             type="search"
+            data-descarte-ignorar
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={searchPlaceholder}
