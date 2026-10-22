@@ -1,7 +1,8 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FileDown } from 'lucide-react';
+import { ChevronDown, FileDown, Truck, Users } from 'lucide-react';
+import { SelectorOpcionesSheet, selectorTriggerClass } from '@/components/ui/SelectorOpcionesSheet';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { useTipoFlotaVisible } from '@/hooks/useTipoFlotaVisible';
 import { ClienteSearchSelect, TransportistaSearchSelect } from '@/components/forms/MaestroSearchSelects';
@@ -15,13 +16,10 @@ import type { Cliente, Transportista } from '@/types/api';
 
 type QuickCreate = 'cliente' | 'transportista' | null;
 
-function toggleButtonClass(active: boolean): string {
-  return `h-10 px-4 text-sm uppercase tracking-wider border ${
-    active
-      ? 'bg-vialto-charcoal text-white border-vialto-charcoal'
-      : 'border-black/20 text-vialto-steel hover:bg-vialto-mist'
-  }`;
-}
+const TABS: { id: TipoContraparte; label: string; icon: typeof Users }[] = [
+  { id: 'cliente', label: 'Clientes', icon: Users },
+  { id: 'proveedor', label: 'Proveedores', icon: Truck },
+];
 
 export function CuentaCorrienteTenantPage() {
   const { getToken } = useAuth();
@@ -54,6 +52,7 @@ export function CuentaCorrienteTenantPage() {
 
   const [quickCreate, setQuickCreate] = useState<QuickCreate>(null);
   const [saldosSlot, setSaldosSlot] = useState<HTMLDivElement | null>(null);
+  const [accionesSlot, setAccionesSlot] = useState<HTMLDivElement | null>(null);
   const [limpiarSlot, setLimpiarSlot] = useState<HTMLDivElement | null>(null);
 
   async function handleDescargarListado() {
@@ -97,7 +96,13 @@ export function CuentaCorrienteTenantPage() {
     setContraparteNombre(lista.find((x) => x.id === contraparteId)?.nombre ?? null);
   }, [contraparteId, tipoContraparte, clientes, transportistas]);
 
+  const [sectionSheetOpen, setSectionSheetOpen] = useState(false);
+  const activeTabDef = TABS.find((t) => t.id === tipoContraparte);
+  const ActiveIcon = activeTabDef?.icon;
+
   function elegirTipo(tipo: TipoContraparte) {
+    setSectionSheetOpen(false);
+    if (tipo === tipoContraparte) return;
     setTipoContraparte(tipo);
     setContraparteId('');
   }
@@ -109,15 +114,18 @@ export function CuentaCorrienteTenantPage() {
           <h1 className={pageTitleClass}>Cuenta corriente</h1>
           <div ref={setLimpiarSlot} className="empty:hidden" />
         </div>
-        <button
-          type="button"
-          onClick={handleDescargarListado}
-          disabled={descargando}
-          className="inline-flex h-10 items-center gap-2 px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-50"
-        >
-          <FileDown className="h-4 w-4" />
-          {descargando ? 'Generando…' : 'Descargar listado de deudores'}
-        </button>
+        {/* Deudores = clientes; en Proveedores no aplica. */}
+        {tipoContraparte === 'cliente' && (
+          <button
+            type="button"
+            onClick={handleDescargarListado}
+            disabled={descargando}
+            className="inline-flex h-10 items-center gap-2 px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-50"
+          >
+            <FileDown className="h-4 w-4" />
+            {descargando ? 'Generando…' : 'Descargar listado de deudores'}
+          </button>
+        )}
       </div>
 
       {errorDescarga && (
@@ -126,27 +134,62 @@ export function CuentaCorrienteTenantPage() {
         </p>
       )}
 
+      {/* Pestañas Clientes / Proveedores: mismo estilo que Mantenimiento. */}
+      {hayProveedores && (
+        <div className="mt-6 border-b border-black/15">
+          <div className="pb-3 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setSectionSheetOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={sectionSheetOpen}
+              className={selectorTriggerClass}
+            >
+              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                Sección
+              </span>
+              <span className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                {ActiveIcon && <ActiveIcon className="h-4 w-4 shrink-0 text-vialto-steel" strokeWidth={1.75} aria-hidden />}
+                <span className="truncate font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-vialto-charcoal">
+                  {activeTabDef?.label}
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-vialto-steel" strokeWidth={2} aria-hidden />
+              </span>
+            </button>
+            <SelectorOpcionesSheet
+              open={sectionSheetOpen}
+              onClose={() => setSectionSheetOpen(false)}
+              title="Elegir sección"
+              options={TABS.map((t) => ({ id: t.id, label: t.label }))}
+              activeId={tipoContraparte}
+              onSelect={(id) => elegirTipo(id as TipoContraparte)}
+            />
+          </div>
+
+          <nav className="-mb-px hidden gap-1 overflow-x-auto lg:flex" aria-label="Secciones de cuenta corriente">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => elegirTipo(tab.id)}
+                className={[
+                  'flex shrink-0 whitespace-nowrap items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border',
+                  tipoContraparte === tab.id
+                    ? 'border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal'
+                    : 'border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]',
+                ].join(' ')}
+              >
+                <tab.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      )}
+
       <div className="mt-6">
         {/* items-end: las tarjetas de saldo (con su título arriba) quedan a la altura del select. */}
         <div className="mb-6 flex flex-wrap items-end gap-3">
-          {hayProveedores && (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => elegirTipo('cliente')}
-                className={toggleButtonClass(tipoContraparte === 'cliente')}
-              >
-                Clientes
-              </button>
-              <button
-                type="button"
-                onClick={() => elegirTipo('proveedor')}
-                className={toggleButtonClass(tipoContraparte === 'proveedor')}
-              >
-                Proveedores
-              </button>
-            </div>
-          )}
           <div className="w-full sm:w-80">
             {tipoContraparte === 'cliente' ? (
               <ClienteSearchSelect
@@ -167,6 +210,8 @@ export function CuentaCorrienteTenantPage() {
           </div>
           {/* Las tarjetas de saldo de la cuenta elegida se dibujan acá (portal desde CuentaContraparteView). */}
           <div ref={setSaldosSlot} className="flex flex-wrap gap-2" />
+          {/* Exportar / Nueva venta / Registrar cobro, a la derecha en la misma fila (portal). */}
+          <div ref={setAccionesSlot} className="ml-auto flex empty:hidden" />
         </div>
 
         {contraparteId && contraparteNombre ? (
@@ -176,6 +221,7 @@ export function CuentaCorrienteTenantPage() {
             contraparteId={contraparteId}
             contraparteNombre={contraparteNombre}
             saldosSlot={saldosSlot}
+            accionesSlot={accionesSlot}
             limpiarFiltrosSlot={limpiarSlot}
           />
         ) : (

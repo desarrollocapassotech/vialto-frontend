@@ -99,6 +99,8 @@ type Props = {
    * cuenta, para aprovechar el espacio). Sin él, van arriba de la grilla.
    */
   saldosSlot?: HTMLElement | null;
+  /** Misma fila que el selector y los saldos: Exportar / Nueva venta / Registrar cobro. */
+  accionesSlot?: HTMLElement | null;
   /** Junto al título de la página: ahí va "Limpiar filtros" (regla global). */
   limpiarFiltrosSlot?: HTMLElement | null;
 };
@@ -108,6 +110,7 @@ export function CuentaContraparteView({
   contraparteId,
   contraparteNombre,
   saldosSlot,
+  accionesSlot,
   limpiarFiltrosSlot,
 }: Props) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -506,56 +509,61 @@ export function CuentaContraparteView({
       <p className="text-sm text-vialto-steel">Sin movimientos todavía.</p>
     ) : null;
 
+  const accionesNode = (
+    <div className="ml-auto flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={() => setExportMenuOpen(true)}
+        className="inline-flex h-10 items-center gap-1.5 px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+      >
+        Exportar
+        <svg aria-hidden viewBox="0 0 12 12" className="h-3 w-3 shrink-0">
+          <path
+            d="M2.5 4.5 6 8l3.5-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+      {permiteCargoManual && (
+        <button
+          type="button"
+          onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'cargo' })}
+          className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+        >
+          {tipoContraparte === 'cliente' ? 'Nueva venta' : 'Nueva compra'}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'pago' })}
+        className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+      >
+        {tipoContraparte === 'cliente' ? 'Registrar cobro' : 'Registrar pago'}
+      </button>
+    </div>
+  );
+
   return (
     <div>
       {visorAdjunto}
       {saldosSlot ? createPortal(saldosNode, saldosSlot) : null}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      {accionesSlot ? createPortal(accionesNode, accionesSlot) : null}
+      <LimpiarFiltrosPortal
+        slot={limpiarFiltrosSlot}
+        visible={anyFiltroActivo}
+        onClick={limpiarFiltros}
+        soloDesktop
+      />
+      {(!saldosSlot || !accionesSlot) && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           {!saldosSlot && saldosNode}
-          <LimpiarFiltrosPortal
-            slot={limpiarFiltrosSlot}
-            visible={anyFiltroActivo}
-            onClick={limpiarFiltros}
-            soloDesktop
-          />
+          {!accionesSlot && accionesNode}
         </div>
-        <div className="ml-auto flex gap-2">
-          <button
-            type="button"
-            onClick={() => setExportMenuOpen(true)}
-            className="inline-flex h-10 items-center gap-1.5 px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-          >
-            Exportar
-            <svg aria-hidden viewBox="0 0 12 12" className="h-3 w-3 shrink-0">
-              <path
-                d="M2.5 4.5 6 8l3.5-3.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-          {permiteCargoManual && (
-            <button
-              type="button"
-              onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'cargo' })}
-              className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-            >
-              {tipoContraparte === 'cliente' ? 'Nueva venta' : 'Nueva compra'}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'pago' })}
-            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-          >
-            {tipoContraparte === 'cliente' ? 'Registrar cobro' : 'Registrar pago'}
-          </button>
-        </div>
-      </div>
+      )}
 
       {error && (
         <p className="mb-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
