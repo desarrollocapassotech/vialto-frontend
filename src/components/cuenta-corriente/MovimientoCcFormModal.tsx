@@ -19,12 +19,20 @@ import {
 } from '@/lib/cuentaCorriente';
 import { fmtDateUtc } from '@/lib/fmtDateUtc';
 import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
-import { computeFacturaTotalesFromBases } from '@/lib/facturaTotales';
+import {
+  FacturaLineasEditor,
+  toFacturaLineasPayload,
+  validateFacturaLineasDraft,
+  type FacturaLineaDraft,
+} from '@/components/facturacion/FacturaLineasEditor';
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
+
+/** IVA con el que arranca cada línea de una venta/compra, igual que en Facturas. */
+const IVA_PCT_DEFAULT = 21;
 
 type Props = {
   tipoContraparte: TipoContraparte;
@@ -76,7 +84,11 @@ export function MovimientoCcFormModal({
   // Fijo según el botón que abrió el modal (Nueva venta/compra o Registrar cobro/pago).
   const tipo: TipoMovimientoCc = permiteCargo ? tipoInicial : 'pago';
   const [importeStr, setImporteStr] = useState('');
-  const [ivaPctStr, setIvaPctStr] = useState('');
+  // Venta/compra: líneas como en una factura, cada una con su importe neto e IVA.
+  const [lineas, setLineas] = useState<FacturaLineaDraft[]>([
+    { descripcion: '', importe: 0, importeStr: '', ivaPct: IVA_PCT_DEFAULT },
+  ]);
+  const [lineasIncompletas, setLineasIncompletas] = useState<number[]>([]);
   const [moneda, setMoneda] = useState<ViajeMonedaCodigo>('ARS');
   const [fecha, setFecha] = useState(() => hoyArgentinaIso());
   const [fechaVencimiento, setFechaVencimiento] = useState('');
@@ -111,25 +123,24 @@ export function MovimientoCcFormModal({
     cambiarImputacion(imputarA.includes(id) ? imputarA.filter((x) => x !== id) : [...imputarA, id]);
   }
 
-  // IVA solo en ventas/compras, mismo campo que Facturas: vacío = sin IVA. El importe
-  // cargado es sin IVA y se registra por el total, calculado igual que una factura.
-  const ivaPctNum = ivaPctStr.trim() !== '' ? Number(ivaPctStr) : 0;
-  const ivaPct = esCargo && Number.isFinite(ivaPctNum) && ivaPctNum > 0 ? ivaPctNum : null;
-  const importeNeto = parseCurrencyAr(importeStr) ?? 0;
-  const totales =
-    ivaPct != null && importeNeto > 0
-      ? computeFacturaTotalesFromBases([{ importe: importeNeto, ivaPct }])
-      : null;
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const importe = parseCurrencyAr(importeStr);
-    if (!importe || importe <= 0) {
+    // Venta/compra: el total (neto + IVA de cada línea) lo calcula el backend igual que el pie del editor.
+    const importe = esCargo ? undefined : parseCurrencyAr(importeStr);
+    if (esCargo) {
+      const v = validateFacturaLineasDraft(lineas);
+      if (!v.ok) {
+        setLineasIncompletas(v.indices);
+        setError(v.message);
+        return;
+      }
+      setLineasIncompletas([]);
+      if (lineas.some((l) => (l.ivaPct ?? IVA_PCT_DEFAULT) < 0 || (l.ivaPct ?? IVA_PCT_DEFAULT) > 100)) {
+        setError('El IVA tiene que ser un porcentaje entre 0 y 100.');
+        return;
+      }
+    } else if (!importe || importe <= 0) {
       setError('Ingresá un importe mayor a 0.');
-      return;
-    }
-    if (esCargo && (!Number.isFinite(ivaPctNum) || ivaPctNum < 0 || ivaPctNum > 100)) {
-      setError('El IVA tiene que ser un porcentaje entre 0 y 100.');
       return;
     }
     setSaving(true);
@@ -143,7 +154,13 @@ export function MovimientoCcFormModal({
         // Sin `concepto`: el backend lo pone solo (VENTA/COMPRA/COBRO/PAGO).
         imputarACargoIds: !esCargo && imputarA.length > 0 ? imputarA : undefined,
         importe,
-        ivaPct: ivaPct ?? undefined,
+        lineas: esCargo
+          ? toFacturaLineasPayload(lineas).map((l) => ({
+              descripcion: l.descripcion,
+              importe: l.importe,
+              ivaPct: l.ivaPct ?? IVA_PCT_DEFAULT,
+            }))
+          : undefined,
         moneda,
         fecha,
         fechaVencimiento: fechaVencimiento || undefined,
@@ -189,9 +206,9 @@ export function MovimientoCcFormModal({
       } — ${contraparteNombre}`}
       onClose={descarte.solicitarCierre}
       descarte={descarte}
-      // Cobro/pago: más ancho y alto para la lista de facturas a imputar.
-      maxWidthClass={esCargo ? undefined : 'sm:max-w-3xl'}
-      scrollBody={!esCargo}
+      // Más ancho y alto: líneas de la venta/compra o lista de facturas a imputar del cobro/pago.
+      maxWidthClass={esCargo ? 'sm:max-w-5xl' : 'sm:max-w-3xl'}
+      scrollBody
       footer={
         <>
           <ErrorPieModal error={error} />
@@ -210,21 +227,29 @@ export function MovimientoCcFormModal({
       }
     >
       <form id="movimiento-cc-form" onSubmit={handleSubmit} className="space-y-4">
-        {/* Venta/compra: número de comprobante primero, debajo emisión y vencimiento. */}
+        {/* Venta/compra: número de comprobante y moneda primero, debajo emisión y vencimiento. */}
         {esCargo ? (
           <>
-            <div>
-              <label className={labelClass} htmlFor="cc-comprobante">
-                Número de comprobante
-              </label>
-              <input
-                id="cc-comprobante"
-                type="text"
-                className={inputClass}
-                value={numeroComprobante}
-                onChange={(e) => setNumeroComprobante(e.target.value)}
-                placeholder="Ej. 0001-00001234"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass} htmlFor="cc-comprobante">
+                  Número de comprobante
+                </label>
+                <input
+                  id="cc-comprobante"
+                  type="text"
+                  className={inputClass}
+                  value={numeroComprobante}
+                  onChange={(e) => setNumeroComprobante(e.target.value)}
+                  placeholder="Ej. 0001-00001234"
+                />
+              </div>
+              <div>
+                <label className={labelClass} htmlFor="cc-moneda">
+                  Moneda
+                </label>
+                <MonedaSelect id="cc-moneda" value={moneda} onChange={setMoneda} className={inputClass} />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               {campoFecha}
@@ -326,87 +351,57 @@ export function MovimientoCcFormModal({
         )}
 
         {/* Cobro/pago: importe, moneda y fecha en una fila; el importe toma el ancho que sobra. */}
-        <div
-          className={
-            esCargo
-              ? 'grid grid-cols-2 gap-3'
-              : 'grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_10.5rem]'
-          }
-        >
-          <div>
-            <label className={labelClass} htmlFor="cc-importe">
-              Importe
-            </label>
-            <input
-              id="cc-importe"
-              type="text"
-              inputMode="decimal"
-              className={inputClass}
-              value={importeStr}
-              onChange={(e) => setImporteStr(maskCurrencyArInput(e.target.value))}
-              placeholder="0,00"
-              required
-            />
-          </div>
-          <div>
-            <label className={labelClass} htmlFor="cc-moneda">
-              Moneda
-            </label>
-            {/* Con facturas elegidas, la moneda es la de ellas. */}
-            <MonedaSelect
-              id="cc-moneda"
-              value={moneda}
-              onChange={setMoneda}
-              className={inputClass}
-              disabled={!esCargo && elegidos.length > 0}
-            />
-          </div>
-          {!esCargo && campoFecha}
-        </div>
-
-        {esCargo && (
-          <div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass} htmlFor="cc-iva">
-                  IVA (%)
-                </label>
-                <input
-                  id="cc-iva"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  className={inputClass}
-                  value={ivaPctStr}
-                  onChange={(e) => setIvaPctStr(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
-              {totales && (
-                <div>
-                  <label className={labelClass} htmlFor="cc-total">
-                    Total con IVA
-                  </label>
-                  <input
-                    id="cc-total"
-                    type="text"
-                    className={`${inputClass} bg-vialto-mist tabular-nums`}
-                    value={`${formatCurrencyArFromNumber(totales.total)} ${moneda}`}
-                    readOnly
-                    tabIndex={-1}
-                  />
-                </div>
-              )}
+        {!esCargo && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_10.5rem]">
+            <div>
+              <label className={labelClass} htmlFor="cc-importe">
+                Importe
+              </label>
+              <input
+                id="cc-importe"
+                type="text"
+                inputMode="decimal"
+                className={inputClass}
+                value={importeStr}
+                onChange={(e) => setImporteStr(maskCurrencyArInput(e.target.value))}
+                placeholder="0,00"
+                required
+              />
             </div>
-            {totales && (
-              <p className="mt-1 text-xs text-vialto-steel tabular-nums">
-                {formatCurrencyArFromNumber(totales.neto)} + IVA{' '}
-                {formatCurrencyArFromNumber(totales.iva)} = {formatCurrencyArFromNumber(totales.total)}{' '}
-                {moneda}. Se registra por el total.
-              </p>
-            )}
+            <div>
+              <label className={labelClass} htmlFor="cc-moneda">
+                Moneda
+              </label>
+              {/* Con facturas elegidas, la moneda es la de ellas. */}
+              <MonedaSelect
+                id="cc-moneda"
+                value={moneda}
+                onChange={setMoneda}
+                className={inputClass}
+                disabled={elegidos.length > 0}
+              />
+            </div>
+            {campoFecha}
           </div>
+        )}
+
+        {/* Venta/compra: el importe sale de las líneas (total = neto + IVA de cada una). */}
+        {esCargo && (
+          <FacturaLineasEditor
+            lineas={lineas}
+            onChange={(next) => {
+              setLineas(next);
+              setLineasIncompletas([]);
+              setError(null);
+            }}
+            ivaPctDefault={IVA_PCT_DEFAULT}
+            incompleteIndices={lineasIncompletas}
+            agregarAbajo
+            totalesALaDerecha
+            labelImporte="Importe"
+            mostrarSubtotal
+            importeFormatoAr
+          />
         )}
 
         {esCargo ? null : (

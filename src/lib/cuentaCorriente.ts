@@ -27,6 +27,8 @@ export type MovimientoCc = {
   importeNeto?: number | null;
   ivaPct?: number | null;
   ivaMonto?: number | null;
+  /** Solo ventas/compras manuales cargadas por líneas (con alícuotas distintas, `ivaPct` es null). */
+  lineas?: { descripcion: string; importe: number; ivaPct: number }[] | null;
   moneda: string;
   fecha: string;
   fechaVencimiento: string | null;
@@ -208,10 +210,12 @@ export type CreateMovimientoCcInput = {
   proveedorId?: string;
   tipo: TipoMovimientoCc;
   concepto?: string;
-  /** Con `ivaPct`, es el importe SIN IVA: el backend registra el total (neto + IVA). */
-  importe: number;
+  /** Con `ivaPct`, es el importe SIN IVA: el backend registra el total (neto + IVA). Con `lineas`, se omite. */
+  importe?: number;
   /** % de IVA, solo ventas/compras. Omitido = sin IVA. */
   ivaPct?: number;
+  /** Solo ventas/compras: líneas como en una factura (importe neto + IVA %); el backend registra el total. */
+  lineas?: { descripcion: string; importe: number; ivaPct: number }[];
   moneda?: string;
   fecha: string;
   fechaVencimiento?: string;
