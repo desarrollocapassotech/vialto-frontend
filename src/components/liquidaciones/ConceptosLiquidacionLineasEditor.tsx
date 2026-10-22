@@ -12,6 +12,11 @@ import {
   signedMontoConIvaConcepto,
 } from "@/lib/liquidacionConceptosIva";
 import { tooltipPanelClass } from "@/lib/tooltip";
+import {
+  formatCurrencyArFromNumber,
+  maskCurrencyArInput,
+  parseCurrencyAr,
+} from "@/lib/currencyMask";
 import type {
   ConceptoLiquidacion,
   ConceptoLiquidacionSigno,
@@ -67,7 +72,7 @@ function fmtMoney(n: number) {
 }
 
 function montoStrFromNumber(monto: number): string {
-  return Number.isFinite(monto) && monto > 0 ? String(monto) : "";
+  return Number.isFinite(monto) && monto > 0 ? formatCurrencyArFromNumber(monto) : "";
 }
 
 function parseMontoInput(raw: string): number {
@@ -650,18 +655,18 @@ export function ConceptosLiquidacionLineasEditor({
                     Monto unitario <span className="text-red-500">*</span>
                   </span>
                   <input
-                    type="number"
-                    min={0}
-                    step="0.01"
+                    type="text"
                     inputMode="decimal"
+                    placeholder="0,00"
                     value={displayMontoStr(linea)}
                     disabled={disabled}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => {
-                      const raw = e.target.value;
+                      // Miles con "." y decimales con ",".
+                      const montoStr = maskCurrencyArInput(e.target.value);
                       updateRow(index, {
-                        montoStr: raw,
-                        montoUnitario: parseMontoInput(raw),
+                        montoStr,
+                        montoUnitario: parseCurrencyAr(montoStr) ?? 0,
                       });
                     }}
                     className={`${inputClass} ${montoMissing ? "border-red-400" : ""}`}
@@ -738,12 +743,12 @@ export function ConceptosLiquidacionLineasEditor({
       )}
 
       {!disabled && (
-        <div className="flex justify-end">
+        <div className="flex justify-start">
           <button
             type="button"
             disabled={loading || showQuick}
             onClick={addRow}
-            className="text-[10px] uppercase tracking-wider text-vialto-charcoal hover:text-vialto-fire disabled:opacity-50"
+            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
           >
             + Agregar concepto
           </button>

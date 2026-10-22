@@ -13,6 +13,7 @@ import {
   FacturaTramosEditor,
   computeTotalesFacturaPorTramo,
   emptyFacturaTramoDraft,
+  isFacturaTramoCompleto,
   toFacturaTramosPayload,
   validateFacturaTramosDraft,
   type FacturaTramoDraft,
@@ -21,6 +22,7 @@ import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoF
 import {
   ViajesSeleccionTabla,
   type CantidadTarifaColumnas,
+  type IvaSubtotalColumnas,
 } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
@@ -297,6 +299,8 @@ export function ViajesVinculadosEditor({
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
   unidadCantidad = "TN",
+  ivaPct,
+  tramos,
 }: {
   viajes: Viaje[];
   disponibles: Viaje[];
@@ -316,8 +320,26 @@ export function ViajesVinculadosEditor({
   idPropio2Label?: string;
   /** Encabezado de la columna de cantidad ("TN"/"UD", ver `unidadCantidadViajes`). */
   unidadCantidad?: string;
+  /** % de IVA de la factura: con él la tabla suma las columnas IVA y Subtotal. */
+  ivaPct?: number;
+  /** Tramos de "Facturar por tramo" (solo si está tildado): esos viajes muestran el total de sus tramos. */
+  tramos?: FacturaTramoDraft[];
 }) {
   const showContraparteHint = !clienteId.trim();
+  const tramosCompletos = (tramos ?? []).filter(isFacturaTramoCompleto);
+  const ivaSubtotal: IvaSubtotalColumnas<Viaje> | undefined =
+    ivaPct == null
+      ? undefined
+      : {
+          importeDe: (v) =>
+            (v.cantidadFactura != null && v.precioUnitarioFactura != null) || v.monto != null
+              ? importeNetoViajeParaFactura(v)
+              : null,
+          ivaPctDe: () => ivaPct,
+          formatMonto: (n, v, conMoneda) => formatViajeImporteForListado(n, v.monedaMonto, conMoneda),
+          tramosDe: (v) =>
+            selected.includes(v.id) ? tramosCompletos.filter((t) => t.viajeId === v.id) : null,
+        };
   const cantidadTarifa: CantidadTarifaColumnas<Viaje> = {
     unidad: unidadCantidad,
     cantidadDe: (v) => v.cantidadFactura,
@@ -367,6 +389,7 @@ export function ViajesVinculadosEditor({
           renderMonto={(v, conMoneda) => textoMontoFacturarListado(v, conMoneda)}
           monedaDe={(v) => normalizeViajeMoneda(v.monedaMonto)}
           cantidadTarifa={cantidadTarifa}
+          ivaSubtotal={ivaSubtotal}
           loading={loading}
           fillHeight
           emptyMessage="No hay viajes disponibles para vincular."
@@ -389,6 +412,7 @@ export function ViajesVinculadosEditor({
       renderMonto={(v, conMoneda) => textoMontoFacturarListado(v, conMoneda)}
       monedaDe={(v) => normalizeViajeMoneda(v.monedaMonto)}
       cantidadTarifa={cantidadTarifa}
+      ivaSubtotal={ivaSubtotal}
       loading={loading}
       maxHeightClass="max-h-72"
       emptyMessage="No hay viajes disponibles para vincular."
@@ -762,6 +786,8 @@ export function FacturaEditModal({
                 idPropio2Habilitado={idPropio2Habilitado}
                 idPropio2Label={idPropio2Label}
                 unidadCantidad={unidadCantidad}
+                ivaPct={draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0}
+                tramos={draft.facturarPorTramo ? draft.tramos : undefined}
               />
             </div>
 

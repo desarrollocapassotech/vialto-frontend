@@ -13,7 +13,15 @@ import { Receipt } from "lucide-react";
 import { useHiddenFiscalFields } from "@/hooks/useHiddenFiscalFields";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { BloqueoModal } from "@/components/ui/BloqueoModal";
-import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPreviewPanel";
+import {
+  FacturaArcaPreviewPanel,
+  totalesResumenFactura,
+} from "@/components/facturacion/FacturaArcaPreviewPanel";
+import {
+  DetalleComprobanteEncabezado,
+  ResumenTotalesBarra,
+  VerDetalleButton,
+} from "@/components/facturacion/ResumenDetalleColapsable";
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
@@ -423,6 +431,17 @@ export function FacturaCreateModal({
   const missingEmitMessage = formatFacturaEmitMissingMessage(missingEmitFields);
   const datosEmitIncompletos = datosReady && missingEmitFields.length > 0;
   const sinConfigArca = datosReady && !arcaConfig;
+
+  // Panel de detalle oculto por defecto (debajo queda la barra de totales). Si aparece
+  // un aviso que solo vive en el panel, se abre solo para que no pase desapercibido.
+  const [detalleAbierto, setDetalleAbierto] = useState(false);
+  const avisoEnPanel = bloqueadoUsd || sinConfigArca || arcaConfigMissing;
+  useEffect(() => {
+    if (avisoEnPanel) setDetalleAbierto(true);
+  }, [avisoEnPanel]);
+  useEffect(() => {
+    if (open) setDetalleAbierto(false);
+  }, [open]);
 
   // Al elegir un cliente sin los datos fiscales que ARCA exige, se abre un modal para
   // completarlos — una sola vez por cliente; después se reabre desde el aviso del panel.
@@ -985,9 +1004,8 @@ export function FacturaCreateModal({
         {!hasArca && <div className="sm:col-span-2">{compactIvaField}</div>}
       </div>
       <div className="flex min-h-[14rem] flex-1 flex-col gap-1 overflow-hidden">
-        {/* Mismo título que "Nueva liquidación" (sin asterisco: en facturas los viajes son opcionales). */}
         <p className={compactLabelClass}>
-          Viajes a incluir
+          Viajes <span className="text-red-500">*</span>
           {draft.viajeIds.length > 0 && (
             <span className="ml-1 normal-case text-vialto-charcoal">
               ({draft.viajeIds.length} seleccionado
@@ -1010,6 +1028,8 @@ export function FacturaCreateModal({
             idPropio2Habilitado={idPropio2Habilitado}
             idPropio2Label={idPropio2Label}
             unidadCantidad={unidadCantidadViajes(tenantEfectivo)}
+            ivaPct={ivaPctDefault}
+            tramos={draft.facturarPorTramo ? draft.tramos : undefined}
           />
         </div>
       </div>
@@ -1296,17 +1316,33 @@ export function FacturaCreateModal({
             className={[
               "min-h-0 flex-1 overflow-hidden",
               step === "form" && unifiedArca
-                ? "flex flex-col lg:min-h-0 lg:flex-row"
+                ? "flex flex-col"
                 : "overflow-y-auto",
             ].join(" ")}
           >
             {step === "form" ? (
               unifiedArca ? (
                 <>
-                  <div className="flex min-h-0 flex-col overflow-y-auto border-b border-black/10 px-4 py-4 sm:px-5 lg:w-[68%] lg:max-w-[68%] lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+                <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+                  <div
+                    className={[
+                      "relative flex min-h-0 flex-col overflow-y-auto px-4 py-4 sm:px-5",
+                      detalleAbierto
+                        ? "border-b border-black/10 lg:w-[68%] lg:max-w-[68%] lg:shrink-0 lg:border-b-0 lg:border-r"
+                        : "flex-1",
+                    ].join(" ")}
+                  >
+                    {/* En desktop va en el hueco a la derecha del IVA; en mobile, arriba del formulario. */}
+                    {!detalleAbierto && (
+                      <div className="mb-3 flex justify-end lg:absolute lg:right-5 lg:top-[2.4rem] lg:mb-0">
+                        <VerDetalleButton onClick={() => setDetalleAbierto(true)} />
+                      </div>
+                    )}
                     {compactFields}
                   </div>
-                  <div className="min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:w-[32%] lg:max-w-[32%] lg:shrink-0 lg:min-w-0">
+                  {detalleAbierto && (
+                  <div className="min-h-0 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:w-[32%] lg:max-w-[32%] lg:shrink-0 lg:min-w-0">
+                    <DetalleComprobanteEncabezado onOcultar={() => setDetalleAbierto(false)} />
                     <FacturaArcaPreviewPanel
                       arcaConfig={arcaConfig}
                       clienteDetalle={clienteDetalle}
@@ -1367,6 +1403,11 @@ export function FacturaCreateModal({
                       }
                     />
                   </div>
+                  )}
+                </div>
+                {!detalleAbierto && (
+                  <ResumenTotalesBarra {...totalesResumenFactura(lineas, ivaPctDefault)} />
+                )}
                 </>
               ) : (
                 <div className="overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">

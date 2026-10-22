@@ -49,6 +49,7 @@ type ViajeItem = Pick<
   | "origen"
   | "destino"
   | "precioTransportistaExterno"
+  | "precioTransportistaIvaIncluidoPct"
   | "monedaPrecioTransportistaExterno"
   | "cantidadTransportista"
   | "precioUnitarioTransportista"
@@ -667,6 +668,14 @@ export function LiquidacionEditModal({
                   }}
                   monedaDe={monedaDeViaje}
                   montoSinIva
+                  ivaSubtotal={{
+                    importeDe: (v) => v.precioTransportistaExterno,
+                    ivaPctDe: (v) =>
+                      v.precioTransportistaIvaIncluidoPct ||
+                      (ivaPct.trim() !== "" ? Number(ivaPct) : 0),
+                    formatMonto: (n, v, conMoneda) =>
+                      fmtMontoViaje(n, v.monedaPrecioTransportistaExterno, conMoneda),
+                  }}
                   disabledCheck={(v) => {
                     const moneda = monedaDeViaje(v);
                     const disabled =

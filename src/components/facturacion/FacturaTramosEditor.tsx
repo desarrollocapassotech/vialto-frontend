@@ -170,21 +170,14 @@ export function FacturaTramosEditor({
     onChange(tramos.filter((_, i) => i !== index));
   }
 
+  // Un tramo nuevo recién cuando los anteriores están completos (no se acumulan filas vacías).
+  const hayTramoIncompleto = tramos.some((t) => !isFacturaTramoCompleto(t));
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs uppercase tracking-wider text-vialto-steel">
-          Tramos
-        </p>
-        <button
-          type="button"
-          disabled={disabled || viajeIds.length === 0}
-          onClick={addTramo}
-          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
-        >
-          + Agregar tramo
-        </button>
-      </div>
+      <p className="text-xs uppercase tracking-wider text-vialto-steel">
+        Tramos
+      </p>
 
       {viajeIds.length === 0 && (
         <p className="text-xs text-vialto-steel border border-black/10 bg-vialto-mist/40 px-3 py-2">
@@ -325,6 +318,22 @@ export function FacturaTramosEditor({
           </div>
         );
       })}
+
+      {viajeIds.length > 0 && (
+        <button
+          type="button"
+          disabled={disabled || hayTramoIncompleto}
+          onClick={addTramo}
+          title={
+            hayTramoIncompleto
+              ? "Completá viaje, descripción, importe e IVA del tramo anterior para agregar otro."
+              : undefined
+          }
+          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+        >
+          + Agregar tramo
+        </button>
+      )}
     </div>
   );
 }
