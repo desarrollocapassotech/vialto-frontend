@@ -73,7 +73,8 @@ export function MovimientoCcFormModal({
   onCreated,
 }: Props) {
   const { getToken } = useAuth();
-  const [tipo, setTipo] = useState<TipoMovimientoCc>(permiteCargo ? tipoInicial : 'pago');
+  // Fijo según el botón que abrió el modal (Nueva venta/compra o Registrar cobro/pago).
+  const tipo: TipoMovimientoCc = permiteCargo ? tipoInicial : 'pago';
   const [importeStr, setImporteStr] = useState('');
   const [ivaPctStr, setIvaPctStr] = useState('');
   const [moneda, setMoneda] = useState<ViajeMonedaCodigo>('ARS');
@@ -162,7 +163,7 @@ export function MovimientoCcFormModal({
   const campoFecha = (
     <div>
       <label className={labelClass} htmlFor="cc-fecha">
-        Fecha
+        {esCargo ? 'Emisión' : 'Fecha'}
       </label>
       <input
         id="cc-fecha"
@@ -209,34 +210,39 @@ export function MovimientoCcFormModal({
       }
     >
       <form id="movimiento-cc-form" onSubmit={handleSubmit} className="space-y-4">
-        {permiteCargo && (
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setTipo('cargo')}
-            className={`flex-1 h-10 text-sm uppercase tracking-wider border ${
-              esCargo
-                ? 'bg-vialto-charcoal text-white border-vialto-charcoal'
-                : 'border-black/20 text-vialto-steel hover:bg-vialto-mist'
-            }`}
-          >
-            {esCliente ? 'Venta' : 'Compra'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setTipo('pago')}
-            className={`flex-1 h-10 text-sm uppercase tracking-wider border ${
-              !esCargo
-                ? 'bg-vialto-charcoal text-white border-vialto-charcoal'
-                : 'border-black/20 text-vialto-steel hover:bg-vialto-mist'
-            }`}
-          >
-            {esCliente ? 'Cobro' : 'Pago'}
-          </button>
-        </div>
-        )}
-
-        {esCargo ? null : (
+        {/* Venta/compra: número de comprobante primero, debajo emisión y vencimiento. */}
+        {esCargo ? (
+          <>
+            <div>
+              <label className={labelClass} htmlFor="cc-comprobante">
+                Número de comprobante
+              </label>
+              <input
+                id="cc-comprobante"
+                type="text"
+                className={inputClass}
+                value={numeroComprobante}
+                onChange={(e) => setNumeroComprobante(e.target.value)}
+                placeholder="Ej. 0001-00001234"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {campoFecha}
+              <div>
+                <label className={labelClass} htmlFor="cc-vencimiento">
+                  Vencimiento
+                </label>
+                <input
+                  id="cc-vencimiento"
+                  type="date"
+                  className={inputClass}
+                  value={fechaVencimiento}
+                  onChange={(e) => setFechaVencimiento(e.target.value)}
+                />
+              </div>
+            </div>
+          </>
+        ) : (
           <fieldset>
             <legend className={labelClass}>
               {esCliente ? 'Facturas que cobra' : 'Liquidaciones que paga'}
@@ -403,39 +409,7 @@ export function MovimientoCcFormModal({
           </div>
         )}
 
-        {esCargo && (
-          <div className="grid grid-cols-2 gap-3">
-            {campoFecha}
-            <div>
-              <label className={labelClass} htmlFor="cc-vencimiento">
-                Vencimiento
-              </label>
-              <input
-                id="cc-vencimiento"
-                type="date"
-                className={inputClass}
-                value={fechaVencimiento}
-                onChange={(e) => setFechaVencimiento(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-
-        {esCargo ? (
-          <div>
-            <label className={labelClass} htmlFor="cc-comprobante">
-              Número de comprobante
-            </label>
-            <input
-              id="cc-comprobante"
-              type="text"
-              className={inputClass}
-              value={numeroComprobante}
-              onChange={(e) => setNumeroComprobante(e.target.value)}
-              placeholder="Si no factura desde Vialto, el número de tu comprobante externo"
-            />
-          </div>
-        ) : (
+        {esCargo ? null : (
           <div className={esCliente ? '' : 'grid grid-cols-1 gap-3 sm:grid-cols-2'}>
             {/* Pago a proveedor: número del comprobante del pago (orden de pago, recibo). */}
             {!esCliente && (
