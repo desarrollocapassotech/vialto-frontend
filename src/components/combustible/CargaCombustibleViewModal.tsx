@@ -10,7 +10,7 @@ import { apiJson } from "@/lib/api";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { friendlyError } from "@/lib/friendlyError";
 import type { CargaCombustible } from "@/types/api";
-import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
+import { VisorFotos, type FotoVisor } from "@/components/ui/VisorFotos";
 import { CargaCombustibleEditModal } from "./CargaCombustibleEditModal";
 import { VehiculoViewModal } from "@/components/vehiculos/VehiculoViewModal";
 import { SospechaBadge, motivoAfectaCampo } from "./SospechaBadge";
@@ -56,7 +56,7 @@ export function CargaCombustibleViewModal({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [visorUrl, setVisorUrl] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [viewingVehiculo, setViewingVehiculo] = useState(false);
   const [showFechaRegistro, setShowFechaRegistro] = useState(false);
@@ -173,10 +173,16 @@ export function CargaCombustibleViewModal({
     ? carga!.importe / carga!.litros
     : carga?.precioPorLitro;
 
+  const fotosCarga: FotoVisor[] = [
+    carga?.fotoTacometro && { url: carga.fotoTacometro, titulo: "Foto del Tacómetro" },
+    carga?.fotoTicket && { url: carga.fotoTicket, titulo: "Foto del Ticket" },
+  ].filter((f): f is FotoVisor => !!f);
+
   return (
     <ViewModalShell
       title="Detalle de Carga de Combustible"
       onClose={onClose}
+      maxWidthClass="sm:max-w-4xl"
       footer={
         <div className="flex w-full items-center justify-end gap-3">
           <button type="button" onClick={onClose} className={viewModalBtnGhost}>
@@ -206,7 +212,7 @@ export function CargaCombustibleViewModal({
       )}
       {!loading && carga && (
         <div className="space-y-6">
-          <div className={viewModalGridClass}>
+          <div className={`${viewModalGridClass} lg:grid-cols-3`}>
             <div>
               <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
                 Fecha
@@ -374,7 +380,7 @@ export function CargaCombustibleViewModal({
                 {carga.fotoTacometro ? (
                   <button
                     type="button"
-                    onClick={() => setPreviewUrl(carga.fotoTacometro!)}
+                    onClick={() => setVisorUrl(carga.fotoTacometro!)}
                     className="group relative aspect-video w-full overflow-hidden border border-black/15 bg-white hover:border-vialto-fire/40 transition-colors"
                   >
                     <img
@@ -403,7 +409,7 @@ export function CargaCombustibleViewModal({
                 {carga.fotoTicket ? (
                   <button
                     type="button"
-                    onClick={() => setPreviewUrl(carga.fotoTicket!)}
+                    onClick={() => setVisorUrl(carga.fotoTicket!)}
                     className="group relative aspect-video w-full overflow-hidden border border-black/15 bg-white hover:border-vialto-fire/40 transition-colors"
                   >
                     <img
@@ -428,15 +434,14 @@ export function CargaCombustibleViewModal({
         </div>
       )}
 
-      {previewUrl && (
-        <AdjuntoPreviewModal
-          url={previewUrl}
-          title={
-            previewUrl === carga?.fotoTacometro
-              ? "Foto del Tacómetro"
-              : "Foto del Ticket"
-          }
-          onClose={() => setPreviewUrl(null)}
+      {visorUrl && (
+        <VisorFotos
+          fotos={fotosCarga}
+          indiceInicial={Math.max(
+            0,
+            fotosCarga.findIndex((f) => f.url === visorUrl),
+          )}
+          onClose={() => setVisorUrl(null)}
         />
       )}
 
