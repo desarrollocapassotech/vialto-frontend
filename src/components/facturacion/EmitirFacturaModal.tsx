@@ -16,6 +16,7 @@ import { useLockBodyScroll } from "@/hooks/useLockBodyScroll";
 import { SinConfigArcaAviso } from "@/components/facturacion/SinConfigArcaAviso";
 import { EmisorArcaResumen } from "@/components/facturacion/EmisorArcaResumen";
 import { ParteFacturaResumen } from "@/components/facturacion/ParteFacturaResumen";
+import { useReceptorPadronBloqueado } from "@/hooks/useReceptorPadronBloqueado";
 import {
   computeFacturaTotales,
   defaultFacturaLineas,
@@ -193,6 +194,15 @@ export function EmitirFacturaModal({
     }
   }, [missingHiddenFields, error]);
 
+  const receptorCliente = useReceptorPadronBloqueado({
+    entidad: "clientes",
+    id: factura.clienteId,
+    habilitado: Boolean(factura.clienteId),
+    tenantId,
+    getToken,
+    datosKey: clienteDetalle?.idFiscal ?? null,
+  });
+
   const sinConfigArca = datosReady && !arcaConfig;
   const tipoInvalido = factura.tipo !== "cliente";
 
@@ -200,7 +210,13 @@ export function EmitirFacturaModal({
     ? "Solo se pueden emitir facturas de tipo cliente."
     : bloqueadoUsd
       ? MSG_ARCA_NO_FACTURA_USD
-      : null;
+      : receptorCliente.bloqueado && receptorCliente.mensaje
+        ? receptorCliente.mensaje
+        : null;
+
+  const emisionBloqueada = Boolean(
+    emitBloqueadoRazon || datosEmitIncompletos || receptorCliente.bloqueado,
+  );
 
   function notifyEmitBlock(message: string) {
     // Va al aviso del pie (ErrorPieModal). Se limpia y se vuelve a poner para que zumbe
@@ -227,6 +243,10 @@ export function EmitirFacturaModal({
 
   async function handleEmitirArca() {
     if (busyArca) return;
+    if (receptorCliente.bloqueado && receptorCliente.mensaje) {
+      notifyEmitBlock(receptorCliente.mensaje);
+      return;
+    }
     if (emitBloqueadoRazon) {
       notifyEmitBlock(emitBloqueadoRazon);
       return;
@@ -556,7 +576,11 @@ export function EmitirFacturaModal({
 
                     {emitBloqueadoRazon && (
                       <p
-                        className="text-xs text-amber-900 border border-amber-400/40 bg-amber-50 px-3 py-2"
+                        className={`text-xs px-3 py-2 border ${
+                          receptorCliente.bloqueado
+                            ? "text-red-700 bg-red-50 border-red-200"
+                            : "text-amber-900 border-amber-400/40 bg-amber-50"
+                        }`}
                         role="alert"
                       >
                         {emitBloqueadoRazon}
@@ -648,9 +672,31 @@ export function EmitirFacturaModal({
                 </button>
                 <button
                   type="button"
-                  disabled={busyArca}
-                  onClick={() => setConfirmarEmision(true)}
-                  className="inline-flex items-center gap-2 h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={
+                    busyArca ||
+                    !datosReady ||
+                    receptorCliente.verificando ||
+                    Boolean(emisionBloqueada)
+                  }
+                  aria-disabled={emisionBloqueada || undefined}
+                  onClick={() => {
+                    if (emisionBloqueada) {
+                      if (receptorCliente.bloqueado && receptorCliente.mensaje) {
+                        notifyEmitBlock(receptorCliente.mensaje);
+                      } else if (emitBloqueadoRazon) {
+                        notifyEmitBlock(emitBloqueadoRazon);
+                      } else if (datosEmitIncompletos) {
+                        notifyEmitBlock(missingEmitMessage ?? "Faltan datos para emitir.");
+                      }
+                      return;
+                    }
+                    setConfirmarEmision(true);
+                  }}
+                  className={`inline-flex items-center gap-2 h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider ${
+                    emisionBloqueada
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-vialto-charcoal/90"
+                  }`}
                 >
                   {!busyArca && (
                     <Receipt

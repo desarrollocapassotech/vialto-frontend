@@ -9,6 +9,8 @@ import { fechaDiaYmd } from '@/lib/fmtDateUtc';
 import { friendlyError } from '@/lib/friendlyError';
 import { actualizarComprobanteMovimiento, type MovimientoCc } from '@/lib/cuentaCorriente';
 import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
+import { ComprobanteAdjuntoField } from '@/components/shared/ComprobanteAdjuntoField';
+import { uploadComprobante } from '@/lib/comprobanteUpload';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
@@ -35,15 +37,38 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
   const [error, setError] = useState<string | null>(null);
   const esLiquidacion = movimiento.origen === 'liquidacion';
   const esFactura = movimiento.origen === 'factura';
+  // Archivo: igual que "Adjuntar comprobante" de Facturas/Liquidaciones (sin ARCA). Se
+  // guarda en la factura/liquidación; una venta/compra manual no tiene dónde guardarlo.
+  const archivoEditable =
+    numeroEditable &&
+    ((esFactura && !!movimiento.facturaId) || (esLiquidacion && !!movimiento.liquidacionId));
+  const urlGuardada =
+    (esFactura
+      ? movimiento.facturaComprobantes?.comprobanteUrl
+      : movimiento.liquidacionComprobantes?.comprobanteUrl
+    )?.trim() || null;
+  const [file, setFile] = useState<File | null>(null);
+  const [quitarGuardado, setQuitarGuardado] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
     try {
+      let comprobanteUrl: string | null | undefined;
+      if (archivoEditable && file) {
+        comprobanteUrl = await uploadComprobante(
+          () => getToken(),
+          file,
+          esFactura ? 'facturacion' : 'integracion-arca',
+        );
+      } else if (archivoEditable && quitarGuardado) {
+        comprobanteUrl = null;
+      }
       await actualizarComprobanteMovimiento(() => getToken(), movimiento.id, {
         ...(numeroEditable ? { numeroComprobante: numero.trim() || null } : {}),
         ...(vencimientoEditable ? { fechaVencimiento: vencimiento || null } : {}),
+        ...(comprobanteUrl !== undefined ? { comprobanteUrl } : {}),
       });
       onDone();
       onClose();
@@ -114,6 +139,17 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
             </p>
           )}
         </div>
+
+        {archivoEditable && (
+          <ComprobanteAdjuntoField
+            file={file}
+            existingUrl={quitarGuardado ? null : urlGuardada}
+            onFileChange={setFile}
+            onClearExisting={() => setQuitarGuardado(true)}
+            disabled={saving}
+            label="Archivo"
+          />
+        )}
 
         {vencimientoEditable && (
           <div>

@@ -118,7 +118,6 @@ export function FacturaViewModal({
   onAdjuntarComprobante?: () => void;
   onEmitirArca?: () => void;
   onAnular?: () => void;
-  onVerNotaCredito?: () => void;
   /** Solo facturas a cliente, no anuladas y no ya cobradas. */
   onMarcarCobrada?: () => void;
   /**

@@ -24,8 +24,9 @@ export const VIAJES_COLUMNAS = [
   // Opcional (Tenant.viajesColumnaProductosHabilitada); el label real es el
   // plural de "Producto" de la empresa (`useProductoLabels`).
   { id: "productos", label: "Productos" },
-  // Última por defecto, al lado de Acciones (oct 2026, a pedido).
   { id: "etapa", label: "Etapa" },
+  // Opcional (Tenant.viajesObservaciones); inmediatamente a la izquierda de Acciones por defecto.
+  { id: "observaciones", label: "Observaciones" },
 ] as const;
 
 export type ViajeColumnaId = (typeof VIAJES_COLUMNAS)[number]["id"];
@@ -72,6 +73,7 @@ export function columnasViajesHabilitadas(
         | "idPropio2Habilitado"
         | "tipoFlota"
         | "viajesColumnaProductosHabilitada"
+        | "viajesObservaciones"
       >
     | null
     | undefined,
@@ -94,6 +96,8 @@ export function columnasViajesHabilitadas(
     // columna quedaría siempre vacía).
     productos:
       Boolean(tenant?.viajesColumnaProductosHabilitada) && campoVisible("productoItems"),
+    // Switch propio de superadmin (Tenant.viajesObservaciones).
+    observaciones: Boolean(tenant?.viajesObservaciones),
   };
   return new Set(IDS_ESTANDAR.filter((id) => habilitada[id]));
 }

@@ -244,6 +244,8 @@ export function CamposEmpresaPage() {
   const [nuevaOpcionProveedor, setNuevaOpcionProveedor] = useState("");
   const [empresaColumnaProductos, setEmpresaColumnaProductos] = useState(false);
   const [savingColumnaProductos, setSavingColumnaProductos] = useState(false);
+  const [empresaViajesObservaciones, setEmpresaViajesObservaciones] = useState(false);
+  const [savingViajesObservaciones, setSavingViajesObservaciones] = useState(false);
   // Label de "Producto" (singular/plural). El plural lo genera la IA al guardar el singular.
   const [empresaProductoLabel, setEmpresaProductoLabel] = useState("");
   const [empresaProductoLabelGuardado, setEmpresaProductoLabelGuardado] = useState("");
@@ -276,6 +278,7 @@ export function CamposEmpresaPage() {
       idPropio2Habilitado: empresaIdPropio2Habilitado,
       tipoFlota: empresaTipoFlota,
       viajesColumnaProductosHabilitada: empresaColumnaProductos,
+      viajesObservaciones: empresaViajesObservaciones,
     }),
     [
       empresaIdSistemaHabilitado,
@@ -283,6 +286,7 @@ export function CamposEmpresaPage() {
       empresaIdPropio2Habilitado,
       empresaTipoFlota,
       empresaColumnaProductos,
+      empresaViajesObservaciones,
     ],
   );
 
@@ -340,6 +344,7 @@ export function CamposEmpresaPage() {
           setEmpresaMarcarCobrada(tenant.marcarCobradaHabilitada ?? false);
           setEmpresaOpcionesProveedor(tenant.opcionesProveedorLiquidacion ?? []);
           setEmpresaColumnaProductos(tenant.viajesColumnaProductosHabilitada ?? false);
+          setEmpresaViajesObservaciones(tenant.viajesObservaciones ?? false);
           setEmpresaProductoLabel(tenant.productoLabel ?? "");
           setEmpresaProductoLabelGuardado(tenant.productoLabel ?? "");
           setEmpresaProductoPlural(tenant.productoLabelPlural ?? "");
@@ -661,6 +666,27 @@ export function CamposEmpresaPage() {
       showToast(msg, "error");
     } finally {
       setSavingColumnaProductos(false);
+    }
+  }
+
+  async function toggleViajesObservaciones() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaViajesObservaciones;
+    setSavingViajesObservaciones(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ viajesObservaciones: nuevoValor }),
+      });
+      setEmpresaViajesObservaciones(nuevoValor);
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingViajesObservaciones(false);
     }
   }
 
@@ -1814,6 +1840,26 @@ export function CamposEmpresaPage() {
                         empresaColumnaProductos
                           ? "Ocultar columna de productos"
                           : "Mostrar columna de productos"
+                      }
+                    />
+                  </div>
+                  <div className="flex w-full items-center justify-between gap-4 border-t border-black/10 pt-3">
+                    <div>
+                      <span className="text-xs font-semibold uppercase tracking-[0.10em] text-vialto-charcoal">
+                        Columna de observaciones
+                      </span>
+                      <p className="mt-1 text-xs text-vialto-steel">
+                        Muestra la columna "Observaciones" en la tabla de viajes de esta empresa.
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      checked={empresaViajesObservaciones}
+                      disabled={savingViajesObservaciones}
+                      onChange={() => void toggleViajesObservaciones()}
+                      label={
+                        empresaViajesObservaciones
+                          ? "Ocultar columna Observaciones en viajes"
+                          : "Mostrar columna Observaciones en viajes"
                       }
                     />
                   </div>

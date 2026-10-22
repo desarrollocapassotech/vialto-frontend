@@ -12,6 +12,7 @@ import {
   Ban,
   Download,
   Eye,
+  FileDown,
   FileMinus,
   FileText,
   FlaskConical,
@@ -33,7 +34,7 @@ import {
   type LiquidacionConTransportista,
 } from "@/components/liquidaciones/LiquidacionViewModal";
 import { LiquidacionEditModal } from "@/components/liquidaciones/LiquidacionEditModal";
-import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
+import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
 import { AccionesFila } from "@/components/ui/AccionesFila";
 import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 
@@ -59,6 +60,7 @@ import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { useToast } from "@/lib/toast";
 import { apiFetch, apiJson } from "@/lib/api";
+import { verPdfLiquidacion } from "@/lib/liquidacionContratoPdf";
 import { friendlyError } from "@/lib/friendlyError";
 import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
@@ -149,6 +151,7 @@ function LiquidacionAccionesMenu({
   onEliminar,
   onVerComprobante,
   onAdjuntarComprobante,
+  onVerPdfLiquidacion,
   open: openProp,
   onOpenChange,
 }: {
@@ -166,6 +169,8 @@ function LiquidacionAccionesMenu({
   onVerComprobante: () => void;
   /** Sin ARCA: "Adjuntar comprobante" si la liquidación todavía no tiene archivo. */
   onAdjuntarComprobante?: () => void;
+  /** Sin ARCA: "PDF de liquidación" (resumen que genera Vialto), aparte del comprobante adjunto. */
+  onVerPdfLiquidacion?: () => void;
   /** Si se pasa junto con `onOpenChange`, el abierto/cerrado pasa a ser controlado por el padre (ej. click en la fila de la tabla). */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -224,6 +229,14 @@ function LiquidacionAccionesMenu({
       label: "Ver comprobante",
       icon: FileText,
       onClick: onVerComprobante,
+    });
+  }
+  if (onVerPdfLiquidacion && !hasArca) {
+    options.push({
+      id: "pdf-liquidacion",
+      label: "PDF de liquidación",
+      icon: FileDown,
+      onClick: onVerPdfLiquidacion,
     });
   }
   if (onAdjuntarComprobante && !hasArca && !liq.comprobanteUrl?.trim()) {
@@ -426,9 +439,6 @@ export function LiquidacionesTenantPage() {
   const [anularTipo, setAnularTipo] = useState<"nota_credito" | "nota_debito">(
     "nota_credito",
   );
-  const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
-    string | null
-  >(null);
   /** Liquidación sin ARCA a la que se le adjunta el comprobante (modal). */
   const [adjuntarLiq, setAdjuntarLiq] = useState<LiquidacionConTransportista | null>(
     null,
@@ -851,8 +861,14 @@ export function LiquidacionesTenantPage() {
    * Clip de la grilla: adjunto subido (manual) o PDF del CVLP si se emitió por ARCA
    * (no tiene URL guardada, se genera al pedirlo). Sin comprobante, sin clip.
    */
+  /** Adjunto guardado (comprobante o anulación manual) en pestaña nueva, abierta en el click. */
+  function verAdjunto(url: string | null | undefined, titulo = "Comprobante") {
+    const u = url?.trim();
+    if (u) void abrirAdjuntoEnPestana({ url: u }, () => getToken(), titulo);
+  }
+
   function abrirComprobanteClip(liq: LiquidacionConTransportista): (() => void) | undefined {
-    if (liq.comprobanteUrl?.trim()) return () => setPreviewComprobanteUrl(liq.comprobanteUrl);
+    if (liq.comprobanteUrl?.trim()) return () => verAdjunto(liq.comprobanteUrl);
     if (liq.cbteNro != null) return () => void verPdf(liq);
     return undefined;
   }
@@ -909,7 +925,7 @@ export function LiquidacionesTenantPage() {
     if (!hasArca || liq.estado !== "anulado") return undefined;
     if (liq.anulacionMetodo === "manual") {
       const url = liq.anulacionManualComprobanteUrl?.trim();
-      return url ? () => window.open(url, "_blank", "noopener,noreferrer") : undefined;
+      return url ? () => verAdjunto(url, "Comprobante de anulación") : undefined;
     }
     return liq.anulacionCae ? () => void verPdfAnulacion(liq) : undefined;
   }
@@ -959,7 +975,7 @@ export function LiquidacionesTenantPage() {
       onEmitir: () => setPendingEmitir(liq),
       onVerAnulacion: () => {
         if (liq.anulacionMetodo === "manual" && liq.anulacionManualComprobanteUrl) {
-          window.open(liq.anulacionManualComprobanteUrl, "_blank", "noopener,noreferrer");
+          verAdjunto(liq.anulacionManualComprobanteUrl, "Comprobante de anulación");
         } else {
           void verPdfAnulacion(liq);
         }
@@ -970,10 +986,15 @@ export function LiquidacionesTenantPage() {
       onEliminar: () => setEliminarConfirm(liq),
       onVerComprobante: () => {
         if (hasArca) void verPdf(liq);
-        else if (liq.comprobanteUrl) setPreviewComprobanteUrl(liq.comprobanteUrl);
+        else verAdjunto(liq.comprobanteUrl);
       },
       onAdjuntarComprobante: !hasArca ? () => setAdjuntarLiq(liq) : undefined,
+      onVerPdfLiquidacion: !hasArca ? () => verPdfLiquidacionFila(liq) : undefined,
     };
+  }
+
+  function verPdfLiquidacionFila(liq: LiquidacionConTransportista) {
+    void verPdfLiquidacion(liq.id, () => getToken(), isSuperAdmin ? activeTenantId : undefined);
   }
 
   const filteredRows = rows
@@ -1286,6 +1307,13 @@ export function LiquidacionesTenantPage() {
                       conTexto={!numeroLiquidacion(liq)}
                     />
                   )
+                )}
+                {!hasArca && (
+                  <ComprobanteAdjuntoClip
+                    onClick={() => verPdfLiquidacionFila(liq)}
+                    tono="pdf"
+                    titulo="PDF de liquidación"
+                  />
                 )}
                 {abrirAnulacionClip(liq) && (
                   <ComprobanteAdjuntoClip
@@ -1724,14 +1752,6 @@ export function LiquidacionesTenantPage() {
         />
       )}
 
-      {previewComprobanteUrl && (
-        <AdjuntoPreviewModal
-          url={previewComprobanteUrl}
-          title="Comprobante"
-          onClose={() => setPreviewComprobanteUrl(null)}
-        />
-      )}
-
       {detail?.mode === "view" && (
         <LiquidacionViewModal
           liq={detail.liq}
@@ -1752,8 +1772,11 @@ export function LiquidacionesTenantPage() {
             hasArca && detail.liq.cbteNro != null
               ? () => void verPdf(detail.liq)
               : !hasArca && detail.liq.comprobanteUrl?.trim()
-                ? () => setPreviewComprobanteUrl(detail.liq.comprobanteUrl)
+                ? () => verAdjunto(detail.liq.comprobanteUrl)
                 : undefined
+          }
+          onVerPdfLiquidacion={
+            !hasArca ? () => verPdfLiquidacionFila(detail.liq) : undefined
           }
           onVerAnulacion={
             detail.liq.estado === "anulado" &&
@@ -1766,11 +1789,7 @@ export function LiquidacionesTenantPage() {
             detail.liq.anulacionMetodo === "manual" &&
             detail.liq.anulacionManualComprobanteUrl
               ? () =>
-                  window.open(
-                    detail.liq.anulacionManualComprobanteUrl as string,
-                    "_blank",
-                    "noopener,noreferrer",
-                  )
+                  verAdjunto(detail.liq.anulacionManualComprobanteUrl, "Comprobante de anulación")
               : undefined
           }
           onEliminar={

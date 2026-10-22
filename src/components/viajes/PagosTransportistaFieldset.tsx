@@ -9,7 +9,7 @@ import {
 } from "@/lib/currencyMask";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { isoToFechaHora } from "@/lib/viajeFechaHora";
+import { fechaDiaYmd } from "@/lib/fmtDateUtc";
 import { formatViajeImporteForListado } from "@/lib/viajesFlota";
 import {
   PAGO_TRANSPORTISTA_SALDO_ERROR,
@@ -22,9 +22,7 @@ import type { PagoTransportista } from "@/types/api";
 function fechaPagoToInputValue(fecha: string | undefined | null): string {
   const t = fecha?.trim();
   if (!t) return hoyArgentinaIso();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
-  const { fecha: local } = isoToFechaHora(t);
-  return local || hoyArgentinaIso();
+  return fechaDiaYmd(t) ?? hoyArgentinaIso();
 }
 
 export interface PagoTransportistaDraft {

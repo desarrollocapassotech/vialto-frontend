@@ -17,7 +17,11 @@ import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPre
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
-import { useValidacionPadronRegistro } from "@/hooks/useValidacionPadronRegistro";
+import { useReceptorPadronBloqueado } from "@/hooks/useReceptorPadronBloqueado";
+import {
+  aplicarCambiosPadronCliente,
+  useValidacionPadronRegistro,
+} from "@/hooks/useValidacionPadronRegistro";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { PadronValidacionEstado } from "@/components/shared/PadronValidacionEstado";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
@@ -431,8 +435,8 @@ export function FacturaCreateModal({
 
   // Al elegir el cliente se valida su CUIT contra el padrón de ARCA (opt-in por empresa,
   // mismo circuito que el transportista en "Nueva liquidación"): si ARCA informa otra
-  // condición IVA / domicilio, el modal se abre con eso precargado y al guardar queda la
-  // huella de validado (no se vuelve a consultar mientras esos datos no cambien).
+  // razón social / condición IVA / domicilio, el backend la guarda sola (sin confirmación,
+  // el CUIT no se toca) y acá se refresca el cliente. Solo un CUIT rechazado abre el modal.
   const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
   const validacionPadronHabilitada =
     unifiedArca && tenantEfectivo?.validacionCuitArcaHabilitada === true;
@@ -444,12 +448,27 @@ export function FacturaCreateModal({
     habilitado: validacionPadronHabilitada,
     tenantId,
     getToken,
+    onActualizado: ({ padron, cambios }) => {
+      setClienteDetalle((c) => (c ? aplicarCambiosPadronCliente(c, padron, cambios) : c));
+      onDataSaved?.();
+    },
   });
   const padronClienteAviso =
-    padronCliente.resultado?.resultado === "diferencias" ||
-    padronCliente.resultado?.resultado === "rechazado"
-      ? padronCliente.resultado
-      : null;
+    padronCliente.resultado?.resultado === "rechazado" ? padronCliente.resultado : null;
+  // Se actualizó solo: parpadeo suave en el receptor + "Ver datos" para revisarlo/editarlo.
+  const padronClienteActualizado = padronCliente.resultado?.resultado === "actualizado";
+
+  // CUIT del cliente (receptor de la factura) dado de baja / apócrifo en ARCA: no se
+  // puede emitir. Se avisa en el pie, igual que los datos faltantes.
+  const receptorCliente = useReceptorPadronBloqueado({
+    entidad: "clientes",
+    id: open ? clienteElegidoId : null,
+    habilitado: unifiedArca,
+    tenantId,
+    getToken,
+    datosKey: clienteDetalle?.idFiscal ?? null,
+  });
+  const emisionBloqueada = datosEmitIncompletos || receptorCliente.bloqueado;
 
   // Zumbido del aviso del pie al tocar "Emitir a ARCA" con datos faltantes.
   const zumbidoAviso = useZumbidoAviso();
@@ -679,6 +698,14 @@ export function FacturaCreateModal({
     }
 
     if (action === "emitir") {
+      if (emisionBloqueada) {
+        if (datosEmitIncompletos) {
+          notifyError(missingEmitMessage ?? "Faltan datos para emitir.");
+        } else if (receptorCliente.mensaje) {
+          notifyError(receptorCliente.mensaje);
+        }
+        return;
+      }
       if (bloqueadoUsd) {
         notifyError(MSG_ARCA_NO_FACTURA_USD);
         return;
@@ -748,8 +775,11 @@ export function FacturaCreateModal({
       // Se creó pero falló ARCA: refrescar y cerrar
       if (facturaCreada) {
         onFacturaGuardada?.(facturaCreada);
+        const msg = friendlyError(err, "arca");
         showToast(
-          "La factura quedó en borrador pero no se pudo emitir a ARCA. Podés reintentar desde el listado.",
+          msg && msg !== "No pudimos conectar con ARCA / AFIP SDK. Revisá la configuración e intentá de nuevo."
+            ? msg
+            : "La factura quedó en borrador pero no se pudo emitir a ARCA. Podés reintentar desde el listado.",
           "error",
         );
         onClose();
@@ -1312,6 +1342,7 @@ export function FacturaCreateModal({
                           />
                         ) : undefined
                       }
+                      receptorResaltado={padronClienteActualizado}
                       feedbackSlot={
                         <div ref={feedbackRef} className="space-y-2">
                           {arcaConfigMissing && (
@@ -1432,23 +1463,35 @@ export function FacturaCreateModal({
           {step === "form" && (
             <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
               <ErrorPieModal error={displayError} />
-              {/* Faltantes para emitir: fijo en el pie, al lado de "Emitir a ARCA", para que se vea siempre. */}
-              {unifiedArca && datosEmitIncompletos && (
-                <AvisoFaltantesEmision
-                  mensaje={
-                    missingClienteFields.length === missingEmitFields.length
-                      ? "Faltan datos del cliente para poder facturar."
-                      : "Faltan datos para poder facturar."
-                  }
-                  hayOcultos={missingHiddenClienteFields.length > 0}
-                  onCompletar={
-                    clienteDetalle && missingClienteFields.length > 0
-                      ? () => setDatosClienteModalOpen(true)
-                      : undefined
-                  }
-                  zumbando={zumbidoAviso.zumbando}
-                  onZumbidoEnd={zumbidoAviso.terminar}
-                />
+              {/* Faltantes para emitir o CUIT bloqueado: fijo en el pie, al lado de "Emitir a ARCA", para que se vea siempre. */}
+              {unifiedArca && (
+                datosEmitIncompletos ? (
+                  <AvisoFaltantesEmision
+                    mensaje={
+                      missingClienteFields.length === missingEmitFields.length
+                        ? "Faltan datos del cliente para poder facturar."
+                        : "Faltan datos para poder facturar."
+                    }
+                    hayOcultos={missingHiddenClienteFields.length > 0}
+                    onCompletar={
+                      clienteDetalle && missingClienteFields.length > 0
+                        ? () => setDatosClienteModalOpen(true)
+                        : undefined
+                    }
+                    zumbando={zumbidoAviso.zumbando}
+                    onZumbidoEnd={zumbidoAviso.terminar}
+                  />
+                ) : (
+                  receptorCliente.mensaje && (
+                    <AvisoFaltantesEmision
+                      mensaje={receptorCliente.mensaje}
+                      hayOcultos={false}
+                      bloqueante
+                      zumbando={zumbidoAviso.zumbando}
+                      onZumbidoEnd={zumbidoAviso.terminar}
+                    />
+                  )
+                )
               )}
               <button
                 type="button"
@@ -1473,22 +1516,28 @@ export function FacturaCreateModal({
                       ? "Guardando…"
                       : "Guardar borrador"}
                   </button>
-                  {/* Con datos faltantes no se usa `disabled` (no dispararía el click): se ve
+                  {/* Con datos faltantes o CUIT bloqueado no se usa `disabled` (no dispararía el click): se ve
                       deshabilitado y el click hace zumbar el aviso del pie. */}
                   <button
                     type="button"
-                    disabled={busy || monedaInvalida || bloqueadoUsd || montoCero}
+                    disabled={
+                      busy ||
+                      monedaInvalida ||
+                      bloqueadoUsd ||
+                      montoCero ||
+                      receptorCliente.verificando
+                    }
                     title={montoCero ? MSG_EMITIR_MONTO_CERO : undefined}
-                    aria-disabled={datosEmitIncompletos || undefined}
+                    aria-disabled={emisionBloqueada || undefined}
                     onClick={() => {
-                      if (datosEmitIncompletos) {
+                      if (emisionBloqueada) {
                         zumbidoAviso.disparar();
                         return;
                       }
                       setConfirmarEmision(true);
                     }}
                     className={`inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white disabled:opacity-60 ${
-                      datosEmitIncompletos
+                      emisionBloqueada
                         ? "cursor-not-allowed opacity-60"
                         : "hover:bg-vialto-graphite"
                     }`}
@@ -1526,10 +1575,10 @@ export function FacturaCreateModal({
       </div>
 
       {clienteDetalle &&
-        (missingClienteFields.length > 0 || padronClienteAviso) && (
+        (missingClienteFields.length > 0 || padronClienteAviso || padronClienteActualizado) && (
           <DatosFiscalesFaltantesModal
             // Remonta al llegar la respuesta de ARCA para que el formulario tome lo precargado.
-            key={`${clienteDetalle.id}-${padronClienteAviso?.resultado ?? "sin-arca"}`}
+            key={`${clienteDetalle.id}-${padronCliente.resultado?.resultado ?? "sin-arca"}`}
             open={datosClienteModalOpen && step === "form"}
             entidad="cliente"
             id={clienteDetalle.id}
@@ -1538,32 +1587,26 @@ export function FacturaCreateModal({
               nombre: clienteDetalle.nombre ?? "",
               pais: clienteDetalle.pais ?? null,
               idFiscal: clienteDetalle.idFiscal ?? null,
-              condicionIva:
-                padronClienteAviso?.resultado === "diferencias" &&
-                padronClienteAviso.diferencias.includes("condicionIva")
-                  ? padronClienteAviso.padron.condicionIva
-                  : (clienteDetalle.condicionIva ?? null),
+              condicionIva: clienteDetalle.condicionIva ?? null,
               condicionTributaria: clienteDetalle.condicionTributaria ?? null,
-              direccion:
-                padronClienteAviso?.resultado === "diferencias" &&
-                padronClienteAviso.diferencias.includes("domicilio")
-                  ? padronClienteAviso.padron.domicilio
-                  : (clienteDetalle.direccion ?? null),
+              direccion: clienteDetalle.direccion ?? null,
             }}
             missingFields={missingClienteFields}
             padron={padronClienteAviso}
+            actualizadoDesdeArca={padronClienteActualizado}
             accion="emitir una factura"
             tenantId={tenantId}
             getToken={getToken}
             onSaved={(c) => {
+              const mismoCuit = (c as Cliente).idFiscal === clienteDetalle.idFiscal;
               setClienteDetalle(c as Cliente);
               onDataSaved?.();
-              if (padronClienteAviso) {
-                // Revisó y guardó contra lo de ARCA: se guarda la huella de validado.
+              if (padronClienteActualizado && mismoCuit) {
+                // Editó a mano lo que vino de ARCA: se respeta (no se vuelve a pisar).
                 void padronCliente.confirmar();
               } else {
-                // Completó datos que faltaban (ej. el CUIT): se valida ahora; si ARCA
-                // coincide se guarda la huella, si no, el modal se reabre precargado.
+                // Completó datos o corrigió el CUIT: se valida de nuevo contra ARCA (lo que
+                // difiera se actualiza solo; si el CUIT sigue rechazado, el modal se reabre).
                 datosClienteAvisadoRef.current = null;
                 void padronCliente.revalidar();
               }

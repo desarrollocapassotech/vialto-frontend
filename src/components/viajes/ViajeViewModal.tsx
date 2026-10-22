@@ -1,6 +1,8 @@
 import { useEffect, type ReactNode } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
+import { verPdfLiquidacion } from "@/lib/liquidacionContratoPdf";
+import { verPdfFacturaArca } from "@/lib/facturaPdfArca";
 import { ComprobanteAdjuntoClip } from "@/components/shared/ComprobanteAdjuntoClip";
 import { Banknote, Receipt } from "lucide-react";
 import {
@@ -38,6 +40,7 @@ import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionI
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
 import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
 import { numeroVisibleViaje, viajeUsaNumeroInterno } from "@/lib/viajesFlota";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { Dato, DatosCabecera } from "@/components/shared/DetalleComprobante";
 import {
   AccionSeccionViaje,
@@ -45,8 +48,10 @@ import {
   FilaDetalleViaje,
   SeccionDetalleViaje,
   VerComprobanteAdjunto,
+  VerPdfLiquidacionLink,
 } from "@/components/viajes/ViajeDetalleSecciones";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { ViajeAdjuntosSeccion } from "@/components/viajes/ViajeAdjuntosSeccion";
 import {
   canAccessEmisionFacturasArca,
   canAccessEmisionLiquidoProductoArca,
@@ -64,12 +69,7 @@ const SECCIONES_GRID: Record<number, string> = {
 };
 
 function fmtDate(iso: string | null | undefined) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return fmtDateUtc(iso);
 }
 
 function fmtMonto(monto: number | null | undefined, moneda?: string | null) {
@@ -110,8 +110,14 @@ export function ViajeViewModal({
   liquidando = false,
   onRegistrarPago,
   modulos,
+  puedeEditarAdjuntos = false,
+  onViajeActualizado,
 }: {
   viaje: Viaje;
+  /** Admin/superadmin: puede agregar y quitar documentos del viaje (se guardan al momento). */
+  puedeEditarAdjuntos?: boolean;
+  /** El viaje cambió desde el detalle (ej. documentos): el host actualiza su listado. */
+  onViajeActualizado?: (viaje: Viaje) => void;
   /**
    * Módulos de la empresa del viaje. Desde superadmin pasar los de la empresa elegida
    * (`useCurrentTenant()` ahí resuelve la org del superadmin). Si no se pasa se usan los
@@ -175,6 +181,23 @@ export function ViajeViewModal({
     const q = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
     const apiPath = `/api/integracion-arca/liquidaciones/${encodeURIComponent(l.id)}/pdf${q}`;
     return () => void abrirAdjuntoEnPestana({ apiPath }, () => getToken(), "Liquidación");
+  }
+  /**
+   * Comprobante de la factura: si se emitió en ARCA, el PDF se genera en el momento (mismo
+   * diseño que su nota de crédito, ver `verPdfFacturaArca`); si es manual, el adjunto.
+   */
+  function abrirComprobanteFactura(
+    f: { id: string; cae?: string | null; comprobanteUrl?: string | null } | null | undefined,
+  ): (() => void) | undefined {
+    if (!f) return undefined;
+    if (f.cae) {
+      return () =>
+        void verPdfFacturaArca(f.id, "factura", () => getToken(), tenantId || undefined).catch(
+          () => undefined,
+        );
+    }
+    if (f.comprobanteUrl?.trim()) return () => verAdjunto(f.comprobanteUrl);
+    return undefined;
   }
   const mods = modulos ?? currentTenant?.modules ?? null;
   // Mismo criterio que la grilla de Viajes: Facturación (manual o ARCA) y Liquidaciones
@@ -432,12 +455,7 @@ export function ViajeViewModal({
           <FilaDetalleViaje
             key="factura"
             label="Factura"
-            value={conAdjunto(
-              factura?.comprobanteUrl?.trim()
-                ? () => verAdjunto(factura.comprobanteUrl)
-                : undefined,
-              `N° ${nroFactura}`,
-            )}
+            value={conAdjunto(abrirComprobanteFactura(factura), `N° ${nroFactura}`)}
             sub={
               <>
                 {[
@@ -446,11 +464,9 @@ export function ViajeViewModal({
                 ]
                   .filter(Boolean)
                   .join(" · ") || null}
-                {factura?.comprobanteUrl?.trim() && (
+                {abrirComprobanteFactura(factura) && (
                   <span className="block">
-                    <VerComprobanteAdjunto
-                      onClick={() => verAdjunto(factura.comprobanteUrl)}
-                    />
+                    <VerComprobanteAdjunto onClick={abrirComprobanteFactura(factura)!} />
                   </span>
                 )}
               </>
@@ -552,6 +568,11 @@ export function ViajeViewModal({
                   .filter(Boolean)
                   .join(" · ") || null;
               const abrirComprobante = abrirComprobanteLiquidacion(l);
+              // Sin ARCA el comprobante es el adjunto: el PDF que arma Vialto va aparte.
+              const verPdfLiq =
+                !tieneLiqArca && l.cbteNro == null
+                  ? () => void verPdfLiquidacion(l.id, () => getToken(), tenantId || undefined)
+                  : undefined;
               return [
                 <FilaDetalleViaje
                   key={`${lv.liquidacionId}-cbte`}
@@ -563,12 +584,17 @@ export function ViajeViewModal({
                       : "Manual",
                   )}
                   sub={
-                    subComprobante || abrirComprobante ? (
+                    subComprobante || abrirComprobante || verPdfLiq ? (
                       <>
                         {subComprobante}
                         {abrirComprobante && (
                           <span className="block">
                             <VerComprobanteAdjunto onClick={abrirComprobante} />
+                          </span>
+                        )}
+                        {verPdfLiq && (
+                          <span className="block">
+                            <VerPdfLiquidacionLink onClick={verPdfLiq} />
                           </span>
                         )}
                       </>
@@ -833,6 +859,16 @@ export function ViajeViewModal({
             </div>
           )}
         </div>
+
+        {ver("adjuntos") && (
+          <ViajeAdjuntosSeccion
+            key={viaje.id}
+            viaje={viaje}
+            tenantId={tenantId}
+            puedeEditar={puedeEditarAdjuntos && !bloqueado}
+            onViajeActualizado={onViajeActualizado}
+          />
+        )}
 
         {esMultiCliente && (
           <div className="py-5">

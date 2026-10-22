@@ -166,9 +166,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
                     {formatViajeImporteForListado(g.monto, g.moneda)}
                   </span>
                   <span className="text-right text-vialto-steel tabular-nums">
-                    {g.fecha
-                      ? fmtDateUtc(g.fecha)
-                      : '—'}
+                    {fmtDateUtc(g.fecha)}
                   </span>
                   <OtroGastoAutorDisplay
                     row={g}

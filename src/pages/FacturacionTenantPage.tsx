@@ -19,6 +19,7 @@ import {
 } from "@/components/facturacion/FacturaEditModal";
 import { FacturaCreateModal } from "@/components/facturacion/FacturaCreateModal";
 import { facturaEditable, facturaLetraFromCbteTipo } from "@/lib/arcaCbteTipo";
+import { verPdfFacturaArca } from "@/lib/facturaPdfArca";
 import { FacturaAccionesMenu } from "@/components/facturacion/FacturaAccionesMenu";
 import { AnularFacturaModal } from "@/components/facturacion/AnularFacturaModal";
 import { EmitirFacturaModal } from "@/components/facturacion/EmitirFacturaModal";
@@ -1105,19 +1106,30 @@ export function FacturacionTenantPage({
     void refetchViajesParaFacturar();
   }
 
-  function verComprobanteUrl(url: string | null | undefined) {
-    if (url?.trim()) {
-      window.open(url, "_blank", "noopener,noreferrer");
+  /**
+   * Factura emitida en ARCA: el PDF se genera en el momento (mismo diseño que su NC, ver
+   * `verPdfFacturaArca`). Sin ARCA: el archivo que se adjuntó.
+   */
+  function verComprobante(f: Factura) {
+    if (f.cae) {
+      verPdfFacturaArca(f.id, "factura", () => getToken(), platform ? tid : undefined).catch(
+        (e) => showToast(friendlyError(e, "arca"), "error"),
+      );
+      return;
+    }
+    if (f.comprobanteUrl?.trim()) {
+      window.open(f.comprobanteUrl, "_blank", "noopener,noreferrer");
     }
   }
 
   function verNotaCredito(f: Factura) {
-    if (f.notaCreditoUrl?.trim()) {
-      window.open(f.notaCreditoUrl, "_blank", "noopener,noreferrer");
+    if (f.anulacionCae) {
+      verPdfFacturaArca(f.id, "nc", () => getToken(), platform ? tid : undefined).catch((e) =>
+        showToast(friendlyError(e, "arca"), "error"),
+      );
       return;
     }
-    // Sin URL en Cloudinary aún: abrir el modal de anulación en modo ya-anulada
-    // (permite descargar el PDF generado on-demand).
+    // Anulación sin CAE todavía: abrir el modal de anulación en modo ya-anulada.
     abrirAnularFactura(f);
   }
 
@@ -1678,7 +1690,7 @@ export function FacturacionTenantPage({
                 )}
                 {f.comprobanteUrl?.trim() ? (
                   <ComprobanteAdjuntoClip
-                    onClick={() => verComprobanteUrl(f.comprobanteUrl)}
+                    onClick={() => verComprobante(f)}
                     conTexto={!f.numero}
                   />
                 ) : (
@@ -1762,7 +1774,7 @@ export function FacturacionTenantPage({
                 }
                 onVerComprobante={
                   f.comprobanteUrl
-                    ? () => verComprobanteUrl(f.comprobanteUrl)
+                    ? () => verComprobante(f)
                     : undefined
                 }
                 onVerNotaCredito={
@@ -1782,7 +1794,7 @@ export function FacturacionTenantPage({
                 {f.numero || (f.comprobanteUrl?.trim() ? null : "—")}
                 {f.comprobanteUrl?.trim() && (
                   <ComprobanteAdjuntoClip
-                    onClick={() => verComprobanteUrl(f.comprobanteUrl)}
+                    onClick={() => verComprobante(f)}
                   />
                 )}
               </span>
@@ -1837,7 +1849,7 @@ export function FacturacionTenantPage({
                 }
                 onVerComprobante={
                   f.comprobanteUrl
-                    ? () => verComprobanteUrl(f.comprobanteUrl)
+                    ? () => verComprobante(f)
                     : undefined
                 }
                 onVerNotaCredito={
@@ -1930,12 +1942,7 @@ export function FacturacionTenantPage({
           }
           onVerComprobante={
             viewingFactura.comprobanteUrl
-              ? () => verComprobanteUrl(viewingFactura.comprobanteUrl)
-              : undefined
-          }
-          onVerNotaCredito={
-            hasArca && viewingFactura.arcaEstado === "anulado"
-              ? () => verNotaCredito(viewingFactura)
+              ? () => verComprobante(viewingFactura)
               : undefined
           }
           onMarcarCobrada={

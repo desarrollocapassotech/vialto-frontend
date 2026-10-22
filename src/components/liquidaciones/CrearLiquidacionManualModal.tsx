@@ -26,7 +26,11 @@ import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { ConfirmarEmisionArcaDialog } from "@/components/shared/ConfirmarEmisionArcaDialog";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
-import { useValidacionPadronRegistro } from "@/hooks/useValidacionPadronRegistro";
+import {
+  aplicarCambiosPadronCliente,
+  aplicarCambiosPadronTransportista,
+  useValidacionPadronRegistro,
+} from "@/hooks/useValidacionPadronRegistro";
 import { useReceptorPadronBloqueado } from "@/hooks/useReceptorPadronBloqueado";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { unidadCantidadViajes } from "@/lib/pdfDetalleViaje";
@@ -58,6 +62,7 @@ import {
   signedMontoNetoConcepto,
 } from "@/lib/liquidacionConceptosIva";
 import { useToast } from "@/lib/toast";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import {
   formatViajeImporteForListado,
   numeroVisibleViaje,
@@ -108,10 +113,8 @@ type ViajeItem = Pick<
   | "cliente"
 >;
 
-function fmtDate(iso: string | null) {
-  if (!iso) return "—";
-  const [y, m, d] = iso.slice(0, 10).split("-");
-  return `${d}/${m}/${y}`;
+function fmtDate(iso: string | null | undefined) {
+  return fmtDateUtc(iso);
 }
 
 /** Valor para `<input type="date">` a partir de un ISO en medianoche UTC, sin corrimiento por zona horaria. */
@@ -735,8 +738,9 @@ export function CrearLiquidacionManualModal({
   const transportistaSeleccionadoId = transportistaSeleccionado?.id;
 
   // Al elegir el transportista se valida su CUIT contra el padrón de ARCA (opt-in por
-  // empresa). Si ARCA informa otra condición IVA / domicilio, o el CUIT no está activo,
-  // se abre el mismo modal con lo de ARCA precargado.
+  // empresa). Si ARCA informa otra razón social / condición IVA / domicilio, el backend
+  // la guarda sola (sin confirmación, el CUIT no se toca) y acá se refresca. Solo un CUIT
+  // rechazado (inactivo / inexistente) abre el modal.
   const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
   const validacionPadronHabilitada =
     hasLiquidoProductoArca &&
@@ -747,27 +751,39 @@ export function CrearLiquidacionManualModal({
     habilitado: validacionPadronHabilitada,
     tenantId,
     getToken,
+    onActualizado: ({ padron, cambios }) => {
+      if (transportistaSeleccionado) {
+        setTransportistaActualizado(
+          aplicarCambiosPadronTransportista(
+            transportistaSeleccionado as Transportista,
+            padron,
+            cambios,
+          ),
+        );
+      }
+      onDataSaved?.();
+    },
   });
   const padronTransportistaAviso =
-    padronTransportista.resultado?.resultado === "diferencias" ||
     padronTransportista.resultado?.resultado === "rechazado"
       ? padronTransportista.resultado
       : null;
 
-  // Mismo circuito para el cliente de los viajes elegidos: se valida apenas se conoce,
-  // se precarga lo de ARCA en su modal y, al guardar, queda la huella de validado.
+  // Mismo circuito para el cliente de los viajes elegidos: se valida apenas se conoce y
+  // lo que difiera de ARCA se actualiza solo.
   const padronCliente = useValidacionPadronRegistro({
     entidad: "clientes",
     id: clienteDetalle?.id,
     habilitado: validacionPadronHabilitada,
     tenantId,
     getToken,
+    onActualizado: ({ padron, cambios }) => {
+      setClienteDetalle((c) => (c ? aplicarCambiosPadronCliente(c, padron, cambios) : c));
+      onDataSaved?.();
+    },
   });
   const padronClienteAviso =
-    padronCliente.resultado?.resultado === "diferencias" ||
-    padronCliente.resultado?.resultado === "rechazado"
-      ? padronCliente.resultado
-      : null;
+    padronCliente.resultado?.resultado === "rechazado" ? padronCliente.resultado : null;
 
   // CUIT del transportista (receptor del CVLP) dado de baja / apócrifo en ARCA: no se
   // puede emitir. Se avisa en el pie, igual que los datos faltantes.
@@ -781,7 +797,7 @@ export function CrearLiquidacionManualModal({
   });
   const emisionBloqueada = datosEmitIncompletos || receptorTransportista.bloqueado;
 
-  // Hay algo para mostrar en cada modal (si no, el modal ni se renderiza).
+  // Hay algo que obliga a mostrar cada modal (se abre solo una vez por motivo).
   const modalTransportistaDisponible = Boolean(
     transportistaSeleccionadoId &&
       (missingTransportistaFields.length > 0 || padronTransportistaAviso),
@@ -789,11 +805,22 @@ export function CrearLiquidacionManualModal({
   const modalClienteDisponible = Boolean(
     clienteDetalle && (missingClienteFields.length > 0 || padronClienteAviso),
   );
+  // Datos actualizados solos desde ARCA: el modal no se abre solo, pero queda disponible
+  // desde "Ver datos" para revisarlos/editarlos.
+  const padronTransportistaActualizado =
+    padronTransportista.resultado?.resultado === "actualizado";
+  const padronClienteActualizado = padronCliente.resultado?.resultado === "actualizado";
+  const modalTransportistaRenderizable = Boolean(
+    modalTransportistaDisponible || (transportistaSeleccionadoId && padronTransportistaActualizado),
+  );
+  const modalClienteRenderizable = Boolean(
+    modalClienteDisponible || (clienteDetalle && padronClienteActualizado),
+  );
   // Si el estado apunta a un modal que ya no corresponde mostrar, cuenta como cerrado:
   // si no, bloquearía la apertura del otro (ej. abriendo desde la grilla de Viajes).
   const modalDatosVisible =
-    (modalDatos === "transportista" && modalTransportistaDisponible) ||
-    (modalDatos === "cliente" && modalClienteDisponible)
+    (modalDatos === "transportista" && modalTransportistaRenderizable) ||
+    (modalDatos === "cliente" && modalClienteRenderizable)
       ? modalDatos
       : null;
 
@@ -1807,6 +1834,7 @@ export function CrearLiquidacionManualModal({
                                 .join("\n")
                             : undefined
                         }
+                        resaltado={padronTransportistaActualizado}
                         estado={
                           transportistaId ? (
                             <PadronValidacionEstado
@@ -1834,6 +1862,7 @@ export function CrearLiquidacionManualModal({
                           ]
                             .filter(Boolean)
                             .join("\n")}
+                          resaltado={padronClienteActualizado}
                           estado={
                             <PadronValidacionEstado
                               habilitado={validacionPadronHabilitada}
@@ -2069,11 +2098,10 @@ export function CrearLiquidacionManualModal({
         }}
       />
 
-      {transportistaSeleccionadoId &&
-        (missingTransportistaFields.length > 0 || padronTransportistaAviso) && (
+      {transportistaSeleccionadoId && modalTransportistaRenderizable && (
           <DatosFiscalesFaltantesModal
-            // Remonta al llegar la respuesta de ARCA para que el formulario tome lo precargado.
-            key={`${transportistaSeleccionadoId}-${padronTransportistaAviso?.resultado ?? "sin-arca"}`}
+            // Remonta al llegar la respuesta de ARCA para que el formulario tome lo actualizado.
+            key={`${transportistaSeleccionadoId}-${padronTransportista.resultado?.resultado ?? "sin-arca"}`}
             open={modalDatos === "transportista" && step === "form"}
             entidad="transportista"
             id={transportistaSeleccionadoId}
@@ -2082,33 +2110,28 @@ export function CrearLiquidacionManualModal({
               nombre: transportistaSeleccionado?.nombre ?? "",
               pais: transportistaSeleccionado?.pais ?? null,
               idFiscal: transportistaSeleccionado?.idFiscal ?? null,
-              condicionIva:
-                padronTransportistaAviso?.resultado === "diferencias" &&
-                padronTransportistaAviso.diferencias.includes("condicionIva")
-                  ? padronTransportistaAviso.padron.condicionIva
-                  : (transportistaSeleccionado?.condicionIva ?? null),
+              condicionIva: transportistaSeleccionado?.condicionIva ?? null,
               condicionTributaria:
                 transportistaSeleccionado?.condicionTributaria ?? null,
-              direccion:
-                padronTransportistaAviso?.resultado === "diferencias" &&
-                padronTransportistaAviso.diferencias.includes("domicilio")
-                  ? padronTransportistaAviso.padron.domicilio
-                  : (transportistaSeleccionado?.domicilio ?? null),
+              direccion: transportistaSeleccionado?.domicilio ?? null,
             }}
             missingFields={missingTransportistaFields}
             padron={padronTransportistaAviso}
+            actualizadoDesdeArca={padronTransportistaActualizado}
             accion="emitir una liquidación"
             tenantId={tenantId}
             getToken={getToken}
             onSaved={(t) => {
+              const mismoCuit =
+                (t as Transportista).idFiscal === transportistaSeleccionado?.idFiscal;
               setTransportistaActualizado(t as Transportista);
               onDataSaved?.();
-              if (padronTransportistaAviso) {
-                // Revisó y guardó contra lo de ARCA: queda marcado como validado.
+              if (padronTransportistaActualizado && mismoCuit) {
+                // Editó a mano lo que vino de ARCA: se respeta (no se vuelve a pisar).
                 void padronTransportista.confirmar();
               } else {
-                // Completó datos que faltaban (ej. el CUIT): se valida ahora. Si ARCA
-                // informa algo distinto, el modal se vuelve a abrir con eso precargado.
+                // Completó datos o corrigió el CUIT: se valida de nuevo contra ARCA (lo que
+                // difiera se actualiza solo; si el CUIT sigue rechazado, el modal se reabre).
                 datosAvisadosRef.current.delete(`t:${transportistaSeleccionadoId}:arca`);
                 void padronTransportista.revalidar();
               }
@@ -2117,11 +2140,10 @@ export function CrearLiquidacionManualModal({
           />
         )}
 
-      {clienteDetalle &&
-        (missingClienteFields.length > 0 || padronClienteAviso) && (
+      {clienteDetalle && modalClienteRenderizable && (
           <DatosFiscalesFaltantesModal
-            // Remonta al llegar la respuesta de ARCA para que el formulario tome lo precargado.
-            key={`${clienteDetalle.id}-${padronClienteAviso?.resultado ?? "sin-arca"}`}
+            // Remonta al llegar la respuesta de ARCA para que el formulario tome lo actualizado.
+            key={`${clienteDetalle.id}-${padronCliente.resultado?.resultado ?? "sin-arca"}`}
             open={modalDatos === "cliente" && step === "form"}
             entidad="cliente"
             id={clienteDetalle.id}
@@ -2130,32 +2152,25 @@ export function CrearLiquidacionManualModal({
               nombre: clienteDetalle.nombre ?? "",
               pais: clienteDetalle.pais ?? null,
               idFiscal: clienteDetalle.idFiscal ?? null,
-              condicionIva:
-                padronClienteAviso?.resultado === "diferencias" &&
-                padronClienteAviso.diferencias.includes("condicionIva")
-                  ? padronClienteAviso.padron.condicionIva
-                  : (clienteDetalle.condicionIva ?? null),
+              condicionIva: clienteDetalle.condicionIva ?? null,
               condicionTributaria: clienteDetalle.condicionTributaria ?? null,
-              direccion:
-                padronClienteAviso?.resultado === "diferencias" &&
-                padronClienteAviso.diferencias.includes("domicilio")
-                  ? padronClienteAviso.padron.domicilio
-                  : (clienteDetalle.direccion ?? null),
+              direccion: clienteDetalle.direccion ?? null,
             }}
             missingFields={missingClienteFields}
             padron={padronClienteAviso}
+            actualizadoDesdeArca={padronClienteActualizado}
             accion="emitir una liquidación"
             tenantId={tenantId}
             getToken={getToken}
             onSaved={(c) => {
+              const mismoCuit = (c as Cliente).idFiscal === clienteDetalle.idFiscal;
               setClienteDetalle(c as Cliente);
               onDataSaved?.();
-              if (padronClienteAviso) {
-                // Revisó y guardó contra lo de ARCA: se guarda la huella de validado.
+              if (padronClienteActualizado && mismoCuit) {
+                // Editó a mano lo que vino de ARCA: se respeta (no se vuelve a pisar).
                 void padronCliente.confirmar();
               } else {
-                // Completó datos que faltaban (ej. el CUIT): se valida ahora; si ARCA
-                // coincide se guarda la huella, si no, el modal se reabre precargado.
+                // Completó datos o corrigió el CUIT: se valida de nuevo contra ARCA.
                 datosAvisadosRef.current.delete(`c:${clienteDetalle.id}:arca`);
                 void padronCliente.revalidar();
               }

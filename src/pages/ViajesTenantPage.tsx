@@ -1,3 +1,10 @@
+import {
+  AdjuntarComprobanteClip,
+  ComprobanteAdjuntoClip,
+} from "@/components/shared/ComprobanteAdjuntoClip";
+import { AgregarDocumentoViajeModal } from "@/components/viajes/ViajeAdjuntosSeccion";
+import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
+import { adjuntosActivosViaje } from "@/lib/viajesAdjuntos";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { createPortal } from "react-dom";
 import { useAuth, useUser } from "@clerk/clerk-react";
@@ -47,6 +54,7 @@ import {
 } from "@/lib/arcaCbteTipo";
 import { apiJson, apiFetch, ApiError } from "@/lib/api";
 import { hoyArgentinaIso, vencimientoPorDefecto } from "@/lib/facturaFechaEmision";
+import { verPdfLiquidacion } from "@/lib/liquidacionContratoPdf";
 import { useToast } from "@/lib/toast";
 import { friendlyError } from "@/lib/friendlyError";
 import {
@@ -173,6 +181,14 @@ import type { FacturaDraft } from "@/components/facturacion/FacturaEditModal";
 
 /** Un campo de `ListadoCard` (tarjeta mobile de la grilla). */
 type ListadoCardCampo = { label: ReactNode; value: ReactNode };
+
+function normalizarTextoBusqueda(s: string): string {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
 
 // ─── COMPONENTE DE BUSCADOR CON COMBOBOX (AUTOCOMPLETE) ────────────────────
 function AutocompleteInput({
@@ -431,6 +447,7 @@ export function ViajesTenantPage({
   // Tenant efectivo (propio u override de superadmin): el superadmin ve la
   // grilla con el orden de columnas de la empresa elegida.
   const { tenant: tenantEfectivo } = useTenantPaisFijo(tid || undefined);
+  const mostrarColumnaObservaciones = Boolean(tenantEfectivo?.viajesObservaciones);
 
   // "Nueva factura" desde Viajes: el modal necesita TODOS los viajes del cliente, no
   // la página visible de la grilla (`rows`, paginada y con los filtros del listado).
@@ -502,6 +519,8 @@ export function ViajesTenantPage({
 
   const [exportarViaje, setExportarViaje] = useState<Viaje | null>(null);
   const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
+  /** Viaje sin documentos al que se le agrega uno desde la grilla (clip o acciones). */
+  const [agregarDocViaje, setAgregarDocViaje] = useState<Viaje | null>(null);
   /** Fila/card clickeada: abre el menú de acciones de ese viaje en vez del modal de detalle. */
   const [accionesAbiertoViajeId, setAccionesAbiertoViajeId] = useState<
     string | null
@@ -535,6 +554,7 @@ export function ViajesTenantPage({
     numero: "",
     ctg: "",
     idPropio2: "",
+    observaciones: "",
     clienteId: "",
     transportistaId: "",
     choferId: "",
@@ -554,6 +574,7 @@ export function ViajesTenantPage({
   const [numeroFiltroActivo, setNumeroFiltroActivo] = useState("");
   const [ctgFiltroActivo, setCtgFiltroActivo] = useState("");
   const [idPropio2FiltroActivo, setIdPropio2FiltroActivo] = useState("");
+  const [observacionesFiltroActivo, setObservacionesFiltroActivo] = useState("");
   const [clienteIdFiltroActivo, setClienteIdFiltroActivo] = useState("");
   const [transportistaIdFiltroActivo, setTransportistaIdFiltroActivo] =
     useState("");
@@ -713,6 +734,37 @@ export function ViajesTenantPage({
           .filter((x) => x.toLowerCase().includes(qClean));
 
         return Array.from(new Set(matches));
+      } catch {
+        return [];
+      }
+    },
+    [platform, tid],
+  );
+
+  const searchObservaciones = useCallback(
+    async (q: string) => {
+      const qClean = normalizarTextoBusqueda(q);
+      if (!qClean) return [];
+
+      const params = new URLSearchParams();
+      if (platform && tid) params.set("tenantId", tid);
+      params.set("page", "1");
+      params.set("pageSize", "1000");
+
+      const url = platform
+        ? `/api/platform/viajes/paginated?${params.toString()}`
+        : `/api/viajes/paginated?${params.toString()}`;
+
+      try {
+        const res = await apiJson<ViajesPaginatedResponse>(url, () =>
+          getTokenRef.current(),
+        );
+
+        const matches = res.items
+          .map((v) => v.observaciones?.trim() || "")
+          .filter((x) => Boolean(x) && normalizarTextoBusqueda(x).includes(qClean));
+
+        return Array.from(new Set(matches)).slice(0, 10);
       } catch {
         return [];
       }
@@ -903,6 +955,7 @@ export function ViajesTenantPage({
           numero: numF,
           ctg: ctgF,
           idPropio2: idp2F,
+          observaciones: obsF,
           clienteId: cid,
           transportistaId: transpFiltro,
           choferId: choferFiltro,
@@ -970,7 +1023,11 @@ export function ViajesTenantPage({
           ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}&` : "&"}`
           : `/api/viajes/paginated${filtrosQs ? `?${filtrosQs}&` : "?"}`;
 
-        const isLocalSearch = !!numF.trim() || !!ctgF.trim() || !!idp2F.trim();
+        const isLocalSearch =
+          !!numF.trim() ||
+          !!ctgF.trim() ||
+          !!idp2F.trim() ||
+          (mostrarColumnaObservaciones && !!obsF?.trim());
         const pageApi = isLocalSearch ? 1 : Math.max(1, Math.floor(page));
         // Traemos de a muchos si es búsqueda local para garantizar encontrarlo
         const pageSizeApi = isLocalSearch ? 1000 : pageSizeApiValido(pageSize);
@@ -1025,6 +1082,9 @@ export function ViajesTenantPage({
           const qNum = numF.replace(/#/g, "").trim().toLowerCase();
           const qCtg = ctgF.trim().toLowerCase();
           const qIdPropio2 = idp2F.trim().toLowerCase();
+          const qObs = mostrarColumnaObservaciones
+            ? normalizarTextoBusqueda(obsF)
+            : "";
 
           let filteredItems = items;
           if (qNum) {
@@ -1042,6 +1102,11 @@ export function ViajesTenantPage({
           if (qIdPropio2) {
             filteredItems = filteredItems.filter((v) =>
               (v.idPropio2 || "").toLowerCase().includes(qIdPropio2),
+            );
+          }
+          if (qObs) {
+            filteredItems = filteredItems.filter((v) =>
+              normalizarTextoBusqueda(v.observaciones || "").includes(qObs),
             );
           }
 
@@ -1133,6 +1198,18 @@ export function ViajesTenantPage({
     };
     setListadoRefetching(true);
     setIdPropio2FiltroActivo(idp2);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  function aplicarFiltroColumnaObservaciones(val: string) {
+    const obs = val.trim();
+    filtrosAplicadosRef.current = {
+      ...filtrosAplicadosRef.current,
+      observaciones: obs,
+    };
+    setListadoRefetching(true);
+    setObservacionesFiltroActivo(obs);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
   }
@@ -1401,6 +1478,7 @@ export function ViajesTenantPage({
       numero: "",
       ctg: "",
       idPropio2: "",
+      observaciones: "",
       clienteId: "",
       transportistaId: "",
       choferId: "",
@@ -1419,6 +1497,7 @@ export function ViajesTenantPage({
     setNumeroFiltroActivo("");
     setCtgFiltroActivo("");
     setIdPropio2FiltroActivo("");
+    setObservacionesFiltroActivo("");
     setClienteIdFiltroActivo("");
     setTransportistaIdFiltroActivo("");
     setChoferIdFiltroActivo("");
@@ -1445,6 +1524,7 @@ export function ViajesTenantPage({
     !!numeroFiltroActivo.trim() ||
     !!ctgFiltroActivo.trim() ||
     !!idPropio2FiltroActivo.trim() ||
+    (mostrarColumnaObservaciones && !!observacionesFiltroActivo.trim()) ||
     !!clienteIdFiltroActivo.trim() ||
     !!transportistaIdFiltroActivo.trim() ||
     !!choferIdFiltroActivo.trim() ||
@@ -1462,6 +1542,7 @@ export function ViajesTenantPage({
     if (numeroFiltroActivo.trim()) n += 1;
     if (ctgFiltroActivo.trim()) n += 1;
     if (idPropio2FiltroActivo.trim()) n += 1;
+    if (mostrarColumnaObservaciones && observacionesFiltroActivo.trim()) n += 1;
     if (clienteIdFiltroActivo.trim()) n += 1;
     if (transportistaIdFiltroActivo.trim()) n += 1;
     if (choferIdFiltroActivo.trim()) n += 1;
@@ -1477,6 +1558,8 @@ export function ViajesTenantPage({
     numeroFiltroActivo,
     ctgFiltroActivo,
     idPropio2FiltroActivo,
+    observacionesFiltroActivo,
+    mostrarColumnaObservaciones,
     clienteIdFiltroActivo,
     transportistaIdFiltroActivo,
     choferIdFiltroActivo,
@@ -1694,6 +1777,8 @@ export function ViajesTenantPage({
       const {
         numero: numF,
         ctg: ctgF,
+        idPropio2: idp2F,
+        observaciones: obsF,
         clienteId: cid,
         transportistaId: transpFiltro,
         choferId: choferFiltro,
@@ -1798,10 +1883,18 @@ export function ViajesTenantPage({
       }
 
       // Filtros locales si aplican
-      const isLocalSearch = !!numF.trim() || !!ctgF.trim();
+      const isLocalSearch =
+        !!numF.trim() ||
+        !!ctgF.trim() ||
+        !!idp2F?.trim() ||
+        (mostrarColumnaObservaciones && !!obsF?.trim());
       if (isLocalSearch) {
         const qNum = numF.replace(/#/g, "").trim().toLowerCase();
         const qCtg = ctgF.trim().toLowerCase();
+        const qIdp2 = idp2F?.trim().toLowerCase();
+        const qObs = mostrarColumnaObservaciones
+          ? normalizarTextoBusqueda(obsF)
+          : "";
         if (qNum)
           itemsExport = itemsExport.filter((v) =>
             String(v.numero).toLowerCase().includes(qNum),
@@ -1811,6 +1904,14 @@ export function ViajesTenantPage({
             (v.numeroIdentificacionPersonalizado || "")
               .toLowerCase()
               .includes(qCtg),
+          );
+        if (qIdp2)
+          itemsExport = itemsExport.filter((v) =>
+            (v.idPropio2 || "").toLowerCase().includes(qIdp2),
+          );
+        if (qObs)
+          itemsExport = itemsExport.filter((v) =>
+            normalizarTextoBusqueda(v.observaciones || "").includes(qObs),
           );
       }
 
@@ -2209,6 +2310,7 @@ export function ViajesTenantPage({
     (mostrarColumnaTransporte ? 0 : -1) +
     (mostrarColumnaIdPropio2 ? 1 : 0) +
     (mostrarColumnaProductos ? 1 : 0) +
+    (mostrarColumnaObservaciones ? 1 : 0) +
     (mostrarColumnaIdSistema ? 0 : -1) +
     (mostrarColumnaIdPropio1 ? 0 : -1);
   const tableColSpan = mostrarColumnaSeleccionLote
@@ -2238,6 +2340,11 @@ export function ViajesTenantPage({
       aplicarFiltroColumnaTransportista("");
     }
   }, [mostrarColumnaTransporte]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!mostrarColumnaObservaciones && observacionesFiltroActivo.trim()) {
+      aplicarFiltroColumnaObservaciones("");
+    }
+  }, [mostrarColumnaObservaciones]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mostrarCargandoListado = !error && (rows === null || listadoRefetching);
   const elegiblesEnPagina = (rows ?? []).filter(esElegibleLote);
@@ -2254,6 +2361,50 @@ export function ViajesTenantPage({
   // Columnas de la grilla en el orden configurado por superadmin
   // (`Tenant.viajesColumnasOrden`); cada una sigue con su propia visibilidad.
   const ordenColumnas = ordenColumnasViajes(tenantEfectivo);
+  /** Agregar/quitar documentos del viaje: admin de la empresa o superadmin (igual que el backend). */
+  const puedeEditarDocumentos =
+    platform || isOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
+  // Clip de documentos del viaje: va en la primera columna de ID visible (según el
+  // orden de columnas de la empresa).
+  const idColumnaConClip = ordenColumnas.find(
+    (id) =>
+      (id === "idSistema" && mostrarColumnaIdSistema) ||
+      (id === "idPropio1" && mostrarColumnaIdPropio1) ||
+      (id === "idPropio2" && mostrarColumnaIdPropio2),
+  );
+  /** Con 1 documento abre el archivo; con más, el detalle del viaje (sección Documentos). */
+  function clipDocumentosViaje(v: Viaje): ReactNode {
+    const docs = adjuntosActivosViaje(v);
+    if (!isViajeFieldVisible("detalle_viaje", "adjuntos")) return null;
+    if (docs.length === 0) {
+      // Sin documentos: clip casi transparente para agregar (igual que Facturas/Liquidaciones).
+      return puedeEditarDocumentos ? (
+        <AdjuntarComprobanteClip
+          titulo="Agregar documento"
+          onClick={() => setAgregarDocViaje(v)}
+        />
+      ) : null;
+    }
+    return (
+      <span className="inline-flex shrink-0 items-center">
+        <ComprobanteAdjuntoClip
+          titulo={docs.map((d) => d.titulo).join(" · ")}
+          onClick={() =>
+            docs.length === 1
+              ? void abrirAdjuntoEnPestana(
+                  { url: docs[0].url },
+                  () => getToken(),
+                  docs[0].titulo,
+                )
+              : setViewingViaje(v)
+          }
+        />
+        {docs.length > 1 && (
+          <span className="text-[10px] text-vialto-steel">{docs.length}</span>
+        )}
+      </span>
+    );
+  }
   const viajesHeaderColumnas: Record<ViajeColumnaId, ReactNode> = {
     idSistema: mostrarColumnaIdSistema && (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -2625,6 +2776,25 @@ export function ViajesTenantPage({
         {productoLabelsTenant.plural}
       </th>
     ),
+    observaciones: mostrarColumnaObservaciones && (
+      <th scope="col" className={`${listadoTablaThClass} align-top`}>
+        <ViajesListadoHeaderFiltro
+          title="Observaciones"
+          filterActive={!!observacionesFiltroActivo.trim()}
+          filterSignature={observacionesFiltroActivo}
+          onClear={() => aplicarFiltroColumnaObservaciones("")}
+          minWidthClass="min-w-0"
+        >
+          <AutocompleteInput
+            value={observacionesFiltroActivo}
+            onChange={(val) => aplicarFiltroColumnaObservaciones(val)}
+            onSearch={searchObservaciones}
+            disabled={listadoRefetching}
+            placeholder="Buscar observación..."
+          />
+        </ViajesListadoHeaderFiltro>
+      </th>
+    ),
   };
 
   // El admin de la empresa (o el superadmin operando sobre ella) puede cambiar el
@@ -2687,6 +2857,20 @@ export function ViajesTenantPage({
             onSearch={searchIdPropio2}
             disabled={listadoRefetching}
             placeholder="Buscar valor..."
+          />
+        </ListadoFiltroCampo>
+      )}
+      {mostrarColumnaObservaciones && (
+        <ListadoFiltroCampo
+          label="Observaciones"
+          active={!!observacionesFiltroActivo.trim()}
+        >
+          <AutocompleteInput
+            value={observacionesFiltroActivo}
+            onChange={(val) => aplicarFiltroColumnaObservaciones(val)}
+            onSearch={searchObservaciones}
+            disabled={listadoRefetching}
+            placeholder="Buscar observación..."
           />
         </ListadoFiltroCampo>
       )}
@@ -3117,6 +3301,7 @@ export function ViajesTenantPage({
           </tr>
         }
         renderTableRow={(v) => {
+          const clip = clipDocumentosViaje(v);
           const clientesRuta = clientesRutaListadoViaje(v, clientes);
           const nombreCliente = clientesRuta[0].nombre;
           const nombreTransp = nombreTransportistaExternoListadoViaje(
@@ -3131,24 +3316,33 @@ export function ViajesTenantPage({
           const celdas: Record<ViajeColumnaId, ReactNode> = {
             idSistema: mostrarColumnaIdSistema && (
               <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
-                {/* IDs: se truncan por el principio, lo que distingue es el final. */}
-                <TruncarInicio className="max-w-[5rem]" title={`#${v.numero}`}>
-                  #{v.numero}
-                </TruncarInicio>
+                <span className="flex items-center gap-1.5">
+                  {/* IDs: se truncan por el principio, lo que distingue es el final. */}
+                  <TruncarInicio className="max-w-[5rem]" title={`#${v.numero}`}>
+                    #{v.numero}
+                  </TruncarInicio>
+                  {idColumnaConClip === "idSistema" && clip}
+                </span>
               </td>
             ),
             idPropio1: mostrarColumnaIdPropio1 && (
               <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
-                <TruncarInicio>
-                  {v.numeroIdentificacionPersonalizado?.trim() || "—"}
-                </TruncarInicio>
+                <span className="flex items-center gap-1.5">
+                  <TruncarInicio>
+                    {v.numeroIdentificacionPersonalizado?.trim() || "—"}
+                  </TruncarInicio>
+                  {idColumnaConClip === "idPropio1" && clip}
+                </span>
               </td>
             ),
             idPropio2: mostrarColumnaIdPropio2 && (
               <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
-                <TruncarInicio>
-                  {v.idPropio2?.trim() || "—"}
-                </TruncarInicio>
+                <span className="flex items-center gap-1.5">
+                  <TruncarInicio>
+                    {v.idPropio2?.trim() || "—"}
+                  </TruncarInicio>
+                  {idColumnaConClip === "idPropio2" && clip}
+                </span>
               </td>
             ),
             cliente: (
@@ -3307,6 +3501,18 @@ export function ViajesTenantPage({
                 </span>
               </td>
             ),
+            observaciones: mostrarColumnaObservaciones && (
+              <td className="h-8 px-3 py-1 text-vialto-steel">
+                {v.observaciones?.trim() ? (
+                  <span
+                    className="block max-w-[14rem] truncate"
+                    title={v.observaciones.trim()}
+                  >
+                    {v.observaciones.trim()}
+                  </span>
+                ) : null}
+              </td>
+            ),
           };
           return (
             <tr
@@ -3393,6 +3599,9 @@ export function ViajesTenantPage({
                       : undefined;
                   })()}
                   onEliminar={() => requestDeleteViaje(v)}
+                  onAgregarDocumento={
+                    puedeEditarDocumentos ? () => setAgregarDocViaje(v) : undefined
+                  }
                 />
               </td>
             </tr>
@@ -3574,6 +3783,15 @@ export function ViajesTenantPage({
                   },
                 ]
               : [],
+            observaciones:
+              mostrarColumnaObservaciones && v.observaciones?.trim()
+                ? [
+                    {
+                      label: "Observaciones",
+                      value: v.observaciones.trim(),
+                    },
+                  ]
+                : [],
           };
           return (
             <ListadoCard
@@ -3663,6 +3881,9 @@ export function ViajesTenantPage({
                       : undefined;
                   })()}
                   onEliminar={() => requestDeleteViaje(v)}
+                  onAgregarDocumento={
+                    puedeEditarDocumentos ? () => setAgregarDocViaje(v) : undefined
+                  }
                 />
               }
             />
@@ -3688,11 +3909,32 @@ export function ViajesTenantPage({
         />
       )}
 
+      {agregarDocViaje && (
+        <AgregarDocumentoViajeModal
+          viaje={agregarDocViaje}
+          tenantId={platform ? tid : undefined}
+          onClose={() => setAgregarDocViaje(null)}
+          onAgregado={(v) => {
+            setAgregarDocViaje(null);
+            setRows((prev) =>
+              prev ? prev.map((r) => (r.id === v.id ? v : r)) : prev,
+            );
+          }}
+        />
+      )}
+
       {viewingViaje && (
         <ViajeViewModal
           viaje={viewingViaje}
           tenantId={platform ? tid : undefined}
           modulos={platform ? tenantModules : currentTenant?.modules}
+          puedeEditarAdjuntos={puedeEditarDocumentos}
+          onViajeActualizado={(v) => {
+            setViewingViaje(v);
+            setRows((prev) =>
+              prev ? prev.map((r) => (r.id === v.id ? v : r)) : prev,
+            );
+          }}
           hasLiquidoProductoArca={hasLiquidoProductoArcaResuelto}
           editando={abriendoEditorViaje}
           onClose={() => setViewingViaje(null)}
@@ -4176,12 +4418,11 @@ export function ViajesTenantPage({
             hasArca={true}
             onClose={() => setViewingFactura(null)}
             onVerComprobante={
-              viewingFactura.comprobanteUrl
+              viewingFactura.comprobanteUrl?.trim()
                 ? () =>
-                    window.open(
-                      viewingFactura.comprobanteUrl!,
-                      "_blank",
-                      "noopener,noreferrer",
+                    void abrirAdjuntoEnPestana(
+                      { url: viewingFactura.comprobanteUrl!.trim() },
+                      () => getToken(),
                     )
                 : undefined
             }
@@ -4221,27 +4462,6 @@ export function ViajesTenantPage({
                 },
               });
             }}
-            onVerNotaCredito={
-              viewingFactura.arcaEstado === "anulado"
-                ? () => {
-                    if (viewingFactura.notaCreditoUrl) {
-                      window.open(
-                        viewingFactura.notaCreditoUrl,
-                        "_blank",
-                        "noopener,noreferrer",
-                      );
-                    } else {
-                      setViewingFactura(null);
-                      navigate("/facturacion", {
-                        state: {
-                          ...facturacionNavExtras(),
-                          viewFacturaId: viewingFactura.id,
-                        },
-                      });
-                    }
-                  }
-                : undefined
-            }
           />
         )}
 
@@ -4262,6 +4482,13 @@ export function ViajesTenantPage({
               navigate(`/liquidaciones?${params.toString()}`);
             }}
             onClose={() => setViewingLiquidacion(null)}
+            onVerPdfLiquidacion={() =>
+              void verPdfLiquidacion(
+                viewingLiquidacion.id,
+                () => getToken(),
+                platform && tid ? tid : undefined,
+              )
+            }
             onEmitir={
               hasLiquidoProductoArca
                 ? () => {
@@ -4301,10 +4528,9 @@ export function ViajesTenantPage({
                   }
                 : viewingLiquidacion.comprobanteUrl?.trim()
                   ? () =>
-                      window.open(
-                        viewingLiquidacion.comprobanteUrl,
-                        "_blank",
-                        "noopener,noreferrer",
+                      void abrirAdjuntoEnPestana(
+                        { url: viewingLiquidacion.comprobanteUrl!.trim() },
+                        () => getToken(),
                       )
                   : undefined
             }

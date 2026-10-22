@@ -18,7 +18,6 @@ import {
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { BloqueoModal } from "@/components/ui/BloqueoModal";
-import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { Spinner } from "@/components/ui/Spinner";
 import { ApiError, apiFetch, apiJson } from "@/lib/api";
 import {
@@ -100,7 +99,6 @@ export function AnularFacturaModal({
   const [error, setError] = useState<string | null>(null);
   const [facturaResultado, setFacturaResultado] = useState<Factura>(factura);
   const [downloading, setDownloading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
   const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(
     clienteInicial,
@@ -239,14 +237,10 @@ export function AnularFacturaModal({
   }
 
   /**
-   * "Ver comprobante" de la NC, en pestaña nueva (regla del sistema): el PDF subido si
-   * existe; si no, el que genera el backend con los datos de la NC.
+   * "Ver comprobante" de la NC, en pestaña nueva: siempre el PDF que genera el backend en el
+   * momento (no el guardado al anular), así sale con el mismo diseño que la factura original.
    */
-  async function verComprobanteNc(notaCreditoUrl?: string | null) {
-    if (notaCreditoUrl) {
-      setPreviewUrl(notaCreditoUrl);
-      return;
-    }
+  async function verComprobanteNc() {
     // La pestaña se abre en el click (si no, el navegador la bloquea como popup).
     const ventana = window.open("", "_blank");
     setDownloading(true);
@@ -298,7 +292,7 @@ export function AnularFacturaModal({
                   <button
                     type="button"
                     disabled={downloading}
-                    onClick={() => void verComprobanteNc(factura.notaCreditoUrl)}
+                    onClick={() => void verComprobanteNc()}
                     className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50"
                   >
                     {downloading ? "Generando…" : "Ver comprobante"}
@@ -314,13 +308,6 @@ export function AnularFacturaModal({
               </div>
             </div>
           </div>,
-        )}
-        {previewUrl && (
-          <AdjuntoPreviewModal
-            url={previewUrl}
-            title="Nota de Crédito"
-            onClose={() => setPreviewUrl(null)}
-          />
         )}
       </>
     );
@@ -536,7 +523,7 @@ export function AnularFacturaModal({
                       <button
                         type="button"
                         disabled={downloading}
-                        onClick={() => void verComprobanteNc(facturaResultado.notaCreditoUrl)}
+                        onClick={() => void verComprobanteNc()}
                         className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50"
                       >
                         {downloading ? "Generando…" : "Ver comprobante"}
@@ -590,13 +577,6 @@ export function AnularFacturaModal({
             )}
           </div>
         </div>,
-      )}
-      {previewUrl && (
-        <AdjuntoPreviewModal
-          url={previewUrl}
-          title="Nota de Crédito"
-          onClose={() => setPreviewUrl(null)}
-        />
       )}
     </>
   );

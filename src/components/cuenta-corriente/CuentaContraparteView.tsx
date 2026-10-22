@@ -1,6 +1,6 @@
 import { fechaDiaYmd, fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth } from '@clerk/clerk-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Banknote,
@@ -51,6 +51,10 @@ import {
 } from '@/lib/tenantModules';
 import { ExportarEstadoCuentaModal } from './ExportarEstadoCuentaModal';
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
+import { ComprobanteAdjuntoClip } from '@/components/shared/ComprobanteAdjuntoClip';
+import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
+import { verPdfFacturaArca } from '@/lib/facturaPdfArca';
+import { verPdfLiquidacion } from '@/lib/liquidacionContratoPdf';
 
 type ModalState =
   | { kind: 'nuevo'; tipoInicial: TipoMovimientoCc }
@@ -119,6 +123,7 @@ export function CuentaContraparteView({
   // "Ver factura/liquidación" solo si la empresa tiene el módulo (si no, no puede abrirla).
   const puedeVerFacturas = ventasNacenDeFacturas(modulos);
   const puedeVerLiquidaciones = comprasNacenDeLiquidaciones(modulos);
+  const hasArcaLiquidaciones = canAccessEmisionLiquidoProductoArca(modulos);
   const [movimientos, setMovimientos] = useState<MovimientoCc[] | null>(null);
   const [saldos, setSaldos] = useState<SaldoPorMoneda[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -264,6 +269,77 @@ export function CuentaContraparteView({
     if (c.facturaId && puedeVerFacturas) return { tipo: 'factura', id: c.facturaId };
     if (c.liquidacionId && puedeVerLiquidaciones) return { tipo: 'liquidacion', id: c.liquidacionId };
     return null;
+  }
+
+  /**
+   * Clips de la columna Comprobante, mismo criterio y colores que las grillas de Facturas y
+   * Liquidaciones: gris = comprobante (adjunto o PDF de ARCA), azul = PDF de liquidación
+   * (sin ARCA), rojo = anulación. Un cargo muestra los suyos; una anulación, el de la
+   * anulación del cargo que compensa. Los cobros/pagos no llevan clip.
+   */
+  function clipsDe(m: MovimientoConSaldo): ReactNode {
+    const tk = () => getToken();
+    const adjunto = (url: string | null | undefined, titulo: string) => {
+      const u = url?.trim();
+      return u ? () => void abrirAdjuntoEnPestana({ url: u }, tk, titulo) : undefined;
+    };
+    const pdfLiq = (id: string, kind: 'pdf' | 'pdf-anulacion', titulo: string) => () =>
+      void abrirAdjuntoEnPestana(
+        { apiPath: `/api/integracion-arca/liquidaciones/${encodeURIComponent(id)}/${kind}` },
+        tk,
+        titulo,
+      );
+    const pdfFactura = (id: string, kind: 'factura' | 'nc') => () =>
+      void verPdfFacturaArca(id, kind, tk).catch(() => undefined);
+
+    if (m.tipo === 'credito' && m.anulaMovimientoId) {
+      const anulado = (movimientos ?? []).find((x) => x.id === m.anulaMovimientoId);
+      const f = anulado?.facturaComprobantes;
+      const l = anulado?.liquidacionComprobantes;
+      let abrir: (() => void) | undefined;
+      let titulo = 'Ver comprobante de anulación';
+      if (anulado?.facturaId && f) {
+        titulo = 'Ver nota de crédito';
+        abrir = f.anulacionCae
+          ? pdfFactura(anulado.facturaId, 'nc')
+          : adjunto(f.notaCreditoUrl, 'Nota de crédito');
+      } else if (anulado?.liquidacionId && l) {
+        abrir =
+          l.anulacionMetodo === 'manual'
+            ? adjunto(l.anulacionManualComprobanteUrl, 'Comprobante de anulación')
+            : l.anulacionCae
+              ? pdfLiq(anulado.liquidacionId, 'pdf-anulacion', 'Anulación')
+              : undefined;
+      }
+      return abrir ? <ComprobanteAdjuntoClip onClick={abrir} tono="anulacion" titulo={titulo} /> : null;
+    }
+
+    if (m.tipo !== 'cargo') return null;
+    const clips: ReactNode[] = [];
+    const f = m.facturaComprobantes;
+    const l = m.liquidacionComprobantes;
+    if (m.facturaId && f) {
+      const abrir = f.cae ? pdfFactura(m.facturaId, 'factura') : adjunto(f.comprobanteUrl, 'Comprobante');
+      if (abrir) clips.push(<ComprobanteAdjuntoClip key="cbte" onClick={abrir} />);
+    } else if (m.liquidacionId && l) {
+      const abrir =
+        l.cbteNro != null
+          ? pdfLiq(m.liquidacionId, 'pdf', 'Liquidación')
+          : adjunto(l.comprobanteUrl, 'Comprobante');
+      if (abrir) clips.push(<ComprobanteAdjuntoClip key="cbte" onClick={abrir} />);
+      if (!hasArcaLiquidaciones && l.cbteNro == null) {
+        const liqId = m.liquidacionId;
+        clips.push(
+          <ComprobanteAdjuntoClip
+            key="pdf"
+            onClick={() => void verPdfLiquidacion(liqId, tk)}
+            tono="pdf"
+            titulo="PDF de liquidación"
+          />,
+        );
+      }
+    }
+    return clips.length ? <>{clips}</> : null;
   }
 
   /** Acciones de una fila: las usan el botón de Acciones y el click en la fila. */
@@ -522,19 +598,23 @@ export function CuentaContraparteView({
           {
             id: 'numeroFactura',
             header: 'Comprobante',
-            cell: (m: MovimientoConSaldo) =>
-              m.comprobantesImputados.length > 1 ? (
-                // Varias facturas: su número propio (o "…") y el tooltip (oscuro, de
-                // ListadoDatos) lista a cuáles se imputó.
-                <span
-                  className="cursor-help"
-                  title={`Imputado a:\n${m.comprobantesImputados.join('\n')}`}
-                >
-                  {m.numeroComprobante?.trim() || '…'}
-                </span>
-              ) : (
-                m.comprobanteMostrado ?? '—'
-              ),
+            cell: (m: MovimientoConSaldo) => (
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                {m.comprobantesImputados.length > 1 ? (
+                  // Varias facturas: su número propio (o "…") y el tooltip (oscuro, de
+                  // ListadoDatos) lista a cuáles se imputó.
+                  <span
+                    className="cursor-help"
+                    title={`Imputado a:\n${m.comprobantesImputados.join('\n')}`}
+                  >
+                    {m.numeroComprobante?.trim() || '…'}
+                  </span>
+                ) : (
+                  m.comprobanteMostrado ?? '—'
+                )}
+                {clipsDe(m)}
+              </span>
+            ),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
@@ -718,7 +798,7 @@ export function CuentaContraparteView({
         <ComprobanteOrigenCcModal
           comprobante={modal.comprobante}
           contraparteNombre={contraparteNombre}
-          hasArcaLiquidaciones={canAccessEmisionLiquidoProductoArca(modulos)}
+          hasArcaLiquidaciones={hasArcaLiquidaciones}
           onClose={() => setModal(null)}
         />
       )}

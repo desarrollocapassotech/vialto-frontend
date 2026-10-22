@@ -5,6 +5,7 @@ import {
   Download,
   Eye,
   FilePen,
+  Paperclip,
   FileText,
   FileWarning,
   HandCoins,
@@ -32,6 +33,7 @@ import {
 } from '@/lib/viajesComprobantes';
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
+import { adjuntosActivosViaje } from '@/lib/viajesAdjuntos';
 import { useFieldConfig } from '@/hooks/useFieldConfig';
 
 interface Props {
@@ -60,6 +62,8 @@ interface Props {
   /** Solo si el viaje tiene una liquidación en borrador (sin emitir). */
   onContinuarLiquidacion?: () => void;
   onEliminar?: () => void;
+  /** Admin/superadmin: "Agregar documento" si el viaje todavía no tiene ninguno. */
+  onAgregarDocumento?: () => void;
   /** Si se pasa junto con `onOpenChange`, el abierto/cerrado pasa a ser controlado por el padre (ej. click en la fila de la tabla). */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -83,6 +87,7 @@ export function ViajeAccionesMenu({
   onContinuarFactura,
   onContinuarLiquidacion,
   onEliminar,
+  onAgregarDocumento,
   open: openProp,
   onOpenChange,
 }: Props) {
@@ -115,6 +120,10 @@ export function ViajeAccionesMenu({
     ? MSG_ARCA_NO_LIQUIDA_USD
     : null;
   const permiteExportar = viaje.etapa !== 'cancelado' && hasExportacionActiva;
+  const permiteAgregarDocumento =
+    Boolean(onAgregarDocumento) &&
+    isVisible('detalle_viaje', 'adjuntos') &&
+    adjuntosActivosViaje(viaje).length === 0;
 
   const options = useMemo(() => {
     const items: AccionOpcion[] = [{ id: 'ver', label: 'Ver viaje', icon: Eye, onClick: onVer }];
@@ -194,6 +203,14 @@ export function ViajeAccionesMenu({
     if (permiteExportar) {
       items.push({ id: 'exportar', label: 'Exportar', icon: Download, onClick: onExportar });
     }
+    if (permiteAgregarDocumento && onAgregarDocumento) {
+      items.push({
+        id: 'agregar-documento',
+        label: 'Agregar documento',
+        icon: Paperclip,
+        onClick: onAgregarDocumento,
+      });
+    }
     if (onEliminar) {
       items.push({ id: 'eliminar', label: 'Eliminar', icon: Trash2, onClick: onEliminar, danger: true });
     }
@@ -220,6 +237,8 @@ export function ViajeAccionesMenu({
     onRegistrarPago,
     permiteExportar,
     onExportar,
+    permiteAgregarDocumento,
+    onAgregarDocumento,
     onEliminar,
   ]);
 

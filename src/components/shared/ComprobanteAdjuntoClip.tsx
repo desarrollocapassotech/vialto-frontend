@@ -7,10 +7,13 @@ import { Paperclip } from "lucide-react";
 export function AdjuntarComprobanteClip({
   onClick,
   conTexto = false,
+  titulo = "Adjuntar comprobante",
 }: {
   onClick: () => void;
-  /** Sin número de comprobante: muestra "Adjuntar comprobante" al lado del clip. */
+  /** Sin número de comprobante: muestra `titulo` al lado del clip. */
   conTexto?: boolean;
+  /** Tooltip y texto (ej. "Agregar documento" en Viajes). */
+  titulo?: string;
 }) {
   return (
     <button
@@ -19,8 +22,8 @@ export function AdjuntarComprobanteClip({
         e.stopPropagation();
         onClick();
       }}
-      title="Adjuntar comprobante"
-      aria-label="Adjuntar comprobante"
+      title={titulo}
+      aria-label={titulo}
       className={`inline-flex shrink-0 items-center gap-1 transition-colors hover:text-vialto-fire focus-visible:text-vialto-fire ${
         conTexto
           ? "text-xs font-normal text-vialto-steel/50"
@@ -28,7 +31,7 @@ export function AdjuntarComprobanteClip({
       }`}
     >
       <Paperclip className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden />
-      {conTexto && "Adjuntar comprobante"}
+      {conTexto && titulo}
     </button>
   );
 }
@@ -50,8 +53,9 @@ export function ComprobanteAdjuntoClip({
   /**
    * `anulacion`: comprobante que anula al original (nota de crédito/débito, anulación
    * manual), en rojo para distinguirlo cuando hay más de un clip en la celda.
+   * `pdf`: PDF que genera Vialto (ej. "PDF de liquidación" sin ARCA), en azul.
    */
-  tono?: "comprobante" | "anulacion";
+  tono?: "comprobante" | "anulacion" | "pdf";
   /** Tooltip; por defecto "Ver comprobante adjunto". */
   titulo?: string;
 }) {
@@ -68,7 +72,9 @@ export function ComprobanteAdjuntoClip({
       className={`inline-flex shrink-0 items-center gap-1 ${
         tono === "anulacion"
           ? "text-red-600/80 hover:text-red-800"
-          : "text-vialto-steel hover:text-vialto-charcoal"
+          : tono === "pdf"
+            ? "text-sky-700/80 hover:text-sky-900"
+            : "text-vialto-steel hover:text-vialto-charcoal"
       } ${conTexto ? "text-xs font-normal" : ""}`}
     >
       <Paperclip className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />

@@ -54,6 +54,23 @@ export type MovimientoCc = {
    * pago: sin imputar). Solo viene poblado en `fetchMovimientos` (`GET .../movimientos`).
    */
   pendiente?: number;
+  /** Factura de origen: datos para los clips de la columna Comprobante. */
+  facturaComprobantes?: {
+    cae: string | null;
+    comprobanteUrl: string | null;
+    arcaEstado: string | null;
+    anulacionCae: string | null;
+    notaCreditoUrl: string | null;
+  } | null;
+  /** Liquidación de origen: datos para los clips de la columna Comprobante. */
+  liquidacionComprobantes?: {
+    cbteNro: number | null;
+    comprobanteUrl: string | null;
+    estado: string;
+    anulacionMetodo: string | null;
+    anulacionCae: string | null;
+    anulacionManualComprobanteUrl: string | null;
+  } | null;
 };
 
 export type SaldoPorMoneda = { moneda: string; saldo: number };
@@ -271,7 +288,12 @@ export function repartirImputacion(
 export function actualizarComprobanteMovimiento(
   getToken: GetToken,
   id: string,
-  datos: { numeroComprobante?: string | null; fechaVencimiento?: string | null },
+  datos: {
+    numeroComprobante?: string | null;
+    fechaVencimiento?: string | null;
+    /** Archivo ya subido (Cloudinary); solo factura o liquidación sin ARCA. */
+    comprobanteUrl?: string | null;
+  },
 ) {
   return apiJson<MovimientoCc>(
     `/api/cuenta-corriente/movimientos/${encodeURIComponent(id)}/comprobante`,
