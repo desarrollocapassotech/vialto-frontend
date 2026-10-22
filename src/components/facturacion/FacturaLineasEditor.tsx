@@ -6,7 +6,11 @@ import {
   type FacturaTramoDraft,
 } from '@/components/facturacion/FacturaTramosEditor';
 import type { Factura, Viaje } from '@/types/api';
-import { maskCurrencyArInput, parseCurrencyAr } from '@/lib/currencyMask';
+import {
+  formatCurrencyArFromNumber,
+  maskCurrencyArInput,
+  parseCurrencyAr,
+} from '@/lib/currencyMask';
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
 import {
   computeFacturaTotalesFromBases,
@@ -42,14 +46,8 @@ function fmtMoney(n: number) {
   return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function parseImporte(raw: string): number {
-  if (raw.trim() === '') return 0;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : 0;
-}
-
 function displayImporteStr(linea: FacturaLineaDraft): string {
-  return linea.importeStr ?? (linea.importe > 0 ? String(linea.importe) : '');
+  return linea.importeStr ?? (linea.importe > 0 ? formatCurrencyArFromNumber(linea.importe) : '');
 }
 
 export function isFacturaLineaCompleta(l: FacturaLineaDraft): boolean {
@@ -336,8 +334,6 @@ interface Props {
   labelImporte?: string;
   /** Columna "Subtotal" de solo lectura por línea: importe + su IVA. */
   mostrarSubtotal?: boolean;
-  /** Importe con máscara argentina (miles con ".", decimales con ","), como el resto de Cuenta corriente. */
-  importeFormatoAr?: boolean;
 }
 
 /** Importe de la línea con su IVA (2 decimales); solo para mostrar. */
@@ -357,7 +353,6 @@ export function FacturaLineasEditor({
   totalesALaDerecha = false,
   labelImporte = 'Importe neto',
   mostrarSubtotal = false,
-  importeFormatoAr = false,
 }: Props) {
   const totales = useMemo(
     () => computeFacturaTotales(lineas, ivaPctDefault),
@@ -441,39 +436,22 @@ export function FacturaLineasEditor({
             </div>
             <div>
               <CrudFieldLabel required>{labelImporte}</CrudFieldLabel>
-              {importeFormatoAr ? (
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  disabled={disabled}
-                  value={displayImporteStr(linea)}
-                  onChange={(e) => {
-                    const importeStr = maskCurrencyArInput(e.target.value);
-                    updateLinea(index, {
-                      importeStr,
-                      importe: parseCurrencyAr(importeStr) ?? 0,
-                    });
-                  }}
-                  className={inputClass}
-                  placeholder="0,00"
-                />
-              ) : (
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  disabled={disabled}
-                  value={displayImporteStr(linea)}
-                  onChange={(e) => {
-                    const importeStr = e.target.value;
-                    updateLinea(index, {
-                      importeStr,
-                      importe: parseImporte(importeStr),
-                    });
-                  }}
-                  className={inputClass}
-                />
-              )}
+              {/* Miles con "." y decimales con ",". */}
+              <input
+                type="text"
+                inputMode="decimal"
+                disabled={disabled}
+                value={displayImporteStr(linea)}
+                onChange={(e) => {
+                  const importeStr = maskCurrencyArInput(e.target.value);
+                  updateLinea(index, {
+                    importeStr,
+                    importe: parseCurrencyAr(importeStr) ?? 0,
+                  });
+                }}
+                className={inputClass}
+                placeholder="0,00"
+              />
             </div>
             <div>
               <CrudFieldLabel>IVA %</CrudFieldLabel>

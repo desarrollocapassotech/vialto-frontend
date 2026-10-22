@@ -30,7 +30,7 @@ import {
   textoImporteFacturaSeleccion,
   textoMontoFacturarListado,
 } from "@/lib/viajesFlota";
-import { normalizeViajeMoneda } from "@/lib/currencyMask";
+import { formatCurrencyArFromNumber, normalizeViajeMoneda } from "@/lib/currencyMask";
 import {
   computeFacturaTotalesFromBases,
   importeNetoViajeParaFactura,
@@ -161,7 +161,7 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
       viajeId: t.viajeId,
       detalle: t.detalle,
       monto: t.monto,
-      montoStr: t.monto > 0 ? String(t.monto) : "",
+      montoStr: t.monto > 0 ? formatCurrencyArFromNumber(t.monto) : "",
       ivaPct: t.ivaPct,
       ivaPctStr: String(t.ivaPct),
     }));

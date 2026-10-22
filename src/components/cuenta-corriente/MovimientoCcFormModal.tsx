@@ -400,7 +400,6 @@ export function MovimientoCcFormModal({
             totalesALaDerecha
             labelImporte="Importe"
             mostrarSubtotal
-            importeFormatoAr
           />
         )}
 
