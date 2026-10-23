@@ -55,7 +55,12 @@ export type ConceptoLineaDraft = {
    * ID del viaje al que corresponde este concepto (si modoAplicacion === 'VIAJE_PUNTUAL').
    */
   viajeId?: string | null;
+  /** Aclaración libre opcional (ej. "Faltante del viaje 10135713752"). */
+  detalle?: string;
 };
+
+/** Largo máximo del detalle (mismo tope que el backend). */
+const DETALLE_MAX = 200;
 
 export interface ViajeOpcionDraft {
   id: string;
@@ -731,6 +736,19 @@ export function ConceptosLiquidacionLineasEditor({
                     </button>
                   )}
                 </div>
+
+                <label className="min-w-0 sm:col-span-6">
+                  <span className={labelClass}>Detalle</span>
+                  <input
+                    type="text"
+                    maxLength={DETALLE_MAX}
+                    value={linea.detalle ?? ""}
+                    disabled={disabled}
+                    placeholder="Ej. Faltante del viaje 10135713752"
+                    onChange={(e) => updateRow(index, { detalle: e.target.value })}
+                    className={inputClass}
+                  />
+                </label>
               </div>
             );
           })}
@@ -789,5 +807,6 @@ export function toConceptosLineasPayload(lineas: ConceptoLineaDraft[]) {
     ...(l.signo ? { signo: l.signo } : {}),
     modoAplicacion: l.modoAplicacion ?? 'GENERAL',
     viajeId: l.modoAplicacion === 'VIAJE_PUNTUAL' ? (l.viajeId || null) : null,
+    ...(l.detalle?.trim() ? { detalle: l.detalle.trim() } : {}),
   }));
 }

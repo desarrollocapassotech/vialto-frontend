@@ -6,7 +6,7 @@ import {
   fmtSignedLiquidacionMoney,
   round2,
 } from "@/lib/liquidacionMoney";
-import { signedMontoNetoConcepto } from "@/lib/liquidacionConceptosIva";
+import { nombreConDetalle, signedMontoNetoConcepto } from "@/lib/liquidacionConceptosIva";
 
 
 // Re-export para no romper imports existentes.
@@ -20,6 +20,7 @@ type ConceptoLineaDisplay = {
   ivaPct?: number | null;
   cantidad?: number;
   montoUnitario?: number | null;
+  detalle?: string | null;
 };
 
 type Props = {
@@ -146,7 +147,7 @@ export function LiquidacionMontosBreakdown({
       ].filter(Boolean);
       return {
         key: row.id ?? `concepto-${idx}`,
-        label: `${nombre}${detalle.length ? ` (${detalle.join(", ")})` : ""}`,
+        label: `${nombreConDetalle(nombre, row.detalle)}${detalle.length ? ` (${detalle.join(", ")})` : ""}`,
         value: fmtSignedLiquidacionMoney(
           Math.abs(neto),
           neto >= 0 ? "plus" : "minus",

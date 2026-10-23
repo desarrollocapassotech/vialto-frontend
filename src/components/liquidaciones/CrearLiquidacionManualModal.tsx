@@ -65,6 +65,7 @@ import {
 } from "@/lib/currencyMask";
 import { friendlyError } from "@/lib/friendlyError";
 import {
+  nombreConDetalle,
   signedMontoConIvaConcepto,
   signedMontoNetoConcepto,
 } from "@/lib/liquidacionConceptosIva";
@@ -453,6 +454,7 @@ export function CrearLiquidacionManualModal({
             ivaPct: l.ivaPct ?? undefined,
             modoAplicacion: l.modoAplicacion ?? "GENERAL",
             viajeId: l.viajeId ?? null,
+            detalle: l.detalle ?? undefined,
           })),
       );
       if (base.ivaPct != null) setIvaPct(String(base.ivaPct));
@@ -1992,16 +1994,31 @@ export function CrearLiquidacionManualModal({
                       )}
                     </section>
 
-                    {/* La comisión va aparte; abajo quedan solo neto gravado, IVA por alícuota y total. */}
-                    {showSummary && comisionMonto > 0 && (
+                    {/* Comisión y conceptos van aparte (neto, sin IVA, en el orden de carga);
+                        abajo quedan solo neto gravado, IVA por alícuota y total. */}
+                    {showSummary && (comisionMonto > 0 || conceptosCompletos.length > 0) && (
                       <section className="space-y-1">
                         <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
-                          Comisión
+                          {conceptosCompletos.length > 0 ? "Comisión y conceptos" : "Comisión"}
                         </p>
-                        <ResumenRow
-                          label={`Comisión por flete ${comisionNum}%`}
-                          value={`${fmtSignedLiquidacionMoney(comisionMonto, "minus")} ${monedaResumen}`}
-                        />
+                        {comisionMonto > 0 && (
+                          <ResumenRow
+                            label={`Comisión por flete ${comisionNum}%`}
+                            value={`${fmtSignedLiquidacionMoney(comisionMonto, "minus")} ${monedaResumen}`}
+                          />
+                        )}
+                        {conceptosCompletos.map((l, idx) => {
+                          const mult = getMultiplicador(l.modoAplicacion);
+                          const neto =
+                            signedMontoNetoConcepto(l.signo, Number(l.monto) || 0) * mult;
+                          return (
+                            <ResumenRow
+                              key={`${l.conceptoLiquidacionId}-${idx}`}
+                              label={`${nombreConDetalle(l.nombre || "Concepto", l.detalle)}${mult > 1 ? ` (×${mult} viajes)` : ""}`}
+                              value={`${fmtSignedLiquidacionMoney(Math.abs(neto), neto >= 0 ? "plus" : "minus")} ${monedaResumen}`}
+                            />
+                          );
+                        })}
                       </section>
                     )}
 

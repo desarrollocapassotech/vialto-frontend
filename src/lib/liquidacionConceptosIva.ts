@@ -50,6 +50,12 @@ export function signedMontoNetoConcepto(
   return signo === "contra" ? -base : base;
 }
 
+/** "Nombre — detalle" si el concepto tiene detalle; si no, el nombre solo (igual que el PDF). */
+export function nombreConDetalle(nombre: string, detalle?: string | null): string {
+  const d = detalle?.trim();
+  return d ? `${nombre} — ${d}` : nombre;
+}
+
 /** IVA general del comprobante: solo sobre (bruto − comisión), sin pisar el IVA de cada concepto. */
 export function ivaGeneralSobreBase(
   bruto: number,

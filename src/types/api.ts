@@ -1008,6 +1008,8 @@ export interface LiquidacionConceptoLinea {
   orden: number;
   modoAplicacion: string;
   viajeId: string | null;
+  /** Aclaración libre opcional (ej. "Faltante del viaje 10135713752"). */
+  detalle?: string | null;
 }
 
 /** Viaje incluido en una liquidación (join liquidacion_viajes + viaje). */
