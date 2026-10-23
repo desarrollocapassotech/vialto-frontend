@@ -102,6 +102,8 @@ export function MovimientoCcFormModal({
 
   const esCargo = tipo === 'cargo';
   const esCliente = tipoContraparte === 'cliente';
+  /** Vencimiento anterior a la emisión (YYYY-MM-DD, se comparan como texto). */
+  const vencimientoAnterior = !!fechaVencimiento && !!fecha && fechaVencimiento < fecha;
 
   // Cobro/pago: a qué facturas/liquidaciones imputarlo. Vacío = "No imputar" (queda a cuenta).
   const [imputarA, setImputarA] = useState<string[]>([]);
@@ -150,6 +152,11 @@ export function MovimientoCcFormModal({
     // Todo movimiento manual (venta, compra, cobro, pago) se identifica por su comprobante.
     if (!numeroComprobante.trim()) {
       setError('Ingresá el número de comprobante.');
+      return;
+    }
+    // Fechas YYYY-MM-DD: se comparan como texto. El backend valida lo mismo.
+    if (esCargo && vencimientoAnterior) {
+      setError('El vencimiento no puede ser anterior a la fecha de emisión.');
       return;
     }
     if (esCargo) {
@@ -298,7 +305,9 @@ export function MovimientoCcFormModal({
                 <input
                   id="cc-vencimiento"
                   type="date"
-                  className={inputClass}
+                  // El calendario no ofrece días anteriores a la emisión.
+                  min={fecha || undefined}
+                  className={`${inputClass} ${vencimientoAnterior ? 'border-red-400' : ''}`}
                   value={fechaVencimiento}
                   onChange={(e) => setFechaVencimiento(e.target.value)}
                 />

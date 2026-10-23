@@ -222,6 +222,8 @@ export function MovimientoCcDetalleModal({
   const [lineasIncompletas, setLineasIncompletas] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Vencimiento anterior a la emisión (YYYY-MM-DD, se comparan como texto). */
+  const vencimientoAnterior = !!vencimiento && !!fecha && vencimiento < fecha;
   // Cerrar/cancelar con cambios sin guardar pide confirmación y cierra todo (no vuelve a "Ver").
   // Guardia solo en modo editar (regla de CLAUDE.md: ver + editar en el mismo modal).
   const descarte = useConfirmarDescarte(onClose, editando);
@@ -247,6 +249,10 @@ export function MovimientoCcDetalleModal({
     }
     if (!fecha) {
       setError('Ingresá la fecha de emisión.');
+      return;
+    }
+    if (esCargo && vencimientoAnterior) {
+      setError('El vencimiento no puede ser anterior a la fecha de emisión.');
       return;
     }
     let importe: number | undefined;
@@ -418,7 +424,9 @@ export function MovimientoCcDetalleModal({
                 <input
                   id="det-vencimiento"
                   type="date"
-                  className={inputClass}
+                  // El calendario no ofrece días anteriores a la emisión.
+                  min={fecha || undefined}
+                  className={`${inputClass} ${vencimientoAnterior ? 'border-red-400' : ''}`}
                   value={vencimiento}
                   onChange={(e) => setVencimiento(e.target.value)}
                 />
