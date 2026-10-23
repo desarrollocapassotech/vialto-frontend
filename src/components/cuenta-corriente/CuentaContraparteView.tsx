@@ -64,7 +64,8 @@ import {
 } from '@/lib/tenantModules';
 import { ExportarEstadoCuentaModal } from './ExportarEstadoCuentaModal';
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
-import { FiltrosRapidos } from '@/components/listado/FiltrosRapidos';
+import { FiltrosRapidos, type FiltroRapidoOpcion } from '@/components/listado/FiltrosRapidos';
+import { hoyArgentinaIso } from '@/lib/facturaFechaEmision';
 import { TruncarInicio } from '@/components/ui/TruncarInicio';
 import { ComprobanteAdjuntoClip } from '@/components/shared/ComprobanteAdjuntoClip';
 import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
@@ -138,6 +139,19 @@ function estaSinImputar(m: MovimientoCc): boolean {
   if (m.tipo === 'credito' || m.estadoDisponibilidad === 'anulado') return false;
   if (m.tipo !== 'cargo' && m.tipo !== 'pago') return false;
   return (m.pendiente ?? 0) > 0.005;
+}
+
+type FiltroRapidoCc = 'sin_imputar' | 'vencidos' | 'sin_cobrar';
+
+/** Filtro rápido "Sin cobrar" / "Sin pagar": venta/compra no anulada con saldo pendiente. */
+function estaSinCobrar(m: MovimientoCc): boolean {
+  return m.tipo === 'cargo' && m.estadoDisponibilidad !== 'anulado' && (m.pendiente ?? 0) > 0.005;
+}
+
+/** Filtro rápido "Vencidos": sin cobrar/pagar y con vencimiento anterior a hoy (día en Argentina). */
+function estaVencido(m: MovimientoCc, hoy: string): boolean {
+  const vto = fechaDiaYmd(m.fechaVencimiento);
+  return estaSinCobrar(m) && !!vto && vto < hoy;
 }
 
 /** Orden de carga ascendente; `id` desempata movimientos creados en el mismo instante. */
@@ -272,12 +286,18 @@ export function CuentaContraparteView({
   // Se elige tocando la tarjeta de saldo de esa moneda (solo si la cuenta tiene más de una).
   const [monedaFiltro, setMonedaFiltro] = useState('');
   const multimoneda = (saldos?.length ?? 0) > 1;
-  // Filtro rápido junto al título (mismo componente que Viajes/Facturas/Liquidaciones).
-  const [filtroRapido, setFiltroRapido] = useState<'' | 'sin_imputar'>('');
-  const cantidadSinImputar = useMemo(
-    () => (movimientosConSaldo ?? []).filter(estaSinImputar).length,
-    [movimientosConSaldo],
-  );
+  // Filtros rápidos junto al título (mismo componente que Viajes/Facturas/Liquidaciones),
+  // excluyentes entre sí.
+  const [filtroRapido, setFiltroRapido] = useState<FiltroRapidoCc | ''>('');
+  const cantidadesFiltroRapido = useMemo(() => {
+    const hoy = hoyArgentinaIso();
+    const lista = movimientosConSaldo ?? [];
+    return {
+      sin_imputar: lista.filter(estaSinImputar).length,
+      vencidos: lista.filter((m) => estaVencido(m, hoy)).length,
+      sin_cobrar: lista.filter(estaSinCobrar).length,
+    };
+  }, [movimientosConSaldo]);
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
@@ -295,8 +315,11 @@ export function CuentaContraparteView({
   // en vez de recalcularse desde cero con el subconjunto filtrado.
   const movimientosFiltrados = useMemo<MovimientoConSaldo[] | null>(() => {
     if (!movimientosConSaldo) return null;
+    const hoy = hoyArgentinaIso();
     return movimientosConSaldo.filter((m) => {
       if (filtroRapido === 'sin_imputar' && !estaSinImputar(m)) return false;
+      if (filtroRapido === 'vencidos' && !estaVencido(m, hoy)) return false;
+      if (filtroRapido === 'sin_cobrar' && !estaSinCobrar(m)) return false;
       if (monedaFiltro && m.moneda !== monedaFiltro) return false;
       const fecha = fechaDiaYmd(m.fecha) ?? '';
       if (desdeFiltro && fecha < desdeFiltro) return false;
@@ -712,7 +735,15 @@ export function CuentaContraparteView({
       {filtrosRapidosSlot &&
         createPortal(
           <FiltrosRapidos
-            opciones={[{ id: 'sin_imputar' as const, label: 'Sin imputar', count: cantidadSinImputar }]}
+            opciones={[
+              { id: 'sin_imputar', label: 'Sin imputar', count: cantidadesFiltroRapido.sin_imputar },
+              { id: 'vencidos', label: 'Vencidos', count: cantidadesFiltroRapido.vencidos },
+              {
+                id: 'sin_cobrar',
+                label: tipoContraparte === 'cliente' ? 'Sin cobrar' : 'Sin pagar',
+                count: cantidadesFiltroRapido.sin_cobrar,
+              },
+            ] satisfies FiltroRapidoOpcion<FiltroRapidoCc>[]}
             value={filtroRapido}
             onChange={setFiltroRapido}
             ariaLabel="Filtros rápidos de cuenta corriente"
