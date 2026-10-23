@@ -1,7 +1,8 @@
 import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 import { useAuth } from '@clerk/clerk-react';
 import { useRef, useState, type FormEvent } from 'react';
-import { Info } from 'lucide-react';
+import { FileSpreadsheet, Info } from 'lucide-react';
+import { ImportarAfipModal } from './ImportarAfipModal';
 import { TooltipsDelegados } from '@/components/ui/TooltipsDelegados';
 import {
   ViewModalShell,
@@ -95,6 +96,7 @@ export function MovimientoCcFormModal({
   const [numeroComprobante, setNumeroComprobante] = useState('');
   const [formaPago, setFormaPago] = useState('');
   const [saving, setSaving] = useState(false);
+  const [importandoAfip, setImportandoAfip] = useState(false);
   const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
 
@@ -253,6 +255,17 @@ export function MovimientoCcFormModal({
         {/* Venta/compra: número de comprobante y moneda primero, debajo emisión y vencimiento. */}
         {esCargo ? (
           <>
+            {/* Carga masiva: Excel de "Mis Comprobantes" de AFIP (emitidos / recibidos). */}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setImportandoAfip(true)}
+                className="inline-flex items-center gap-1.5 border border-black/15 px-3 py-1.5 text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist hover:text-vialto-charcoal"
+              >
+                <FileSpreadsheet className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+                Importar desde AFIP
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelClass} htmlFor="cc-comprobante">
@@ -475,6 +488,17 @@ export function MovimientoCcFormModal({
         )}
 
       </form>
+      {importandoAfip && (
+        <ImportarAfipModal
+          lado={tipoContraparte}
+          onClose={() => setImportandoAfip(false)}
+          // Importó: recargar la cuenta y cerrar también "Nueva venta/compra".
+          onImportado={() => {
+            onCreated();
+            onClose();
+          }}
+        />
+      )}
     </ViewModalShell>
   );
 }

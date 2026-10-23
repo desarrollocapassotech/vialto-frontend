@@ -259,6 +259,48 @@ export function actualizarMovimiento(
   });
 }
 
+export type ResultadoImportarAfip = {
+  creados: number;
+  filas: {
+    fila: number;
+    numeroComprobante: string;
+    fecha: string;
+    cuit: string;
+    denominacion: string | null;
+    contraparteNombre: string | null;
+    moneda: string;
+    total: number | null;
+    estado: 'importar' | 'importado' | 'omitido';
+    motivo?: string;
+  }[];
+};
+
+/**
+ * Importa ventas (Excel "Mis Comprobantes Emitidos" de AFIP) o compras ("Recibidos") ya
+ * leídos con `leerExcelMisComprobantes`. `simular: true` = vista previa sin crear nada.
+ */
+export function importarAfip(
+  getToken: GetToken,
+  input: {
+    lado: TipoContraparte;
+    simular: boolean;
+    filas: {
+      fila: number;
+      cuit: string;
+      denominacion?: string;
+      numeroComprobante: string;
+      fecha: string;
+      moneda: string;
+      lineas: { descripcion: string; importe: number; ivaPct: number }[];
+    }[];
+  },
+) {
+  return apiJson<ResultadoImportarAfip>('/api/cuenta-corriente/movimientos/importar-afip', getToken, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 /** Color del monto de un cobro (entra plata: verde) o de un pago (sale plata: rojo). */
 export function claseMontoCobroPago(esCobro: boolean): string {
   return esCobro ? 'text-emerald-700' : 'text-red-700';
