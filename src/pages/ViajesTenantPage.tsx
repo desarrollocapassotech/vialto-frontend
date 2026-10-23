@@ -3316,7 +3316,7 @@ export function ViajesTenantPage({
               <td className="h-8 px-3 py-1 text-vialto-steel tabular-nums">
                 <span className="flex items-center gap-1.5">
                   {/* IDs: se truncan por el principio, lo que distingue es el final. */}
-                  <TruncarInicio className="max-w-[5rem]" title={`#${v.numero}`}>
+                  <TruncarInicio className="max-w-[6ch]" title={`#${v.numero}`}>
                     #{v.numero}
                   </TruncarInicio>
                   {idColumnaConClip === "idSistema" && clip}
