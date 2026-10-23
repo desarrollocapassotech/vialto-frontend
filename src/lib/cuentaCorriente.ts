@@ -433,7 +433,14 @@ export async function descargarEstadoCuentaPdf(
 }
 
 /** Descarga el PDF del listado completo de deudores (todos los pendientes de cobro y de pago). */
-export async function descargarListadoDeudoresPdf(getToken: GetToken) {
-  const res = await apiFetch('/api/cuenta-corriente/listado-deudores/pdf', getToken);
-  await descargarBlobODescartarError(res, 'listado-deudores.pdf');
+/** PDF "Pendientes de cobro" (clientes) o "Pendientes de pago" (proveedores). */
+export async function descargarListadoDeudoresPdf(getToken: GetToken, lado: TipoContraparte) {
+  const res = await apiFetch(
+    `/api/cuenta-corriente/listado-deudores/pdf?lado=${lado}`,
+    getToken,
+  );
+  await descargarBlobODescartarError(
+    res,
+    lado === 'cliente' ? 'pendientes-de-cobro.pdf' : 'pendientes-de-pago.pdf',
+  );
 }

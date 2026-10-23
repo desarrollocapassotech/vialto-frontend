@@ -60,7 +60,8 @@ export function CuentaCorrienteTenantPage() {
     setDescargando(true);
     setErrorDescarga(null);
     try {
-      await descargarListadoDeudoresPdf(() => getToken());
+      // Pestaña Clientes → pendientes de cobro; Proveedores → pendientes de pago.
+      await descargarListadoDeudoresPdf(() => getToken(), tipoContraparte);
     } catch (e) {
       setErrorDescarga(friendlyError(e, 'cuentaCorriente'));
     } finally {
@@ -117,18 +118,20 @@ export function CuentaCorrienteTenantPage() {
           <div ref={setFiltrosRapidosSlot} className="flex min-w-0 items-center gap-2 empty:hidden" />
           <div ref={setLimpiarSlot} className="empty:hidden" />
         </div>
-        {/* Deudores = clientes; en Proveedores no aplica. */}
-        {tipoContraparte === 'cliente' && (
-          <button
-            type="button"
-            onClick={handleDescargarListado}
-            disabled={descargando}
-            className="inline-flex h-10 items-center gap-2 px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-50"
-          >
-            <FileDown className="h-4 w-4" />
-            {descargando ? 'Generando…' : 'Descargar listado de deudores'}
-          </button>
-        )}
+        {/* PDF del lado de la pestaña: pendientes de cobro (clientes) o de pago (proveedores). */}
+        <button
+          type="button"
+          onClick={handleDescargarListado}
+          disabled={descargando}
+          className="inline-flex h-10 items-center gap-2 px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-50"
+        >
+          <FileDown className="h-4 w-4" />
+          {descargando
+            ? 'Generando…'
+            : tipoContraparte === 'cliente'
+              ? 'Pendientes de cobro'
+              : 'Pendientes de pago'}
+        </button>
       </div>
 
       {errorDescarga && (

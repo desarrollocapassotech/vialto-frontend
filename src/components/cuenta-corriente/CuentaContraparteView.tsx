@@ -88,6 +88,8 @@ type ModalState =
 
 type MovimientoConSaldo = MovimientoCc & {
   saldoAcumulado: number;
+  /** Saldo de CADA moneda después de este movimiento (las que no se movieron arrastran el último). */
+  saldosAcumulados: Record<string, number>;
   /** Cobro/pago imputado a un solo cargo: ese cargo (su factura/liquidación). */
   cargoUnico: MovimientoCc | null;
   /** Columna Comprobante: el número propio del movimiento (en un cobro/pago, el del recibo/orden de pago). */
@@ -121,6 +123,19 @@ function EtiquetaImputacionCargo({ m }: { m: MovimientoCc }) {
   return (
     <span className={`inline-flex shrink-0 cursor-help ${clase}`} title={titulo} aria-label={titulo}>
       <Icono className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+    </span>
+  );
+}
+
+/**
+ * Título de columna sin embudo con la misma altura que uno con embudo
+ * (`ViajesListadoHeaderFiltro`: botón h-[26px]), así todos quedan en la misma línea cuando
+ * el encabezado tiene dos filas y las celdas van `align-top`.
+ */
+function TituloSinFiltro({ children, alignRight }: { children: ReactNode; alignRight?: boolean }) {
+  return (
+    <span className={`flex min-h-[26px] items-center ${alignRight ? 'justify-end' : ''}`}>
+      {children}
     </span>
   );
 }
@@ -271,6 +286,7 @@ export function CuentaContraparteView({
       conSaldo.push({
         ...m,
         saldoAcumulado: acumulado,
+        saldosAcumulados: Object.fromEntries(acumuladoPorMoneda),
         cargoUnico,
         comprobantesImputados,
         comprobanteMostrado: m.numeroComprobante?.trim() || null,
@@ -616,6 +632,10 @@ export function CuentaContraparteView({
     () => [...new Set((movimientos ?? []).map((m) => m.moneda))].sort(),
     [movimientos],
   );
+  // Cuenta con pesos y dólares (y sin filtrar por una moneda): "Saldo acumulado" se parte en
+  // una subcolumna por moneda (ARS / USD), con el encabezado en dos filas.
+  const saldoMultimoneda = monedasDisponibles.length > 1 && !monedaFiltro;
+  const filasHead = saldoMultimoneda ? 2 : 1;
 
   const monedaFiltroInput = (
     <select
@@ -847,12 +867,27 @@ export function CuentaContraparteView({
                 : '—',
             tdClassName: `${listadoTablaTdClass} tabular-nums text-vialto-steel`,
           },
-          {
-            id: 'saldoAcumulado',
-            header: 'Saldo acumulado',
-            cell: (m: MovimientoConSaldo) => `${fmtSaldo(m.saldoAcumulado)} ${m.moneda}`,
-            tdClassName: `${listadoTablaTdClass} tabular-nums font-medium`,
-          },
+          // Una moneda: "Saldo acumulado". Varias (y sin filtrar por moneda): una subcolumna
+          // por moneda bajo "Saldo acumulado", nunca sumadas; resalta la moneda de la fila.
+          ...(saldoMultimoneda
+            ? monedasDisponibles.map((moneda) => ({
+                id: `saldoAcumulado-${moneda}`,
+                header: `Saldo ${moneda}`,
+                cell: (m: MovimientoConSaldo) => (
+                  <span className={m.moneda === moneda ? 'font-medium' : 'text-vialto-steel'}>
+                    {m.saldosAcumulados[moneda] != null ? fmtSaldo(m.saldosAcumulados[moneda]) : '—'}
+                  </span>
+                ),
+                tdClassName: `${listadoTablaTdClass} tabular-nums`,
+              }))
+            : [
+                {
+                  id: 'saldoAcumulado',
+                  header: 'Saldo acumulado',
+                  cell: (m: MovimientoConSaldo) => `${fmtSaldo(m.saldoAcumulado)} ${m.moneda}`,
+                  tdClassName: `${listadoTablaTdClass} tabular-nums font-medium`,
+                },
+              ]),
         ]}
         rows={error ? [] : movimientosFiltrados}
         rowKey={(m) => m.id}
@@ -883,8 +918,13 @@ export function CuentaContraparteView({
           </>
         }
         tableHead={
+          <>
+          {/* Con pesos y dólares el encabezado tiene 2 filas ("Saldo acumulado" arriba, ARS/USD
+              abajo). Para que todos los títulos queden en la misma línea: todas las celdas de la
+              primera fila van `align-top`, y los títulos sin embudo usan `TituloSinFiltro`, con la
+              misma altura que el botón del embudo. */}
           <tr className={listadoTablaHeadRowClass}>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Fecha"
                 filterActive={!!desdeFiltro || !!hastaFiltro}
@@ -897,10 +937,10 @@ export function CuentaContraparteView({
                 {fechaFiltroCampos}
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Vencimiento
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
+              <TituloSinFiltro>Vencimiento</TituloSinFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Tipo"
                 filterActive={!!tipoFiltro.trim()}
@@ -910,7 +950,7 @@ export function CuentaContraparteView({
                 {tipoFiltroInput}
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Comprobante"
                 filterActive={!!comprobanteFiltro.trim()}
@@ -920,17 +960,22 @@ export function CuentaContraparteView({
                 {comprobanteFiltroInput}
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Debe
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
+              <TituloSinFiltro>Debe</TituloSinFiltro>
             </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Haber
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
+              <TituloSinFiltro>Haber</TituloSinFiltro>
             </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Saldo
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
+              <TituloSinFiltro>Saldo</TituloSinFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              {/* Mismo filtro que las tarjetas de saldo: un solo estado de moneda. */}
+            {/* "Saldo acumulado" ocupa una subcolumna por moneda (con varias). El embudo de
+                moneda es el mismo filtro que las tarjetas de saldo. */}
+            <th
+              scope={saldoMultimoneda ? 'colgroup' : 'col'}
+              colSpan={saldoMultimoneda ? monedasDisponibles.length : 1}
+              className={`${listadoTablaThClass} align-top`}
+            >
               <ViajesListadoHeaderFiltro
                 title="Saldo acumulado"
                 filterActive={!!monedaFiltro}
@@ -940,12 +985,22 @@ export function CuentaContraparteView({
                 {monedaFiltroInput}
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} text-right`}>
-              Acciones
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top text-right`}>
+              <TituloSinFiltro alignRight>Acciones</TituloSinFiltro>
             </th>
           </tr>
+          {saldoMultimoneda && (
+            <tr className={listadoTablaHeadRowClass}>
+              {monedasDisponibles.map((moneda) => (
+                <th key={moneda} scope="col" className={`${listadoTablaThClass} pt-0`}>
+                  {moneda}
+                </th>
+              ))}
+            </tr>
+          )}
+          </>
         }
-        tableColSpan={9}
+        tableColSpan={8 + (saldoMultimoneda ? monedasDisponibles.length : 1)}
         // Sin padding vertical: los botones (h-8) ya dan el alto, así una fila con acciones
         // no queda más alta que una sin acciones.
         actionsTdClassName="px-3 py-0 text-right align-middle md:px-4"
