@@ -13,6 +13,7 @@ import {
   canAccessViajes,
   canAccessStock,
   canAccessEmisionLiquidoProductoArca,
+  canAccessMantenimiento,
 } from "@/lib/tenantModules";
 import {
   LiquidacionAnulacionMetodoRadios,
@@ -239,6 +240,8 @@ export function CamposEmpresaPage() {
   const [savingRecomendacionCiudades, setSavingRecomendacionCiudades] = useState(false);
   const [empresaMarcarCobrada, setEmpresaMarcarCobrada] = useState(false);
   const [savingMarcarCobrada, setSavingMarcarCobrada] = useState(false);
+  const [empresaPlanesMantenimiento, setEmpresaPlanesMantenimiento] = useState(true);
+  const [savingPlanesMantenimiento, setSavingPlanesMantenimiento] = useState(false);
   const [empresaOpcionesProveedor, setEmpresaOpcionesProveedor] = useState<string[]>([]);
   const [savingOpcionesProveedor, setSavingOpcionesProveedor] = useState(false);
   const [nuevaOpcionProveedor, setNuevaOpcionProveedor] = useState("");
@@ -342,6 +345,7 @@ export function CamposEmpresaPage() {
           setEmpresaDashboardHabilitado(tenant.dashboardHabilitado ?? true);
           setEmpresaRecomendacionCiudades(tenant.recomendacionCiudadesHabilitada ?? true);
           setEmpresaMarcarCobrada(tenant.marcarCobradaHabilitada ?? false);
+          setEmpresaPlanesMantenimiento(tenant.mantenimientoPlanesHabilitados ?? true);
           setEmpresaOpcionesProveedor(tenant.opcionesProveedorLiquidacion ?? []);
           setEmpresaColumnaProductos(tenant.viajesColumnaProductosHabilitada ?? false);
           setEmpresaViajesObservaciones(tenant.viajesObservaciones ?? false);
@@ -556,6 +560,27 @@ export function CamposEmpresaPage() {
       showToast(msg, "error");
     } finally {
       setSavingMarcarCobrada(false);
+    }
+  }
+
+  async function togglePlanesMantenimiento() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaPlanesMantenimiento;
+    setSavingPlanesMantenimiento(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ mantenimientoPlanesHabilitados: nuevoValor }),
+      });
+      setEmpresaPlanesMantenimiento(nuevoValor);
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingPlanesMantenimiento(false);
     }
   }
 
@@ -1607,6 +1632,30 @@ export function CamposEmpresaPage() {
                             />
                           </td>
                         </tr>
+                        {empresaTenant && canAccessMantenimiento(empresaTenant.modules) && (
+                          <tr className="border-t border-black/10">
+                            <td className="px-4 py-2.5">
+                              Planes de Mantenimiento
+                              <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                                Prendido: planes, vencimientos y avisos por mail.
+                                Apagado: Mantenimiento queda solo para registrar
+                                órdenes de trabajo. Los planes cargados no se borran.
+                              </p>
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              <ToggleSwitch
+                                checked={empresaPlanesMantenimiento}
+                                disabled={savingPlanesMantenimiento}
+                                onChange={() => void togglePlanesMantenimiento()}
+                                label={
+                                  empresaPlanesMantenimiento
+                                    ? "Deshabilitar planes de Mantenimiento"
+                                    : "Habilitar planes de Mantenimiento"
+                                }
+                              />
+                            </td>
+                          </tr>
+                        )}
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
                             Validar CUIT con ARCA (Clientes y Transportistas)

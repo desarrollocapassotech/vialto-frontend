@@ -83,6 +83,14 @@ export function canAccessMantenimiento(modules: string[]): boolean {
 }
 
 /**
+ * Planes de Mantenimiento (y con ellos vencimientos, panel y avisos), switch de superadmin
+ * `Tenant.mantenimientoPlanesHabilitados`, prendido por defecto. Apagado: solo órdenes de trabajo.
+ */
+export function planesMantenimientoHabilitados(tenant: { mantenimientoPlanesHabilitados?: boolean } | null | undefined): boolean {
+  return tenant?.mantenimientoPlanesHabilitados !== false;
+}
+
+/**
  * Módulos que tienen al menos un tipo de notificación. Espejo de los `requiereModulo` de
  * `NOTIFICACIONES_CATALOG` en el backend (`notificaciones-catalog.ts`): si se suma un tipo
  * de notificación para un módulo nuevo, agregarlo también acá.

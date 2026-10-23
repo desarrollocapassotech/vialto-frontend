@@ -45,6 +45,8 @@ import type {
   VehiculoPlanAsignado,
 } from "@/types/mantenimiento";
 import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
+import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { planesMantenimientoHabilitados } from "@/lib/tenantModules";
 
 export type OrdenModalEstado =
   | { modo: "crear"; precarga?: PrecargaOrden }
@@ -99,6 +101,9 @@ export function OrdenTrabajoModal({
 }) {
   const { showToast } = useToast();
   const maestro = useMaestroData();
+  // Planes apagados (switch de superadmin): sin "Planes que cumple". Una OT vieja conserva los suyos al editarla.
+  const { tenant } = useCurrentTenant();
+  const conPlanes = planesMantenimientoHabilitados(tenant);
 
   const [modo, setModo] = useState<"crear" | "ver" | "editar">(estado.modo);
   const [orden, setOrden] = useState<OrdenTrabajoDetalle | null>(null);
@@ -344,7 +349,7 @@ export function OrdenTrabajoModal({
       {cargando ? (
         <p className="text-sm text-vialto-steel">Cargando…</p>
       ) : modo === "ver" && orden ? (
-        <VistaOrden orden={orden} warning={warning} getToken={getToken} tenantId={tenantId} />
+        <VistaOrden orden={orden} warning={warning} conPlanes={conPlanes} getToken={getToken} tenantId={tenantId} />
       ) : (
         <div className="grid gap-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -406,6 +411,7 @@ export function OrdenTrabajoModal({
             </div>
           </div>
 
+          {conPlanes && (
           <div className="grid gap-1.5">
             <CrudFieldLabel>Planes que cumple</CrudFieldLabel>
             <PlanesCumpleCheckboxes
@@ -420,6 +426,7 @@ export function OrdenTrabajoModal({
               tenantId={tenantId}
             />
           </div>
+          )}
 
           <div className="grid gap-1.5">
             <CrudFieldLabel>Tareas realizadas</CrudFieldLabel>
@@ -459,11 +466,14 @@ export function OrdenTrabajoModal({
 function VistaOrden({
   orden,
   warning,
+  conPlanes,
   getToken,
   tenantId,
 }: {
   orden: OrdenTrabajoDetalle;
   warning: string | null;
+  /** Planes apagados: "Planes que cumple" solo si la OT tiene alguno (de antes del switch). */
+  conPlanes: boolean;
   getToken: () => Promise<string | null>;
   tenantId?: string;
 }) {
@@ -486,9 +496,11 @@ function VistaOrden({
         <Dato label="Taller">{orden.taller?.nombre ?? "—"}</Dato>
       </dl>
       <div className={viewModalGridClass}>
-        <Campo label="Planes que cumple">
-          {orden.planes.length ? orden.planes.map((p) => p.vehiculoPlan.plan.nombre).join(", ") : "—"}
-        </Campo>
+        {(conPlanes || orden.planes.length > 0) && (
+          <Campo label="Planes que cumple">
+            {orden.planes.length ? orden.planes.map((p) => p.vehiculoPlan.plan.nombre).join(", ") : "—"}
+          </Campo>
+        )}
         <Campo label="Tareas realizadas">{fmtTareas(orden.tareas)}</Campo>
       </div>
       <div>

@@ -13,7 +13,9 @@ import {
   canAccessCuentaCorriente,
   canAccessEmisionLiquidoProductoArca,
   canAccessMantenimiento,
+  planesMantenimientoHabilitados,
 } from "@/lib/tenantModules";
+import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { useMantenimientoDashboard } from "@/hooks/useMantenimientoDashboard";
 import { ProximosVencimientosLista } from "@/components/mantenimiento/ProximosVencimientosLista";
 import { useEffect, useId, useState } from "react";
@@ -844,7 +846,9 @@ export function TenantOwnerDashboard({
   const showCombustible = canAccessCombustible(modules);
   const showCuentaCorriente = canAccessCuentaCorriente(modules);
   const showIntegracionArca = canAccessEmisionLiquidoProductoArca(modules);
-  const showMantenimiento = canAccessMantenimiento(modules);
+  // Con los planes apagados (switch de superadmin) no hay vencimientos que mostrar.
+  const { tenant } = useCurrentTenant();
+  const showMantenimiento = canAccessMantenimiento(modules) && planesMantenimientoHabilitados(tenant);
   const showFinanciero = showViajes || showFacturacionModulo;
   const [periodModalOpen, setPeriodModalOpen] = useState(false);
   const [moduloSheetOpen, setModuloSheetOpen] = useState(false);

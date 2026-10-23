@@ -18,6 +18,8 @@ import { useMaestroData } from "@/hooks/useMaestroData";
 import { apiJson } from "@/lib/api";
 import { mantUrl } from "@/lib/mantenimientoApi";
 import { isOrgMember } from "@/lib/roleLabels";
+import { planesMantenimientoHabilitados } from "@/lib/tenantModules";
+import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import type { PlanMantenimiento, PrecargaOrden } from "@/types/mantenimiento";
 
 type Tab = "vencimientos" | "ordenes" | "planes";
@@ -50,10 +52,15 @@ export function MantenimientoTenantPage({
     [embeddedInSuperadmin, orgRole, user?.publicMetadata],
   );
   const token = useCallback(() => getToken(), [getToken]);
+  // Switch de superadmin: con los planes apagados, Mantenimiento es solo órdenes de trabajo.
+  const { tenant, loading: tenantLoading } = useCurrentTenant();
+  const conPlanes = planesMantenimientoHabilitados(tenant);
+  const tabs = conPlanes ? TABS : TABS.filter((t) => t.id === "ordenes");
+  const tabPorDefecto: Tab = conPlanes ? "vencimientos" : "ordenes";
 
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get("tab") as Tab | null;
-  const activeTab: Tab = TABS.some((t) => t.id === rawTab) ? (rawTab as Tab) : "vencimientos";
+  const activeTab: Tab = tabs.some((t) => t.id === rawTab) ? (rawTab as Tab) : tabPorDefecto;
   const [sectionSheetOpen, setSectionSheetOpen] = useState(false);
 
   const [modal, setModal] = useState<OrdenModalEstado | null>(null);
@@ -70,6 +77,12 @@ export function MantenimientoTenantPage({
   // Solo al entrar: una vez arrancado, el asistente sigue en pantalla aunque ya haya planes.
   const [vista, setVista] = useState<Vista>("cargando");
   useEffect(() => {
+    if (tenantLoading) return;
+    // Sin planes no hay nada que configurar: directo a las órdenes de trabajo.
+    if (!conPlanes) {
+      setVista("pestanas");
+      return;
+    }
     let cancelado = false;
     apiJson<PlanMantenimiento[]>(mantUrl("planes", tenantId), () => token())
       .then((planes) => {
@@ -80,7 +93,7 @@ export function MantenimientoTenantPage({
     return () => {
       cancelado = true;
     };
-  }, [token, tenantId, soloLectura]);
+  }, [token, tenantId, soloLectura, tenantLoading, conPlanes]);
 
   function setTab(tab: Tab) {
     setSearchParams(
@@ -100,9 +113,9 @@ export function MantenimientoTenantPage({
     recargar();
   }
 
-  const activeTabDef = TABS.find((t) => t.id === activeTab);
+  const activeTabDef = tabs.find((t) => t.id === activeTab);
   const ActiveIcon = activeTabDef?.icon;
-  const sectionOptions: SelectorOpcion[] = TABS.map((t) => ({ id: t.id, label: t.label }));
+  const sectionOptions: SelectorOpcion[] = tabs.map((t) => ({ id: t.id, label: t.label }));
 
   return (
     <div className="w-full">
@@ -146,6 +159,8 @@ export function MantenimientoTenantPage({
 
       {vista === "pestanas" && (
         <>
+          {/* Con una sola sección (planes apagados) no hace falta la barra de pestañas. */}
+          {tabs.length > 1 && (
           <div className="mt-6 border-b border-black/15">
             <div className="pb-3 lg:hidden">
               <button
@@ -177,7 +192,7 @@ export function MantenimientoTenantPage({
             </div>
 
             <nav className="-mb-px hidden gap-1 overflow-x-auto lg:flex" aria-label="Secciones de mantenimiento">
-              {TABS.map((tab) => (
+              {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
@@ -195,6 +210,7 @@ export function MantenimientoTenantPage({
               ))}
             </nav>
           </div>
+          )}
 
           <div className="mt-6">
             {activeTab === "vencimientos" && (

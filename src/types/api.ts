@@ -419,6 +419,8 @@ export interface Tenant {
   recomendacionCiudadesHabilitada?: boolean;
   /** Default false (se oculta "Marcar como cobrada" en Facturas). true = habilitada; solo lo cambia superadmin. */
   marcarCobradaHabilitada?: boolean;
+  /** false = Mantenimiento solo con órdenes de trabajo (sin planes, vencimientos ni avisos). Default true. */
+  mantenimientoPlanesHabilitados?: boolean;
   /**
    * Unidad de cantidad de flete del tenant — 'TN' (default, toneladas) | 'UD' (unidades).
    * Afecta los PDFs de Factura A/B, Liquidación (CVLP) y Contrato de liquidación, y los
