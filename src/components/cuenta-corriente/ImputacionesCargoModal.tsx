@@ -3,6 +3,7 @@ import { ViewModalShell, viewModalBtnGhost } from '@/components/ui/ViewModalShel
 import { formatCurrencyArFromNumber } from '@/lib/currencyMask';
 import { fmtDateUtc } from '@/lib/fmtDateUtc';
 import { claseMontoCobroPago, type MovimientoCc } from '@/lib/cuentaCorriente';
+import { DeshacerImputacionButton } from './DeshacerImputacionButton';
 
 type Props = {
   /** La venta/compra imputada. */
@@ -11,6 +12,8 @@ type Props = {
   movimientos: MovimientoCc[];
   /** Abre el detalle del cobro/pago tocado. */
   onVerMovimiento: (m: MovimientoCc) => void;
+  /** Después de deshacer una imputación: recargar la grilla y cerrar. */
+  onDeshecha: () => void;
   onClose: () => void;
 };
 
@@ -23,7 +26,7 @@ export function imputacionesDeCargo(cargo: MovimientoCc, movimientos: Movimiento
     .flatMap((pago) =>
       (pago.imputacionesPorCargo ?? [])
         .filter((i) => i.cargoId === cargo.id)
-        .map((i) => ({ pago, importe: i.importe })),
+        .map((i) => ({ pago, importe: i.importe, imputacionId: i.imputacionId })),
     )
     .sort((a, b) => new Date(a.pago.fecha).getTime() - new Date(b.pago.fecha).getTime());
 }
@@ -32,7 +35,7 @@ export function imputacionesDeCargo(cargo: MovimientoCc, movimientos: Movimiento
  * Detalle de una venta/compra imputada: qué cobros/pagos la cancelan, cuánto aplicó cada
  * uno y cuánto le queda. Espejo de `ImputacionesCobroModal` (que va del cobro a las ventas).
  */
-export function ImputacionesCargoModal({ cargo, movimientos, onVerMovimiento, onClose }: Props) {
+export function ImputacionesCargoModal({ cargo, movimientos, onVerMovimiento, onDeshecha, onClose }: Props) {
   const esVenta = !!cargo.clienteId;
   const filas = imputacionesDeCargo(cargo, movimientos);
   const totalImputado = filas.reduce((s, f) => s + f.importe, 0);
@@ -75,13 +78,13 @@ export function ImputacionesCargoModal({ cargo, movimientos, onVerMovimiento, on
       </dl>
 
       <ul className="divide-y divide-black/10 border border-black/10">
-        {filas.map(({ pago, importe }) => (
-          <li key={pago.id}>
+        {filas.map(({ pago, importe, imputacionId }) => (
+          <li key={pago.id} className="flex items-center gap-2 pr-3">
            {/* Tocar el cobro/pago abre su detalle. */}
            <button
             type="button"
             onClick={() => onVerMovimiento(pago)}
-            className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-vialto-mist"
+            className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left text-sm hover:bg-vialto-mist"
            >
             <span className="min-w-0 flex-1">
               <span
@@ -102,6 +105,13 @@ export function ImputacionesCargoModal({ cargo, movimientos, onVerMovimiento, on
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-vialto-steel" aria-hidden />
            </button>
+           <DeshacerImputacionButton
+            imputacionId={imputacionId}
+            descripcion={`${monto(importe, cargo.moneda)} del ${esVenta ? 'cobro' : 'pago'} ${
+              pago.numeroComprobante?.trim() || 'sin comprobante'
+            }`}
+            onDeshecha={onDeshecha}
+           />
           </li>
         ))}
       </ul>

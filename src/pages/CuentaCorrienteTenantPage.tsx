@@ -54,12 +54,14 @@ export function CuentaCorrienteTenantPage() {
   const [saldosSlot, setSaldosSlot] = useState<HTMLDivElement | null>(null);
   const [accionesSlot, setAccionesSlot] = useState<HTMLDivElement | null>(null);
   const [limpiarSlot, setLimpiarSlot] = useState<HTMLDivElement | null>(null);
+  const [filtrosRapidosSlot, setFiltrosRapidosSlot] = useState<HTMLDivElement | null>(null);
 
   async function handleDescargarListado() {
     setDescargando(true);
     setErrorDescarga(null);
     try {
-      await descargarListadoDeudoresPdf(() => getToken());
+      // Pestaña Clientes → pendientes de cobro; Proveedores → pendientes de pago.
+      await descargarListadoDeudoresPdf(() => getToken(), tipoContraparte);
     } catch (e) {
       setErrorDescarga(friendlyError(e, 'cuentaCorriente'));
     } finally {
@@ -112,20 +114,24 @@ export function CuentaCorrienteTenantPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-x-4">
           <h1 className={pageTitleClass}>Cuenta corriente</h1>
+          {/* Filtro rápido ("Sin imputar") al lado del título, como en Viajes. */}
+          <div ref={setFiltrosRapidosSlot} className="flex min-w-0 items-center gap-2 empty:hidden" />
           <div ref={setLimpiarSlot} className="empty:hidden" />
         </div>
-        {/* Deudores = clientes; en Proveedores no aplica. */}
-        {tipoContraparte === 'cliente' && (
-          <button
-            type="button"
-            onClick={handleDescargarListado}
-            disabled={descargando}
-            className="inline-flex h-10 items-center gap-2 px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-50"
-          >
-            <FileDown className="h-4 w-4" />
-            {descargando ? 'Generando…' : 'Descargar listado de deudores'}
-          </button>
-        )}
+        {/* PDF del lado de la pestaña: pendientes de cobro (clientes) o de pago (proveedores). */}
+        <button
+          type="button"
+          onClick={handleDescargarListado}
+          disabled={descargando}
+          className="inline-flex h-10 items-center gap-2 px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-50"
+        >
+          <FileDown className="h-4 w-4" />
+          {descargando
+            ? 'Generando…'
+            : tipoContraparte === 'cliente'
+              ? 'Pendientes de cobro'
+              : 'Pendientes de pago'}
+        </button>
       </div>
 
       {errorDescarga && (
@@ -223,6 +229,7 @@ export function CuentaCorrienteTenantPage() {
             saldosSlot={saldosSlot}
             accionesSlot={accionesSlot}
             limpiarFiltrosSlot={limpiarSlot}
+            filtrosRapidosSlot={filtrosRapidosSlot}
           />
         ) : (
           <p className="text-vialto-steel">

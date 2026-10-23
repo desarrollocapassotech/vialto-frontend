@@ -52,8 +52,17 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [quitarGuardado, setQuitarGuardado] = useState(false);
 
+  // El vencimiento no puede ser anterior a la fecha del comprobante (YYYY-MM-DD, como texto).
+  const fechaComprobante = fechaDiaYmd(movimiento.fecha) ?? '';
+  const vencimientoAnterior =
+    vencimientoEditable && !!vencimiento && !!fechaComprobante && vencimiento < fechaComprobante;
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (vencimientoAnterior) {
+      setError('El vencimiento no puede ser anterior a la fecha del comprobante.');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -162,7 +171,8 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
             <input
               id="cc-vencimiento"
               type="date"
-              className={inputClass}
+              min={fechaComprobante || undefined}
+              className={`${inputClass} ${vencimientoAnterior ? 'border-red-400' : ''}`}
               value={vencimiento}
               onChange={(e) => setVencimiento(e.target.value)}
             />

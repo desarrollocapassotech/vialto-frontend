@@ -127,7 +127,8 @@ export function TableroCuentaCorriente({ onSeleccionarContraparte, desde, hasta 
   const [data, setData] = useState<TableroCcResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [descargando, setDescargando] = useState(false);
+  // Lado que se está descargando (un botón por lado: pendientes de cobro / de pago).
+  const [descargando, setDescargando] = useState<TipoContraparte | null>(null);
   const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
 
   useEffect(() => {
@@ -154,15 +155,15 @@ export function TableroCuentaCorriente({ onSeleccionarContraparte, desde, hasta 
     };
   }, [getToken, isLoaded, isSignedIn, desde, hasta]);
 
-  async function handleDescargarListado() {
-    setDescargando(true);
+  async function handleDescargarListado(lado: TipoContraparte) {
+    setDescargando(lado);
     setErrorDescarga(null);
     try {
-      await descargarListadoDeudoresPdf(() => getToken());
+      await descargarListadoDeudoresPdf(() => getToken(), lado);
     } catch (e) {
       setErrorDescarga(friendlyError(e, 'cuentaCorriente'));
     } finally {
-      setDescargando(false);
+      setDescargando(null);
     }
   }
 
@@ -196,15 +197,25 @@ export function TableroCuentaCorriente({ onSeleccionarContraparte, desde, hasta 
         ) : (
           <span />
         )}
-        <button
-          type="button"
-          onClick={handleDescargarListado}
-          disabled={descargando}
-          className="inline-flex h-9 items-center gap-2 px-3 border border-black/20 text-vialto-steel text-xs uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-50"
-        >
-          <FileDown className="h-4 w-4" />
-          {descargando ? 'Generando…' : 'Descargar listado de deudores'}
-        </button>
+        {/* Un PDF por lado, como en la página de Cuenta corriente. */}
+        <div className="flex flex-wrap gap-2">
+          {(['cliente', 'proveedor'] as const).map((lado) => (
+            <button
+              key={lado}
+              type="button"
+              onClick={() => void handleDescargarListado(lado)}
+              disabled={descargando !== null}
+              className="inline-flex h-9 items-center gap-2 px-3 border border-black/20 text-vialto-steel text-xs uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-50"
+            >
+              <FileDown className="h-4 w-4" />
+              {descargando === lado
+                ? 'Generando…'
+                : lado === 'cliente'
+                  ? 'Pendientes de cobro'
+                  : 'Pendientes de pago'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {errorDescarga && (

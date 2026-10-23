@@ -1,7 +1,8 @@
 import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 import { useAuth } from '@clerk/clerk-react';
 import { useRef, useState, type FormEvent } from 'react';
-import { Info } from 'lucide-react';
+import { FileSpreadsheet, Info } from 'lucide-react';
+import { ImportarAfipModal } from './ImportarAfipModal';
 import { TooltipsDelegados } from '@/components/ui/TooltipsDelegados';
 import {
   ViewModalShell,
@@ -95,11 +96,14 @@ export function MovimientoCcFormModal({
   const [numeroComprobante, setNumeroComprobante] = useState('');
   const [formaPago, setFormaPago] = useState('');
   const [saving, setSaving] = useState(false);
+  const [importandoAfip, setImportandoAfip] = useState(false);
   const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
 
   const esCargo = tipo === 'cargo';
   const esCliente = tipoContraparte === 'cliente';
+  /** Vencimiento anterior a la emisión (YYYY-MM-DD, se comparan como texto). */
+  const vencimientoAnterior = !!fechaVencimiento && !!fecha && fechaVencimiento < fecha;
 
   // Cobro/pago: a qué facturas/liquidaciones imputarlo. Vacío = "No imputar" (queda a cuenta).
   const [imputarA, setImputarA] = useState<string[]>([]);
@@ -148,6 +152,11 @@ export function MovimientoCcFormModal({
     // Todo movimiento manual (venta, compra, cobro, pago) se identifica por su comprobante.
     if (!numeroComprobante.trim()) {
       setError('Ingresá el número de comprobante.');
+      return;
+    }
+    // Fechas YYYY-MM-DD: se comparan como texto. El backend valida lo mismo.
+    if (esCargo && vencimientoAnterior) {
+      setError('El vencimiento no puede ser anterior a la fecha de emisión.');
       return;
     }
     if (esCargo) {
@@ -253,6 +262,17 @@ export function MovimientoCcFormModal({
         {/* Venta/compra: número de comprobante y moneda primero, debajo emisión y vencimiento. */}
         {esCargo ? (
           <>
+            {/* Carga masiva: Excel de "Mis Comprobantes" de AFIP (emitidos / recibidos). */}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setImportandoAfip(true)}
+                className="inline-flex items-center gap-1.5 border border-black/15 px-3 py-1.5 text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist hover:text-vialto-charcoal"
+              >
+                <FileSpreadsheet className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+                Importar desde AFIP
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelClass} htmlFor="cc-comprobante">
@@ -285,7 +305,9 @@ export function MovimientoCcFormModal({
                 <input
                   id="cc-vencimiento"
                   type="date"
-                  className={inputClass}
+                  // El calendario no ofrece días anteriores a la emisión.
+                  min={fecha || undefined}
+                  className={`${inputClass} ${vencimientoAnterior ? 'border-red-400' : ''}`}
                   value={fechaVencimiento}
                   onChange={(e) => setFechaVencimiento(e.target.value)}
                 />
@@ -475,6 +497,17 @@ export function MovimientoCcFormModal({
         )}
 
       </form>
+      {importandoAfip && (
+        <ImportarAfipModal
+          lado={tipoContraparte}
+          onClose={() => setImportandoAfip(false)}
+          // Importó: recargar la cuenta y cerrar también "Nueva venta/compra".
+          onImportado={() => {
+            onCreated();
+            onClose();
+          }}
+        />
+      )}
     </ViewModalShell>
   );
 }

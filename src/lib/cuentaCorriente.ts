@@ -49,8 +49,8 @@ export type MovimientoCc = {
   vencimientoEditable?: boolean;
   /** Cobro/pago: cargos a los que está imputado (sin repetir). */
   cargosImputadosIds?: string[];
-  /** Cobro/pago: cuánto se aplicó a cada cargo. */
-  imputacionesPorCargo?: { cargoId: string; importe: number }[];
+  /** Cobro/pago: cuánto se aplicó a cada cargo, con el id de la imputación (para deshacerla). */
+  imputacionesPorCargo?: { imputacionId: string; cargoId: string; importe: number }[];
   /**
    * Cuánto de ESTE movimiento puntual sigue sin resolverse (cargo: sin cobrar/pagar;
    * pago: sin imputar). Solo viene poblado en `fetchMovimientos` (`GET .../movimientos`).
@@ -184,8 +184,10 @@ export type ExportarMovimientosResponse = {
   clienteId: string | null;
   proveedorId: string | null;
   periodo: { desde: string; hasta: string };
-  saldoInicial: number;
-  saldoFinal: number;
+  /** Un saldo por moneda (nunca se suman pesos con dólares). */
+  saldoInicial: { moneda: string; saldo: number }[];
+  saldoFinal: { moneda: string; saldo: number }[];
+  /** `saldoAcumulado` de cada movimiento es el de SU moneda. */
   movimientos: MovimientoExport[];
 };
 
@@ -254,6 +256,48 @@ export function actualizarMovimiento(
   return apiJson<MovimientoCc>(`/api/cuenta-corriente/movimientos/${encodeURIComponent(id)}`, getToken, {
     method: 'PATCH',
     body: JSON.stringify(datos),
+  });
+}
+
+export type ResultadoImportarAfip = {
+  creados: number;
+  filas: {
+    fila: number;
+    numeroComprobante: string;
+    fecha: string;
+    cuit: string;
+    denominacion: string | null;
+    contraparteNombre: string | null;
+    moneda: string;
+    total: number | null;
+    estado: 'importar' | 'importado' | 'omitido';
+    motivo?: string;
+  }[];
+};
+
+/**
+ * Importa ventas (Excel "Mis Comprobantes Emitidos" de AFIP) o compras ("Recibidos") ya
+ * leídos con `leerExcelMisComprobantes`. `simular: true` = vista previa sin crear nada.
+ */
+export function importarAfip(
+  getToken: GetToken,
+  input: {
+    lado: TipoContraparte;
+    simular: boolean;
+    filas: {
+      fila: number;
+      cuit: string;
+      denominacion?: string;
+      numeroComprobante: string;
+      fecha: string;
+      moneda: string;
+      lineas: { descripcion: string; importe: number; ivaPct: number }[];
+    }[];
+  },
+) {
+  return apiJson<ResultadoImportarAfip>('/api/cuenta-corriente/movimientos/importar-afip', getToken, {
+    method: 'POST',
+    body: JSON.stringify(input),
   });
 }
 
@@ -431,7 +475,14 @@ export async function descargarEstadoCuentaPdf(
 }
 
 /** Descarga el PDF del listado completo de deudores (todos los pendientes de cobro y de pago). */
-export async function descargarListadoDeudoresPdf(getToken: GetToken) {
-  const res = await apiFetch('/api/cuenta-corriente/listado-deudores/pdf', getToken);
-  await descargarBlobODescartarError(res, 'listado-deudores.pdf');
+/** PDF "Pendientes de cobro" (clientes) o "Pendientes de pago" (proveedores). */
+export async function descargarListadoDeudoresPdf(getToken: GetToken, lado: TipoContraparte) {
+  const res = await apiFetch(
+    `/api/cuenta-corriente/listado-deudores/pdf?lado=${lado}`,
+    getToken,
+  );
+  await descargarBlobODescartarError(
+    res,
+    lado === 'cliente' ? 'pendientes-de-cobro.pdf' : 'pendientes-de-pago.pdf',
+  );
 }

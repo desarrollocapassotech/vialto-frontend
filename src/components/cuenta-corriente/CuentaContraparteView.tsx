@@ -4,12 +4,16 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { createPortal } from 'react-dom';
 import {
   Banknote,
+  CircleCheck,
+  CircleDashed,
   Eye,
   FileSearch,
   FileSpreadsheet,
   FileText,
   Filter,
-  ListChecks,
+  History,
+  Trash2,
+  Undo2,
   X,
 } from 'lucide-react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
@@ -44,7 +48,14 @@ import { ComprobanteCcModal } from './ComprobanteCcModal';
 import { ComprobanteOrigenCcModal, type ComprobanteOrigenCc } from './ComprobanteOrigenCcModal';
 import { ImputacionesCobroModal } from './ImputacionesCobroModal';
 import { ImputacionesCargoModal, imputacionesDeCargo } from './ImputacionesCargoModal';
-import { MovimientoCcDetalleModal, nombreMovimientoCc } from './MovimientoCcDetalleModal';
+import {
+  EliminarMovimientoDialog,
+  MovimientoCcDetalleModal,
+  cantidadImputacionesCc,
+  movimientoCcEliminable,
+  nombreMovimientoCc,
+} from './MovimientoCcDetalleModal';
+import { DeshacerImputacionDialog } from './DeshacerImputacionButton';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import {
   canAccessEmisionLiquidoProductoArca,
@@ -53,6 +64,9 @@ import {
 } from '@/lib/tenantModules';
 import { ExportarEstadoCuentaModal } from './ExportarEstadoCuentaModal';
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
+import { FiltrosRapidos, type FiltroRapidoOpcion } from '@/components/listado/FiltrosRapidos';
+import { hoyArgentinaIso } from '@/lib/facturaFechaEmision';
+import { TruncarInicio } from '@/components/ui/TruncarInicio';
 import { ComprobanteAdjuntoClip } from '@/components/shared/ComprobanteAdjuntoClip';
 import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
 import { useAbrirAdjunto } from '@/hooks/useAbrirAdjunto';
@@ -67,11 +81,15 @@ type ModalState =
   | { kind: 'imputaciones'; pago: MovimientoCc }
   | { kind: 'imputacionesCargo'; cargo: MovimientoCc }
   | { kind: 'detalle'; movimiento: MovimientoCc }
+  | { kind: 'deshacerImputacion'; imputacionId: string; descripcion: string }
+  | { kind: 'eliminar'; movimiento: MovimientoCc }
   | { kind: 'exportar'; formato: 'pdf' | 'excel' }
   | null;
 
 type MovimientoConSaldo = MovimientoCc & {
   saldoAcumulado: number;
+  /** Saldo de CADA moneda después de este movimiento (las que no se movieron arrastran el último). */
+  saldosAcumulados: Record<string, number>;
   /** Cobro/pago imputado a un solo cargo: ese cargo (su factura/liquidación). */
   cargoUnico: MovimientoCc | null;
   /** Columna Comprobante: el número propio del movimiento (en un cobro/pago, el del recibo/orden de pago). */
@@ -85,6 +103,70 @@ function fmtSaldo(valor: number): string {
   return valor < 0
     ? `-$ ${formatCurrencyArFromNumber(-valor)}`
     : `$ ${formatCurrencyArFromNumber(valor)}`;
+}
+
+/**
+ * Ícono sutil junto al número de una venta/compra imputada (tooltip con el detalle):
+ * tilde verde = imputada por completo, círculo punteado ámbar = en parte (le queda saldo).
+ * Sale de `estadoDisponibilidad`, que recalcula el backend.
+ */
+function EtiquetaImputacionCargo({ m }: { m: MovimientoCc }) {
+  if (m.tipo !== 'cargo') return null;
+  const estado =
+    m.estadoDisponibilidad === 'cancelado'
+      ? { Icono: CircleCheck, clase: 'text-emerald-600', titulo: 'Imputada por completo' }
+      : m.estadoDisponibilidad === 'parcial'
+        ? { Icono: CircleDashed, clase: 'text-amber-600', titulo: 'Imputada en parte: le queda saldo' }
+        : null;
+  if (!estado) return null;
+  const { Icono, clase, titulo } = estado;
+  return (
+    <span className={`inline-flex shrink-0 cursor-help ${clase}`} title={titulo} aria-label={titulo}>
+      <Icono className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+    </span>
+  );
+}
+
+/**
+ * Título de columna sin embudo con la misma altura que uno con embudo
+ * (`ViajesListadoHeaderFiltro`: botón h-[26px]), así todos quedan en la misma línea cuando
+ * el encabezado tiene dos filas y las celdas van `align-top`.
+ */
+function TituloSinFiltro({ children, alignRight }: { children: ReactNode; alignRight?: boolean }) {
+  return (
+    <span className={`flex min-h-[26px] items-center ${alignRight ? 'justify-end' : ''}`}>
+      {children}
+    </span>
+  );
+}
+
+/** Subtítulo del menú de acciones de una fila: tipo + número de comprobante ("COBRO 3132132"). */
+function subtituloAcciones(m: MovimientoCc): string {
+  const numero = m.numeroComprobante?.trim();
+  return numero ? `${m.concepto} ${numero}` : m.concepto;
+}
+
+/**
+ * Filtro rápido "Sin imputar": venta/compra con saldo pendiente o cobro/pago con algo sin
+ * imputar. Lo anulado y los créditos de anulación no cuentan.
+ */
+function estaSinImputar(m: MovimientoCc): boolean {
+  if (m.tipo === 'credito' || m.estadoDisponibilidad === 'anulado') return false;
+  if (m.tipo !== 'cargo' && m.tipo !== 'pago') return false;
+  return (m.pendiente ?? 0) > 0.005;
+}
+
+type FiltroRapidoCc = 'sin_imputar' | 'vencidos' | 'sin_cobrar';
+
+/** Filtro rápido "Sin cobrar" / "Sin pagar": venta/compra no anulada con saldo pendiente. */
+function estaSinCobrar(m: MovimientoCc): boolean {
+  return m.tipo === 'cargo' && m.estadoDisponibilidad !== 'anulado' && (m.pendiente ?? 0) > 0.005;
+}
+
+/** Filtro rápido "Vencidos": sin cobrar/pagar y con vencimiento anterior a hoy (día en Argentina). */
+function estaVencido(m: MovimientoCc, hoy: string): boolean {
+  const vto = fechaDiaYmd(m.fechaVencimiento);
+  return estaSinCobrar(m) && !!vto && vto < hoy;
 }
 
 /** Orden de carga ascendente; `id` desempata movimientos creados en el mismo instante. */
@@ -107,6 +189,8 @@ type Props = {
   accionesSlot?: HTMLElement | null;
   /** Junto al título de la página: ahí va "Limpiar filtros" (regla global). */
   limpiarFiltrosSlot?: HTMLElement | null;
+  /** Junto al título: embudo + chips de filtro rápido ("Sin imputar"), como en Viajes. */
+  filtrosRapidosSlot?: HTMLElement | null;
 };
 
 export function CuentaContraparteView({
@@ -116,6 +200,7 @@ export function CuentaContraparteView({
   saldosSlot,
   accionesSlot,
   limpiarFiltrosSlot,
+  filtrosRapidosSlot,
 }: Props) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
@@ -201,6 +286,7 @@ export function CuentaContraparteView({
       conSaldo.push({
         ...m,
         saldoAcumulado: acumulado,
+        saldosAcumulados: Object.fromEntries(acumuladoPorMoneda),
         cargoUnico,
         comprobantesImputados,
         comprobanteMostrado: m.numeroComprobante?.trim() || null,
@@ -216,6 +302,18 @@ export function CuentaContraparteView({
   // Se elige tocando la tarjeta de saldo de esa moneda (solo si la cuenta tiene más de una).
   const [monedaFiltro, setMonedaFiltro] = useState('');
   const multimoneda = (saldos?.length ?? 0) > 1;
+  // Filtros rápidos junto al título (mismo componente que Viajes/Facturas/Liquidaciones),
+  // excluyentes entre sí.
+  const [filtroRapido, setFiltroRapido] = useState<FiltroRapidoCc | ''>('');
+  const cantidadesFiltroRapido = useMemo(() => {
+    const hoy = hoyArgentinaIso();
+    const lista = movimientosConSaldo ?? [];
+    return {
+      sin_imputar: lista.filter(estaSinImputar).length,
+      vencidos: lista.filter((m) => estaVencido(m, hoy)).length,
+      sin_cobrar: lista.filter(estaSinCobrar).length,
+    };
+  }, [movimientosConSaldo]);
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
@@ -223,8 +321,9 @@ export function CuentaContraparteView({
     if (tipoFiltro.trim()) n += 1;
     if (comprobanteFiltro.trim()) n += 1;
     if (monedaFiltro) n += 1;
+    if (filtroRapido) n += 1;
     return n;
-  }, [desdeFiltro, hastaFiltro, tipoFiltro, comprobanteFiltro, monedaFiltro]);
+  }, [desdeFiltro, hastaFiltro, tipoFiltro, comprobanteFiltro, monedaFiltro, filtroRapido]);
   const anyFiltroActivo = activeFilterCount > 0;
 
   // Filtro solo de despliegue: se aplica sobre `movimientosConSaldo` (ya calculado con
@@ -232,7 +331,11 @@ export function CuentaContraparteView({
   // en vez de recalcularse desde cero con el subconjunto filtrado.
   const movimientosFiltrados = useMemo<MovimientoConSaldo[] | null>(() => {
     if (!movimientosConSaldo) return null;
+    const hoy = hoyArgentinaIso();
     return movimientosConSaldo.filter((m) => {
+      if (filtroRapido === 'sin_imputar' && !estaSinImputar(m)) return false;
+      if (filtroRapido === 'vencidos' && !estaVencido(m, hoy)) return false;
+      if (filtroRapido === 'sin_cobrar' && !estaSinCobrar(m)) return false;
       if (monedaFiltro && m.moneda !== monedaFiltro) return false;
       const fecha = fechaDiaYmd(m.fecha) ?? '';
       if (desdeFiltro && fecha < desdeFiltro) return false;
@@ -247,9 +350,10 @@ export function CuentaContraparteView({
         return false;
       return true;
     });
-  }, [movimientosConSaldo, monedaFiltro, desdeFiltro, hastaFiltro, tipoFiltro, comprobanteFiltro]);
+  }, [movimientosConSaldo, monedaFiltro, desdeFiltro, hastaFiltro, tipoFiltro, comprobanteFiltro, filtroRapido]);
 
   function limpiarFiltros() {
+    setFiltroRapido('');
     setMonedaFiltro('');
     setDesdeFiltro('');
     setHastaFiltro('');
@@ -379,8 +483,57 @@ export function CuentaContraparteView({
       opciones.push({
         id: 'ver-imputacion',
         label: 'Ver imputación',
-        icon: ListChecks,
+        icon: History,
         onClick: () => setModal({ kind: 'imputacionesCargo', cargo: m }),
+      });
+    }
+    // Deshacer imputación desde la fila: con una sola, confirma y la deshace ahí; con
+    // varias, abre "Ver …" (cada imputación tiene su botón Deshacer).
+    const imputacionesFila =
+      m.tipo === 'cargo'
+        ? imputacionesDeCargo(m, movimientos ?? []).map((i) => ({
+            imputacionId: i.imputacionId,
+            importe: i.importe,
+            otro: i.pago as MovimientoCc | null,
+          }))
+        : m.tipo === 'pago'
+          ? (m.imputacionesPorCargo ?? []).map((i) => ({
+              imputacionId: i.imputacionId,
+              importe: i.importe,
+              otro: (movimientos ?? []).find((x) => x.id === i.cargoId) ?? null,
+            }))
+          : [];
+    if (imputacionesFila.length > 0) {
+      opciones.push({
+        id: 'deshacer-imputacion',
+        label: imputacionesFila.length === 1 ? 'Deshacer imputación' : 'Deshacer imputaciones',
+        icon: Undo2,
+        onClick: () => {
+          if (imputacionesFila.length > 1) {
+            setModal({ kind: 'detalle', movimiento: m });
+            return;
+          }
+          const { imputacionId, importe, otro } = imputacionesFila[0];
+          setModal({
+            kind: 'deshacerImputacion',
+            imputacionId,
+            descripcion: `$ ${formatCurrencyArFromNumber(importe)} ${m.moneda} ${
+              m.tipo === 'cargo' ? 'del' : 'a'
+            } ${otro ? nombreMovimientoCc(otro) : 'comprobante'} ${
+              otro?.numeroComprobante?.trim() || 'sin comprobante'
+            }`,
+          });
+        },
+      });
+    }
+    // Eliminar toda venta/compra/cobro/pago manual no anulado, aunque esté imputado: el
+    // backend deshace sus imputaciones antes de borrarlo.
+    if (movimientoCcEliminable(m)) {
+      opciones.push({
+        id: 'eliminar',
+        label: `Eliminar ${nombreMovimientoCc(m)}`,
+        icon: Trash2,
+        onClick: () => setModal({ kind: 'eliminar', movimiento: m }),
       });
     }
     const origen = comprobanteOrigenDe(m);
@@ -479,6 +632,10 @@ export function CuentaContraparteView({
     () => [...new Set((movimientos ?? []).map((m) => m.moneda))].sort(),
     [movimientos],
   );
+  // Cuenta con pesos y dólares (y sin filtrar por una moneda): "Saldo acumulado" se parte en
+  // una subcolumna por moneda (ARS / USD), con el encabezado en dos filas.
+  const saldoMultimoneda = monedasDisponibles.length > 1 && !monedaFiltro;
+  const filasHead = saldoMultimoneda ? 2 : 1;
 
   const monedaFiltroInput = (
     <select
@@ -504,9 +661,7 @@ export function CuentaContraparteView({
           const activa = monedaFiltro === s.moneda;
           const monto = (
             <span
-              className={`font-[family-name:var(--font-display)] text-lg tracking-wide tabular-nums ${
-                s.saldo > 0.005 ? 'text-vialto-bright' : 'text-white'
-              }`}
+              className="font-[family-name:var(--font-display)] text-lg tracking-wide tabular-nums text-white"
             >
               {fmtSaldo(s.saldo)}
             </span>
@@ -594,6 +749,25 @@ export function CuentaContraparteView({
       {visorAdjunto}
       {saldosSlot ? createPortal(saldosNode, saldosSlot) : null}
       {accionesSlot ? createPortal(accionesNode, accionesSlot) : null}
+      {/* Filtro rápido junto al título, igual que Viajes. */}
+      {filtrosRapidosSlot &&
+        createPortal(
+          <FiltrosRapidos
+            opciones={[
+              { id: 'sin_imputar', label: 'Sin imputar', count: cantidadesFiltroRapido.sin_imputar },
+              { id: 'vencidos', label: 'Vencidos', count: cantidadesFiltroRapido.vencidos },
+              {
+                id: 'sin_cobrar',
+                label: tipoContraparte === 'cliente' ? 'Sin cobrar' : 'Sin pagar',
+                count: cantidadesFiltroRapido.sin_cobrar,
+              },
+            ] satisfies FiltroRapidoOpcion<FiltroRapidoCc>[]}
+            value={filtroRapido}
+            onChange={setFiltroRapido}
+            ariaLabel="Filtros rápidos de cuenta corriente"
+          />,
+          filtrosRapidosSlot,
+        )}
       <LimpiarFiltrosPortal
         slot={limpiarFiltrosSlot}
         visible={anyFiltroActivo}
@@ -643,18 +817,25 @@ export function CuentaContraparteView({
             header: 'Comprobante',
             cell: (m: MovimientoConSaldo) => (
               <span className="flex items-center gap-1.5 whitespace-nowrap">
-                {m.comprobantesImputados.length > 0 ? (
-                  // Cobro/pago: su propio comprobante; el tooltip (oscuro, de ListadoDatos)
-                  // lista las facturas/liquidaciones a las que se imputó.
-                  <span
-                    className="cursor-help"
-                    title={`Imputado a:\n${m.comprobantesImputados.join('\n')}`}
-                  >
-                    {m.comprobanteMostrado ?? '—'}
-                  </span>
-                ) : (
-                  m.comprobanteMostrado ?? '—'
-                )}
+                {/* Número largo: se trunca por el principio (se ven los últimos caracteres,
+                    "…0000127"), como las columnas de ID; el número completo va en el tooltip.
+                    En un cobro/pago el tooltip suma a qué facturas/liquidaciones se imputó. */}
+                <TruncarInicio
+                  className={`max-w-[11rem] ${m.comprobantesImputados.length > 0 ? 'cursor-help' : ''}`}
+                  title={
+                    [
+                      m.comprobanteMostrado ?? '',
+                      m.comprobantesImputados.length > 0
+                        ? `Imputado a:\n${m.comprobantesImputados.join('\n')}`
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join('\n\n') || undefined
+                  }
+                >
+                  {m.comprobanteMostrado ?? '—'}
+                </TruncarInicio>
+                <EtiquetaImputacionCargo m={m} />
                 {clipsDe(m)}
               </span>
             ),
@@ -684,12 +865,27 @@ export function CuentaContraparteView({
                 : '—',
             tdClassName: `${listadoTablaTdClass} tabular-nums text-vialto-steel`,
           },
-          {
-            id: 'saldoAcumulado',
-            header: 'Saldo acumulado',
-            cell: (m: MovimientoConSaldo) => `${fmtSaldo(m.saldoAcumulado)} ${m.moneda}`,
-            tdClassName: `${listadoTablaTdClass} tabular-nums font-medium`,
-          },
+          // Una moneda: "Saldo acumulado". Varias (y sin filtrar por moneda): una subcolumna
+          // por moneda bajo "Saldo acumulado", nunca sumadas; resalta la moneda de la fila.
+          ...(saldoMultimoneda
+            ? monedasDisponibles.map((moneda) => ({
+                id: `saldoAcumulado-${moneda}`,
+                header: `Saldo ${moneda}`,
+                cell: (m: MovimientoConSaldo) => (
+                  <span className={m.moneda === moneda ? 'font-medium' : 'text-vialto-steel'}>
+                    {m.saldosAcumulados[moneda] != null ? fmtSaldo(m.saldosAcumulados[moneda]) : '—'}
+                  </span>
+                ),
+                tdClassName: `${listadoTablaTdClass} tabular-nums`,
+              }))
+            : [
+                {
+                  id: 'saldoAcumulado',
+                  header: 'Saldo acumulado',
+                  cell: (m: MovimientoConSaldo) => `${fmtSaldo(m.saldoAcumulado)} ${m.moneda}`,
+                  tdClassName: `${listadoTablaTdClass} tabular-nums font-medium`,
+                },
+              ]),
         ]}
         rows={error ? [] : movimientosFiltrados}
         rowKey={(m) => m.id}
@@ -720,8 +916,13 @@ export function CuentaContraparteView({
           </>
         }
         tableHead={
+          <>
+          {/* Con pesos y dólares el encabezado tiene 2 filas ("Saldo acumulado" arriba, ARS/USD
+              abajo). Para que todos los títulos queden en la misma línea: todas las celdas de la
+              primera fila van `align-top`, y los títulos sin embudo usan `TituloSinFiltro`, con la
+              misma altura que el botón del embudo. */}
           <tr className={listadoTablaHeadRowClass}>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Fecha"
                 filterActive={!!desdeFiltro || !!hastaFiltro}
@@ -734,10 +935,10 @@ export function CuentaContraparteView({
                 {fechaFiltroCampos}
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Vencimiento
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
+              <TituloSinFiltro>Vencimiento</TituloSinFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Tipo"
                 filterActive={!!tipoFiltro.trim()}
@@ -747,7 +948,7 @@ export function CuentaContraparteView({
                 {tipoFiltroInput}
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Comprobante"
                 filterActive={!!comprobanteFiltro.trim()}
@@ -757,17 +958,22 @@ export function CuentaContraparteView({
                 {comprobanteFiltroInput}
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Debe
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
+              <TituloSinFiltro>Debe</TituloSinFiltro>
             </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Haber
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
+              <TituloSinFiltro>Haber</TituloSinFiltro>
             </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Saldo
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
+              <TituloSinFiltro>Saldo</TituloSinFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              {/* Mismo filtro que las tarjetas de saldo: un solo estado de moneda. */}
+            {/* "Saldo acumulado" ocupa una subcolumna por moneda (con varias). El embudo de
+                moneda es el mismo filtro que las tarjetas de saldo. */}
+            <th
+              scope={saldoMultimoneda ? 'colgroup' : 'col'}
+              colSpan={saldoMultimoneda ? monedasDisponibles.length : 1}
+              className={`${listadoTablaThClass} align-top`}
+            >
               <ViajesListadoHeaderFiltro
                 title="Saldo acumulado"
                 filterActive={!!monedaFiltro}
@@ -777,12 +983,22 @@ export function CuentaContraparteView({
                 {monedaFiltroInput}
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} text-right`}>
-              Acciones
+            <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top text-right`}>
+              <TituloSinFiltro alignRight>Acciones</TituloSinFiltro>
             </th>
           </tr>
+          {saldoMultimoneda && (
+            <tr className={listadoTablaHeadRowClass}>
+              {monedasDisponibles.map((moneda) => (
+                <th key={moneda} scope="col" className={`${listadoTablaThClass} pt-0`}>
+                  {moneda}
+                </th>
+              ))}
+            </tr>
+          )}
+          </>
         }
-        tableColSpan={9}
+        tableColSpan={8 + (saldoMultimoneda ? monedasDisponibles.length : 1)}
         // Sin padding vertical: los botones (h-8) ya dan el alto, así una fila con acciones
         // no queda más alta que una sin acciones.
         actionsTdClassName="px-3 py-0 text-right align-middle md:px-4"
@@ -799,7 +1015,7 @@ export function CuentaContraparteView({
             <AccionesFila
               options={opciones}
               destacadas={opciones.map((o) => o.id)}
-              subtitle={m.concepto}
+              subtitle={subtituloAcciones(m)}
             />
           );
         }}
@@ -866,11 +1082,37 @@ export function CuentaContraparteView({
           onVerMovimiento={(otro) => setModal({ kind: 'detalle', movimiento: otro })}
         />
       )}
+      {modal?.kind === 'eliminar' && (
+        <EliminarMovimientoDialog
+          movimiento={modal.movimiento}
+          cantidadImputaciones={cantidadImputacionesCc(modal.movimiento, movimientos ?? [])}
+          onCancel={() => setModal(null)}
+          onEliminado={() => {
+            setModal(null);
+            void cargarDatos();
+          }}
+        />
+      )}
+      {modal?.kind === 'deshacerImputacion' && (
+        <DeshacerImputacionDialog
+          imputacionId={modal.imputacionId}
+          descripcion={modal.descripcion}
+          onCancel={() => setModal(null)}
+          onDeshecha={() => {
+            setModal(null);
+            void cargarDatos();
+          }}
+        />
+      )}
       {modal?.kind === 'imputacionesCargo' && (
         <ImputacionesCargoModal
           cargo={modal.cargo}
           movimientos={movimientos ?? []}
           onVerMovimiento={(otro) => setModal({ kind: 'detalle', movimiento: otro })}
+          onDeshecha={() => {
+            setModal(null);
+            void cargarDatos();
+          }}
           onClose={() => setModal(null)}
         />
       )}
@@ -896,7 +1138,7 @@ export function CuentaContraparteView({
         open={accionesDeFila != null}
         onClose={() => setAccionesDeFila(null)}
         title="Acciones"
-        subtitle={accionesDeFila?.concepto}
+        subtitle={accionesDeFila ? subtituloAcciones(accionesDeFila) : undefined}
         options={accionesDeFila ? accionesDe(accionesDeFila) : []}
       />
 

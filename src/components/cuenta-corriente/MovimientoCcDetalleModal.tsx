@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/ViewModalShell';
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
   FacturaLineasEditor,
   computeFacturaTotales,
@@ -30,10 +31,12 @@ import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 import {
   actualizarMovimiento,
   claseMontoCobroPago,
+  eliminarMovimiento,
   estadoMovimientoCcLabel,
   type MovimientoCc,
 } from '@/lib/cuentaCorriente';
 import { imputacionesDeCargo } from './ImputacionesCargoModal';
+import { DeshacerImputacionButton } from './DeshacerImputacionButton';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
@@ -63,6 +66,85 @@ const monto = (n: number, moneda: string) => `$ ${formatCurrencyArFromNumber(n)}
 export function nombreMovimientoCc(m: MovimientoCc): string {
   if (m.tipo === 'pago') return m.clienteId ? 'cobro' : 'pago';
   return m.clienteId ? 'venta' : 'compra';
+}
+
+/**
+ * ¿Se puede eliminar? Toda venta/compra/cobro/pago manual no anulado, aunque esté imputado
+ * (el backend deshace sus imputaciones antes de borrarlo). Facturas, liquidaciones y
+ * anulaciones no: se manejan desde su módulo. Lo usan el botón del modal y la fila.
+ */
+export function movimientoCcEliminable(m: MovimientoCc): boolean {
+  return (
+    m.origen === 'manual' &&
+    m.estadoDisponibilidad !== 'anulado' &&
+    (m.tipo === 'cargo' || m.tipo === 'pago')
+  );
+}
+
+/** Cuántas imputaciones tiene (para avisar que se deshacen al eliminar). */
+export function cantidadImputacionesCc(m: MovimientoCc, movimientos: MovimientoCc[]): number {
+  if (m.tipo === 'pago') return m.imputacionesPorCargo?.length ?? 0;
+  if (m.tipo === 'cargo') return imputacionesDeCargo(m, movimientos).length;
+  return 0;
+}
+
+/** Confirmación + eliminar una venta/compra/cobro/pago manual (deshace sus imputaciones). */
+export function EliminarMovimientoDialog({
+  movimiento: m,
+  cantidadImputaciones,
+  onCancel,
+  onEliminado,
+}: {
+  movimiento: MovimientoCc;
+  /** Imputaciones que se van a deshacer (0 = ninguna). */
+  cantidadImputaciones: number;
+  onCancel: () => void;
+  /** Después de eliminar: recargar la grilla (y cerrar el modal que lo mostraba). */
+  onEliminado: () => void;
+}) {
+  const { getToken } = useAuth();
+  const { showToast } = useToast();
+  const [eliminando, setEliminando] = useState(false);
+  const nombre = nombreMovimientoCc(m);
+  const esCargo = m.tipo === 'cargo';
+
+  async function eliminar() {
+    setEliminando(true);
+    try {
+      await eliminarMovimiento(() => getToken(), m.id);
+      // Venta/compra en femenino, cobro/pago en masculino.
+      showToast(`${nombre[0].toUpperCase()}${nombre.slice(1)} eliminad${esCargo ? 'a' : 'o'}.`, 'success');
+      onEliminado();
+    } catch (err) {
+      showToast(friendlyError(err, 'cuentaCorriente'), 'error');
+    } finally {
+      setEliminando(false);
+    }
+  }
+
+  return (
+    <ConfirmDialog
+      open
+      title={`¿Eliminar ${esCargo ? 'la' : 'el'} ${nombre}?`}
+      message={`Se elimina ${esCargo ? 'la' : 'el'} ${nombre} ${
+        m.numeroComprobante?.trim() || 'sin comprobante'
+      } por ${monto(m.importe, m.moneda)}.${
+        cantidadImputaciones > 0
+          ? ` Antes se ${cantidadImputaciones === 1 ? 'deshace su imputación' : `deshacen sus ${cantidadImputaciones} imputaciones`}: ${
+              esCargo
+                ? `${m.clienteId ? 'los cobros vuelven' : 'los pagos vuelven'} a quedar sin imputar`
+                : `${m.clienteId ? 'las ventas vuelven' : 'las compras vuelven'} a quedar pendientes`
+            }.`
+          : ''
+      } El saldo de la cuenta se recalcula sin este movimiento.`}
+      confirmLabel="Eliminar"
+      cancelLabel="Cancelar"
+      tone="danger"
+      busy={eliminando}
+      onCancel={onCancel}
+      onConfirm={() => void eliminar()}
+    />
+  );
 }
 
 /** Líneas para editar: las guardadas o, en una venta/compra vieja, una sola con su importe e IVA. */
@@ -112,11 +194,22 @@ export function MovimientoCcDetalleModal({
 
   // Imputaciones: de la venta/compra (qué cobros la cancelan) o del cobro/pago (a qué ventas fue).
   const imputaciones = esCargo
-    ? imputacionesDeCargo(m, movimientos).map(({ pago, importe }) => ({ otro: pago, importe }))
-    : (m.imputacionesPorCargo ?? []).map((i) => ({ otro: porId.get(i.cargoId) ?? null, importe: i.importe }));
+    ? imputacionesDeCargo(m, movimientos).map(({ pago, importe, imputacionId }) => ({
+        otro: pago,
+        importe,
+        imputacionId,
+      }))
+    : (m.imputacionesPorCargo ?? []).map((i) => ({
+        otro: porId.get(i.cargoId) ?? null,
+        importe: i.importe,
+        imputacionId: i.imputacionId,
+      }));
   const tieneImputaciones = imputaciones.length > 0;
   const editable = manual && !anulado;
   const puedeEditar = editable || !!onEditarAutomatico;
+  // Eliminar aunque esté imputado: el backend deshace sus imputaciones antes.
+  const puedeEliminar = movimientoCcEliminable(m);
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
 
   const [editando, setEditando] = useState(false);
   const [numero, setNumero] = useState(m.numeroComprobante ?? '');
@@ -129,6 +222,10 @@ export function MovimientoCcDetalleModal({
   const [lineasIncompletas, setLineasIncompletas] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Mensaje de la confirmación de cambio de importe con imputaciones (null = cerrada). */
+  const [confirmarImporte, setConfirmarImporte] = useState<string | null>(null);
+  /** Vencimiento anterior a la emisión (YYYY-MM-DD, se comparan como texto). */
+  const vencimientoAnterior = !!vencimiento && !!fecha && vencimiento < fecha;
   // Cerrar/cancelar con cambios sin guardar pide confirmación y cierra todo (no vuelve a "Ver").
   // Guardia solo en modo editar (regla de CLAUDE.md: ver + editar en el mismo modal).
   const descarte = useConfirmarDescarte(onClose, editando);
@@ -146,33 +243,71 @@ export function MovimientoCcDetalleModal({
     setEditando(true);
   }
 
+  /** Total que va a quedar con lo cargado en el formulario (para comparar con el actual). */
+  function totalNuevo(): number | null {
+    if (esCargo) return computeFacturaTotales(lineas, IVA_PCT_DEFAULT).total;
+    const n = parseCurrencyAr(importeStr);
+    return n && n > 0 ? n : null;
+  }
+
+  /**
+   * Cambio de importe con imputaciones: antes de guardar se confirma, diciendo qué va a
+   * pasar (se recalcula lo pendiente, o se recortan imputaciones si queda por debajo).
+   */
+  function mensajeCambioImporte(nuevo: number): string {
+    const imputado = imputaciones.reduce((s, i) => s + i.importe, 0);
+    const otro = esCargo ? (esCliente ? 'los cobros' : 'los pagos') : esCliente ? 'las ventas' : 'las compras';
+    const base = `El importe pasa de ${monto(m.importe, m.moneda)} a ${monto(nuevo, m.moneda)} y tiene ${monto(imputado, m.moneda)} imputados.`;
+    if (nuevo + 0.005 < imputado) {
+      return `${base} Se van a recortar imputaciones por ${monto(imputado - nuevo, m.moneda)}, de la más nueva a la más vieja: ese importe vuelve a quedar disponible en ${otro}.`;
+    }
+    return esCargo
+      ? `${base} Las imputaciones quedan igual y ${esCliente ? 'la venta' : 'la compra'} queda con ${monto(nuevo - imputado, m.moneda)} pendientes.`
+      : `${base} Las imputaciones quedan igual y quedan ${monto(nuevo - imputado, m.moneda)} sin imputar (a cuenta).`;
+  }
+
   async function guardar(e: FormEvent) {
     e.preventDefault();
+    if (!validarFormulario()) return;
+    const nuevo = totalNuevo();
+    if (tieneImputaciones && nuevo != null && Math.abs(nuevo - m.importe) > 0.005) {
+      setConfirmarImporte(mensajeCambioImporte(nuevo));
+      return;
+    }
+    await enviar();
+  }
+
+  /** Validaciones del formulario; muestra el error y devuelve false si algo falta. */
+  function validarFormulario(): boolean {
     if (!numero.trim()) {
       setError('Ingresá el número de comprobante.');
-      return;
+      return false;
     }
     if (!fecha) {
       setError('Ingresá la fecha de emisión.');
-      return;
+      return false;
     }
-    let importe: number | undefined;
-    if (!tieneImputaciones) {
-      if (esCargo) {
-        const v = validateFacturaLineasDraft(lineas);
-        if (!v.ok) {
-          setLineasIncompletas(v.indices);
-          setError(v.message);
-          return;
-        }
-      } else {
-        importe = parseCurrencyAr(importeStr);
-        if (!importe || importe <= 0) {
-          setError('Ingresá un importe mayor a 0.');
-          return;
-        }
+    if (esCargo && vencimientoAnterior) {
+      setError('El vencimiento no puede ser anterior a la fecha de emisión.');
+      return false;
+    }
+    if (esCargo) {
+      const v = validateFacturaLineasDraft(lineas);
+      if (!v.ok) {
+        setLineasIncompletas(v.indices);
+        setError(v.message);
+        return false;
       }
+    } else if (totalNuevo() == null) {
+      setError('Ingresá un importe mayor a 0.');
+      return false;
     }
+    return true;
+  }
+
+  async function enviar() {
+    setConfirmarImporte(null);
+    const importe = esCargo ? undefined : (totalNuevo() ?? undefined);
     setSaving(true);
     setError(null);
     try {
@@ -180,19 +315,18 @@ export function MovimientoCcDetalleModal({
         numeroComprobante: numero.trim(),
         fecha,
         ...(esCargo ? { fechaVencimiento: vencimiento || null } : { formaPago: formaPago.trim() }),
-        // Lo que mueve plata, solo sin imputaciones.
-        ...(tieneImputaciones
-          ? {}
-          : esCargo
-            ? {
-                moneda,
-                lineas: toFacturaLineasPayload(lineas).map((l) => ({
-                  descripcion: l.descripcion,
-                  importe: l.importe,
-                  ivaPct: l.ivaPct ?? IVA_PCT_DEFAULT,
-                })),
-              }
-            : { moneda, importe }),
+        // El importe se manda siempre: con imputaciones, el backend las ajusta al nuevo total.
+        // La moneda solo sin imputaciones (no se imputa entre monedas).
+        ...(tieneImputaciones ? {} : { moneda }),
+        ...(esCargo
+          ? {
+              lineas: toFacturaLineasPayload(lineas).map((l) => ({
+                descripcion: l.descripcion,
+                importe: l.importe,
+                ivaPct: l.ivaPct ?? IVA_PCT_DEFAULT,
+              })),
+            }
+          : { importe }),
       });
       // Venta/compra en femenino, cobro/pago en masculino.
       showToast(
@@ -219,24 +353,44 @@ export function MovimientoCcDetalleModal({
       descarte={descarte}
       maxWidthClass={esCargo ? 'sm:max-w-5xl' : 'sm:max-w-3xl'}
       scrollBody
+      // `key` distinta en cada botón: sin ella React reutiliza el botón "Editar" (type=button)
+      // como "Guardar" (type=submit) en el mismo click, y el navegador envía el formulario
+      // apenas se abre la edición (se guardaba solo y se cerraba).
       footer={
         editando ? (
           <>
-            <ErrorPieModal error={error} />
-            <button type="button" className={viewModalBtnGhost} onClick={descarte.solicitarCierre}>
+            <ErrorPieModal key="error" error={error} />
+            <button key="cancelar" type="button" className={viewModalBtnGhost} onClick={descarte.solicitarCierre}>
               Cancelar
             </button>
-            <button type="submit" form="detalle-cc-form" className={viewModalBtnPrimary} disabled={saving}>
+            <button
+              key="guardar"
+              type="submit"
+              form="detalle-cc-form"
+              className={viewModalBtnPrimary}
+              disabled={saving}
+            >
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
           </>
         ) : (
           <>
-            <button type="button" className={viewModalBtnGhost} onClick={onClose}>
+            {/* Eliminar: manual y no anulado (aunque esté imputado: el backend deshace las imputaciones). */}
+            {puedeEliminar && (
+              <button
+                key="eliminar"
+                type="button"
+                className={`${viewModalBtnGhost} mr-auto border-red-200 text-red-700 hover:bg-red-50`}
+                onClick={() => setConfirmandoEliminar(true)}
+              >
+                Eliminar
+              </button>
+            )}
+            <button key="cerrar" type="button" className={viewModalBtnGhost} onClick={onClose}>
               Cerrar
             </button>
             {puedeEditar && (
-              <button type="button" className={viewModalBtnPrimary} onClick={editar}>
+              <button key="editar" type="button" className={viewModalBtnPrimary} onClick={editar}>
                 Editar
               </button>
             )}
@@ -287,7 +441,6 @@ export function MovimientoCcDetalleModal({
                   className={inputClass}
                   value={importeStr}
                   onChange={(e) => setImporteStr(maskCurrencyArInput(e.target.value))}
-                  disabled={tieneImputaciones}
                   required
                 />
               </div>
@@ -315,7 +468,9 @@ export function MovimientoCcDetalleModal({
                 <input
                   id="det-vencimiento"
                   type="date"
-                  className={inputClass}
+                  // El calendario no ofrece días anteriores a la emisión.
+                  min={fecha || undefined}
+                  className={`${inputClass} ${vencimientoAnterior ? 'border-red-400' : ''}`}
                   value={vencimiento}
                   onChange={(e) => setVencimiento(e.target.value)}
                 />
@@ -361,7 +516,6 @@ export function MovimientoCcDetalleModal({
               }}
               ivaPctDefault={IVA_PCT_DEFAULT}
               incompleteIndices={lineasIncompletas}
-              disabled={tieneImputaciones}
               agregarAbajo
               totalesALaDerecha
               labelImporte="Importe"
@@ -369,11 +523,6 @@ export function MovimientoCcDetalleModal({
             />
           )}
 
-          {tieneImputaciones && (
-            <p className="text-xs text-vialto-steel">
-              Tiene imputaciones: el importe y la moneda no se pueden cambiar. El resto sí.
-            </p>
-          )}
         </form>
       ) : (
         <div className="space-y-5">
@@ -474,7 +623,7 @@ export function MovimientoCcDetalleModal({
                 {esCargo ? `${esCliente ? 'Cobros' : 'Pagos'} imputados` : 'Imputado a'}
               </p>
               <ul className="divide-y divide-black/10 border border-black/10">
-                {imputaciones.map(({ otro, importe }, i) => {
+                {imputaciones.map(({ otro, importe, imputacionId }, i) => {
                   const contenido = (
                     <>
                       <span className="min-w-0 flex-1 truncate">
@@ -495,20 +644,30 @@ export function MovimientoCcDetalleModal({
                     </>
                   );
                   return (
-                    <li key={otro?.id ?? i}>
+                    <li key={otro?.id ?? i} className="flex items-center gap-2 pr-3">
                       {/* Tocar el comprobante asociado abre su detalle. */}
                       {otro ? (
                         <button
                           type="button"
                           onClick={() => onVerMovimiento(otro)}
-                          className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-vialto-mist"
+                          className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left text-sm hover:bg-vialto-mist"
                           title={`Ver ${nombreMovimientoCc(otro)}`}
                         >
                           {contenido}
                         </button>
                       ) : (
-                        <div className="flex items-center gap-3 px-3 py-2 text-sm">{contenido}</div>
+                        <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-sm">{contenido}</div>
                       )}
+                      <DeshacerImputacionButton
+                        imputacionId={imputacionId}
+                        descripcion={`${monto(importe, m.moneda)} ${esCargo ? 'del' : 'a'} ${
+                          otro ? nombreMovimientoCc(otro) : 'comprobante'
+                        } ${otro?.numeroComprobante?.trim() || 'sin comprobante'}`}
+                        onDeshecha={() => {
+                          onSaved();
+                          onClose();
+                        }}
+                      />
                     </li>
                   );
                 })}
@@ -522,6 +681,30 @@ export function MovimientoCcDetalleModal({
             </p>
           )}
         </div>
+      )}
+      {confirmarImporte && (
+        <ConfirmDialog
+          open
+          title="¿Cambiar el importe? Se recalculan las imputaciones"
+          message={confirmarImporte}
+          confirmLabel="Guardar"
+          cancelLabel="Seguir editando"
+          busy={saving}
+          onCancel={() => setConfirmarImporte(null)}
+          onConfirm={() => void enviar()}
+        />
+      )}
+      {confirmandoEliminar && (
+        <EliminarMovimientoDialog
+          movimiento={m}
+          cantidadImputaciones={imputaciones.length}
+          onCancel={() => setConfirmandoEliminar(false)}
+          onEliminado={() => {
+            setConfirmandoEliminar(false);
+            onSaved();
+            onClose();
+          }}
+        />
       )}
     </ViewModalShell>
   );
