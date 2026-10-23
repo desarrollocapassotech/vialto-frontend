@@ -57,6 +57,15 @@ function hoyIso(): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
+function Dato({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0 px-3 py-2">
+      <dt className="text-[11px] uppercase tracking-wider text-vialto-steel">{label}</dt>
+      <dd className="truncate text-sm text-vialto-charcoal">{children}</dd>
+    </div>
+  );
+}
+
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -284,7 +293,8 @@ export function OrdenTrabajoModal({
       : orden
         ? (
             <span className="flex items-center gap-2">
-              OT N° {orden.numero} · {orden.vehiculo.patente}
+              OT N° {orden.numero} ·{" "}
+              <VehiculoHoverCard vehiculoId={orden.vehiculo.id}>{orden.vehiculo.patente}</VehiculoHoverCard>
               <EstadoOrdenBadge estado={orden.estado} />
             </span>
           )
@@ -468,19 +478,19 @@ function VistaOrden({
           </p>
         </div>
       )}
+      {/* Franja compacta (mismo estilo que el detalle de Cuenta corriente); el vehículo va en el título. */}
+      <dl className="grid grid-cols-2 border border-black/10 bg-vialto-mist/40 sm:grid-flow-col sm:auto-cols-fr sm:grid-cols-none sm:divide-x sm:divide-black/10">
+        <Dato label="Fecha">{fmtFecha(orden.fecha)}</Dato>
+        <Dato label="Tipo">{fmtTipoOrden(orden.tipo)}</Dato>
+        <Dato label="Km">{fmtKm(orden.km)}</Dato>
+        <Dato label="Taller">{orden.taller?.nombre ?? "—"}</Dato>
+      </dl>
       <div className={viewModalGridClass}>
-        <Campo label="Vehículo">
-          <VehiculoHoverCard vehiculoId={orden.vehiculo.id}>{orden.vehiculo.patente}</VehiculoHoverCard>
-        </Campo>
-        <Campo label="Fecha del trabajo">{fmtFecha(orden.fecha)}</Campo>
-        <Campo label="Tipo">{fmtTipoOrden(orden.tipo)}</Campo>
-        <Campo label="Km del vehículo">{fmtKm(orden.km)}</Campo>
-        <Campo label="Taller">{orden.taller?.nombre ?? "—"}</Campo>
         <Campo label="Planes que cumple">
           {orden.planes.length ? orden.planes.map((p) => p.vehiculoPlan.plan.nombre).join(", ") : "—"}
         </Campo>
+        <Campo label="Tareas realizadas">{fmtTareas(orden.tareas)}</Campo>
       </div>
-      <Campo label="Tareas realizadas">{fmtTareas(orden.tareas)}</Campo>
       <div>
         <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Costos</p>
         {orden.items.length === 0 ? (

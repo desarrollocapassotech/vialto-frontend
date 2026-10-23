@@ -281,7 +281,7 @@ export function PlanModal({
             <label className="grid gap-1.5">
               <CrudFieldLabel required>Categoría</CrudFieldLabel>
               <CrudSelect value={categoria} onChange={(e) => setCategoria(e.target.value as CategoriaPlan)} className="w-full">
-                <option value="documental">Documental (VTV, póliza, RUTA…)</option>
+                <option value="documental">Documental</option>
                 <option value="mecanico">Mecánico</option>
               </CrudSelect>
             </label>

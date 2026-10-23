@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Wrench } from "lucide-react";
+import { FileText, Wrench } from "lucide-react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { FiltrosRapidos, type FiltroRapidoOpcion } from "@/components/listado/FiltrosRapidos";
@@ -22,7 +22,6 @@ import {
   fmtFaltan,
   fmtFecha,
   fmtKm,
-  fmtOrigenKm,
   fmtReferencia,
 } from "@/lib/mantenimientoLabels";
 import type { Vehiculo } from "@/types/api";
@@ -236,12 +235,16 @@ export function VencimientosSection({
           {
             id: "plan",
             header: "Plan",
-            cell: (f) => (
-              <span>
-                {f.plan.nombre}
-                <span className="block text-xs text-vialto-steel">{CATEGORIA_PLAN_LABELS[f.plan.categoria] ?? f.plan.categoria}</span>
-              </span>
-            ),
+            cell: (f) => {
+              const Icono = f.plan.categoria === "documental" ? FileText : Wrench;
+              const categoria = CATEGORIA_PLAN_LABELS[f.plan.categoria] ?? f.plan.categoria;
+              return (
+                <span className="inline-flex items-center gap-1.5">
+                  <Icono className="h-3.5 w-3.5 shrink-0 text-vialto-steel/60" strokeWidth={1.75} aria-label={categoria} />
+                  <span title={categoria}>{f.plan.nombre}</span>
+                </span>
+              );
+            },
           },
           {
             id: "faltan",
@@ -256,12 +259,7 @@ export function VencimientosSection({
           {
             id: "km",
             header: "Km actual",
-            cell: (f) => (
-              <span>
-                {fmtKm(f.odometro?.km)}
-                <span className="block text-xs text-vialto-steel">{fmtOrigenKm(f.odometro)}</span>
-              </span>
-            ),
+            cell: (f) => fmtKm(f.odometro?.km),
           },
           { id: "referencia", header: "Último service", cell: (f) => <span className="text-sm">{fmtReferencia(f)}</span> },
         ]}
