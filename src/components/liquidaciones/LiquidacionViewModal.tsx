@@ -113,6 +113,7 @@ function normalizeConceptosLineas(
       conceptoLiquidacionId: row.conceptoLiquidacionId ?? null,
       modoAplicacion: row.modoAplicacion ?? "GENERAL",
       viajeId: row.viajeId ?? null,
+      detalle: row.detalle ?? null,
     };
   });
 }

@@ -65,6 +65,7 @@ import {
 } from "@/lib/currencyMask";
 import { friendlyError } from "@/lib/friendlyError";
 import {
+  nombreConDetalle,
   signedMontoConIvaConcepto,
   signedMontoNetoConcepto,
 } from "@/lib/liquidacionConceptosIva";
@@ -453,6 +454,7 @@ export function CrearLiquidacionManualModal({
             ivaPct: l.ivaPct ?? undefined,
             modoAplicacion: l.modoAplicacion ?? "GENERAL",
             viajeId: l.viajeId ?? null,
+            detalle: l.detalle ?? undefined,
           })),
       );
       if (base.ivaPct != null) setIvaPct(String(base.ivaPct));
@@ -2012,7 +2014,7 @@ export function CrearLiquidacionManualModal({
                           return (
                             <ResumenRow
                               key={`${l.conceptoLiquidacionId}-${idx}`}
-                              label={`${l.nombre || "Concepto"}${mult > 1 ? ` (×${mult} viajes)` : ""}`}
+                              label={`${nombreConDetalle(l.nombre || "Concepto", l.detalle)}${mult > 1 ? ` (×${mult} viajes)` : ""}`}
                               value={`${fmtSignedLiquidacionMoney(Math.abs(neto), neto >= 0 ? "plus" : "minus")} ${monedaResumen}`}
                             />
                           );

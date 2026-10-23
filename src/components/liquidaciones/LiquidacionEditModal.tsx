@@ -229,6 +229,7 @@ export function LiquidacionEditModal({
           ivaPct: l.ivaPct ?? undefined,
           modoAplicacion: l.modoAplicacion ?? 'GENERAL',
           viajeId: l.viajeId ?? null,
+          detalle: l.detalle ?? undefined,
         })),
   );
   const [conceptosIncomplete, setConceptosIncomplete] = useState<number[]>([]);
@@ -281,6 +282,7 @@ export function LiquidacionEditModal({
               ivaPct: l.ivaPct ?? undefined,
               modoAplicacion: l.modoAplicacion ?? 'GENERAL',
               viajeId: l.viajeId ?? null,
+              detalle: l.detalle ?? undefined,
             })),
         );
       } catch {
