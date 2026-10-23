@@ -184,16 +184,13 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
         );
         return;
       }
-      if (importe > pendienteCargo + EPS) {
-        setError(
-          `El importe supera lo que falta ${esCliente ? 'cobrar' : 'pagar'} (${formatCurrencyArFromNumber(pendienteCargo)} ${cargo.moneda}).`,
-        );
-        return;
-      }
+      // Más de lo que falta no se rechaza: se imputa hasta el saldo de la venta/compra y
+      // el resto del cobro/pago queda sin imputar.
+      const aImputar = Math.min(importe, pendienteCargo);
       setSaving(true);
       try {
-        await crearImputacion(() => getToken(), { pagoId, cargoId: cargo.id, importe });
-        avisarImputado(importe);
+        await crearImputacion(() => getToken(), { pagoId, cargoId: cargo.id, importe: aImputar });
+        avisarImputado(aImputar);
         onDone();
         onClose();
       } catch (err) {
