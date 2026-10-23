@@ -1,7 +1,7 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ChevronDown, ClipboardList, Gauge } from "lucide-react";
+import { ChevronDown, ClipboardList, Gauge, ListChecks } from "lucide-react";
 import {
   SelectorOpcionesSheet,
   selectorTriggerClass,
@@ -9,15 +9,17 @@ import {
 } from "@/components/ui/SelectorOpcionesSheet";
 import { VencimientosSection } from "@/components/mantenimiento/VencimientosSection";
 import { OrdenesTrabajoSection } from "@/components/mantenimiento/OrdenesTrabajoSection";
+import { PlanesSection } from "@/components/mantenimiento/PlanesSection";
 import { OrdenTrabajoModal, type OrdenModalEstado } from "@/components/mantenimiento/OrdenTrabajoModal";
 import { isOrgMember } from "@/lib/roleLabels";
 import type { PrecargaOrden } from "@/types/mantenimiento";
 
-type Tab = "vencimientos" | "ordenes";
+type Tab = "vencimientos" | "ordenes" | "planes";
 
 const TABS: { id: Tab; label: string; icon: typeof Gauge }[] = [
   { id: "vencimientos", label: "Vencimientos", icon: Gauge },
   { id: "ordenes", label: "Órdenes de trabajo", icon: ClipboardList },
+  { id: "planes", label: "Planes", icon: ListChecks },
 ];
 
 /**
@@ -49,6 +51,7 @@ export function MantenimientoTenantPage({
   const [reloadKey, setReloadKey] = useState(0);
   const [limpiarFiltrosSlot, setLimpiarFiltrosSlot] =
     useState<HTMLDivElement | null>(null);
+  const [accionesSlot, setAccionesSlot] = useState<HTMLDivElement | null>(null);
   const recargar = useCallback(() => setReloadKey((k) => k + 1), []);
 
   function setTab(tab: Tab) {
@@ -73,8 +76,9 @@ export function MantenimientoTenantPage({
         <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">Mantenimiento</h1>
         {/* Cada sección portalea acá sus filtros rápidos y su "Limpiar filtros" (como en Viajes). */}
         <div ref={setLimpiarFiltrosSlot} className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 empty:hidden" />
-        {!soloLectura && (
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+        {/* Acciones del título: la pestaña Planes pone las suyas por portal. */}
+        <div ref={setAccionesSlot} className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {!soloLectura && activeTab !== "planes" && (
             <button
               type="button"
               onClick={() => setModal({ modo: "crear" })}
@@ -82,8 +86,8 @@ export function MantenimientoTenantPage({
             >
               Nueva orden de trabajo
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="mt-6 border-b border-black/15">
@@ -145,6 +149,7 @@ export function MantenimientoTenantPage({
             reloadKey={reloadKey}
             limpiarFiltrosSlot={limpiarFiltrosSlot}
             onRegistrarService={(precarga: PrecargaOrden) => setModal({ modo: "crear", precarga })}
+            onIrAPlanes={() => setTab("planes")}
           />
         )}
         {activeTab === "ordenes" && (
@@ -155,6 +160,17 @@ export function MantenimientoTenantPage({
             reloadKey={reloadKey}
             limpiarFiltrosSlot={limpiarFiltrosSlot}
             onVer={(ordenId) => setModal({ modo: "ver", ordenId })}
+            onCambio={recargar}
+          />
+        )}
+        {activeTab === "planes" && (
+          <PlanesSection
+            getToken={token}
+            tenantId={tenantId}
+            soloLectura={soloLectura}
+            reloadKey={reloadKey}
+            limpiarFiltrosSlot={limpiarFiltrosSlot}
+            accionesSlot={accionesSlot}
             onCambio={recargar}
           />
         )}

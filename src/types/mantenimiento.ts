@@ -141,6 +141,54 @@ export interface VehiculoPlanAsignado {
   plan: { id: string; nombre: string; categoria: CategoriaPlan; activo: boolean; tareas: TareaMantenimiento[] };
 }
 
+/** Plan de mantenimiento (`GET mantenimiento/planes`, `GET planes/:id`). */
+export interface PlanMantenimiento {
+  id: string;
+  nombre: string;
+  categoria: CategoriaPlan;
+  /** null = cualquier tipo de vehículo. */
+  tipoVehiculo: string | null;
+  intervaloKm: number | null;
+  intervaloDias: number | null;
+  avisoKm: number | null;
+  avisoDias: number | null;
+  tareas: TareaMantenimiento[];
+  activo: boolean;
+  /** Vehículos con la asignación activa. */
+  _count: { vehiculos: number };
+}
+
+/** Plan sugerido (`GET mantenimiento/planes/plantillas`). */
+export interface PlantillaPlan {
+  nombre: string;
+  categoria: CategoriaPlan;
+  intervaloKm: number | null;
+  intervaloDias: number | null;
+  avisoKm: number | null;
+  avisoDias: number | null;
+  tareas: TareaMantenimiento[];
+  /** La empresa ya tiene un plan con ese nombre (aunque esté inactivo). */
+  yaCargada: boolean;
+}
+
+/** Vehículo asignado a un plan (`GET mantenimiento/planes/:id/vehiculos`). */
+export interface AsignacionPlan {
+  id: string;
+  vehiculoId: string;
+  planId: string;
+  activo: boolean;
+  baseKm: number | null;
+  baseFecha: string | null;
+  vehiculo: { id: string; patente: string; tipo: string };
+}
+
+/** Respuesta de `POST mantenimiento/planes/:id/vehiculos`. */
+export interface ResultadoAsignacion {
+  creados: AsignacionPlan[];
+  reactivados: AsignacionPlan[];
+  yaAsignados: string[];
+}
+
 /** Datos con los que "Registrar service" abre el alta de una OT. */
 export interface PrecargaOrden {
   vehiculoId: string;

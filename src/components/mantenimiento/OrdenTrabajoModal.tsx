@@ -131,7 +131,8 @@ export function OrdenTrabajoModal({
     [fieldErrors, lineaErrors],
   );
   const [guardando, setGuardando] = useState(false);
-  const descarte = useConfirmarDescarte(onClose);
+  // En "ver" no hay nada que perder; al pasar a editar arranca sin cambios.
+  const descarte = useConfirmarDescarte(onClose, modo !== "ver");
 
   const cargarFormDesde = useCallback((o: OrdenTrabajoDetalle) => {
     setVehiculoId(o.vehiculoId);
@@ -202,6 +203,13 @@ export function OrdenTrabajoModal({
       if (nuevas.length) setTareas([...tareas, ...Array.from(new Set(nuevas))]);
     }
     setVehiculoPlanIds(next);
+  }
+
+  /** Plan recién asignado desde "+ Asignar plan": queda tildado y suma sus tareas. */
+  function tildarPlanAsignado(vp: VehiculoPlanAsignado) {
+    descarte.marcarModificado();
+    setVehiculoPlanIds((prev) => (prev.includes(vp.id) ? prev : [...prev, vp.id]));
+    setTareas((prev) => [...prev, ...vp.plan.tareas.filter((t) => !prev.includes(t))]);
   }
 
   function validar(): boolean {
@@ -305,23 +313,16 @@ export function OrdenTrabajoModal({
     ) : (
       <>
         <ErrorPieModal error={error} fieldErrors={erroresPie} />
-        <button
-          type="button"
-          disabled={guardando}
-          onClick={() => {
-            if (modo === "editar" && orden) {
-              // Volver a la vista descartando lo editado.
-              cargarFormDesde(orden);
-              setModo("ver");
-            } else {
-              onClose();
-            }
-          }}
-          className={viewModalBtnGhost}
-        >
+        <button type="button" disabled={guardando} onClick={descarte.solicitarCierre} className={viewModalBtnGhost}>
           Cancelar
         </button>
-        <button type="button" disabled={guardando || cargando} onClick={() => void guardar()} className={viewModalBtnPrimary}>
+        <button
+          key="guardar"
+          type="button"
+          disabled={guardando || cargando}
+          onClick={() => void guardar()}
+          className={viewModalBtnPrimary}
+        >
           {guardando && <Spinner className="mr-2 h-3.5 w-3.5" />}
           {guardando ? "Guardando…" : "Guardar"}
         </button>
@@ -329,7 +330,7 @@ export function OrdenTrabajoModal({
     );
 
   return (
-    <ViewModalShell title={titulo} onClose={descarte.solicitarCierre} descarte={descarte} footer={footer} maxWidthClass="sm:max-w-3xl" scrollBody>
+    <ViewModalShell title={titulo} onClose={descarte.solicitarCierre} descarte={descarte} footer={footer} maxWidthClass="sm:max-w-5xl" scrollBody>
       {cargando ? (
         <p className="text-sm text-vialto-steel">Cargando…</p>
       ) : modo === "ver" && orden ? (
@@ -399,9 +400,12 @@ export function OrdenTrabajoModal({
             <CrudFieldLabel>Planes que cumple</CrudFieldLabel>
             <PlanesCumpleCheckboxes
               vehiculoId={vehiculoId}
+              vehiculoTipo={vehiculo?.tipo}
               value={vehiculoPlanIds}
               onChange={cambiarPlanes}
               onPlanesCargados={setPlanesUnidad}
+              onAsignado={tildarPlanAsignado}
+              soloLectura={soloLectura}
               getToken={getToken}
               tenantId={tenantId}
             />

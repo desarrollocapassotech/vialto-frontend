@@ -9,6 +9,11 @@ export function EstadoVencimientoBadge({ estado }: { estado: EstadoVencimiento }
   return <span className={`${BADGE_BASE} ${e.badge}`}>{e.label}</span>;
 }
 
+/** Plan o asignación desactivada (gris, mismo tono que ANULADA pero sin tachar). */
+export function InactivoBadge() {
+  return <span className={`${BADGE_BASE} border-gray-300/80 bg-gray-100 text-gray-500`}>INACTIVO</span>;
+}
+
 export function EstadoOrdenBadge({ estado }: { estado: EstadoOrden }) {
   const e = ESTADO_ORDEN[estado] ?? ESTADO_ORDEN.cerrada;
   return <span className={`${BADGE_BASE} ${e.badge}`}>{e.label}</span>;

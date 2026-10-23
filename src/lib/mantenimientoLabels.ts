@@ -141,6 +141,31 @@ export const CATEGORIA_PLAN_LABELS: Record<string, string> = {
   documental: "Documental",
 };
 
+type IntervalosPlan = {
+  intervaloKm: number | null;
+  intervaloDias: number | null;
+  avisoKm: number | null;
+  avisoDias: number | null;
+};
+
+/** "Cada 20.000 km o 180 días" (lo que llegue primero). */
+export function fmtIntervalo(p: IntervalosPlan): string {
+  const partes = [
+    p.intervaloKm != null ? fmtKm(p.intervaloKm) : null,
+    p.intervaloDias != null ? plural(p.intervaloDias, "día", "días") : null,
+  ].filter(Boolean);
+  return partes.length ? `Cada ${partes.join(" o ")}` : "—";
+}
+
+/** "2.000 km / 15 días antes" o "—" si el plan no avisa con anticipación. */
+export function fmtAviso(p: IntervalosPlan): string {
+  const partes = [
+    p.avisoKm != null ? fmtKm(p.avisoKm) : null,
+    p.avisoDias != null ? plural(p.avisoDias, "día", "días") : null,
+  ].filter(Boolean);
+  return partes.length ? `${partes.join(" / ")} antes` : "—";
+}
+
 /** "Faltan 1.500 km · 12 días", "Pasado por 1.000 km", "Venció hace 5 días", etc. */
 export function fmtFaltan(f: FilaVencimiento): string {
   if (f.estado === "sin_datos") {

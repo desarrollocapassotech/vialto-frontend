@@ -44,12 +44,15 @@ export function VencimientosSection({
   reloadKey,
   onRegistrarService,
   limpiarFiltrosSlot,
+  onIrAPlanes,
 }: {
   getToken: () => Promise<string | null>;
   tenantId?: string;
   soloLectura: boolean;
   reloadKey: number;
   onRegistrarService: (precarga: PrecargaOrden) => void;
+  /** Sin asignaciones: link a la pestaña Planes. */
+  onIrAPlanes?: () => void;
   /** Lugar junto al título de la página para "Limpiar filtros". */
   limpiarFiltrosSlot?: HTMLElement | null;
 }) {
@@ -140,6 +143,14 @@ export function VencimientosSection({
       />
       {error && (
         <p className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
+      )}
+      {filas?.length === 0 && !error && onIrAPlanes && (
+        <p className="mb-4 text-sm text-vialto-steel">
+          Los vencimientos salen de los planes asignados a cada vehículo.{" "}
+          <button type="button" onClick={onIrAPlanes} className="font-medium text-vialto-fire hover:underline">
+            Ir a Planes
+          </button>
+        </p>
       )}
 
       <ListadoDatos<FilaVencimiento>

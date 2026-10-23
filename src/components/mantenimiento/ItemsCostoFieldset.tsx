@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from "lucide-react";
 import { maskCurrencyArInput } from "@/lib/currencyMask";
+import { marcarModalModificado } from "@/lib/descarteModal";
 import { nuevaLineaCosto, totalLineas, type LineaCosto } from "@/lib/mantenimientoCostos";
 import { fmtMoneda } from "@/lib/mantenimientoLabels";
 
@@ -53,7 +54,10 @@ export function ItemsCostoFieldset({
           </div>
           <button
             type="button"
-            onClick={() => onChange(lineas.filter((x) => x.key !== l.key))}
+            onClick={() => {
+              marcarModalModificado();
+              onChange(lineas.filter((x) => x.key !== l.key));
+            }}
             aria-label="Quitar línea"
             className="inline-flex h-10 w-10 items-center justify-center text-vialto-steel hover:bg-vialto-mist hover:text-red-700"
           >
@@ -64,7 +68,10 @@ export function ItemsCostoFieldset({
       <div className="flex items-center justify-between gap-3 pt-1">
         <button
           type="button"
-          onClick={() => onChange([...lineas, nuevaLineaCosto()])}
+          onClick={() => {
+            marcarModalModificado();
+            onChange([...lineas, nuevaLineaCosto()]);
+          }}
           className="inline-flex h-9 items-center gap-1.5 border border-black/20 px-3 text-xs uppercase tracking-wider hover:bg-vialto-mist"
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={2} />

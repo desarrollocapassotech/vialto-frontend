@@ -4,6 +4,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { VisorFotos, type FotoVisor } from "@/components/ui/VisorFotos";
 import { esImagenAdjunto } from "@/lib/abrirAdjunto";
 import { apiJson } from "@/lib/api";
+import { marcarModalModificado } from "@/lib/descarteModal";
 import { isComprobanteFile } from "@/lib/comprobanteUpload";
 import { friendlyError } from "@/lib/friendlyError";
 import { mantUrl } from "@/lib/mantenimientoApi";
@@ -107,7 +108,10 @@ export function AdjuntosOrdenField({
               {!readOnly && onChange && (
                 <button
                   type="button"
-                  onClick={() => onChange(value.filter((u) => u !== url))}
+                  onClick={() => {
+                    marcarModalModificado();
+                    onChange(value.filter((u) => u !== url));
+                  }}
                   aria-label={`Quitar ${nombreAdjunto(url)}`}
                   className="ml-auto inline-flex h-7 w-7 items-center justify-center text-vialto-steel hover:bg-vialto-mist hover:text-red-700"
                 >
