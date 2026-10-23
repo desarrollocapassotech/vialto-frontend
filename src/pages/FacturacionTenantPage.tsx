@@ -501,7 +501,8 @@ export function FacturacionTenantPage({
   }, [creating, viajes.length, viajesNuevaFactura]);
 
   useEffect(() => {
-    if (!editingId || !editDraft || viajes.length === 0) return;
+    // Mientras se traen los viajes de la factura no se recorta: todavía pueden faltar.
+    if (!editingId || !editDraft || viajes.length === 0 || viajesLoading) return;
     const allowed = new Set(viajesEdicionFactura.map((v) => v.id));
     setEditDraft((ed) => {
       if (!ed) return ed;
@@ -519,6 +520,7 @@ export function FacturacionTenantPage({
     editDraft?.transportistaId,
     editDraft?.tipo,
     viajes.length,
+    viajesLoading,
     viajesEdicionFactura,
   ]);
 
@@ -641,11 +643,26 @@ export function FacturacionTenantPage({
     };
   }, [searchParams, setSearchParams, facturaUrl, getToken]);
 
-  async function ensureViajesLoaded() {
-    if (viajes.length > 0 || viajesLoading) return;
+  /**
+   * `incluirIds`: viajes de la factura que se edita. El listado trae los recientes y los
+   * pendientes; una factura vieja puede tener viajes fuera de eso, y sin ellos el efecto
+   * de arriba los sacaba del borrador (al guardar, quedaban desvinculados).
+   */
+  function viajesListUrlCon(incluirIds: string[]) {
+    if (incluirIds.length === 0) return viajesListUrl;
+    const sep = viajesListUrl.includes("?") ? "&" : "?";
+    return `${viajesListUrl}${sep}incluir=${encodeURIComponent(incluirIds.join(","))}`;
+  }
+
+  async function ensureViajesLoaded(incluirIds: string[] = []) {
+    if (viajesLoading) return;
+    const faltan = incluirIds.filter((id) => !viajes.some((v) => v.id === id));
+    if (viajes.length > 0 && faltan.length === 0) return;
     setViajesLoading(true);
     try {
-      const data = await apiJson<Viaje[]>(viajesListUrl, () => getToken());
+      const data = await apiJson<Viaje[]>(viajesListUrlCon(incluirIds), () =>
+        getToken(),
+      );
       setViajes(data);
     } catch {
       // best-effort: si falla, el selector de viajes de la factura queda vacío
@@ -665,7 +682,10 @@ export function FacturacionTenantPage({
    */
   async function refetchViajesParaFacturar() {
     try {
-      const data = await apiJson<Viaje[]>(viajesListUrl, () => getToken());
+      const data = await apiJson<Viaje[]>(
+        viajesListUrlCon(editDraft?.viajeIds ?? []),
+        () => getToken(),
+      );
       setViajes(data);
     } catch {
       // best-effort: si falla, el selector queda con los datos previos
@@ -865,7 +885,7 @@ export function FacturacionTenantPage({
     setEditingId(f.id);
     setEditDraft(facturaToEditDraft(f));
     setCreating(false);
-    void ensureViajesLoaded();
+    void ensureViajesLoaded(f.viajeIds ?? []);
   }
 
   function cancelEdit() {
