@@ -55,6 +55,7 @@ import {
 } from '@/lib/tenantModules';
 import { ExportarEstadoCuentaModal } from './ExportarEstadoCuentaModal';
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
+import { FiltrosRapidos } from '@/components/listado/FiltrosRapidos';
 import { ComprobanteAdjuntoClip } from '@/components/shared/ComprobanteAdjuntoClip';
 import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
 import { useAbrirAdjunto } from '@/hooks/useAbrirAdjunto';
@@ -90,6 +91,16 @@ function fmtSaldo(valor: number): string {
     : `$ ${formatCurrencyArFromNumber(valor)}`;
 }
 
+/**
+ * Filtro rápido "Sin imputar": venta/compra con saldo pendiente o cobro/pago con algo sin
+ * imputar. Lo anulado y los créditos de anulación no cuentan.
+ */
+function estaSinImputar(m: MovimientoCc): boolean {
+  if (m.tipo === 'credito' || m.estadoDisponibilidad === 'anulado') return false;
+  if (m.tipo !== 'cargo' && m.tipo !== 'pago') return false;
+  return (m.pendiente ?? 0) > 0.005;
+}
+
 /** Orden de carga ascendente; `id` desempata movimientos creados en el mismo instante. */
 function compararPorCarga(a: MovimientoCc, b: MovimientoCc): number {
   const porCarga = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -110,6 +121,8 @@ type Props = {
   accionesSlot?: HTMLElement | null;
   /** Junto al título de la página: ahí va "Limpiar filtros" (regla global). */
   limpiarFiltrosSlot?: HTMLElement | null;
+  /** Junto al título: embudo + chips de filtro rápido ("Sin imputar"), como en Viajes. */
+  filtrosRapidosSlot?: HTMLElement | null;
 };
 
 export function CuentaContraparteView({
@@ -119,6 +132,7 @@ export function CuentaContraparteView({
   saldosSlot,
   accionesSlot,
   limpiarFiltrosSlot,
+  filtrosRapidosSlot,
 }: Props) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
@@ -219,6 +233,12 @@ export function CuentaContraparteView({
   // Se elige tocando la tarjeta de saldo de esa moneda (solo si la cuenta tiene más de una).
   const [monedaFiltro, setMonedaFiltro] = useState('');
   const multimoneda = (saldos?.length ?? 0) > 1;
+  // Filtro rápido junto al título (mismo componente que Viajes/Facturas/Liquidaciones).
+  const [filtroRapido, setFiltroRapido] = useState<'' | 'sin_imputar'>('');
+  const cantidadSinImputar = useMemo(
+    () => (movimientosConSaldo ?? []).filter(estaSinImputar).length,
+    [movimientosConSaldo],
+  );
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
@@ -226,8 +246,9 @@ export function CuentaContraparteView({
     if (tipoFiltro.trim()) n += 1;
     if (comprobanteFiltro.trim()) n += 1;
     if (monedaFiltro) n += 1;
+    if (filtroRapido) n += 1;
     return n;
-  }, [desdeFiltro, hastaFiltro, tipoFiltro, comprobanteFiltro, monedaFiltro]);
+  }, [desdeFiltro, hastaFiltro, tipoFiltro, comprobanteFiltro, monedaFiltro, filtroRapido]);
   const anyFiltroActivo = activeFilterCount > 0;
 
   // Filtro solo de despliegue: se aplica sobre `movimientosConSaldo` (ya calculado con
@@ -236,6 +257,7 @@ export function CuentaContraparteView({
   const movimientosFiltrados = useMemo<MovimientoConSaldo[] | null>(() => {
     if (!movimientosConSaldo) return null;
     return movimientosConSaldo.filter((m) => {
+      if (filtroRapido === 'sin_imputar' && !estaSinImputar(m)) return false;
       if (monedaFiltro && m.moneda !== monedaFiltro) return false;
       const fecha = fechaDiaYmd(m.fecha) ?? '';
       if (desdeFiltro && fecha < desdeFiltro) return false;
@@ -250,9 +272,10 @@ export function CuentaContraparteView({
         return false;
       return true;
     });
-  }, [movimientosConSaldo, monedaFiltro, desdeFiltro, hastaFiltro, tipoFiltro, comprobanteFiltro]);
+  }, [movimientosConSaldo, monedaFiltro, desdeFiltro, hastaFiltro, tipoFiltro, comprobanteFiltro, filtroRapido]);
 
   function limpiarFiltros() {
+    setFiltroRapido('');
     setMonedaFiltro('');
     setDesdeFiltro('');
     setHastaFiltro('');
@@ -636,6 +659,17 @@ export function CuentaContraparteView({
       {visorAdjunto}
       {saldosSlot ? createPortal(saldosNode, saldosSlot) : null}
       {accionesSlot ? createPortal(accionesNode, accionesSlot) : null}
+      {/* Filtro rápido junto al título, igual que Viajes. */}
+      {filtrosRapidosSlot &&
+        createPortal(
+          <FiltrosRapidos
+            opciones={[{ id: 'sin_imputar' as const, label: 'Sin imputar', count: cantidadSinImputar }]}
+            value={filtroRapido}
+            onChange={setFiltroRapido}
+            ariaLabel="Filtros rápidos de cuenta corriente"
+          />,
+          filtrosRapidosSlot,
+        )}
       <LimpiarFiltrosPortal
         slot={limpiarFiltrosSlot}
         visible={anyFiltroActivo}

@@ -54,6 +54,7 @@ export function CuentaCorrienteTenantPage() {
   const [saldosSlot, setSaldosSlot] = useState<HTMLDivElement | null>(null);
   const [accionesSlot, setAccionesSlot] = useState<HTMLDivElement | null>(null);
   const [limpiarSlot, setLimpiarSlot] = useState<HTMLDivElement | null>(null);
+  const [filtrosRapidosSlot, setFiltrosRapidosSlot] = useState<HTMLDivElement | null>(null);
 
   async function handleDescargarListado() {
     setDescargando(true);
@@ -112,6 +113,8 @@ export function CuentaCorrienteTenantPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-x-4">
           <h1 className={pageTitleClass}>Cuenta corriente</h1>
+          {/* Filtro rápido ("Sin imputar") al lado del título, como en Viajes. */}
+          <div ref={setFiltrosRapidosSlot} className="flex min-w-0 items-center gap-2 empty:hidden" />
           <div ref={setLimpiarSlot} className="empty:hidden" />
         </div>
         {/* Deudores = clientes; en Proveedores no aplica. */}
@@ -223,6 +226,7 @@ export function CuentaCorrienteTenantPage() {
             saldosSlot={saldosSlot}
             accionesSlot={accionesSlot}
             limpiarFiltrosSlot={limpiarSlot}
+            filtrosRapidosSlot={filtrosRapidosSlot}
           />
         ) : (
           <p className="text-vialto-steel">
