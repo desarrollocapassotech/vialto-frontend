@@ -250,7 +250,18 @@ export function OrdenesTrabajoSection({
           { id: "numero", header: "N°", cell: (o) => <span className="tabular-nums">{o.numero}</span> },
           { id: "fecha", header: "Fecha", cell: (o) => fmtFecha(o.fecha) },
           { id: "unidad", header: "Vehículo", primary: true, cell: (o) => <VehiculoHoverCard vehiculoId={o.vehiculo.id}>{o.vehiculo.patente}</VehiculoHoverCard> },
-          { id: "tipo", header: "Tipo", cell: (o) => fmtTipoOrden(o.tipo) },
+          {
+            id: "tipo",
+            header: "Tipo",
+            cell: (o) => (
+              <span>
+                {fmtTipoOrden(o.tipo)}
+                {o.origen === "reporte_chofer" && (
+                  <span className="block text-xs text-vialto-steel">Cargada por el chofer</span>
+                )}
+              </span>
+            ),
+          },
           { id: "taller", header: "Taller", cell: (o) => o.taller?.nombre ?? "—" },
           { id: "km", header: "Km", cell: (o) => fmtKm(o.km) },
           {

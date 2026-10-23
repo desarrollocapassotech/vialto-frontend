@@ -491,7 +491,10 @@ function VistaOrden({
       {/* Franja compacta (mismo estilo que el detalle de Cuenta corriente); el vehículo va en el título. */}
       <dl className="grid grid-cols-2 border border-black/10 bg-vialto-mist/40 sm:grid-flow-col sm:auto-cols-fr sm:grid-cols-none sm:divide-x sm:divide-black/10">
         <Dato label="Fecha">{fmtFecha(orden.fecha)}</Dato>
-        <Dato label="Tipo">{fmtTipoOrden(orden.tipo)}</Dato>
+        <Dato label="Tipo">
+          {fmtTipoOrden(orden.tipo)}
+          {orden.origen === "reporte_chofer" && <span className="text-vialto-steel"> · por el chofer</span>}
+        </Dato>
         <Dato label="Km">{fmtKm(orden.km)}</Dato>
         <Dato label="Taller">{orden.taller?.nombre ?? "—"}</Dato>
       </dl>

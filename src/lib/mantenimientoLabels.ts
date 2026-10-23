@@ -10,7 +10,8 @@ import { formatCurrencyArFromNumber } from "@/lib/currencyMask";
 
 // ── Catálogo de tareas ───────────────────────────────────────────────────────
 // Duplicado a propósito del backend (vialto-backend/src/modules/mantenimiento/
-// tareas-mantenimiento.const.ts): no hay paquete compartido. Mantener sincronizados.
+// tareas-mantenimiento.const.ts): no hay paquete compartido. Mantener sincronizados
+// (también los textos con `TAREAS_MANTENIMIENTO_GRUPOS`, que es lo que ve el chofer en la app).
 
 export type CategoriaTarea =
   | "motor"

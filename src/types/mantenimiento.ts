@@ -94,7 +94,8 @@ export interface OrdenTrabajo {
   numero: number;
   vehiculoId: string;
   tipo: TipoOrden;
-  origen: 'manual' | 'plan' | (string & {});
+  /** `reporte_chofer` = la registró el chofer desde la app de Combustible. */
+  origen: 'manual' | 'plan' | 'reporte_chofer' | (string & {});
   estado: EstadoOrden;
   tallerId: string | null;
   fecha: string;
