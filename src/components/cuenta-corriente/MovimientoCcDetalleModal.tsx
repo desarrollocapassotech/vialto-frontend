@@ -34,6 +34,7 @@ import {
   type MovimientoCc,
 } from '@/lib/cuentaCorriente';
 import { imputacionesDeCargo } from './ImputacionesCargoModal';
+import { DeshacerImputacionButton } from './DeshacerImputacionButton';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
@@ -112,8 +113,16 @@ export function MovimientoCcDetalleModal({
 
   // Imputaciones: de la venta/compra (qué cobros la cancelan) o del cobro/pago (a qué ventas fue).
   const imputaciones = esCargo
-    ? imputacionesDeCargo(m, movimientos).map(({ pago, importe }) => ({ otro: pago, importe }))
-    : (m.imputacionesPorCargo ?? []).map((i) => ({ otro: porId.get(i.cargoId) ?? null, importe: i.importe }));
+    ? imputacionesDeCargo(m, movimientos).map(({ pago, importe, imputacionId }) => ({
+        otro: pago,
+        importe,
+        imputacionId,
+      }))
+    : (m.imputacionesPorCargo ?? []).map((i) => ({
+        otro: porId.get(i.cargoId) ?? null,
+        importe: i.importe,
+        imputacionId: i.imputacionId,
+      }));
   const tieneImputaciones = imputaciones.length > 0;
   const editable = manual && !anulado;
   const puedeEditar = editable || !!onEditarAutomatico;
@@ -474,7 +483,7 @@ export function MovimientoCcDetalleModal({
                 {esCargo ? `${esCliente ? 'Cobros' : 'Pagos'} imputados` : 'Imputado a'}
               </p>
               <ul className="divide-y divide-black/10 border border-black/10">
-                {imputaciones.map(({ otro, importe }, i) => {
+                {imputaciones.map(({ otro, importe, imputacionId }, i) => {
                   const contenido = (
                     <>
                       <span className="min-w-0 flex-1 truncate">
@@ -495,20 +504,30 @@ export function MovimientoCcDetalleModal({
                     </>
                   );
                   return (
-                    <li key={otro?.id ?? i}>
+                    <li key={otro?.id ?? i} className="flex items-center gap-2 pr-3">
                       {/* Tocar el comprobante asociado abre su detalle. */}
                       {otro ? (
                         <button
                           type="button"
                           onClick={() => onVerMovimiento(otro)}
-                          className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-vialto-mist"
+                          className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left text-sm hover:bg-vialto-mist"
                           title={`Ver ${nombreMovimientoCc(otro)}`}
                         >
                           {contenido}
                         </button>
                       ) : (
-                        <div className="flex items-center gap-3 px-3 py-2 text-sm">{contenido}</div>
+                        <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-sm">{contenido}</div>
                       )}
+                      <DeshacerImputacionButton
+                        imputacionId={imputacionId}
+                        descripcion={`${monto(importe, m.moneda)} ${esCargo ? 'del' : 'a'} ${
+                          otro ? nombreMovimientoCc(otro) : 'comprobante'
+                        } ${otro?.numeroComprobante?.trim() || 'sin comprobante'}`}
+                        onDeshecha={() => {
+                          onSaved();
+                          onClose();
+                        }}
+                      />
                     </li>
                   );
                 })}

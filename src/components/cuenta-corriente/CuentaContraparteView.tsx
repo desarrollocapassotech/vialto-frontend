@@ -9,7 +9,8 @@ import {
   FileSpreadsheet,
   FileText,
   Filter,
-  ListChecks,
+  History,
+  Undo2,
   X,
 } from 'lucide-react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
@@ -45,6 +46,7 @@ import { ComprobanteOrigenCcModal, type ComprobanteOrigenCc } from './Comprobant
 import { ImputacionesCobroModal } from './ImputacionesCobroModal';
 import { ImputacionesCargoModal, imputacionesDeCargo } from './ImputacionesCargoModal';
 import { MovimientoCcDetalleModal, nombreMovimientoCc } from './MovimientoCcDetalleModal';
+import { DeshacerImputacionDialog } from './DeshacerImputacionButton';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import {
   canAccessEmisionLiquidoProductoArca,
@@ -67,6 +69,7 @@ type ModalState =
   | { kind: 'imputaciones'; pago: MovimientoCc }
   | { kind: 'imputacionesCargo'; cargo: MovimientoCc }
   | { kind: 'detalle'; movimiento: MovimientoCc }
+  | { kind: 'deshacerImputacion'; imputacionId: string; descripcion: string }
   | { kind: 'exportar'; formato: 'pdf' | 'excel' }
   | null;
 
@@ -379,8 +382,47 @@ export function CuentaContraparteView({
       opciones.push({
         id: 'ver-imputacion',
         label: 'Ver imputación',
-        icon: ListChecks,
+        icon: History,
         onClick: () => setModal({ kind: 'imputacionesCargo', cargo: m }),
+      });
+    }
+    // Deshacer imputación desde la fila: con una sola, confirma y la deshace ahí; con
+    // varias, abre "Ver …" (cada imputación tiene su botón Deshacer).
+    const imputacionesFila =
+      m.tipo === 'cargo'
+        ? imputacionesDeCargo(m, movimientos ?? []).map((i) => ({
+            imputacionId: i.imputacionId,
+            importe: i.importe,
+            otro: i.pago as MovimientoCc | null,
+          }))
+        : m.tipo === 'pago'
+          ? (m.imputacionesPorCargo ?? []).map((i) => ({
+              imputacionId: i.imputacionId,
+              importe: i.importe,
+              otro: (movimientos ?? []).find((x) => x.id === i.cargoId) ?? null,
+            }))
+          : [];
+    if (imputacionesFila.length > 0) {
+      opciones.push({
+        id: 'deshacer-imputacion',
+        label: imputacionesFila.length === 1 ? 'Deshacer imputación' : 'Deshacer imputaciones',
+        icon: Undo2,
+        onClick: () => {
+          if (imputacionesFila.length > 1) {
+            setModal({ kind: 'detalle', movimiento: m });
+            return;
+          }
+          const { imputacionId, importe, otro } = imputacionesFila[0];
+          setModal({
+            kind: 'deshacerImputacion',
+            imputacionId,
+            descripcion: `$ ${formatCurrencyArFromNumber(importe)} ${m.moneda} ${
+              m.tipo === 'cargo' ? 'del' : 'a'
+            } ${otro ? nombreMovimientoCc(otro) : 'comprobante'} ${
+              otro?.numeroComprobante?.trim() || 'sin comprobante'
+            }`,
+          });
+        },
       });
     }
     const origen = comprobanteOrigenDe(m);
@@ -866,11 +908,26 @@ export function CuentaContraparteView({
           onVerMovimiento={(otro) => setModal({ kind: 'detalle', movimiento: otro })}
         />
       )}
+      {modal?.kind === 'deshacerImputacion' && (
+        <DeshacerImputacionDialog
+          imputacionId={modal.imputacionId}
+          descripcion={modal.descripcion}
+          onCancel={() => setModal(null)}
+          onDeshecha={() => {
+            setModal(null);
+            void cargarDatos();
+          }}
+        />
+      )}
       {modal?.kind === 'imputacionesCargo' && (
         <ImputacionesCargoModal
           cargo={modal.cargo}
           movimientos={movimientos ?? []}
           onVerMovimiento={(otro) => setModal({ kind: 'detalle', movimiento: otro })}
+          onDeshecha={() => {
+            setModal(null);
+            void cargarDatos();
+          }}
           onClose={() => setModal(null)}
         />
       )}
