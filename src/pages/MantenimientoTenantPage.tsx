@@ -12,6 +12,9 @@ import { OrdenesTrabajoSection } from "@/components/mantenimiento/OrdenesTrabajo
 import { PlanesSection } from "@/components/mantenimiento/PlanesSection";
 import { OrdenTrabajoModal, type OrdenModalEstado } from "@/components/mantenimiento/OrdenTrabajoModal";
 import { MantenimientoOnboarding } from "@/components/mantenimiento/onboarding/MantenimientoOnboarding";
+import { HistorialVehiculoModal } from "@/components/mantenimiento/HistorialVehiculoModal";
+import { EditarKmVehiculoModal } from "@/components/combustible/EditarKmVehiculoModal";
+import { useMaestroData } from "@/hooks/useMaestroData";
 import { apiJson } from "@/lib/api";
 import { mantUrl } from "@/lib/mantenimientoApi";
 import { isOrgMember } from "@/lib/roleLabels";
@@ -59,6 +62,10 @@ export function MantenimientoTenantPage({
     useState<HTMLDivElement | null>(null);
   const [accionesSlot, setAccionesSlot] = useState<HTMLDivElement | null>(null);
   const recargar = useCallback(() => setReloadKey((k) => k + 1), []);
+  const maestro = useMaestroData();
+  const [historialVehiculoId, setHistorialVehiculoId] = useState<string | null>(null);
+  const [editarKmVehiculoId, setEditarKmVehiculoId] = useState<string | null>(null);
+  const vehiculoEditarKm = editarKmVehiculoId ? maestro.vehiculos.find((v) => v.id === editarKmVehiculoId) : undefined;
 
   // Solo al entrar: una vez arrancado, el asistente sigue en pantalla aunque ya haya planes.
   const [vista, setVista] = useState<Vista>("cargando");
@@ -199,6 +206,8 @@ export function MantenimientoTenantPage({
                 limpiarFiltrosSlot={limpiarFiltrosSlot}
                 onRegistrarService={(precarga: PrecargaOrden) => setModal({ modo: "crear", precarga })}
                 onIrAPlanes={() => setTab("planes")}
+                onHistorial={setHistorialVehiculoId}
+                onEditarKm={setEditarKmVehiculoId}
               />
             )}
             {activeTab === "ordenes" && (
@@ -209,6 +218,7 @@ export function MantenimientoTenantPage({
                 reloadKey={reloadKey}
                 limpiarFiltrosSlot={limpiarFiltrosSlot}
                 onVer={(ordenId) => setModal({ modo: "ver", ordenId })}
+                onHistorial={setHistorialVehiculoId}
                 onCambio={recargar}
               />
             )}
@@ -225,6 +235,35 @@ export function MantenimientoTenantPage({
             )}
           </div>
         </>
+      )}
+
+      {historialVehiculoId && (
+        <HistorialVehiculoModal
+          vehiculoId={historialVehiculoId}
+          soloLectura={soloLectura}
+          getToken={token}
+          tenantId={tenantId}
+          onClose={() => setHistorialVehiculoId(null)}
+          onVerOrden={(ordenId) => setModal({ modo: "ver", ordenId })}
+          onCambio={() => {
+            void maestro.refreshVehiculos();
+            recargar();
+          }}
+        />
+      )}
+      {vehiculoEditarKm && (
+        <EditarKmVehiculoModal
+          url={`/api/vehiculos/${encodeURIComponent(vehiculoEditarKm.id)}/km${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ""}`}
+          vehiculoId={vehiculoEditarKm.id}
+          patente={vehiculoEditarKm.patente}
+          kmActual={vehiculoEditarKm.kmActual}
+          onClose={() => setEditarKmVehiculoId(null)}
+          onSuccess={() => {
+            setEditarKmVehiculoId(null);
+            void maestro.refreshVehiculos();
+            recargar();
+          }}
+        />
       )}
 
       {modal && (

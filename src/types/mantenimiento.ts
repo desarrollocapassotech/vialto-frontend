@@ -189,6 +189,35 @@ export interface ResultadoAsignacion {
   yaAsignados: string[];
 }
 
+/** Un evento de la línea de tiempo del vehículo (`GET mantenimiento/vehiculos/:id/historial`). */
+export type EventoHistorial =
+  | {
+      tipo: "orden";
+      fecha: string;
+      createdAt: string;
+      orden: {
+        id: string;
+        numero: number;
+        tipo: TipoOrden;
+        estado: EstadoOrden;
+        km: number | null;
+        costoTotal: number;
+        tareas: TareaMantenimiento[];
+        descripcion: string | null;
+        taller: { id: string; nombre: string } | null;
+        planes: { vehiculoPlanId: string; planNombre: string }[];
+        cantidadItems: number;
+      };
+    }
+  | { tipo: "lectura"; fecha: string; createdAt: string; km: number; fuente: FuenteKm; fuenteId: string };
+
+export interface HistorialVehiculo {
+  vehiculo: { id: string; patente: string; tipo: string; marca: string | null; modelo: string | null; kmActual: number };
+  odometro: { km: number; fecha: string; fuente: FuenteKm } | null;
+  /** Más reciente primero. Incluye OT anuladas. */
+  eventos: EventoHistorial[];
+}
+
 /** Datos con los que "Registrar service" abre el alta de una OT. */
 export interface PrecargaOrden {
   vehiculoId: string;

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { FileText, Wrench } from "lucide-react";
+import { FileText, Gauge, History, Wrench } from "lucide-react";
+import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { FiltrosRapidos, type FiltroRapidoOpcion } from "@/components/listado/FiltrosRapidos";
@@ -44,6 +45,8 @@ export function VencimientosSection({
   onRegistrarService,
   limpiarFiltrosSlot,
   onIrAPlanes,
+  onHistorial,
+  onEditarKm,
 }: {
   getToken: () => Promise<string | null>;
   tenantId?: string;
@@ -52,6 +55,8 @@ export function VencimientosSection({
   onRegistrarService: (precarga: PrecargaOrden) => void;
   /** Sin asignaciones: link a la pestaña Planes. */
   onIrAPlanes?: () => void;
+  onHistorial: (vehiculoId: string) => void;
+  onEditarKm: (vehiculoId: string) => void;
   /** Lugar junto al título de la página para "Limpiar filtros". */
   limpiarFiltrosSlot?: HTMLElement | null;
 }) {
@@ -153,7 +158,7 @@ export function VencimientosSection({
       )}
 
       <ListadoDatos<FilaVencimiento>
-        tableColSpan={soloLectura ? 7 : 8}
+        tableColSpan={8}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -226,7 +231,7 @@ export function VencimientosSection({
             <th scope="col" className={listadoTablaThClass}>Fecha estimada</th>
             <th scope="col" className={listadoTablaThClass}>Km actual</th>
             <th scope="col" className={listadoTablaThClass}>Último service</th>
-            {!soloLectura && <th scope="col" className={`${listadoTablaThClass} text-right`}>Acciones</th>}
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>Acciones</th>
           </tr>
         }
         columns={[
@@ -274,16 +279,18 @@ export function VencimientosSection({
         }
         loadingMessage="Calculando vencimientos…"
         actionsTdClassName={listadoTablaAccionesTdClass}
-        renderActions={
-          soloLectura
-            ? undefined
-            : (f) => (
-                <AccionesFila
-                  options={[{ id: "registrar", label: "Registrar service", icon: Wrench, onClick: () => registrarService(f) }]}
-                  destacadas={["registrar"]}
-                />
-              )
-        }
+        renderActions={(f) => {
+          const opciones: AccionOpcion[] = [];
+          if (!soloLectura) {
+            opciones.push({ id: "registrar", label: "Registrar service", icon: Wrench, onClick: () => registrarService(f) });
+          }
+          opciones.push({ id: "historial", label: "Historial del vehículo", icon: History, onClick: () => onHistorial(f.vehiculo.id) });
+          if (!soloLectura) {
+            // Mismo nombre e ícono que en Combustible → Asignación de vehículos.
+            opciones.push({ id: "editar-km", label: "Editar km", icon: Gauge, onClick: () => onEditarKm(f.vehiculo.id) });
+          }
+          return <AccionesFila options={opciones} destacadas={soloLectura ? ["historial"] : ["registrar", "historial"]} />;
+        }}
       />
     </div>
   );

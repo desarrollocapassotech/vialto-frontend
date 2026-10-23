@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
@@ -6,15 +7,24 @@ import { useToast } from "@/lib/toast";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 
+/**
+ * Corregir el km de un vehículo. Lo usan Combustible (Asignación de vehículos, ruta de
+ * plataforma con `tenantId`) y Mantenimiento (historial del vehículo, ruta de core
+ * `POST /api/vehiculos/:id/km`: pasar `url`). Se monta en un portal para quedar encima
+ * de otro modal.
+ */
 export function EditarKmVehiculoModal({
   tenantId,
+  url,
   vehiculoId,
   patente,
   kmActual,
   onClose,
   onSuccess,
 }: {
-  tenantId: string;
+  tenantId?: string;
+  /** Ruta del POST; por defecto la de Combustible (plataforma). */
+  url?: string;
   vehiculoId: string;
   patente: string;
   kmActual: number;
@@ -30,6 +40,8 @@ export function EditarKmVehiculoModal({
 
   const kmNumero = Number(km);
   const kmInvalido = km.trim() === "" || Number.isNaN(kmNumero) || kmNumero < 0;
+  const endpoint =
+    url ?? `/api/platform/combustible/vehiculos/${vehiculoId}/km?tenantId=${encodeURIComponent(tenantId ?? "")}`;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,11 +49,7 @@ export function EditarKmVehiculoModal({
     setLoading(true);
     setError(null);
     try {
-      await apiJson(
-        `/api/platform/combustible/vehiculos/${vehiculoId}/km?tenantId=${encodeURIComponent(tenantId)}`,
-        () => getToken(),
-        { method: "POST", body: JSON.stringify({ kmNuevo: kmNumero }) },
-      );
+      await apiJson(endpoint, () => getToken(), { method: "POST", body: JSON.stringify({ kmNuevo: kmNumero }) });
       showToast("Kilometraje actualizado correctamente", "success");
       onSuccess(kmNumero);
     } catch (err) {
@@ -52,7 +60,7 @@ export function EditarKmVehiculoModal({
     }
   }
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
       role="dialog"
@@ -81,6 +89,11 @@ export function EditarKmVehiculoModal({
             autoFocus
             className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal focus:outline-none focus:border-vialto-fire"
           />
+          {!kmInvalido && kmNumero < kmActual && (
+            <p className="mt-1.5 text-xs text-amber-800/90">
+              Es menor al km actual ({kmActual.toLocaleString("es-AR")} km). Guardalo solo si es una corrección.
+            </p>
+          )}
         </div>
 
 
@@ -104,6 +117,7 @@ export function EditarKmVehiculoModal({
         </div>
       </form>
       {descarte.dialogo}
-    </div>
+    </div>,
+    document.body,
   );
 }
