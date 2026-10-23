@@ -661,9 +661,7 @@ export function CuentaContraparteView({
           const activa = monedaFiltro === s.moneda;
           const monto = (
             <span
-              className={`font-[family-name:var(--font-display)] text-lg tracking-wide tabular-nums ${
-                s.saldo > 0.005 ? 'text-vialto-bright' : 'text-white'
-              }`}
+              className="font-[family-name:var(--font-display)] text-lg tracking-wide tabular-nums text-white"
             >
               {fmtSaldo(s.saldo)}
             </span>
