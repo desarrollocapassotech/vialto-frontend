@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/ViewModalShell';
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
   FacturaLineasEditor,
   computeFacturaTotales,
@@ -30,6 +31,7 @@ import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 import {
   actualizarMovimiento,
   claseMontoCobroPago,
+  eliminarMovimiento,
   estadoMovimientoCcLabel,
   type MovimientoCc,
 } from '@/lib/cuentaCorriente';
@@ -64,6 +66,85 @@ const monto = (n: number, moneda: string) => `$ ${formatCurrencyArFromNumber(n)}
 export function nombreMovimientoCc(m: MovimientoCc): string {
   if (m.tipo === 'pago') return m.clienteId ? 'cobro' : 'pago';
   return m.clienteId ? 'venta' : 'compra';
+}
+
+/**
+ * ¿Se puede eliminar? Toda venta/compra/cobro/pago manual no anulado, aunque esté imputado
+ * (el backend deshace sus imputaciones antes de borrarlo). Facturas, liquidaciones y
+ * anulaciones no: se manejan desde su módulo. Lo usan el botón del modal y la fila.
+ */
+export function movimientoCcEliminable(m: MovimientoCc): boolean {
+  return (
+    m.origen === 'manual' &&
+    m.estadoDisponibilidad !== 'anulado' &&
+    (m.tipo === 'cargo' || m.tipo === 'pago')
+  );
+}
+
+/** Cuántas imputaciones tiene (para avisar que se deshacen al eliminar). */
+export function cantidadImputacionesCc(m: MovimientoCc, movimientos: MovimientoCc[]): number {
+  if (m.tipo === 'pago') return m.imputacionesPorCargo?.length ?? 0;
+  if (m.tipo === 'cargo') return imputacionesDeCargo(m, movimientos).length;
+  return 0;
+}
+
+/** Confirmación + eliminar una venta/compra/cobro/pago manual (deshace sus imputaciones). */
+export function EliminarMovimientoDialog({
+  movimiento: m,
+  cantidadImputaciones,
+  onCancel,
+  onEliminado,
+}: {
+  movimiento: MovimientoCc;
+  /** Imputaciones que se van a deshacer (0 = ninguna). */
+  cantidadImputaciones: number;
+  onCancel: () => void;
+  /** Después de eliminar: recargar la grilla (y cerrar el modal que lo mostraba). */
+  onEliminado: () => void;
+}) {
+  const { getToken } = useAuth();
+  const { showToast } = useToast();
+  const [eliminando, setEliminando] = useState(false);
+  const nombre = nombreMovimientoCc(m);
+  const esCargo = m.tipo === 'cargo';
+
+  async function eliminar() {
+    setEliminando(true);
+    try {
+      await eliminarMovimiento(() => getToken(), m.id);
+      // Venta/compra en femenino, cobro/pago en masculino.
+      showToast(`${nombre[0].toUpperCase()}${nombre.slice(1)} eliminad${esCargo ? 'a' : 'o'}.`, 'success');
+      onEliminado();
+    } catch (err) {
+      showToast(friendlyError(err, 'cuentaCorriente'), 'error');
+    } finally {
+      setEliminando(false);
+    }
+  }
+
+  return (
+    <ConfirmDialog
+      open
+      title={`¿Eliminar ${esCargo ? 'la' : 'el'} ${nombre}?`}
+      message={`Se elimina ${esCargo ? 'la' : 'el'} ${nombre} ${
+        m.numeroComprobante?.trim() || 'sin comprobante'
+      } por ${monto(m.importe, m.moneda)}.${
+        cantidadImputaciones > 0
+          ? ` Antes se ${cantidadImputaciones === 1 ? 'deshace su imputación' : `deshacen sus ${cantidadImputaciones} imputaciones`}: ${
+              esCargo
+                ? `${m.clienteId ? 'los cobros vuelven' : 'los pagos vuelven'} a quedar sin imputar`
+                : `${m.clienteId ? 'las ventas vuelven' : 'las compras vuelven'} a quedar pendientes`
+            }.`
+          : ''
+      } El saldo de la cuenta se recalcula sin este movimiento.`}
+      confirmLabel="Eliminar"
+      cancelLabel="Cancelar"
+      tone="danger"
+      busy={eliminando}
+      onCancel={onCancel}
+      onConfirm={() => void eliminar()}
+    />
+  );
 }
 
 /** Líneas para editar: las guardadas o, en una venta/compra vieja, una sola con su importe e IVA. */
@@ -126,6 +207,9 @@ export function MovimientoCcDetalleModal({
   const tieneImputaciones = imputaciones.length > 0;
   const editable = manual && !anulado;
   const puedeEditar = editable || !!onEditarAutomatico;
+  // Eliminar aunque esté imputado: el backend deshace sus imputaciones antes.
+  const puedeEliminar = movimientoCcEliminable(m);
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
 
   const [editando, setEditando] = useState(false);
   const [numero, setNumero] = useState(m.numeroComprobante ?? '');
@@ -241,6 +325,16 @@ export function MovimientoCcDetalleModal({
           </>
         ) : (
           <>
+            {/* Eliminar: solo manual, no anulado y sin imputaciones (mismo criterio que el backend). */}
+            {puedeEliminar && (
+              <button
+                type="button"
+                className={`${viewModalBtnGhost} mr-auto border-red-200 text-red-700 hover:bg-red-50`}
+                onClick={() => setConfirmandoEliminar(true)}
+              >
+                Eliminar
+              </button>
+            )}
             <button type="button" className={viewModalBtnGhost} onClick={onClose}>
               Cerrar
             </button>
@@ -541,6 +635,18 @@ export function MovimientoCcDetalleModal({
             </p>
           )}
         </div>
+      )}
+      {confirmandoEliminar && (
+        <EliminarMovimientoDialog
+          movimiento={m}
+          cantidadImputaciones={imputaciones.length}
+          onCancel={() => setConfirmandoEliminar(false)}
+          onEliminado={() => {
+            setConfirmandoEliminar(false);
+            onSaved();
+            onClose();
+          }}
+        />
       )}
     </ViewModalShell>
   );

@@ -4,12 +4,15 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { createPortal } from 'react-dom';
 import {
   Banknote,
+  CircleCheck,
+  CircleDashed,
   Eye,
   FileSearch,
   FileSpreadsheet,
   FileText,
   Filter,
   History,
+  Trash2,
   Undo2,
   X,
 } from 'lucide-react';
@@ -45,7 +48,13 @@ import { ComprobanteCcModal } from './ComprobanteCcModal';
 import { ComprobanteOrigenCcModal, type ComprobanteOrigenCc } from './ComprobanteOrigenCcModal';
 import { ImputacionesCobroModal } from './ImputacionesCobroModal';
 import { ImputacionesCargoModal, imputacionesDeCargo } from './ImputacionesCargoModal';
-import { MovimientoCcDetalleModal, nombreMovimientoCc } from './MovimientoCcDetalleModal';
+import {
+  EliminarMovimientoDialog,
+  MovimientoCcDetalleModal,
+  cantidadImputacionesCc,
+  movimientoCcEliminable,
+  nombreMovimientoCc,
+} from './MovimientoCcDetalleModal';
 import { DeshacerImputacionDialog } from './DeshacerImputacionButton';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import {
@@ -56,6 +65,7 @@ import {
 import { ExportarEstadoCuentaModal } from './ExportarEstadoCuentaModal';
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { FiltrosRapidos } from '@/components/listado/FiltrosRapidos';
+import { TruncarInicio } from '@/components/ui/TruncarInicio';
 import { ComprobanteAdjuntoClip } from '@/components/shared/ComprobanteAdjuntoClip';
 import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
 import { useAbrirAdjunto } from '@/hooks/useAbrirAdjunto';
@@ -71,6 +81,7 @@ type ModalState =
   | { kind: 'imputacionesCargo'; cargo: MovimientoCc }
   | { kind: 'detalle'; movimiento: MovimientoCc }
   | { kind: 'deshacerImputacion'; imputacionId: string; descripcion: string }
+  | { kind: 'eliminar'; movimiento: MovimientoCc }
   | { kind: 'exportar'; formato: 'pdf' | 'excel' }
   | null;
 
@@ -89,6 +100,34 @@ function fmtSaldo(valor: number): string {
   return valor < 0
     ? `-$ ${formatCurrencyArFromNumber(-valor)}`
     : `$ ${formatCurrencyArFromNumber(valor)}`;
+}
+
+/**
+ * Ícono sutil junto al número de una venta/compra imputada (tooltip con el detalle):
+ * tilde verde = imputada por completo, círculo punteado ámbar = en parte (le queda saldo).
+ * Sale de `estadoDisponibilidad`, que recalcula el backend.
+ */
+function EtiquetaImputacionCargo({ m }: { m: MovimientoCc }) {
+  if (m.tipo !== 'cargo') return null;
+  const estado =
+    m.estadoDisponibilidad === 'cancelado'
+      ? { Icono: CircleCheck, clase: 'text-emerald-600', titulo: 'Imputada por completo' }
+      : m.estadoDisponibilidad === 'parcial'
+        ? { Icono: CircleDashed, clase: 'text-amber-600', titulo: 'Imputada en parte: le queda saldo' }
+        : null;
+  if (!estado) return null;
+  const { Icono, clase, titulo } = estado;
+  return (
+    <span className={`inline-flex shrink-0 cursor-help ${clase}`} title={titulo} aria-label={titulo}>
+      <Icono className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+    </span>
+  );
+}
+
+/** Subtítulo del menú de acciones de una fila: tipo + número de comprobante ("COBRO 3132132"). */
+function subtituloAcciones(m: MovimientoCc): string {
+  const numero = m.numeroComprobante?.trim();
+  return numero ? `${m.concepto} ${numero}` : m.concepto;
 }
 
 /**
@@ -448,6 +487,16 @@ export function CuentaContraparteView({
         },
       });
     }
+    // Eliminar toda venta/compra/cobro/pago manual no anulado, aunque esté imputado: el
+    // backend deshace sus imputaciones antes de borrarlo.
+    if (movimientoCcEliminable(m)) {
+      opciones.push({
+        id: 'eliminar',
+        label: `Eliminar ${nombreMovimientoCc(m)}`,
+        icon: Trash2,
+        onClick: () => setModal({ kind: 'eliminar', movimiento: m }),
+      });
+    }
     const origen = comprobanteOrigenDe(m);
     // Cobros/pagos y anulaciones: "Ver facturas asociadas" (una → su detalle; varias →
     // cuánto fue a cada una). Una factura/liquidación: "Ver factura/liquidación".
@@ -719,18 +768,25 @@ export function CuentaContraparteView({
             header: 'Comprobante',
             cell: (m: MovimientoConSaldo) => (
               <span className="flex items-center gap-1.5 whitespace-nowrap">
-                {m.comprobantesImputados.length > 0 ? (
-                  // Cobro/pago: su propio comprobante; el tooltip (oscuro, de ListadoDatos)
-                  // lista las facturas/liquidaciones a las que se imputó.
-                  <span
-                    className="cursor-help"
-                    title={`Imputado a:\n${m.comprobantesImputados.join('\n')}`}
-                  >
-                    {m.comprobanteMostrado ?? '—'}
-                  </span>
-                ) : (
-                  m.comprobanteMostrado ?? '—'
-                )}
+                {/* Número largo: se trunca por el principio (se ven los últimos caracteres,
+                    "…0000127"), como las columnas de ID; el número completo va en el tooltip.
+                    En un cobro/pago el tooltip suma a qué facturas/liquidaciones se imputó. */}
+                <TruncarInicio
+                  className={`max-w-[11rem] ${m.comprobantesImputados.length > 0 ? 'cursor-help' : ''}`}
+                  title={
+                    [
+                      m.comprobanteMostrado ?? '',
+                      m.comprobantesImputados.length > 0
+                        ? `Imputado a:\n${m.comprobantesImputados.join('\n')}`
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join('\n\n') || undefined
+                  }
+                >
+                  {m.comprobanteMostrado ?? '—'}
+                </TruncarInicio>
+                <EtiquetaImputacionCargo m={m} />
                 {clipsDe(m)}
               </span>
             ),
@@ -875,7 +931,7 @@ export function CuentaContraparteView({
             <AccionesFila
               options={opciones}
               destacadas={opciones.map((o) => o.id)}
-              subtitle={m.concepto}
+              subtitle={subtituloAcciones(m)}
             />
           );
         }}
@@ -942,6 +998,17 @@ export function CuentaContraparteView({
           onVerMovimiento={(otro) => setModal({ kind: 'detalle', movimiento: otro })}
         />
       )}
+      {modal?.kind === 'eliminar' && (
+        <EliminarMovimientoDialog
+          movimiento={modal.movimiento}
+          cantidadImputaciones={cantidadImputacionesCc(modal.movimiento, movimientos ?? [])}
+          onCancel={() => setModal(null)}
+          onEliminado={() => {
+            setModal(null);
+            void cargarDatos();
+          }}
+        />
+      )}
       {modal?.kind === 'deshacerImputacion' && (
         <DeshacerImputacionDialog
           imputacionId={modal.imputacionId}
@@ -987,7 +1054,7 @@ export function CuentaContraparteView({
         open={accionesDeFila != null}
         onClose={() => setAccionesDeFila(null)}
         title="Acciones"
-        subtitle={accionesDeFila?.concepto}
+        subtitle={accionesDeFila ? subtituloAcciones(accionesDeFila) : undefined}
         options={accionesDeFila ? accionesDe(accionesDeFila) : []}
       />
 
