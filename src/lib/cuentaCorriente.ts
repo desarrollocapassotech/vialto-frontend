@@ -184,8 +184,10 @@ export type ExportarMovimientosResponse = {
   clienteId: string | null;
   proveedorId: string | null;
   periodo: { desde: string; hasta: string };
-  saldoInicial: number;
-  saldoFinal: number;
+  /** Un saldo por moneda (nunca se suman pesos con dólares). */
+  saldoInicial: { moneda: string; saldo: number }[];
+  saldoFinal: { moneda: string; saldo: number }[];
+  /** `saldoAcumulado` de cada movimiento es el de SU moneda. */
   movimientos: MovimientoExport[];
 };
 

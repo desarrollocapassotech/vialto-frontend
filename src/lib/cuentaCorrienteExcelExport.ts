@@ -17,6 +17,17 @@ export function generarEstadoCuentaExcel(
   _tipoContraparte: TipoContraparte,
   contraparteNombre: string,
 ) {
+  // Con varias monedas, una columna de saldo por moneda ("Saldo ARS", "Saldo USD"), cada fila
+  // con el saldo de todas a ese momento (igual que el PDF). Con una, "Saldo acumulado".
+  const monedas = data.saldoFinal.map((s) => s.moneda);
+  const multimoneda = monedas.length > 1;
+  const saldosPorFila = new Map<string, Map<string, number>>();
+  const corriendo = new Map(data.saldoInicial.map((s) => [s.moneda, s.saldo]));
+  for (const m of [...data.movimientos].reverse()) {
+    corriendo.set(m.moneda, m.saldoAcumulado);
+    saldosPorFila.set(m.id, new Map(corriendo));
+  }
+
   const rows = data.movimientos.map((m) => {
     const row: Record<string, string | number> = {
       Fecha: fmtFecha(m.fecha),
@@ -25,7 +36,11 @@ export function generarEstadoCuentaExcel(
     row.Comprobante = m.numeroComprobante ?? '';
     row.Debe = esDebeCc(m) ? m.importe : '';
     row.Haber = !esDebeCc(m) ? m.importe : '';
-    row['Saldo acumulado'] = m.saldoAcumulado;
+    if (multimoneda) {
+      for (const moneda of monedas) row[`Saldo ${moneda}`] = saldosPorFila.get(m.id)?.get(moneda) ?? 0;
+    } else {
+      row['Saldo acumulado'] = m.saldoAcumulado;
+    }
     row.Moneda = m.moneda;
     // Mismo criterio que `estadoMovimientoCc` en pantalla.
     row.Estado =
@@ -38,6 +53,23 @@ export function generarEstadoCuentaExcel(
   });
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
+  // Anchos (en caracteres) en el orden de las columnas: Fecha, Tipo, Comprobante, Debe, Haber,
+  // Saldo(s), Moneda, Estado. El comprobante es el dato principal: va más ancho.
+  worksheet['!cols'] = [
+    { wch: 11 },
+    { wch: 18 },
+    {
+      wch: Math.min(
+        40,
+        Math.max(14, ...data.movimientos.map((m) => (m.numeroComprobante ?? '').length + 2)),
+      ),
+    },
+    { wch: 14 },
+    { wch: 14 },
+    ...(multimoneda ? monedas : ['']).map(() => ({ wch: 16 })),
+    { wch: 8 },
+    { wch: 14 },
+  ];
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Cuenta corriente');
   const nombreArchivo = contraparteNombre.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
