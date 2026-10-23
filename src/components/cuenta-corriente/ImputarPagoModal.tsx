@@ -178,15 +178,10 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
         setError('Ingresá un importe mayor a 0.');
         return;
       }
-      if (importe > disponibleSeleccionado + EPS) {
-        setError(
-          `El importe supera lo disponible ${esCliente ? 'del cobro' : 'del pago'} (${formatCurrencyArFromNumber(disponibleSeleccionado)} ${pagoSeleccionado?.moneda ?? cargo.moneda}).`,
-        );
-        return;
-      }
-      // Más de lo que falta no se rechaza: se imputa hasta el saldo de la venta/compra y
-      // el resto del cobro/pago queda sin imputar.
-      const aImputar = Math.min(importe, pendienteCargo);
+      // Un importe mayor no se rechaza: se imputa hasta lo que falta de la venta/compra y
+      // hasta lo disponible del cobro/pago. Lo que sobra del cobro queda sin imputar; lo
+      // que falta de la venta queda pendiente.
+      const aImputar = Math.min(importe, pendienteCargo, disponibleSeleccionado);
       setSaving(true);
       try {
         await crearImputacion(() => getToken(), { pagoId, cargoId: cargo.id, importe: aImputar });
