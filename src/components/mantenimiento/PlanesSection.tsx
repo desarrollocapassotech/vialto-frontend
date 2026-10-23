@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Eye, Power, PowerOff, Sparkles, Trash2, Truck } from "lucide-react";
+import { Eye, Power, PowerOff, Trash2, Truck } from "lucide-react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
@@ -23,8 +23,6 @@ import type { PlanMantenimiento, PlantillaPlan } from "@/types/mantenimiento";
 const FILTRO_INPUT = "h-9 w-full border border-black/15 bg-white px-2 text-sm";
 const BTN_SECUNDARIO =
   "inline-flex h-10 items-center gap-2 border border-black/20 bg-white px-4 text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-50";
-const BTN_SUTIL =
-  "mr-2 inline-flex items-center gap-1.5 text-xs text-vialto-steel hover:text-vialto-charcoal hover:underline";
 const BTN_PRIMARIO =
   "inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite";
 
@@ -123,12 +121,21 @@ export function PlanesSection({
     if (!aBorrar) return;
     setOcupado(true);
     try {
-      await apiJson(mantUrl(`planes/${encodeURIComponent(aBorrar.id)}`, tenantId), () => getToken(), { method: "DELETE" });
-      showToast(`"${aBorrar.nombre}" eliminado`, "success");
+      // Sin historial, el backend lo desvincula de sus vehículos y lo borra; con historial, 409.
+      const r = await apiJson<{ desvinculados: number }>(
+        mantUrl(`planes/${encodeURIComponent(aBorrar.id)}`, tenantId),
+        () => getToken(),
+        { method: "DELETE" },
+      );
+      const n = r.desvinculados;
+      showToast(
+        n > 0 ? `"${aBorrar.nombre}" eliminado y quitado de ${n} ${n === 1 ? "vehículo" : "vehículos"}` : `"${aBorrar.nombre}" eliminado`,
+        "success",
+      );
       setABorrar(null);
       onCambio();
     } catch (e) {
-      // 409 si tiene vehículos asignados: el mensaje del backend pide desactivarlo.
+      // 409 si tiene historial: el mensaje del backend pide desactivarlo.
       showToast(friendlyError(e, "mantenimiento"), "error");
     } finally {
       setOcupado(false);
@@ -140,30 +147,16 @@ export function PlanesSection({
     setModal(estadoModal);
   }
 
-  /** `sutil`: junto al título, con planes ya cargados, va como link chico en vez de botón. */
-  const acciones = (sutil: boolean) =>
-    !soloLectura && (
-    <>
-      {faltanPlantillas && (
-        <button
-          type="button"
-          onClick={() => setPlantillasAbierto(true)}
-          className={sutil ? BTN_SUTIL : BTN_SECUNDARIO}
-        >
-          {sutil && <Sparkles className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />}
-          {sutil ? "Ver planes sugeridos" : "Cargar planes sugeridos"}
-        </button>
-      )}
-      <button type="button" onClick={() => abrir({ modo: "crear" })} className={BTN_PRIMARIO}>
-        Nuevo plan
-      </button>
-    </>
+  const btnNuevoPlan = (
+    <button type="button" onClick={() => abrir({ modo: "crear" })} className={BTN_PRIMARIO}>
+      Nuevo plan
+    </button>
   );
 
   return (
     <div>
-      {/* Sin planes, los botones van en el estado vacío (no repetirlos arriba). */}
-      {accionesSlot && !soloLectura && planes?.length !== 0 && createPortal(acciones(true), accionesSlot)}
+      {/* Con planes, junto al título va solo "Nuevo plan"; los sugeridos se ofrecen en el estado vacío. */}
+      {accionesSlot && !soloLectura && planes?.length !== 0 && createPortal(btnNuevoPlan, accionesSlot)}
       <LimpiarFiltrosPortal
         slot={limpiarFiltrosSlot}
         visible={hayFiltros}
@@ -180,7 +173,16 @@ export function PlanesSection({
       {planes && planes.length === 0 && !error ? (
         <div className="border border-dashed border-black/15 bg-white px-6 py-10 text-center">
           <p className="text-sm text-vialto-charcoal">Todavía no hay planes de mantenimiento.</p>
-          {!soloLectura && <div className="mt-4 flex flex-wrap justify-center gap-2">{acciones(false)}</div>}
+          {!soloLectura && (
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              {faltanPlantillas && (
+                <button type="button" onClick={() => setPlantillasAbierto(true)} className={BTN_SECUNDARIO}>
+                  Cargar planes sugeridos
+                </button>
+              )}
+              {btnNuevoPlan}
+            </div>
+          )}
         </div>
       ) : (
         <ListadoDatos<PlanMantenimiento>
@@ -315,7 +317,7 @@ export function PlanesSection({
       <ConfirmDialog
         open={!!aBorrar}
         title="Eliminar plan"
-        message={`¿Eliminar "${aBorrar?.nombre ?? ""}"? Esta acción no se puede deshacer. Si el plan tiene vehículos asignados, hay que desactivarlo en lugar de eliminarlo.`}
+        message={`¿Eliminar "${aBorrar?.nombre ?? ""}"?`}
         confirmLabel="Eliminar"
         tone="danger"
         busy={ocupado}

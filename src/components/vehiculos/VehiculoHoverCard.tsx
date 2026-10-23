@@ -2,16 +2,10 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { createPortal } from "react-dom";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useMaestroData } from "@/hooks/useMaestroData";
-import { labelVehiculoTipo } from "@/lib/labels";
+import { camposVehiculo } from "@/lib/vehiculoCampos";
 
 const MARGEN_PX = 8;
 const DEMORA_MS = 250;
-
-function fmtFecha(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  return new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
-}
-const fmtNum = (n: number) => n.toLocaleString("es-AR");
 
 /**
  * Patente (u otro contenido) que al pasar el cursor —o al enfocarla con teclado— muestra la
@@ -60,20 +54,7 @@ export function VehiculoHoverCard({ vehiculoId, children }: { vehiculoId: string
 
   if (!vehiculo) return <>{children}</>;
 
-  const anio = vehiculo.año ?? vehiculo.anio;
-
-  const campos: { campo: string; label: string; value: string | number | null | undefined }[] = [
-    { campo: "tipo", label: "Tipo", value: labelVehiculoTipo(vehiculo.tipo) },
-    { campo: "marca", label: "Marca", value: vehiculo.marca },
-    { campo: "modelo", label: "Modelo", value: vehiculo.modelo },
-    { campo: "anio", label: "Año", value: anio },
-    { campo: "nroChasis", label: "N.° Chasis", value: vehiculo.nroChasis },
-    { campo: "poliza", label: "Póliza", value: vehiculo.poliza },
-    { campo: "vencimientoPoliza", label: "Vto. Póliza", value: fmtFecha(vehiculo.vencimientoPoliza) },
-    { campo: "tara", label: "Tara (kg)", value: vehiculo.tara != null ? fmtNum(vehiculo.tara) : null },
-    { campo: "precinto", label: "Precinto", value: vehiculo.precinto },
-  ];
-  const visibles = campos.filter(
+  const visibles = camposVehiculo(vehiculo).filter(
     (c) => c.value != null && c.value !== "" && isVisible("detalle_vehiculo", c.campo),
   );
 
