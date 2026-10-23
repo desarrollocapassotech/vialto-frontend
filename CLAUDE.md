@@ -463,7 +463,7 @@ Todo formulario que cargue el CUIT de un Cliente o Transportista (hoy: `ClienteC
 
 **Regla global para toda sección nueva del dashboard de tenant (`src/components/tenant/TenantOwnerDashboard.tsx`).**
 
-Cuando el tenant tiene contratado más de un módulo con contenido propio en el dashboard (hoy: Financiero, Stock, Combustible, Cuenta corriente), esas secciones **no se apilan una debajo de la otra**. Se organizan con una barra de pestañas de subrayado, ubicada debajo del selector de período, con el mismo estilo visual que usa `BaseDeDatosPage.tsx` para Clientes/Transportistas/Choferes/etc.
+Cuando el tenant tiene contratado más de un módulo con contenido propio en el dashboard (hoy: Financiero, Stock, Combustible, Cuenta corriente, Mantenimiento), esas secciones **no se apilan una debajo de la otra**. Se organizan con una barra de pestañas de subrayado, ubicada debajo del selector de período, con el mismo estilo visual que usa `BaseDeDatosPage.tsx` para Clientes/Transportistas/Choferes/etc.
 
 - Si el tenant solo tiene **un** módulo con sección de dashboard, no se muestra la barra de pestañas: esa sección se renderiza directo (sin tab nav de por medio).
 - Si tiene **más de uno**, se arma `moduloTabs: { id, label, icon }[]` agregando una entrada por módulo, condicionada por su respectivo `canAccessX(modules)` de `lib/tenantModules.ts`.

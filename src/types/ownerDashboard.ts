@@ -62,6 +62,12 @@ export type OwnerDashboardResponse = {
       cantidad: number;
       montoTotal: number;
     };
+    /** Mantenimiento: planes vencidos + próximos (snapshot, no depende del período; "sin datos" no cuenta). */
+    mantenimiento?: {
+      cantidad: number;
+      vencidos: number;
+      proximos: number;
+    };
   } | null;
   viajes?: {
     enCurso: MetricCompare;
