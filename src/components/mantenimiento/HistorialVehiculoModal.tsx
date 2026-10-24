@@ -7,10 +7,11 @@ import { VehiculoHoverCard } from "@/components/vehiculos/VehiculoHoverCard";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { mantUrl } from "@/lib/mantenimientoApi";
+import { metaPaginacionCliente, paginasVisibles, slicePaginaCliente } from "@/lib/listadoPaginacion";
 import { fmtFecha, fmtFuenteKm, fmtKm, fmtMoneda, fmtOrigenKm, fmtTipoOrden } from "@/lib/mantenimientoLabels";
 import type { EventoHistorial, HistorialVehiculo } from "@/types/mantenimiento";
 
-const POR_PAGINA = 30;
+const POR_PAGINA = 5;
 type Filtro = "todo" | "orden" | "lectura";
 
 const ICONO_FUENTE = { carga: Fuel, edicion: Pencil } as const;
@@ -51,7 +52,7 @@ export function HistorialVehiculoModal({
   const [error, setError] = useState<string | null>(null);
   const [recarga, setRecarga] = useState(0);
   const [filtro, setFiltro] = useState<Filtro>("orden");
-  const [cantidad, setCantidad] = useState(POR_PAGINA);
+  const [pagina, setPagina] = useState(1);
 
   const [editandoKm, setEditandoKm] = useState(false);
 
@@ -73,6 +74,7 @@ export function HistorialVehiculoModal({
     () => (data?.eventos ?? []).filter((e) => filtro === "todo" || e.tipo === filtro),
     [data, filtro],
   );
+  const meta = metaPaginacionCliente(eventos.length, pagina, POR_PAGINA);
   const ordenes = (data?.eventos ?? []).filter((e) => e.tipo === "orden");
   const ultimaOrden = ordenes.find((e) => e.tipo === "orden" && e.orden.estado !== "anulada");
   const kmActual = data?.odometro?.km ?? null;
@@ -141,7 +143,7 @@ export function HistorialVehiculoModal({
                   aria-selected={filtro === id}
                   onClick={() => {
                     setFiltro(id);
-                    setCantidad(POR_PAGINA);
+                    setPagina(1);
                   }}
                   className={[
                     "flex shrink-0 whitespace-nowrap items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
@@ -178,18 +180,51 @@ export function HistorialVehiculoModal({
                   <span className="w-72 shrink-0">Hecho por</span>
                   <span className="w-28 shrink-0 text-right">Km</span>
                 </li>
-                {eventos.slice(0, cantidad).map((e) => (
+                {slicePaginaCliente(eventos, pagina, POR_PAGINA).map((e) => (
                   <EventoFila key={claveEvento(e)} evento={e} onVerOrden={onVerOrden} />
                 ))}
               </ul>
-              {eventos.length > cantidad && (
-                <button
-                  type="button"
-                  onClick={() => setCantidad((n) => n + POR_PAGINA)}
-                  className="justify-self-center text-sm text-vialto-steel hover:text-vialto-charcoal hover:underline"
-                >
-                  Mostrar más ({eventos.length - cantidad} restantes)
-                </button>
+              {meta.totalPages > 1 && (
+                // Mismo paginador liviano que el import (sin selector de tamaño).
+                <div className="-mt-2 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <span className="text-vialto-steel">
+                    Página {meta.page} de {meta.totalPages} · {meta.total} {meta.total === 1 ? "registro" : "registros"}
+                  </span>
+                  <div className="inline-flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={!meta.hasPrev}
+                      onClick={() => setPagina((n) => Math.max(1, n - 1))}
+                      className="h-8 min-w-8 border border-black/20 px-2 text-xs uppercase tracking-wider hover:bg-vialto-mist/80 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Anterior
+                    </button>
+                    {paginasVisibles(meta.page, meta.totalPages).map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setPagina(n)}
+                        aria-current={n === meta.page ? "page" : undefined}
+                        className={[
+                          "h-8 min-w-8 px-2 border text-xs tabular-nums",
+                          n === meta.page
+                            ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+                            : "border-black/20 text-vialto-charcoal hover:bg-vialto-mist/80",
+                        ].join(" ")}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      disabled={!meta.hasNext}
+                      onClick={() => setPagina((n) => Math.min(meta.totalPages, n + 1))}
+                      className="h-8 min-w-8 border border-black/20 px-2 text-xs uppercase tracking-wider hover:bg-vialto-mist/80 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                </div>
               )}
             </>
           )}

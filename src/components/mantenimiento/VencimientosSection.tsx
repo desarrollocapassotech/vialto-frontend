@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { FileText, Gauge, History, Wrench } from "lucide-react";
+import { ArrowDown, ArrowUp, FileText, Gauge, History, Wrench } from "lucide-react";
 import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
@@ -66,6 +66,7 @@ export function VencimientosSection({
   const [estado, setEstado] = useState<EstadoVencimiento | "">("");
   const [vehiculoId, setVehiculoId] = useState("");
   const [categoria, setCategoria] = useState("");
+  const [ordenFecha, setOrdenFecha] = useState<"asc" | "desc">("asc");
 
   useEffect(() => {
     let cancelado = false;
@@ -101,13 +102,20 @@ export function VencimientosSection({
   const hayFiltros = !!estado || !!vehiculoId || !!categoria;
   const filtradas = useMemo(() => {
     if (!filas) return null;
-    return filas.filter(
+    const lista = filas.filter(
       (f) =>
         (!estado || f.estado === estado) &&
         (!vehiculoId || f.vehiculo.id === vehiculoId) &&
         (!categoria || f.plan.categoria === categoria),
     );
-  }, [filas, estado, vehiculoId, categoria]);
+    // Por fecha estimada (la más cercana primero, o al revés); las que no tienen fecha, siempre al final.
+    // `sort` es estable: a igual fecha queda el orden del backend (vencido → próximo → sin datos → ok).
+    const signo = ordenFecha === "asc" ? 1 : -1;
+    return [...lista].sort((a, b) => {
+      if (!a.fechaEstimada || !b.fechaEstimada) return a.fechaEstimada ? -1 : b.fechaEstimada ? 1 : 0;
+      return a.fechaEstimada.localeCompare(b.fechaEstimada) * signo;
+    });
+  }, [filas, estado, vehiculoId, categoria, ordenFecha]);
 
   const vehiculosConPlanes = useMemo(() => {
     const ids = new Set((filas ?? []).map((f) => f.vehiculo.id));
@@ -228,7 +236,21 @@ export function VencimientosSection({
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={listadoTablaThClass}>Faltan</th>
-            <th scope="col" className={listadoTablaThClass}>Fecha estimada</th>
+            <th scope="col" className={listadoTablaThClass} aria-sort={ordenFecha === "asc" ? "ascending" : "descending"}>
+              <button
+                type="button"
+                onClick={() => setOrdenFecha((o) => (o === "asc" ? "desc" : "asc"))}
+                title={ordenFecha === "asc" ? "Más cercana primero (tocá para invertir)" : "Más lejana primero (tocá para invertir)"}
+                className="inline-flex items-center gap-1 uppercase hover:underline"
+              >
+                Fecha estimada
+                {ordenFecha === "asc" ? (
+                  <ArrowUp className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                ) : (
+                  <ArrowDown className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                )}
+              </button>
+            </th>
             <th scope="col" className={listadoTablaThClass}>Km actual</th>
             <th scope="col" className={listadoTablaThClass}>Último service</th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>Acciones</th>
