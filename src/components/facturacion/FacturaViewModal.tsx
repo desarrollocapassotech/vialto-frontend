@@ -229,7 +229,6 @@ export function FacturaViewModal({
     factura.importeACobrar == null ||
     Math.abs(factura.importeACobrar - totalConIva) < 0.011;
   const saldoPendiente =
-    porTramo &&
     !factura.cobrado &&
     cobroEsTotalConIva &&
     (factura.saldoPendiente ?? 0) > 0.005

@@ -81,9 +81,12 @@ export function importeTotalConIvaPorTramo(
 }
 
 /**
- * Monto contra el que se mide el cobro.
- * Por tramo sin ARCA: `importeACobrar` de la API, o neto + `ivaMonto` persistido,
- * o recálculo live. ARCA / sin tramos: neto.
+ * Monto contra el que se mide el cobro (total real con IVA incluido).
+ * Aplica a empresas con ARCA y sin ARCA:
+ * - `importeACobrar` de la API (si viene).
+ * - En facturas por tramo: suma neto + IVA de cada tramo (usando `ivaMonto` persistido o cálculo live).
+ * - En facturas estándar: suma neto + IVA (usando `ivaMonto` persistido o aplicando `ivaPct`).
+ * - Facturas exentas (0% IVA): preserva el total neto inalterado.
  */
 export function importeACobrarFactura(
   f: {
@@ -94,17 +97,22 @@ export function importeACobrarFactura(
     ivaMonto?: number | null;
     importeACobrar?: number;
   },
-  hasArca: boolean,
+  _hasArca?: boolean,
 ): number {
   if (f.importeACobrar != null && Number.isFinite(f.importeACobrar)) {
     return roundMoney2(f.importeACobrar);
   }
   const tramos = f.tramos ?? [];
-  if (!hasArca && f.facturarPorTramo && tramos.length > 0) {
+  if (f.facturarPorTramo && tramos.length > 0) {
     if (f.ivaMonto != null && Number.isFinite(f.ivaMonto)) {
       return roundMoney2(f.importe + f.ivaMonto);
     }
     return importeTotalConIvaPorTramo(f.importe, tramos, f.ivaPct);
   }
-  return roundMoney2(f.importe);
+  if (f.ivaMonto != null && Number.isFinite(f.ivaMonto)) {
+    return roundMoney2(f.importe + f.ivaMonto);
+  }
+  const pct = Number(f.ivaPct);
+  const iva = Number.isFinite(pct) && pct > 0 ? roundMoney2((f.importe * pct) / 100) : 0;
+  return roundMoney2(f.importe + iva);
 }

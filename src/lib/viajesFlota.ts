@@ -723,9 +723,8 @@ export function textoImporteMonedaFactura(
 }
 
 /**
- * Importe mostrado en tabla de facturas.
- * Por tramo sin ARCA: total de cobro (neto + IVA persistido / `importeACobrar`).
- * En el resto: viajes o `importe`.
+ * Importe mostrado en tabla de facturas y exportaciones.
+ * Siempre muestra el total real con IVA incluido (empresas con y sin ARCA).
  */
 export function textoImporteFacturaListado(
   f: {
@@ -738,23 +737,12 @@ export function textoImporteFacturaListado(
     ivaMonto?: number | null;
     importeACobrar?: number;
   },
-  viajes: Viaje[],
+  _viajes?: Viaje[],
   opts?: { hasArca?: boolean },
 ): string {
-  const porTramoSinArca =
-    !opts?.hasArca &&
-    Boolean(f.facturarPorTramo) &&
-    (f.tramos?.length ?? 0) > 0;
-  if (porTramoSinArca) {
-    return textoImporteMonedaFactura(
-      f.moneda,
-      importeACobrarFactura(f, false),
-    );
+  const total = importeACobrarFactura(f, opts?.hasArca);
+  if (total <= 0 && (!f.importe || f.importe === 0)) {
+    return "—";
   }
-  const t = textoImporteFacturaSeleccion(f.viajeIds, viajes);
-  if (t !== "—") return t;
-  if (f.importe != null && Number.isFinite(f.importe) && f.importe !== 0) {
-    return textoImporteMonedaFactura(f.moneda, f.importe);
-  }
-  return "—";
+  return textoImporteMonedaFactura(f.moneda, total);
 }
