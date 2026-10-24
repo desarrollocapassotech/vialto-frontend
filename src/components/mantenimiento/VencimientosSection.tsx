@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowDown, ArrowUp, FileText, Gauge, History, Wrench } from "lucide-react";
-import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
+import { AccionesOpcionesSheet, type AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { FiltrosRapidos, type FiltroRapidoOpcion } from "@/components/listado/FiltrosRapidos";
@@ -67,6 +67,7 @@ export function VencimientosSection({
   const [vehiculoId, setVehiculoId] = useState("");
   const [categoria, setCategoria] = useState("");
   const [ordenFecha, setOrdenFecha] = useState<"asc" | "desc">("asc");
+  const [accionesDeFila, setAccionesDeFila] = useState<FilaVencimiento | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -121,6 +122,20 @@ export function VencimientosSection({
     const ids = new Set((filas ?? []).map((f) => f.vehiculo.id));
     return maestro.vehiculos.filter((v) => ids.has(v.id));
   }, [filas, maestro.vehiculos]);
+
+  /** Única lista de acciones: la usan el botón de la fila y el clic en la fila (mismo criterio que Cuenta corriente). */
+  function accionesDe(f: FilaVencimiento): AccionOpcion[] {
+    const opciones: AccionOpcion[] = [];
+    if (!soloLectura) {
+      opciones.push({ id: "registrar", label: "Registrar service", icon: Wrench, onClick: () => registrarService(f) });
+    }
+    opciones.push({ id: "historial", label: "Historial del vehículo", icon: History, onClick: () => onHistorial(f.vehiculo.id) });
+    if (!soloLectura) {
+      // Mismo nombre e ícono que en Combustible → Asignación de vehículos.
+      opciones.push({ id: "editar-km", label: "Editar km", icon: Gauge, onClick: () => onEditarKm(f.vehiculo.id) });
+    }
+    return opciones;
+  }
 
   function registrarService(f: FilaVencimiento) {
     onRegistrarService({
@@ -243,7 +258,7 @@ export function VencimientosSection({
                 title={ordenFecha === "asc" ? "Más cercana primero (tocá para invertir)" : "Más lejana primero (tocá para invertir)"}
                 className="inline-flex items-center gap-1 uppercase hover:underline"
               >
-                Fecha estimada
+                Próximo service
                 {ordenFecha === "asc" ? (
                   <ArrowUp className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                 ) : (
@@ -282,7 +297,7 @@ export function VencimientosSection({
               </span>
             ),
           },
-          { id: "fechaEstimada", header: "Fecha estimada", cell: (f) => fmtFecha(f.fechaEstimada) },
+          { id: "fechaEstimada", header: "Próximo service", cell: (f) => fmtFecha(f.fechaEstimada) },
           {
             id: "km",
             header: "Km actual",
@@ -301,18 +316,18 @@ export function VencimientosSection({
         }
         loadingMessage="Calculando vencimientos…"
         actionsTdClassName={listadoTablaAccionesTdClass}
-        renderActions={(f) => {
-          const opciones: AccionOpcion[] = [];
-          if (!soloLectura) {
-            opciones.push({ id: "registrar", label: "Registrar service", icon: Wrench, onClick: () => registrarService(f) });
-          }
-          opciones.push({ id: "historial", label: "Historial del vehículo", icon: History, onClick: () => onHistorial(f.vehiculo.id) });
-          if (!soloLectura) {
-            // Mismo nombre e ícono que en Combustible → Asignación de vehículos.
-            opciones.push({ id: "editar-km", label: "Editar km", icon: Gauge, onClick: () => onEditarKm(f.vehiculo.id) });
-          }
-          return <AccionesFila options={opciones} destacadas={soloLectura ? ["historial"] : ["registrar", "historial"]} />;
-        }}
+        onRowClick={(f) => setAccionesDeFila(f)}
+        renderActions={(f) => (
+          <AccionesFila options={accionesDe(f)} destacadas={soloLectura ? ["historial"] : ["registrar", "historial"]} />
+        )}
+      />
+
+      <AccionesOpcionesSheet
+        open={accionesDeFila != null}
+        onClose={() => setAccionesDeFila(null)}
+        title="Acciones"
+        subtitle={accionesDeFila ? `${accionesDeFila.vehiculo.patente} · ${accionesDeFila.plan.nombre}` : undefined}
+        options={accionesDeFila ? accionesDe(accionesDeFila) : []}
       />
     </div>
   );
