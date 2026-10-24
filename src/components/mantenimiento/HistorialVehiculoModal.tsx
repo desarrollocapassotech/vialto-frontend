@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardList, Fuel, Gauge, Pencil, Truck } from "lucide-react";
+import { ClipboardList, Fuel, Gauge, List, Pencil, Truck } from "lucide-react";
 import { EditarKmVehiculoModal } from "@/components/combustible/EditarKmVehiculoModal";
 import { EstadoOrdenBadge } from "@/components/mantenimiento/MantenimientoBadges";
 import { ViewModalShell, viewModalBtnGhost } from "@/components/ui/ViewModalShell";
@@ -50,7 +50,7 @@ export function HistorialVehiculoModal({
   const [data, setData] = useState<HistorialVehiculo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recarga, setRecarga] = useState(0);
-  const [filtro, setFiltro] = useState<Filtro>("todo");
+  const [filtro, setFiltro] = useState<Filtro>("orden");
   const [cantidad, setCantidad] = useState(POR_PAGINA);
 
   const [editandoKm, setEditandoKm] = useState(false);
@@ -92,7 +92,7 @@ export function HistorialVehiculoModal({
   );
 
   return (
-    <ViewModalShell title={titulo} onClose={onClose} footer={footer} maxWidthClass="sm:max-w-4xl" scrollBody>
+    <ViewModalShell title={titulo} onClose={onClose} footer={footer} maxWidthClass="sm:max-w-6xl" scrollBody>
       {error ? (
         <p className="text-sm text-red-700">{error}</p>
       ) : !data ? (
@@ -124,30 +124,37 @@ export function HistorialVehiculoModal({
             </Dato>
           </dl>
 
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Qué mostrar">
-            {(
-              [
-                ["todo", "Todo"],
-                ["orden", "Órdenes de trabajo"],
-                ["lectura", "Lecturas de km"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={filtro === id}
-                onClick={() => {
-                  setFiltro(id);
-                  setCantidad(POR_PAGINA);
-                }}
-                className={`h-8 border px-3 text-xs uppercase tracking-wider ${
-                  filtro === id ? "border-vialto-charcoal bg-vialto-charcoal text-white" : "border-black/20 bg-white hover:bg-vialto-mist"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          {/* Pestañas con el mismo estilo que las de la pantalla de Mantenimiento. */}
+          <div className="-mb-5 border-b border-black/15">
+            <nav className="-mb-px flex gap-1 overflow-x-auto" role="tablist" aria-label="Qué mostrar">
+              {(
+                [
+                  ["orden", "Órdenes de trabajo", ClipboardList],
+                  ["lectura", "Lecturas de km", Gauge],
+                  ["todo", "Todo", List],
+                ] as const
+              ).map(([id, label, Icono]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={filtro === id}
+                  onClick={() => {
+                    setFiltro(id);
+                    setCantidad(POR_PAGINA);
+                  }}
+                  className={[
+                    "flex shrink-0 whitespace-nowrap items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
+                    filtro === id
+                      ? "border-black/15 border-t-2 border-t-vialto-fire border-b-white bg-white text-vialto-charcoal"
+                      : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
+                  ].join(" ")}
+                >
+                  <Icono className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+                  {label}
+                </button>
+              ))}
+            </nav>
           </div>
 
           {eventos.length === 0 ? (
@@ -161,6 +168,16 @@ export function HistorialVehiculoModal({
           ) : (
             <>
               <ul className="divide-y divide-black/5 border border-black/10 bg-white">
+                <li
+                  aria-hidden
+                  className="hidden items-center gap-3 bg-vialto-mist/50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-vialto-steel sm:flex"
+                >
+                  <span className="w-24 shrink-0">Fecha</span>
+                  <span className="w-4 shrink-0" />
+                  <span className="flex-1">Evento</span>
+                  <span className="w-72 shrink-0">Hecho por</span>
+                  <span className="w-28 shrink-0 text-right">Km</span>
+                </li>
                 {eventos.slice(0, cantidad).map((e) => (
                   <EventoFila key={claveEvento(e)} evento={e} onVerOrden={onVerOrden} />
                 ))}
@@ -203,6 +220,25 @@ function claveEvento(e: EventoHistorial): string {
 
 function EventoFila({ evento: e, onVerOrden }: { evento: EventoHistorial; onVerOrden: (id: string) => void }) {
   const fecha = <span className="w-24 shrink-0 text-xs tabular-nums text-vialto-steel">{fmtFecha(e.fecha)}</span>;
+  // Columna "Hecho por": usuario de Vialto o chofer (app de Combustible).
+  const autor = (
+    <span className="hidden w-72 shrink-0 truncate text-sm sm:block" title={e.autor?.nombre}>
+      {e.autor ? (
+        <>
+          {e.autor.nombre}
+          {e.autor.chofer && <span className="ml-1 text-xs text-vialto-steel">(chofer)</span>}
+        </>
+      ) : (
+        <span className="text-vialto-steel">—</span>
+      )}
+    </span>
+  );
+  const km = (valor: number | null, costo?: number) => (
+    <span className="w-28 shrink-0 text-right">
+      <span className="block tabular-nums">{fmtKm(valor)}</span>
+      {costo != null && costo > 0 && <span className="block text-xs tabular-nums text-vialto-steel">{fmtMoneda(costo)}</span>}
+    </span>
+  );
 
   if (e.tipo === "lectura") {
     const Icono = ICONO_FUENTE[e.fuente as keyof typeof ICONO_FUENTE] ?? Truck;
@@ -211,7 +247,8 @@ function EventoFila({ evento: e, onVerOrden }: { evento: EventoHistorial; onVerO
         {fecha}
         <Icono className="h-4 w-4 shrink-0 text-vialto-steel/70" strokeWidth={1.75} aria-hidden />
         <span className="min-w-0 flex-1 text-vialto-steel">{fmtFuenteKm(e.fuente)}</span>
-        <span className="tabular-nums">{fmtKm(e.km)}</span>
+        {autor}
+        {km(e.km)}
       </li>
     );
   }
@@ -236,10 +273,8 @@ function EventoFila({ evento: e, onVerOrden }: { evento: EventoHistorial; onVerO
           </span>
           {detalle && <span className="block truncate text-xs text-vialto-steel">{detalle}</span>}
         </span>
-        <span className="text-right">
-          <span className="block tabular-nums">{fmtKm(o.km)}</span>
-          {o.costoTotal > 0 && <span className="block text-xs tabular-nums text-vialto-steel">{fmtMoneda(o.costoTotal)}</span>}
-        </span>
+        {autor}
+        {km(o.km, o.costoTotal)}
       </button>
     </li>
   );

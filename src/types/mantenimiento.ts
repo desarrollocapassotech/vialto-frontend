@@ -190,8 +190,14 @@ export interface ResultadoAsignacion {
   yaAsignados: string[];
 }
 
+/** Quién hizo un evento del historial. `chofer` = lo cargó un chofer desde la app de Combustible. */
+export interface AutorEvento {
+  nombre: string;
+  chofer: boolean;
+}
+
 /** Un evento de la línea de tiempo del vehículo (`GET mantenimiento/vehiculos/:id/historial`). */
-export type EventoHistorial =
+export type EventoHistorial = (
   | {
       tipo: "orden";
       fecha: string;
@@ -210,7 +216,11 @@ export type EventoHistorial =
         cantidadItems: number;
       };
     }
-  | { tipo: "lectura"; fecha: string; createdAt: string; km: number; fuente: FuenteKm; fuenteId: string };
+  | { tipo: "lectura"; fecha: string; createdAt: string; km: number; fuente: FuenteKm; fuenteId: string }
+) & {
+  /** null = sin autor conocido (ej. km cargado en el vehículo). */
+  autor: AutorEvento | null;
+};
 
 export interface HistorialVehiculo {
   vehiculo: { id: string; patente: string; tipo: string; marca: string | null; modelo: string | null; kmActual: number };
