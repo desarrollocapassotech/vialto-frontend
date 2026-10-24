@@ -17,6 +17,7 @@ import {
 } from "@/lib/listadoTabla";
 import type { PaginatedMeta, Vehiculo } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { ListadoFiltroBuscador } from "@/components/listado/ListadoFiltroBuscador";
 
 type VehiculosPaginatedResponse = {
   items: Vehiculo[];
@@ -47,12 +48,9 @@ export function VehiculosTenantPage() {
   const [viewingVehiculoPatente, setViewingVehiculoPatente] = useState("");
 
   // Estados de los filtros
-  const [patenteInput, setPatenteInput] = useState("");
   const [filtroPatente, setFiltroPatente] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
-  const [marcaInput, setMarcaInput] = useState("");
   const [filtroMarca, setFiltroMarca] = useState("");
-  const [modeloInput, setModeloInput] = useState("");
   const [filtroModelo, setFiltroModelo] = useState("");
   const [filtroActivo, setFiltroActivo] = useState<
     "todos" | "activos" | "inactivos"
@@ -119,12 +117,9 @@ export function VehiculosTenantPage() {
   }, [filtroPatente, filtroTipo, filtroMarca, filtroModelo, filtroActivo]);
 
   function limpiarFiltros() {
-    setPatenteInput("");
     setFiltroPatente("");
     setFiltroTipo("");
-    setMarcaInput("");
     setFiltroMarca("");
-    setModeloInput("");
     setFiltroModelo("");
     setFiltroActivo("todos");
     setPage(1);
@@ -205,35 +200,15 @@ export function VehiculosTenantPage() {
                   setPage(1);
                 }}
               >
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={patenteInput}
-                    onChange={(e) => setPatenteInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        setFiltroPatente(patenteInput.trim());
-                        setPage(1);
-                      }
-                    }}
-                    placeholder="Buscar…"
-                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 font-mono text-sm ${
-                      patenteInput.trim()
-                        ? "text-vialto-fire"
-                        : "text-vialto-charcoal"
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFiltroPatente(patenteInput.trim());
-                      setPage(1);
-                    }}
-                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-                  >
-                    OK
-                  </button>
-                </div>
+                <ListadoFiltroBuscador
+                  value={filtroPatente}
+                  onApply={(val) => {
+                    setFiltroPatente(val);
+                    setPage(1);
+                  }}
+                  inputClassName="font-mono"
+                  ariaLabel="Filtrar por patente"
+                />
               </ViajesListadoHeaderFiltro>
             </th>
             {isVisible("detalle_vehiculo", "tipo") && (
@@ -276,35 +251,14 @@ export function VehiculosTenantPage() {
                   setPage(1);
                 }}
               >
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={marcaInput}
-                    onChange={(e) => setMarcaInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        setFiltroMarca(marcaInput.trim());
-                        setPage(1);
-                      }
-                    }}
-                    placeholder="Buscar…"
-                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-                      marcaInput.trim()
-                        ? "text-vialto-fire"
-                        : "text-vialto-charcoal"
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFiltroMarca(marcaInput.trim());
-                      setPage(1);
-                    }}
-                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-                  >
-                    OK
-                  </button>
-                </div>
+                <ListadoFiltroBuscador
+                  value={filtroMarca}
+                  onApply={(val) => {
+                    setFiltroMarca(val);
+                    setPage(1);
+                  }}
+                  ariaLabel="Filtrar por marca"
+                />
               </ViajesListadoHeaderFiltro>
             </th>
             )}
@@ -319,35 +273,14 @@ export function VehiculosTenantPage() {
                   setPage(1);
                 }}
               >
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={modeloInput}
-                    onChange={(e) => setModeloInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        setFiltroModelo(modeloInput.trim());
-                        setPage(1);
-                      }
-                    }}
-                    placeholder="Buscar…"
-                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-                      modeloInput.trim()
-                        ? "text-vialto-fire"
-                        : "text-vialto-charcoal"
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFiltroModelo(modeloInput.trim());
-                      setPage(1);
-                    }}
-                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-                  >
-                    OK
-                  </button>
-                </div>
+                <ListadoFiltroBuscador
+                  value={filtroModelo}
+                  onApply={(val) => {
+                    setFiltroModelo(val);
+                    setPage(1);
+                  }}
+                  ariaLabel="Filtrar por modelo"
+                />
               </ViajesListadoHeaderFiltro>
             </th>
             )}
