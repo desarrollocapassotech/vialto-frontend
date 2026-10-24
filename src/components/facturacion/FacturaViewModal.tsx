@@ -211,6 +211,10 @@ export function FacturaViewModal({
   const ivaN = source.ivaPct ?? 0;
   const tramos = source.tramos ?? [];
   const porTramo = Boolean(factura.facturarPorTramo) && tramos.length > 0;
+  const viajeIdsConTramo = new Set(tramos.map((t) => t.viajeId).filter(Boolean));
+  const tieneViajesSinTramo = (source.viajes ?? []).some(
+    (v) => v.id && !viajeIdsConTramo.has(v.id),
+  );
 
   let muestraIva = false;
   let totalConIva = factura.importe;
@@ -218,7 +222,7 @@ export function FacturaViewModal({
     totalConIva =
       factura.ivaMonto != null && Number.isFinite(factura.ivaMonto)
         ? roundMoney2(factura.importe + factura.ivaMonto)
-        : importeTotalConIvaPorTramo(factura.importe, tramos, ivaN);
+        : importeTotalConIvaPorTramo(factura.importe, tramos, ivaN, source.viajes);
     muestraIva = true;
   } else {
     muestraIva = ivaN > 0 && factura.importe > 0;
@@ -590,7 +594,7 @@ export function FacturaViewModal({
             <FilaMontoDesplegable
               label="IVA por tramo"
               resumen={`${tramos.length} tramo${tramos.length === 1 ? '' : 's'}${
-                ivaN > 0 ? ` · resto ${ivaN}%` : ''
+                tieneViajesSinTramo && ivaN > 0 ? ` · viajes sin tramo ${ivaN}%` : ''
               }`}
               value={`+ ${fmt2(ivaTotal)}`}
             >
