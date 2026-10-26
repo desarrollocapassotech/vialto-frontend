@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChoferViewModal } from "@/components/choferes/ChoferViewModal";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -18,7 +18,7 @@ import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Chofer, PaginatedMeta } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
-import { compararAlfabetico } from "@/lib/ordenAlfabetico";
+import { ListadoFiltroBuscador } from "@/components/listado/ListadoFiltroBuscador";
 
 type ChoferesPaginatedResponse = {
   items: Chofer[];
@@ -56,48 +56,28 @@ export function ChoferesTenantPage() {
   const anyFiltroActivo =
     !!filtroNombre || !!filtroDni || filtroActivo !== "todos";
 
-  // Extracción de opciones únicas para los selectores
-  const opcionesNombre = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          (rows || []).map((r) => r.nombre).filter((v): v is string => !!v),
-        ),
-      ).sort(compararAlfabetico),
-    [rows],
-  );
-  const opcionesDni = useMemo(
-    () =>
-      Array.from(
-        new Set((rows || []).map((r) => r.dni).filter((v): v is string => !!v)),
-      ).sort(compararAlfabetico),
-    [rows],
-  );
-
-  const rowsFiltradas = useMemo(() => {
-    if (!rows) return [];
-    return rows.filter((r) => {
-      if (filtroNombre && r.nombre !== filtroNombre) return false;
-      if (filtroDni && r.dni !== filtroDni) return false;
-      if (filtroActivo === "activos" && !r.activo) return false;
-      if (filtroActivo === "inactivos" && r.activo) return false;
-      return true;
-    });
-  }, [rows, filtroNombre, filtroDni, filtroActivo]);
-
   const load = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return;
     const params = new URLSearchParams({
       page: String(page),
       pageSize: String(pageSize),
     });
+    if (filtroNombre.trim()) {
+      params.set("nombre", filtroNombre.trim());
+    }
+    if (filtroDni.trim()) {
+      params.set("dni", filtroDni.trim());
+    }
+    if (filtroActivo !== "todos") {
+      params.set("filtroActivo", filtroActivo);
+    }
     const data = await apiJson<ChoferesPaginatedResponse>(
       `/api/choferes/paginated?${params.toString()}`,
       () => getToken(),
     );
     setRows(data.items);
     setServerMeta(data.meta);
-  }, [getToken, isLoaded, isSignedIn, page, pageSize]);
+  }, [getToken, isLoaded, isSignedIn, page, pageSize, filtroNombre, filtroDni, filtroActivo]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -190,24 +170,15 @@ export function ChoferesTenantPage() {
                   setPage(1);
                 }}
               >
-                <select
+                <ListadoFiltroBuscador
                   value={filtroNombre}
-                  onChange={(e) => {
-                    setFiltroNombre(e.target.value);
+                  onApply={(val) => {
+                    setFiltroNombre(val);
                     setPage(1);
                   }}
-                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    filtroNombre ? "text-vialto-fire" : "text-vialto-charcoal"
-                  }`}
-                  aria-label="Filtrar por Nombre"
-                >
-                  <option value="">Todos</option>
-                  {opcionesNombre.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Buscar…"
+                  ariaLabel="Buscar por Nombre"
+                />
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -220,24 +191,15 @@ export function ChoferesTenantPage() {
                   setPage(1);
                 }}
               >
-                <select
+                <ListadoFiltroBuscador
                   value={filtroDni}
-                  onChange={(e) => {
-                    setFiltroDni(e.target.value);
+                  onApply={(val) => {
+                    setFiltroDni(val);
                     setPage(1);
                   }}
-                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    filtroDni ? "text-vialto-fire" : "text-vialto-charcoal"
-                  }`}
-                  aria-label="Filtrar por DNI"
-                >
-                  <option value="">Todos</option>
-                  {opcionesDni.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Buscar…"
+                  ariaLabel="Buscar por DNI"
+                />
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -303,7 +265,7 @@ export function ChoferesTenantPage() {
             tdClassName: listadoTablaTdClass,
           },
         ]}
-        rows={error ? [] : rowsFiltradas}
+        rows={error ? [] : (rows ?? [])}
         rowKey={(c) => c.id}
         emptyMessage={
           error
