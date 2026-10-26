@@ -112,8 +112,9 @@ export function toFacturaTramosPayload(tramos: FacturaTramoDraft[]) {
 }
 
 /**
- * Neto = suma completa de los viajes. IVA = tramos cargados + el resto del
- * neto con el IVA de cabecera (misma cuenta que se persiste al guardar).
+ * Neto = suma de los tramos cargados (para viajes con tramo) + viajes sin tramo.
+ * La suma de los tramos pisa el monto del viaje.
+ * IVA = tramos cargados + viajes sin tramo con IVA de cabecera.
  */
 export function computeTotalesFacturaPorTramo(
   viajeIds: string[],
@@ -123,8 +124,21 @@ export function computeTotalesFacturaPorTramo(
 ): { neto: number; iva: number; total: number } {
   const completos = tramos.filter(isFacturaTramoCompleto);
   const viajesVinculados = viajes.filter((x) => viajeIds.includes(x.id));
+  const viajeIdsConTramo = new Set(
+    completos.map((t) => t.viajeId).filter(Boolean),
+  );
+  const sumaTramos = roundMoney2(
+    completos.reduce((s, t) => s + (t.monto ?? 0), 0),
+  );
+  const sumaViajesSinTramo = roundMoney2(
+    viajesVinculados
+      .filter((v) => !viajeIdsConTramo.has(v.id))
+      .reduce((s, v) => s + importeNetoViajeParaFactura(v), 0),
+  );
   const neto = roundMoney2(
-    viajesVinculados.reduce((sum, v) => sum + importeNetoViajeParaFactura(v), 0),
+    completos.length > 0
+      ? sumaTramos + sumaViajesSinTramo
+      : viajesVinculados.reduce((s, v) => s + importeNetoViajeParaFactura(v), 0),
   );
   const iva = ivaMontoDeTramos(
     neto,
@@ -179,6 +193,28 @@ export function FacturaTramosEditor({
 
   // Un tramo nuevo recién cuando los anteriores están completos (no se acumulan filas vacías).
   const hayTramoIncompleto = tramos.some((t) => !isFacturaTramoCompleto(t));
+
+  const viajesConDiferencia = useMemo(() => {
+    const tramosPorViaje = new Map<string, number>();
+    for (const t of tramos) {
+      if (isFacturaTramoCompleto(t) && t.viajeId) {
+        tramosPorViaje.set(
+          t.viajeId,
+          roundMoney2((tramosPorViaje.get(t.viajeId) ?? 0) + t.monto),
+        );
+      }
+    }
+    const lista: Array<{ viaje: Viaje; sumaTramos: number; montoOriginal: number }> = [];
+    for (const v of vinculados) {
+      if (!tramosPorViaje.has(v.id)) continue;
+      const suma = tramosPorViaje.get(v.id) ?? 0;
+      const original = importeNetoViajeParaFactura(v);
+      if (Math.abs(suma - original) > 0.005) {
+        lista.push({ viaje: v, sumaTramos: suma, montoOriginal: original });
+      }
+    }
+    return lista;
+  }, [vinculados, tramos]);
 
   return (
     <div className="space-y-3">
@@ -340,6 +376,21 @@ export function FacturaTramosEditor({
         >
           + Agregar tramo
         </button>
+      )}
+
+      {viajesConDiferencia.length > 0 && (
+        <div className="rounded border border-blue-200 bg-blue-50/70 px-3 py-2 text-xs text-blue-900 leading-relaxed">
+          <span className="font-medium">Importante:</span>{" "}
+          {viajesConDiferencia.length === 1 ? (
+            <>
+              La suma de los tramos cargados ({fmtMoney(viajesConDiferencia[0].sumaTramos)}) difiere del monto del viaje ({fmtMoney(viajesConDiferencia[0].montoOriginal)}). Al guardar, el monto del viaje se actualizará a la nueva sumatoria.
+            </>
+          ) : (
+            <>
+              La suma de los tramos cargados difiere del monto original de los viajes. Al guardar, el monto de cada viaje se actualizará a la sumatoria de sus tramos.
+            </>
+          )}
+        </div>
       )}
     </div>
   );
