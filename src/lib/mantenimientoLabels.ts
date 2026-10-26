@@ -10,7 +10,8 @@ import { formatCurrencyArFromNumber } from "@/lib/currencyMask";
 
 // ── Catálogo de tareas ───────────────────────────────────────────────────────
 // Duplicado a propósito del backend (vialto-backend/src/modules/mantenimiento/
-// tareas-mantenimiento.const.ts): no hay paquete compartido. Mantener sincronizados.
+// tareas-mantenimiento.const.ts): no hay paquete compartido. Mantener sincronizados
+// (también los textos con `TAREAS_MANTENIMIENTO_GRUPOS`, que es lo que ve el chofer en la app).
 
 export type CategoriaTarea =
   | "motor"
@@ -141,6 +142,31 @@ export const CATEGORIA_PLAN_LABELS: Record<string, string> = {
   documental: "Documental",
 };
 
+type IntervalosPlan = {
+  intervaloKm: number | null;
+  intervaloDias: number | null;
+  avisoKm: number | null;
+  avisoDias: number | null;
+};
+
+/** "Cada 20.000 km o 180 días" (lo que llegue primero). */
+export function fmtIntervalo(p: IntervalosPlan): string {
+  const partes = [
+    p.intervaloKm != null ? fmtKm(p.intervaloKm) : null,
+    p.intervaloDias != null ? plural(p.intervaloDias, "día", "días") : null,
+  ].filter(Boolean);
+  return partes.length ? `Cada ${partes.join(" o ")}` : "—";
+}
+
+/** "2.000 km / 15 días antes" o "—" si el plan no avisa con anticipación. */
+export function fmtAviso(p: IntervalosPlan): string {
+  const partes = [
+    p.avisoKm != null ? fmtKm(p.avisoKm) : null,
+    p.avisoDias != null ? plural(p.avisoDias, "día", "días") : null,
+  ].filter(Boolean);
+  return partes.length ? `${partes.join(" / ")} antes` : "—";
+}
+
 /** "Faltan 1.500 km · 12 días", "Pasado por 1.000 km", "Venció hace 5 días", etc. */
 export function fmtFaltan(f: FilaVencimiento): string {
   if (f.estado === "sin_datos") {
@@ -173,6 +199,12 @@ const FUENTE_KM_LABELS: Record<string, string> = {
   edicion: "Corrección manual",
   orden_trabajo: "Orden de trabajo",
 };
+
+/** Nombre de la fuente de una lectura de km ("Carga de combustible", "Corrección manual"…). */
+export function fmtFuenteKm(fuente: FuenteKm): string {
+  if (fuente === "vehiculo") return "Km cargado en el vehículo";
+  return FUENTE_KM_LABELS[fuente] ?? fuente;
+}
 
 /** De dónde sale el km: "Carga de combustible del 12/09/2026", "Km cargado en el vehículo", etc. */
 export function fmtOrigenKm(odometro: { fecha: string; fuente: FuenteKm } | null): string {

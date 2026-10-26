@@ -94,7 +94,8 @@ export interface OrdenTrabajo {
   numero: number;
   vehiculoId: string;
   tipo: TipoOrden;
-  origen: 'manual' | 'plan' | (string & {});
+  /** `reporte_chofer` = la registró el chofer desde la app de Combustible. */
+  origen: 'manual' | 'plan' | 'reporte_chofer' | (string & {});
   estado: EstadoOrden;
   tallerId: string | null;
   fecha: string;
@@ -139,6 +140,93 @@ export interface VehiculoPlanAsignado {
   baseKm: number | null;
   baseFecha: string | null;
   plan: { id: string; nombre: string; categoria: CategoriaPlan; activo: boolean; tareas: TareaMantenimiento[] };
+}
+
+/** Plan de mantenimiento (`GET mantenimiento/planes`, `GET planes/:id`). */
+export interface PlanMantenimiento {
+  id: string;
+  nombre: string;
+  categoria: CategoriaPlan;
+  /** null = cualquier tipo de vehículo. */
+  tipoVehiculo: string | null;
+  intervaloKm: number | null;
+  intervaloDias: number | null;
+  avisoKm: number | null;
+  avisoDias: number | null;
+  tareas: TareaMantenimiento[];
+  activo: boolean;
+  /** Vehículos con la asignación activa. */
+  _count: { vehiculos: number };
+}
+
+/** Plan sugerido (`GET mantenimiento/planes/plantillas`). */
+export interface PlantillaPlan {
+  nombre: string;
+  categoria: CategoriaPlan;
+  intervaloKm: number | null;
+  intervaloDias: number | null;
+  avisoKm: number | null;
+  avisoDias: number | null;
+  tareas: TareaMantenimiento[];
+  /** La empresa ya tiene un plan con ese nombre (aunque esté inactivo). */
+  yaCargada: boolean;
+}
+
+/** Vehículo asignado a un plan (`GET mantenimiento/planes/:id/vehiculos`). */
+export interface AsignacionPlan {
+  id: string;
+  vehiculoId: string;
+  planId: string;
+  activo: boolean;
+  baseKm: number | null;
+  baseFecha: string | null;
+  vehiculo: { id: string; patente: string; tipo: string };
+}
+
+/** Respuesta de `POST mantenimiento/planes/:id/vehiculos`. */
+export interface ResultadoAsignacion {
+  creados: AsignacionPlan[];
+  reactivados: AsignacionPlan[];
+  yaAsignados: string[];
+}
+
+/** Quién hizo un evento del historial. `chofer` = lo cargó un chofer desde la app de Combustible. */
+export interface AutorEvento {
+  nombre: string;
+  chofer: boolean;
+}
+
+/** Un evento de la línea de tiempo del vehículo (`GET mantenimiento/vehiculos/:id/historial`). */
+export type EventoHistorial = (
+  | {
+      tipo: "orden";
+      fecha: string;
+      createdAt: string;
+      orden: {
+        id: string;
+        numero: number;
+        tipo: TipoOrden;
+        estado: EstadoOrden;
+        km: number | null;
+        costoTotal: number;
+        tareas: TareaMantenimiento[];
+        descripcion: string | null;
+        taller: { id: string; nombre: string } | null;
+        planes: { vehiculoPlanId: string; planNombre: string }[];
+        cantidadItems: number;
+      };
+    }
+  | { tipo: "lectura"; fecha: string; createdAt: string; km: number; fuente: FuenteKm; fuenteId: string }
+) & {
+  /** null = sin autor conocido (ej. km cargado en el vehículo). */
+  autor: AutorEvento | null;
+};
+
+export interface HistorialVehiculo {
+  vehiculo: { id: string; patente: string; tipo: string; marca: string | null; modelo: string | null; kmActual: number };
+  odometro: { km: number; fecha: string; fuente: FuenteKm } | null;
+  /** Más reciente primero. Incluye OT anuladas. */
+  eventos: EventoHistorial[];
 }
 
 /** Datos con los que "Registrar service" abre el alta de una OT. */

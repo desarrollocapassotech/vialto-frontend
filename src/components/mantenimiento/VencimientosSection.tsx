@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Wrench } from "lucide-react";
+import { ArrowDown, ArrowUp, FileText, Gauge, History, Wrench } from "lucide-react";
+import { AccionesOpcionesSheet, type AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { FiltrosRapidos, type FiltroRapidoOpcion } from "@/components/listado/FiltrosRapidos";
@@ -22,7 +23,6 @@ import {
   fmtFaltan,
   fmtFecha,
   fmtKm,
-  fmtOrigenKm,
   fmtReferencia,
 } from "@/lib/mantenimientoLabels";
 import type { Vehiculo } from "@/types/api";
@@ -44,12 +44,19 @@ export function VencimientosSection({
   reloadKey,
   onRegistrarService,
   limpiarFiltrosSlot,
+  onIrAPlanes,
+  onHistorial,
+  onEditarKm,
 }: {
   getToken: () => Promise<string | null>;
   tenantId?: string;
   soloLectura: boolean;
   reloadKey: number;
   onRegistrarService: (precarga: PrecargaOrden) => void;
+  /** Sin asignaciones: link a la pestaña Planes. */
+  onIrAPlanes?: () => void;
+  onHistorial: (vehiculoId: string) => void;
+  onEditarKm: (vehiculoId: string) => void;
   /** Lugar junto al título de la página para "Limpiar filtros". */
   limpiarFiltrosSlot?: HTMLElement | null;
 }) {
@@ -59,6 +66,8 @@ export function VencimientosSection({
   const [estado, setEstado] = useState<EstadoVencimiento | "">("");
   const [vehiculoId, setVehiculoId] = useState("");
   const [categoria, setCategoria] = useState("");
+  const [ordenFecha, setOrdenFecha] = useState<"asc" | "desc">("asc");
+  const [accionesDeFila, setAccionesDeFila] = useState<FilaVencimiento | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -94,18 +103,39 @@ export function VencimientosSection({
   const hayFiltros = !!estado || !!vehiculoId || !!categoria;
   const filtradas = useMemo(() => {
     if (!filas) return null;
-    return filas.filter(
+    const lista = filas.filter(
       (f) =>
         (!estado || f.estado === estado) &&
         (!vehiculoId || f.vehiculo.id === vehiculoId) &&
         (!categoria || f.plan.categoria === categoria),
     );
-  }, [filas, estado, vehiculoId, categoria]);
+    // Por fecha estimada (la más cercana primero, o al revés); las que no tienen fecha, siempre al final.
+    // `sort` es estable: a igual fecha queda el orden del backend (vencido → próximo → sin datos → ok).
+    const signo = ordenFecha === "asc" ? 1 : -1;
+    return [...lista].sort((a, b) => {
+      if (!a.fechaEstimada || !b.fechaEstimada) return a.fechaEstimada ? -1 : b.fechaEstimada ? 1 : 0;
+      return a.fechaEstimada.localeCompare(b.fechaEstimada) * signo;
+    });
+  }, [filas, estado, vehiculoId, categoria, ordenFecha]);
 
   const vehiculosConPlanes = useMemo(() => {
     const ids = new Set((filas ?? []).map((f) => f.vehiculo.id));
     return maestro.vehiculos.filter((v) => ids.has(v.id));
   }, [filas, maestro.vehiculos]);
+
+  /** Única lista de acciones: la usan el botón de la fila y el clic en la fila (mismo criterio que Cuenta corriente). */
+  function accionesDe(f: FilaVencimiento): AccionOpcion[] {
+    const opciones: AccionOpcion[] = [];
+    if (!soloLectura) {
+      opciones.push({ id: "registrar", label: "Registrar service", icon: Wrench, onClick: () => registrarService(f) });
+    }
+    opciones.push({ id: "historial", label: "Historial del vehículo", icon: History, onClick: () => onHistorial(f.vehiculo.id) });
+    if (!soloLectura) {
+      // Mismo nombre e ícono que en Combustible → Asignación de vehículos.
+      opciones.push({ id: "editar-km", label: "Editar km", icon: Gauge, onClick: () => onEditarKm(f.vehiculo.id) });
+    }
+    return opciones;
+  }
 
   function registrarService(f: FilaVencimiento) {
     onRegistrarService({
@@ -141,9 +171,17 @@ export function VencimientosSection({
       {error && (
         <p className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
       )}
+      {filas?.length === 0 && !error && onIrAPlanes && (
+        <p className="mb-4 text-sm text-vialto-steel">
+          Los vencimientos salen de los planes asignados a cada vehículo.{" "}
+          <button type="button" onClick={onIrAPlanes} className="font-medium text-vialto-fire hover:underline">
+            Ir a Planes
+          </button>
+        </p>
+      )}
 
       <ListadoDatos<FilaVencimiento>
-        tableColSpan={soloLectura ? 7 : 8}
+        tableColSpan={8}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -213,10 +251,24 @@ export function VencimientosSection({
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={listadoTablaThClass}>Faltan</th>
-            <th scope="col" className={listadoTablaThClass}>Fecha estimada</th>
+            <th scope="col" className={listadoTablaThClass} aria-sort={ordenFecha === "asc" ? "ascending" : "descending"}>
+              <button
+                type="button"
+                onClick={() => setOrdenFecha((o) => (o === "asc" ? "desc" : "asc"))}
+                title={ordenFecha === "asc" ? "Más cercana primero (tocá para invertir)" : "Más lejana primero (tocá para invertir)"}
+                className="inline-flex items-center gap-1 uppercase hover:underline"
+              >
+                Próximo service
+                {ordenFecha === "asc" ? (
+                  <ArrowUp className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                ) : (
+                  <ArrowDown className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                )}
+              </button>
+            </th>
             <th scope="col" className={listadoTablaThClass}>Km actual</th>
             <th scope="col" className={listadoTablaThClass}>Último service</th>
-            {!soloLectura && <th scope="col" className={`${listadoTablaThClass} text-right`}>Acciones</th>}
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>Acciones</th>
           </tr>
         }
         columns={[
@@ -225,12 +277,16 @@ export function VencimientosSection({
           {
             id: "plan",
             header: "Plan",
-            cell: (f) => (
-              <span>
-                {f.plan.nombre}
-                <span className="block text-xs text-vialto-steel">{CATEGORIA_PLAN_LABELS[f.plan.categoria] ?? f.plan.categoria}</span>
-              </span>
-            ),
+            cell: (f) => {
+              const Icono = f.plan.categoria === "documental" ? FileText : Wrench;
+              const categoria = CATEGORIA_PLAN_LABELS[f.plan.categoria] ?? f.plan.categoria;
+              return (
+                <span className="inline-flex items-center gap-1.5">
+                  <Icono className="h-3.5 w-3.5 shrink-0 text-vialto-steel/60" strokeWidth={1.75} aria-label={categoria} />
+                  <span title={categoria}>{f.plan.nombre}</span>
+                </span>
+              );
+            },
           },
           {
             id: "faltan",
@@ -241,16 +297,11 @@ export function VencimientosSection({
               </span>
             ),
           },
-          { id: "fechaEstimada", header: "Fecha estimada", cell: (f) => fmtFecha(f.fechaEstimada) },
+          { id: "fechaEstimada", header: "Próximo service", cell: (f) => fmtFecha(f.fechaEstimada) },
           {
             id: "km",
             header: "Km actual",
-            cell: (f) => (
-              <span>
-                {fmtKm(f.odometro?.km)}
-                <span className="block text-xs text-vialto-steel">{fmtOrigenKm(f.odometro)}</span>
-              </span>
-            ),
+            cell: (f) => fmtKm(f.odometro?.km),
           },
           { id: "referencia", header: "Último service", cell: (f) => <span className="text-sm">{fmtReferencia(f)}</span> },
         ]}
@@ -265,16 +316,18 @@ export function VencimientosSection({
         }
         loadingMessage="Calculando vencimientos…"
         actionsTdClassName={listadoTablaAccionesTdClass}
-        renderActions={
-          soloLectura
-            ? undefined
-            : (f) => (
-                <AccionesFila
-                  options={[{ id: "registrar", label: "Registrar service", icon: Wrench, onClick: () => registrarService(f) }]}
-                  destacadas={["registrar"]}
-                />
-              )
-        }
+        onRowClick={(f) => setAccionesDeFila(f)}
+        renderActions={(f) => (
+          <AccionesFila options={accionesDe(f)} destacadas={soloLectura ? ["historial"] : ["registrar", "historial"]} />
+        )}
+      />
+
+      <AccionesOpcionesSheet
+        open={accionesDeFila != null}
+        onClose={() => setAccionesDeFila(null)}
+        title="Acciones"
+        subtitle={accionesDeFila ? `${accionesDeFila.vehiculo.patente} · ${accionesDeFila.plan.nombre}` : undefined}
+        options={accionesDeFila ? accionesDe(accionesDeFila) : []}
       />
     </div>
   );

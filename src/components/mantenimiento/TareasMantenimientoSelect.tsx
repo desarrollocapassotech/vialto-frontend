@@ -15,6 +15,7 @@ import {
 } from "@/lib/mantenimientoLabels";
 import type { TareaMantenimiento } from "@/types/mantenimiento";
 import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
+import { marcarModalModificado } from "@/lib/descarteModal";
 
 const GRUPOS = [
   ...ordenarAlfabetico(TAREAS_POR_CATEGORIA, (g) => g.label).map((g) => ({
@@ -114,6 +115,7 @@ export function TareasMantenimientoSelect({
   }, [q]);
 
   function toggle(v: TareaMantenimiento) {
+    marcarModalModificado();
     onChange(
       value.includes(v) ? value.filter((x) => x !== v) : [...value, v],
     );
@@ -130,6 +132,7 @@ export function TareasMantenimientoSelect({
           <input
             ref={searchRef}
             type="text"
+            data-descarte-ignorar
             autoComplete="off"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

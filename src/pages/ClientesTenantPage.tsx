@@ -16,6 +16,7 @@ import {
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useIdFiscalLabel } from "@/hooks/useIdFiscalLabel";
+import { ListadoFiltroBuscador } from "@/components/listado/ListadoFiltroBuscador";
 import type { Cliente, PaginatedMeta } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 import { compararAlfabetico } from "@/lib/ordenAlfabetico";
@@ -56,25 +57,6 @@ export function ClientesTenantPage() {
 
   const anyFiltroActivo = !!filtroNombre || !!filtroIdFiscal || !!filtroPais;
 
-  // Extracción de opciones únicas para los selectores
-  const opcionesNombre = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          (rows || []).map((r) => r.nombre).filter((v): v is string => !!v),
-        ),
-      ).sort(compararAlfabetico),
-    [rows],
-  );
-  const opcionesIdFiscal = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          (rows || []).map((r) => r.idFiscal).filter((v): v is string => !!v),
-        ),
-      ).sort(compararAlfabetico),
-    [rows],
-  );
   const opcionesPais = useMemo(
     () =>
       Array.from(
@@ -85,23 +67,21 @@ export function ClientesTenantPage() {
     [rows],
   );
 
-  const rowsFiltradas = useMemo(() => {
-    if (!rows) return [];
-    return rows.filter((r) => {
-      if (filtroNombre && r.nombre !== filtroNombre) return false;
-      if (filtroIdFiscal && r.idFiscal !== filtroIdFiscal) return false;
-      if (filtroPais && r.pais !== filtroPais) return false;
-      return true;
-    });
-  }, [rows, filtroNombre, filtroIdFiscal, filtroPais]);
-
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
     (async () => {
       try {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        if (filtroNombre.trim()) params.set("nombre", filtroNombre.trim());
+        if (filtroIdFiscal.trim()) params.set("idFiscal", filtroIdFiscal.trim());
+        if (filtroPais.trim()) params.set("pais", filtroPais.trim());
+
         const data = await apiJson<ClientesPaginatedResponse>(
-          `/api/clientes/paginated?page=${page}&pageSize=${pageSize}`,
+          `/api/clientes/paginated?${params.toString()}`,
           () => getToken(),
         );
         if (!cancelled) {
@@ -120,7 +100,7 @@ export function ClientesTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn, page, pageSize]);
+  }, [getToken, isLoaded, isSignedIn, page, pageSize, filtroNombre, filtroIdFiscal, filtroPais]);
 
   return (
     <div className="w-full">
@@ -168,24 +148,14 @@ export function ClientesTenantPage() {
                   setPage(1);
                 }}
               >
-                <select
+                <ListadoFiltroBuscador
                   value={filtroNombre}
-                  onChange={(e) => {
-                    setFiltroNombre(e.target.value);
+                  onApply={(val) => {
+                    setFiltroNombre(val);
                     setPage(1);
                   }}
-                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    filtroNombre ? "text-vialto-fire" : "text-vialto-charcoal"
-                  }`}
-                  aria-label="Filtrar por Nombre"
-                >
-                  <option value="">Todos</option>
-                  {opcionesNombre.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
+                  ariaLabel="Buscar por Nombre"
+                />
               </ViajesListadoHeaderFiltro>
             </th>
             {idFiscalVisible && (
@@ -199,24 +169,14 @@ export function ClientesTenantPage() {
                     setPage(1);
                   }}
                 >
-                  <select
+                  <ListadoFiltroBuscador
                     value={filtroIdFiscal}
-                    onChange={(e) => {
-                      setFiltroIdFiscal(e.target.value);
+                    onApply={(val) => {
+                      setFiltroIdFiscal(val);
                       setPage(1);
                     }}
-                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                      filtroIdFiscal ? "text-vialto-fire" : "text-vialto-charcoal"
-                    }`}
-                    aria-label={`Filtrar por ${idFiscalLabel}`}
-                  >
-                    <option value="">Todos</option>
-                    {opcionesIdFiscal.map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
-                  </select>
+                    ariaLabel={`Buscar por ${idFiscalLabel}`}
+                  />
                 </ViajesListadoHeaderFiltro>
               </th>
             )}
@@ -316,7 +276,7 @@ export function ClientesTenantPage() {
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           }] : []),
         ]}
-        rows={error ? [] : rowsFiltradas}
+        rows={error ? [] : (rows ?? [])}
         rowKey={(c) => c.id}
         emptyMessage={
           error

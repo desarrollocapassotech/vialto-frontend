@@ -12,7 +12,12 @@ import {
   canAccessCombustible,
   canAccessCuentaCorriente,
   canAccessEmisionLiquidoProductoArca,
+  canAccessMantenimiento,
+  planesMantenimientoHabilitados,
 } from "@/lib/tenantModules";
+import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { useMantenimientoDashboard } from "@/hooks/useMantenimientoDashboard";
+import { ProximosVencimientosLista } from "@/components/mantenimiento/ProximosVencimientosLista";
 import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -22,6 +27,7 @@ import {
   Fuel,
   HandCoins,
   TriangleAlert,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import { useLockBodyScroll } from "@/hooks/useLockBodyScroll";
@@ -278,6 +284,7 @@ export function AlertsPanel({
   };
   const margenBajo = alertas.margenBajo ?? { cantidad: 0, montoTotal: 0 };
   const erroresChofer = alertas.erroresChofer?.cantidad ?? 0;
+  const mantenimiento = alertas.mantenimiento ?? { cantidad: 0, vencidos: 0, proximos: 0 };
   // Sin contador a propósito: la campana del menú superior es el único lugar con número
   // de avisos (ver NotificationBell). Este panel es solo el detalle de lo que sigue abierto.
   const resumenMobile = "Situaciones abiertas del período";
@@ -612,6 +619,59 @@ export function AlertsPanel({
             </div>
           </div>
         )}
+
+        {mantenimiento.cantidad > 0 && (
+          // Rojo si hay algo vencido; ámbar si solo hay próximos.
+          <div
+            className={`flex gap-3 rounded-md border-2 px-3 py-3 ${
+              mantenimiento.vencidos > 0 ? "border-rose-500/70 bg-rose-950/30" : "border-amber-500/70 bg-amber-950/30"
+            }`}
+          >
+            <AlertTriangleIcon
+              className={`mt-0.5 h-5 w-5 shrink-0 ${mantenimiento.vencidos > 0 ? "text-rose-400" : "text-amber-400"}`}
+            />
+            <div className="min-w-0 flex-1">
+              <p
+                className={`font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] ${
+                  mantenimiento.vencidos > 0 ? "text-rose-200/80" : "text-amber-200/80"
+                }`}
+              >
+                Mantenimiento vencido o por vencer
+              </p>
+              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
+                {mantenimiento.cantidad}{" "}
+                <span className="font-body text-base text-white/70">
+                  {mantenimiento.cantidad === 1 ? "plan" : "planes"}
+                </span>
+              </p>
+              <p className={`mt-1 text-xs ${mantenimiento.vencidos > 0 ? "text-rose-100/90" : "text-amber-100/90"}`}>
+                {[
+                  mantenimiento.vencidos > 0
+                    ? `${mantenimiento.vencidos} ${mantenimiento.vencidos === 1 ? "vencido" : "vencidos"}`
+                    : null,
+                  mantenimiento.proximos > 0
+                    ? `${mantenimiento.proximos} ${mantenimiento.proximos === 1 ? "próximo" : "próximos"}`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                <Link
+                  to="/mantenimiento?tab=vencimientos"
+                  className={
+                    mantenimiento.vencidos > 0
+                      ? "inline-flex min-h-11 w-full items-center justify-center rounded border border-rose-400/40 bg-rose-950/40 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-rose-100 hover:bg-rose-900/55 hover:border-rose-300/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 transition-colors"
+                      : "inline-flex min-h-11 w-full items-center justify-center rounded border border-amber-400/40 bg-amber-950/30 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-amber-100 hover:bg-amber-900/40 hover:border-amber-300/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors"
+                  }
+                  onClick={closePanel}
+                >
+                  Ir a mantenimiento →
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -770,7 +830,7 @@ interface TenantOwnerDashboardProps {
   loadingViajeId?: string | null;
 }
 
-type ModuloDashboardTab = "financiero" | "stock" | "combustible" | "cuenta-corriente";
+type ModuloDashboardTab = "financiero" | "stock" | "combustible" | "cuenta-corriente" | "mantenimiento";
 
 export function TenantOwnerDashboard({
   tenantId,
@@ -786,6 +846,9 @@ export function TenantOwnerDashboard({
   const showCombustible = canAccessCombustible(modules);
   const showCuentaCorriente = canAccessCuentaCorriente(modules);
   const showIntegracionArca = canAccessEmisionLiquidoProductoArca(modules);
+  // Con los planes apagados (switch de superadmin) no hay vencimientos que mostrar.
+  const { tenant } = useCurrentTenant();
+  const showMantenimiento = canAccessMantenimiento(modules) && planesMantenimientoHabilitados(tenant);
   const showFinanciero = showViajes || showFacturacionModulo;
   const [periodModalOpen, setPeriodModalOpen] = useState(false);
   const [moduloSheetOpen, setModuloSheetOpen] = useState(false);
@@ -807,9 +870,14 @@ export function TenantOwnerDashboard({
     ...(showCuentaCorriente
       ? [{ id: "cuenta-corriente" as const, label: "Cuenta corriente", icon: HandCoins }]
       : []),
+    ...(showMantenimiento
+      ? [{ id: "mantenimiento" as const, label: "Mantenimiento", icon: Wrench }]
+      : []),
   ];
   const [moduloTab, setModuloTab] = useState<ModuloDashboardTab | null>(null);
   const moduloActivo = moduloTab ?? moduloTabs[0]?.id ?? "financiero";
+  // Solo se pide cuando la pestaña está abierta.
+  const mant = useMantenimientoDashboard(moduloActivo === "mantenimiento" && showMantenimiento);
   const moduloActivoDef = moduloTabs.find((t) => t.id === moduloActivo);
   const ModuloActivoIcon = moduloActivoDef?.icon;
 
@@ -1175,6 +1243,56 @@ export function TenantOwnerDashboard({
 
       {moduloActivo === "cuenta-corriente" && showCuentaCorriente && (
         <CuentaCorrienteDashboardSection dash={dash} />
+      )}
+
+      {moduloActivo === "mantenimiento" && showMantenimiento && (
+        <section aria-labelledby="mantenimiento-heading" className="space-y-4">
+          <h2
+            id="mantenimiento-heading"
+            className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel"
+          >
+            Vencimientos{" "}
+            <span className="normal-case tracking-normal text-vialto-steel/70">· hoy, no depende del período</span>
+          </h2>
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <MetricCard
+              title="Vencidos"
+              tooltip="Planes asignados que ya pasaron su km o su fecha"
+              simpleCount={mant.contadores.vencido}
+              loading={mant.loading}
+              valueTone="payable"
+              linkTo="/mantenimiento?tab=vencimientos"
+            />
+            <MetricCard
+              title="Próximos"
+              tooltip="Planes dentro del aviso anticipado (km o días)"
+              simpleCount={mant.contadores.proximo}
+              loading={mant.loading}
+              valueTone="warn"
+              linkTo="/mantenimiento?tab=vencimientos"
+            />
+            <MetricCard
+              title="Sin datos"
+              tooltip="Planes sin último service o sin km actual: todavía no se puede calcular"
+              simpleCount={mant.contadores.sin_datos}
+              loading={mant.loading}
+              linkTo="/mantenimiento?tab=vencimientos"
+            />
+            <MetricCard
+              title="Al día"
+              tooltip="Planes que todavía no requieren atención"
+              simpleCount={mant.contadores.ok}
+              loading={mant.loading}
+              valueTone="positiveCash"
+              linkTo="/mantenimiento?tab=vencimientos"
+            />
+          </div>
+          {mant.error ? (
+            <p className="text-sm text-vialto-steel">No se pudieron cargar los vencimientos.</p>
+          ) : (
+            !mant.loading && <ProximosVencimientosLista filas={mant.proximos} hayPlanes={(mant.filas?.length ?? 0) > 0} />
+          )}
+        </section>
       )}
     </div>
   );

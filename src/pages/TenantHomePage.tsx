@@ -33,6 +33,7 @@ import {
   canAccessEmisionFacturasArca,
   canAccessEmisionLiquidoProductoArca,
   canAccessFacturacion,
+  canAccessMantenimiento,
   canAccessViajes,
 } from "@/lib/tenantModules";
 import {
@@ -142,12 +143,15 @@ export function TenantHomePage() {
     (canAccessFacturacion(tenant.modules) ||
       hasFacturasArca ||
       canAccessCombustible(tenant.modules) ||
-      canAccessViajes(tenant.modules)) &&
+      canAccessViajes(tenant.modules) ||
+      canAccessMantenimiento(tenant.modules)) &&
     alertas != null &&
     (alertas.facturasVencidas.cantidad > 0 ||
       alertas.viajesSinFactura.cantidad > 0 ||
       (alertas.cargasSospechosas?.cantidad ?? 0) > 0 ||
-      (alertas.margenBajo?.cantidad ?? 0) > 0);
+      (alertas.erroresChofer?.cantidad ?? 0) > 0 ||
+      (alertas.margenBajo?.cantidad ?? 0) > 0 ||
+      (alertas.mantenimiento?.cantidad ?? 0) > 0);
 
   return (
     <div className="w-full">

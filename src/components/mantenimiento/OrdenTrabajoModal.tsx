@@ -45,6 +45,8 @@ import type {
   VehiculoPlanAsignado,
 } from "@/types/mantenimiento";
 import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
+import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { planesMantenimientoHabilitados } from "@/lib/tenantModules";
 
 export type OrdenModalEstado =
   | { modo: "crear"; precarga?: PrecargaOrden }
@@ -55,6 +57,15 @@ const INPUT = "h-10 w-full border bg-white px-3 text-sm";
 function hoyIso(): string {
   const d = new Date();
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function Dato({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0 px-3 py-2">
+      <dt className="text-[11px] uppercase tracking-wider text-vialto-steel">{label}</dt>
+      <dd className="truncate text-sm text-vialto-charcoal">{children}</dd>
+    </div>
+  );
 }
 
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
@@ -90,6 +101,9 @@ export function OrdenTrabajoModal({
 }) {
   const { showToast } = useToast();
   const maestro = useMaestroData();
+  // Planes apagados (switch de superadmin): sin "Planes que cumple". Una OT vieja conserva los suyos al editarla.
+  const { tenant } = useCurrentTenant();
+  const conPlanes = planesMantenimientoHabilitados(tenant);
 
   const [modo, setModo] = useState<"crear" | "ver" | "editar">(estado.modo);
   const [orden, setOrden] = useState<OrdenTrabajoDetalle | null>(null);
@@ -131,7 +145,8 @@ export function OrdenTrabajoModal({
     [fieldErrors, lineaErrors],
   );
   const [guardando, setGuardando] = useState(false);
-  const descarte = useConfirmarDescarte(onClose);
+  // En "ver" no hay nada que perder; al pasar a editar arranca sin cambios.
+  const descarte = useConfirmarDescarte(onClose, modo !== "ver");
 
   const cargarFormDesde = useCallback((o: OrdenTrabajoDetalle) => {
     setVehiculoId(o.vehiculoId);
@@ -202,6 +217,13 @@ export function OrdenTrabajoModal({
       if (nuevas.length) setTareas([...tareas, ...Array.from(new Set(nuevas))]);
     }
     setVehiculoPlanIds(next);
+  }
+
+  /** Plan recién asignado desde "+ Asignar plan": queda tildado y suma sus tareas. */
+  function tildarPlanAsignado(vp: VehiculoPlanAsignado) {
+    descarte.marcarModificado();
+    setVehiculoPlanIds((prev) => (prev.includes(vp.id) ? prev : [...prev, vp.id]));
+    setTareas((prev) => [...prev, ...vp.plan.tareas.filter((t) => !prev.includes(t))]);
   }
 
   function validar(): boolean {
@@ -276,7 +298,8 @@ export function OrdenTrabajoModal({
       : orden
         ? (
             <span className="flex items-center gap-2">
-              OT N° {orden.numero} · {orden.vehiculo.patente}
+              OT N° {orden.numero} ·{" "}
+              <VehiculoHoverCard vehiculoId={orden.vehiculo.id}>{orden.vehiculo.patente}</VehiculoHoverCard>
               <EstadoOrdenBadge estado={orden.estado} />
             </span>
           )
@@ -305,23 +328,16 @@ export function OrdenTrabajoModal({
     ) : (
       <>
         <ErrorPieModal error={error} fieldErrors={erroresPie} />
-        <button
-          type="button"
-          disabled={guardando}
-          onClick={() => {
-            if (modo === "editar" && orden) {
-              // Volver a la vista descartando lo editado.
-              cargarFormDesde(orden);
-              setModo("ver");
-            } else {
-              onClose();
-            }
-          }}
-          className={viewModalBtnGhost}
-        >
+        <button type="button" disabled={guardando} onClick={descarte.solicitarCierre} className={viewModalBtnGhost}>
           Cancelar
         </button>
-        <button type="button" disabled={guardando || cargando} onClick={() => void guardar()} className={viewModalBtnPrimary}>
+        <button
+          key="guardar"
+          type="button"
+          disabled={guardando || cargando}
+          onClick={() => void guardar()}
+          className={viewModalBtnPrimary}
+        >
           {guardando && <Spinner className="mr-2 h-3.5 w-3.5" />}
           {guardando ? "Guardando…" : "Guardar"}
         </button>
@@ -329,11 +345,11 @@ export function OrdenTrabajoModal({
     );
 
   return (
-    <ViewModalShell title={titulo} onClose={descarte.solicitarCierre} descarte={descarte} footer={footer} maxWidthClass="sm:max-w-3xl" scrollBody>
+    <ViewModalShell title={titulo} onClose={descarte.solicitarCierre} descarte={descarte} footer={footer} maxWidthClass="sm:max-w-5xl" scrollBody>
       {cargando ? (
         <p className="text-sm text-vialto-steel">Cargando…</p>
       ) : modo === "ver" && orden ? (
-        <VistaOrden orden={orden} warning={warning} getToken={getToken} tenantId={tenantId} />
+        <VistaOrden orden={orden} warning={warning} conPlanes={conPlanes} getToken={getToken} tenantId={tenantId} />
       ) : (
         <div className="grid gap-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -395,17 +411,22 @@ export function OrdenTrabajoModal({
             </div>
           </div>
 
+          {conPlanes && (
           <div className="grid gap-1.5">
             <CrudFieldLabel>Planes que cumple</CrudFieldLabel>
             <PlanesCumpleCheckboxes
               vehiculoId={vehiculoId}
+              vehiculoTipo={vehiculo?.tipo}
               value={vehiculoPlanIds}
               onChange={cambiarPlanes}
               onPlanesCargados={setPlanesUnidad}
+              onAsignado={tildarPlanAsignado}
+              soloLectura={soloLectura}
               getToken={getToken}
               tenantId={tenantId}
             />
           </div>
+          )}
 
           <div className="grid gap-1.5">
             <CrudFieldLabel>Tareas realizadas</CrudFieldLabel>
@@ -445,11 +466,14 @@ export function OrdenTrabajoModal({
 function VistaOrden({
   orden,
   warning,
+  conPlanes,
   getToken,
   tenantId,
 }: {
   orden: OrdenTrabajoDetalle;
   warning: string | null;
+  /** Planes apagados: "Planes que cumple" solo si la OT tiene alguno (de antes del switch). */
+  conPlanes: boolean;
   getToken: () => Promise<string | null>;
   tenantId?: string;
 }) {
@@ -464,19 +488,24 @@ function VistaOrden({
           </p>
         </div>
       )}
+      {/* Franja compacta (mismo estilo que el detalle de Cuenta corriente); el vehículo va en el título. */}
+      <dl className="grid grid-cols-2 border border-black/10 bg-vialto-mist/40 sm:grid-flow-col sm:auto-cols-fr sm:grid-cols-none sm:divide-x sm:divide-black/10">
+        <Dato label="Fecha">{fmtFecha(orden.fecha)}</Dato>
+        <Dato label="Tipo">
+          {fmtTipoOrden(orden.tipo)}
+          {orden.origen === "reporte_chofer" && <span className="text-vialto-steel"> · por el chofer</span>}
+        </Dato>
+        <Dato label="Km">{fmtKm(orden.km)}</Dato>
+        <Dato label="Taller">{orden.taller?.nombre ?? "—"}</Dato>
+      </dl>
       <div className={viewModalGridClass}>
-        <Campo label="Vehículo">
-          <VehiculoHoverCard vehiculoId={orden.vehiculo.id}>{orden.vehiculo.patente}</VehiculoHoverCard>
-        </Campo>
-        <Campo label="Fecha del trabajo">{fmtFecha(orden.fecha)}</Campo>
-        <Campo label="Tipo">{fmtTipoOrden(orden.tipo)}</Campo>
-        <Campo label="Km del vehículo">{fmtKm(orden.km)}</Campo>
-        <Campo label="Taller">{orden.taller?.nombre ?? "—"}</Campo>
-        <Campo label="Planes que cumple">
-          {orden.planes.length ? orden.planes.map((p) => p.vehiculoPlan.plan.nombre).join(", ") : "—"}
-        </Campo>
+        {(conPlanes || orden.planes.length > 0) && (
+          <Campo label="Planes que cumple">
+            {orden.planes.length ? orden.planes.map((p) => p.vehiculoPlan.plan.nombre).join(", ") : "—"}
+          </Campo>
+        )}
+        <Campo label="Tareas realizadas">{fmtTareas(orden.tareas)}</Campo>
       </div>
-      <Campo label="Tareas realizadas">{fmtTareas(orden.tareas)}</Campo>
       <div>
         <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Costos</p>
         {orden.items.length === 0 ? (

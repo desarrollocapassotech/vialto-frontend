@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Ban, Eye, Trash2 } from "lucide-react";
+import { Ban, Eye, History, Trash2 } from "lucide-react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
@@ -31,6 +31,7 @@ export function OrdenesTrabajoSection({
   soloLectura,
   reloadKey,
   onVer,
+  onHistorial,
   onCambio,
   limpiarFiltrosSlot,
 }: {
@@ -41,6 +42,7 @@ export function OrdenesTrabajoSection({
   /** Lugar junto al título de la página para "Limpiar filtros". */
   limpiarFiltrosSlot?: HTMLElement | null;
   onVer: (ordenId: string) => void;
+  onHistorial: (vehiculoId: string) => void;
   /** Se anuló o borró una orden: el padre recarga también los vencimientos. */
   onCambio: () => void;
 }) {
@@ -248,7 +250,18 @@ export function OrdenesTrabajoSection({
           { id: "numero", header: "N°", cell: (o) => <span className="tabular-nums">{o.numero}</span> },
           { id: "fecha", header: "Fecha", cell: (o) => fmtFecha(o.fecha) },
           { id: "unidad", header: "Vehículo", primary: true, cell: (o) => <VehiculoHoverCard vehiculoId={o.vehiculo.id}>{o.vehiculo.patente}</VehiculoHoverCard> },
-          { id: "tipo", header: "Tipo", cell: (o) => fmtTipoOrden(o.tipo) },
+          {
+            id: "tipo",
+            header: "Tipo",
+            cell: (o) => (
+              <span>
+                {fmtTipoOrden(o.tipo)}
+                {o.origen === "reporte_chofer" && (
+                  <span className="block text-xs text-vialto-steel">Cargada por el chofer</span>
+                )}
+              </span>
+            ),
+          },
           { id: "taller", header: "Taller", cell: (o) => o.taller?.nombre ?? "—" },
           { id: "km", header: "Km", cell: (o) => fmtKm(o.km) },
           {
@@ -272,7 +285,10 @@ export function OrdenesTrabajoSection({
         loadingMessage="Cargando…"
         actionsTdClassName={listadoTablaAccionesTdClass}
         renderActions={(o) => {
-          const opciones: AccionOpcion[] = [{ id: "ver", label: "Ver orden de trabajo", icon: Eye, onClick: () => onVer(o.id) }];
+          const opciones: AccionOpcion[] = [
+            { id: "ver", label: "Ver orden de trabajo", icon: Eye, onClick: () => onVer(o.id) },
+            { id: "historial", label: "Historial del vehículo", icon: History, onClick: () => onHistorial(o.vehiculo.id) },
+          ];
           if (!soloLectura && o.estado !== "anulada") {
             opciones.push({ id: "anular", label: "Anular", icon: Ban, onClick: () => setAAnular(o) });
           }

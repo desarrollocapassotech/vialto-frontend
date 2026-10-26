@@ -122,13 +122,16 @@ export function computeTotalesFacturaPorTramo(
   ivaPctViajesSinTramo: number,
 ): { neto: number; iva: number; total: number } {
   const completos = tramos.filter(isFacturaTramoCompleto);
+  const viajesVinculados = viajes.filter((x) => viajeIds.includes(x.id));
   const neto = roundMoney2(
-    viajeIds.reduce((sum, id) => {
-      const v = viajes.find((x) => x.id === id);
-      return sum + (v ? importeNetoViajeParaFactura(v) : 0);
-    }, 0),
+    viajesVinculados.reduce((sum, v) => sum + importeNetoViajeParaFactura(v), 0),
   );
-  const iva = ivaMontoDeTramos(neto, completos, ivaPctViajesSinTramo);
+  const iva = ivaMontoDeTramos(
+    neto,
+    completos,
+    ivaPctViajesSinTramo,
+    viajesVinculados,
+  );
   return { neto, iva, total: roundMoney2(neto + iva) };
 }
 

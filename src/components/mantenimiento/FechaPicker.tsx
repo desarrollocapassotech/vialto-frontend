@@ -8,6 +8,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { marcarModalModificado } from "@/lib/descarteModal";
 
 const DIAS_SEMANA = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"];
 const GAP = 4;
@@ -162,6 +163,7 @@ export function FechaPicker({
   }
 
   function elegirDia(f: FechaYMD) {
+    marcarModalModificado();
     onChange(toIso(f));
     setOpen(false);
   }
@@ -241,6 +243,7 @@ export function FechaPicker({
             <button
               type="button"
               onClick={() => {
+                marcarModalModificado();
                 onChange("");
                 setOpen(false);
               }}
