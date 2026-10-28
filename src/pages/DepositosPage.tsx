@@ -5,6 +5,7 @@ import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { useTenantsList } from "@/hooks/useTenantsList";
+import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
@@ -62,6 +63,11 @@ export function DepositosPage({
   const [saving, setSaving] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const descarteForm = useConfirmarDescarte(() => {
+    setIsFormOpen(false);
+    setEditingDepositoId(null);
+    setFieldErrors({});
+  }, isFormOpen);
   const [editingDepositoId, setEditingDepositoId] = useState<string | null>(
     null,
   );
@@ -308,9 +314,6 @@ export function DepositosPage({
           <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
             Depósitos
           </h1>
-          <p className="mt-2 text-vialto-steel">
-            Almacená y administrá los puntos de depósito para tu stock.
-          </p>
         </div>
         {(!isPlatform || activeTenantId) && anyFiltroActivo && (
           <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
@@ -480,21 +483,24 @@ export function DepositosPage({
           )}
 
           {isFormOpen && (
-            <div className="mt-8 rounded border border-black/5 bg-white p-6 shadow-sm">
-              <h2 className="text-2xl font-semibold">
-                {editingDepositoId ? "Editar depósito" : "Nuevo depósito"}
-              </h2>
-              <p className="mt-1 text-sm text-vialto-steel">
-                {editingDepositoId
-                  ? "Actualizá los datos del depósito."
-                  : "Cargá un depósito para aplicar stock."}
-              </p>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+              <form
+                onSubmit={handleSubmit}
+                className="w-full max-w-md rounded border border-black/10 bg-white p-5 shadow-lg"
+              >
+                <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">
+                  {editingDepositoId ? "Editar depósito" : "Nuevo depósito"}
+                </h2>
+                <p className="mt-1 mb-4 text-sm text-vialto-steel">
+                  {editingDepositoId
+                    ? "Actualizá los datos del depósito."
+                    : "Cargá un depósito para aplicar stock."}
+                </p>
 
-              <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-                <div>
-                  <label className="block text-sm font-semibold text-vialto-charcoal">
+                <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
+                  <span>
                     Nombre <span className="text-red-500">*</span>
-                  </label>
+                  </span>
                   <input
                     value={form.nombre}
                     onChange={(event) =>
@@ -503,15 +509,14 @@ export function DepositosPage({
                         nombre: event.target.value,
                       }))
                     }
-                    className={`mt-2 w-full rounded border px-3 py-2 text-sm ${fieldErrors.nombre ? "border-red-400" : "border-black/10"}`}
+                    className={`h-9 border px-2 text-sm normal-case tracking-normal text-vialto-charcoal ${fieldErrors.nombre ? "border-red-400" : "border-black/15"}`}
+                    autoFocus
                   />
-                  <CrudFieldError message={fieldErrors.nombre} />
-                </div>
+                </label>
+                <CrudFieldError message={fieldErrors.nombre} />
 
-                <div>
-                  <label className="block text-sm font-semibold text-vialto-charcoal">
-                    Dirección
-                  </label>
+                <label className="mt-3 flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
+                  Dirección
                   <input
                     value={form.direccion}
                     onChange={(event) =>
@@ -520,48 +525,50 @@ export function DepositosPage({
                         direccion: event.target.value,
                       }))
                     }
-                    className="mt-2 w-full rounded border border-black/10 px-3 py-2 text-sm"
+                    className="h-9 border border-black/15 px-2 text-sm normal-case tracking-normal text-vialto-charcoal"
                   />
-                </div>
+                </label>
 
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 text-sm text-vialto-charcoal">
-                    <input
-                      type="checkbox"
-                      checked={form.activo}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          activo: event.target.checked,
-                        }))
-                      }
-                    />
-                    Activo
-                  </label>
-                </div>
+                <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-vialto-charcoal">
+                  <input
+                    type="checkbox"
+                    checked={form.activo}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        activo: event.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4"
+                  />
+                  Activo
+                </label>
 
-                <div className="flex flex-wrap gap-2 pt-4">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-60"
-                  >
-                    Guardar
-                  </button>
+                {error && (
+                  <p className="mt-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {error}
+                  </p>
+                )}
+
+                <div className="mt-5 flex justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setIsFormOpen(false);
-                      setEditingDepositoId(null);
-                      setError(null);
-                      setFieldErrors({});
-                    }}
-                    className="inline-flex h-10 items-center px-4 border border-black/10 text-sm uppercase tracking-wider hover:bg-vialto-mist"
+                    disabled={saving}
+                    onClick={descarteForm.solicitarCierre}
+                    className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
                   >
                     Cancelar
                   </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
+                  >
+                    {saving ? "Guardando…" : "Guardar"}
+                  </button>
                 </div>
               </form>
+              {descarteForm.dialogo}
             </div>
           )}
         </>

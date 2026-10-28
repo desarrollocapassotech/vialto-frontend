@@ -52,7 +52,7 @@ export function UserViewModal({
     <ViewModalShell
       title={nombreCompleto}
       onClose={onClose}
-      maxWidthClass="sm:max-w-md"
+      maxWidthClass="sm:max-w-2xl"
       footer={
         <>
           <button type="button" onClick={onClose} className={viewModalBtnGhost}>
@@ -73,9 +73,9 @@ export function UserViewModal({
           { label: 'Rol', value: formatRole(user.role, user.platformRole) },
           { label: 'Alta', value: formatDate(user.createdAt) },
         ].filter(c => c.value != null && c.value !== '').map((c, i) => (
-          <div key={i}>
+          <div key={i} className="min-w-0">
             <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{c.label}</p>
-            <p className="mt-1 text-sm">{c.value}</p>
+            <p className="mt-1 text-sm [overflow-wrap:anywhere]">{c.value}</p>
           </div>
         ))}
       </div>
