@@ -55,7 +55,15 @@ import { ConfirmarAnulacionManualModal } from "@/components/liquidaciones/Confir
 import { Spinner } from "@/components/ui/Spinner";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { TransportistaSearchSelect } from "@/components/forms/MaestroSearchSelects";
-import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import {
+  TituloOrdenable,
+  ViajesListadoHeaderFiltro,
+} from "@/components/viajes/ViajesListadoHeaderFiltro";
+import {
+  ordenarPorClaves,
+  useOrdenColumna,
+  type ValorOrden,
+} from "@/lib/ordenListado";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { useToast } from "@/lib/toast";
@@ -136,6 +144,27 @@ function fmtDateCorta(iso: string) {
 function transportistaNombre(liq: LiquidacionConTransportista) {
   return liq.transportista?.nombre ?? liq.transportistaId;
 }
+
+/** Columnas de la grilla que se pueden ordenar con click en el título. */
+type LiquidacionSortField =
+  | "comprobante"
+  | "transportista"
+  | "periodo"
+  | "bruto"
+  | "comision"
+  | "iva"
+  | "liquido"
+  | "estado";
+
+/** Estado en orden del circuito, no alfabético. */
+const LIQUIDACION_ESTADO_ORDEN: Record<string, number> = {
+  borrador: 1,
+  pendiente_cae: 2,
+  autorizado: 3,
+  error: 4,
+  pendiente_anulacion: 5,
+  anulado: 6,
+};
 
 function LiquidacionAccionesMenu({
   liq,
@@ -363,6 +392,9 @@ export function LiquidacionesTenantPage() {
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const { orden, ordenColumna } = useOrdenColumna<LiquidacionSortField>(() =>
+    setPage(1),
+  );
 
   const [estadoFilter, setEstadoFilter] = useState<LiquidacionEstado | "todos">(
     "todos",
@@ -878,6 +910,33 @@ export function LiquidacionesTenantPage() {
    * N° de comprobante: el del CVLP (PV-número) con ARCA, o el de la factura del proveedor
    * sin ARCA. Sin número: "" si tiene adjunto (queda solo el clip), "—" si no tiene nada.
    */
+  /** Lo que se ve en cada celda es lo que ordena. */
+  function clavesOrdenLiquidacion(
+    liq: LiquidacionConTransportista,
+    by: LiquidacionSortField,
+  ): ValorOrden[] {
+    switch (by) {
+      case "comprobante": {
+        const n = numeroLiquidacion(liq);
+        return [n === "—" ? null : n];
+      }
+      case "transportista":
+        return [transportistaNombre(liq)];
+      case "periodo":
+        return [Date.parse(liq.periodoDesde), Date.parse(liq.periodoHasta)];
+      case "bruto":
+        return [liq.bruto];
+      case "comision":
+        return [liq.comisionPct];
+      case "iva":
+        return [liq.ivaPct];
+      case "liquido":
+        return [liq.liquido];
+      case "estado":
+        return [LIQUIDACION_ESTADO_ORDEN[liq.estado] ?? 9];
+    }
+  }
+
   function numeroLiquidacion(liq: LiquidacionConTransportista): string {
     if (liq.cbteNro != null) return nroComprobante(liq.ptoVenta, liq.cbteNro);
     const proveedor = liq.numeroComprobanteProveedor?.trim();
@@ -1019,6 +1078,11 @@ export function LiquidacionesTenantPage() {
         return true;
       })
     : null;
+  // Click en el título de la columna: se ordena acá (la lista ya viene completa).
+  const sortedRows =
+    filteredRows && orden
+      ? ordenarPorClaves(filteredRows, (r) => clavesOrdenLiquidacion(r, orden.by), orden.dir)
+      : filteredRows;
 
   const totalItems = filteredRows ? filteredRows.length : 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -1032,8 +1096,8 @@ export function LiquidacionesTenantPage() {
     hasNext: page < totalPages,
   };
 
-  const paginatedRows = filteredRows
-    ? filteredRows.slice((page - 1) * pageSize, page * pageSize)
+  const paginatedRows = sortedRows
+    ? sortedRows.slice((page - 1) * pageSize, page * pageSize)
     : null;
 
   async function handleExportarExcel(selectedIds: string[]) {
@@ -1048,7 +1112,7 @@ export function LiquidacionesTenantPage() {
       );
       await generarLiquidacionesExcel(
         cols,
-        filteredRows,
+        sortedRows ?? filteredRows,
         "Liquidaciones_Exportadas",
       );
       showToast("Excel exportado exitosamente", "success");
@@ -1151,6 +1215,7 @@ export function LiquidacionesTenantPage() {
           <tr className={listadoTablaHeadRowClass}>
               <th scope="col" className={`${listadoTablaThClass} align-top`}>
                 <ViajesListadoHeaderFiltro
+                  orden={ordenColumna("comprobante")}
                   title="Comprobante"
                   filterActive={!!numeroFilter.trim()}
                   filterSignature={numeroFilter}
@@ -1177,6 +1242,7 @@ export function LiquidacionesTenantPage() {
               </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
+                orden={ordenColumna("transportista")}
                 title="Transportista"
                 filterActive={!!transportistaFilter}
                 filterSignature={transportistaFilter}
@@ -1201,6 +1267,7 @@ export function LiquidacionesTenantPage() {
             {mostrarPeriodo && (
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
+                orden={ordenColumna("periodo")}
                 title="Período"
                 filterActive={
                   !!periodoDesdeFilter.trim() || !!periodoHastaFilter.trim()
@@ -1240,20 +1307,21 @@ export function LiquidacionesTenantPage() {
             </th>
             )}
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
-              Bruto
+              <TituloOrdenable title="Bruto" orden={ordenColumna("bruto")} />
             </th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
-              Comisión
+              <TituloOrdenable title="Comisión" orden={ordenColumna("comision")} />
             </th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
-              IVA
+              <TituloOrdenable title="IVA" orden={ordenColumna("iva")} />
             </th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
-              A liquidar
+              <TituloOrdenable title="A liquidar" orden={ordenColumna("liquido")} />
             </th>
             {hasArca && (
               <th scope="col" className={`${listadoTablaThClass} align-top`}>
                 <ViajesListadoHeaderFiltro
+                  orden={ordenColumna("estado")}
                   title="Estado"
                   filterActive={estadoFilter !== "todos"}
                   filterSignature={estadoFilter}

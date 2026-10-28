@@ -619,10 +619,57 @@ Historia: sep 2026 — vencimiento de póliza un día antes (`VehiculoViewModal`
   - **Cómo se decide**: `esImagenAdjunto({ url, file })` (`lib/abrirAdjunto.ts`, sobre `detectarTipoAdjunto`: extensión o `/image/upload/` de Cloudinary; `file.type` para archivos locales). Si el registro ya trae `mimeType` (ej. `ViajeAdjunto`), usar ese.
   - **Botón nuevo de "ver adjunto"**: usar `useAbrirAdjunto()` (`hooks/useAbrirAdjunto.tsx`) → `abrirAdjunto(origen, titulo)` decide visor o pestaña, y renderizar `{visorAdjunto}` en el JSX. No llamar `abrirAdjuntoEnPestana` directo con una URL que pueda ser foto. `AdjuntoPreviewModal` sigue como envoltorio para quien monta un componente al click: imagen → `VisorFotos`, documento → pestaña y se cierra solo.
 - **Orden de columnas de Viajes por empresa (oct 2026)**: `Tenant.viajesColumnasOrden` (`String[]`, `[]` = orden estándar), editable desde superadmin ("Configuración por empresa" → pestaña Viajes, `ViajesColumnasOrdenConfig`) y por el admin de la empresa desde la grilla (ícono sutil junto a "Acciones" → `PATCH /tenants/:orgId/viajes-columnas-orden`, que solo toca ese campo). Los dos usan el mismo `ViajesColumnasOrdenModal` (`components/viajes/`), que recibe las columnas habilitadas y su propio `guardar`; el orden aplica a toda la empresa. `ViajesTenantPage` arma `viajesHeaderColumnas`/`celdas`/`camposMobile` como mapas por id y los recorre con `ordenColumnasViajes(tenantEfectivo)` (`lib/viajesColumnasOrden.ts`); la visibilidad de cada columna sigue siendo la suya. Selección en lote y Acciones quedan fijas. **Columna nueva en la grilla**: sumarla a `VIAJES_COLUMNAS` (front) y a `VIAJES_COLUMNAS_ORDENABLES` (backend, `update-tenant.dto.ts`); los órdenes guardados la reciben al final.
+- **Ordenar Viajes con click en el título de la columna**: ver la sección global "Grillas: ordenar con click en el título de la columna". No confundir con el orden de columnas de arriba (qué columna va dónde).
 - **Columna opcional Productos en Viajes (oct 2026)**: `Tenant.viajesColumnaProductosHabilitada` (switch en "Configuración por empresa" → pestaña Viajes) + campo `productoItems` visible. Muestra `nombresProductosViaje(v)` (`lib/productosViaje.ts`, viaje + clientes adicionales, sin repetir).
 - **Label de "Producto" por empresa (oct 2026)**: `Tenant.productoLabel`/`productoLabelPlural` (superadmin, pestaña General; el plural lo genera la IA en el backend). Leer siempre con `useProductoLabels()` (`hooks/useProductoLabels.tsx`) — nunca escribir "Producto" fijo fuera de Stock. Las páginas que operan sobre un tenant elegido por superadmin montan `ProductoLabelsProvider` con el tenant efectivo (hoy `ViajesTenantPage`, `ViajeCreatePage`); sin provider se usa el tenant propio. **Stock queda afuera**: los componentes compartidos con Stock reciben el label por prop (`ProductoModal labels=…`) y con el default muestran los textos de siempre. "Líquido Producto" (ARCA) no se toca. Frases neutras en género ("Crear grano", "No hay mercaderías que…"), no "Nuevo {label}". Detalle backend en `vialto-backend/CLAUDE.md`, "Label de Producto por tenant".
 - **Columnas de ID: truncar por el principio** (se ven los últimos caracteres, "…01406"), con `TruncarInicio` (`components/ui/TruncarInicio.tsx`). Hoy: ID sistema, ID propio 1 y 2 de Viajes. Toda columna de ID nueva usa ese componente, no `truncate` a secas.
 - Indicadores de pantalla tipo "Emisión electrónica vía ARCA" / "Ambiente de pruebas" no van junto al título sino en la línea del breadcrumb, a la derecha: `BreadcrumbExtras` (`hooks/useBreadcrumbOverride.tsx`), ver `ArcaEmisionIndicadores`.
+
+---
+
+## Grillas: ordenar con click en el título de la columna (oct 2026)
+
+**Regla global para toda grilla actual y futura** (pedido NyM: "ordenar por fecha / alfabético / número sin filtrar uno por uno").
+
+**Cómo se ve y se comporta** (`TituloOrdenable` y prop `orden` de `ViajesListadoHeaderFiltro`, en `components/viajes/ViajesListadoHeaderFiltro.tsx`):
+
+- Click en el **título** ordena: 1er click A→Z / menor a mayor / más vieja a más nueva, 2do click al revés. El embudo sigue filtrando, son cosas separadas.
+- Columna sin orden: las dos flechitas (↑↓) siempre visibles en gris muy tenue (`text-vialto-steel/25`). Columna activa: flecha naranja con la dirección + ✕ (la misma del filtro, `BotonQuitar`) que vuelve al orden por defecto de la grilla. Si el orden actual ya es el de por defecto, no hay ✕.
+- Columnas sin filtro (montos, litros, productos) usan `<TituloOrdenable title=… orden=…/>` directo en el `<th>`. Acciones y selección en lote no se ordenan.
+- Cambiar el orden vuelve a la página 1. El Excel exporta con el orden aplicado.
+
+**Criterio de comparación — uno solo, no reinventar** (`lib/ordenListado.ts`, espejo de `vialto-backend/src/shared/util/orden-listado.util.ts`; si cambia, cambiar los dos):
+
+- Texto sin mayúsculas ni acentos ("Álvarez" junto a "Alvarez"), números dentro del texto como números ("CP 2" < "CP 10"), números como números.
+- Vacíos siempre al final, en los dos sentidos.
+- `ordenarPorClaves(filas, claves, dir)`: varias claves (la 2da desempata la 1ra), y al final por id para que la paginación sea estable.
+- **Lo que se ve en la celda es lo que ordena**: nombre del cliente (no el id), "Flota propia" si no hay transportista, el total a cobrar si eso muestra la columna Importe.
+- **Estados/etapas en orden del circuito, no alfabético** (ej. pendiente → en curso → finalizado → cancelado; borrador → esperando AFIP → facturado → error → anulado).
+
+**Dónde se ordena**:
+
+- **Grilla paginada en el servidor** → mandar `sortBy`/`sortDir` y ordenar en el backend **sobre todos los registros filtrados**, nunca solo la página. Patrón backend: traer ids + claves con un `select` mínimo (acotado por `tenantId`), `ordenarPorClaves`, cortar la página y traer solo esos registros completos (ver `ViajesService.findAllPaginatedOrdenTexto`, `CombustibleService.findPaginaOrdenColumna`, `FacturacionService.ordenarFacturas`). Validar `sortBy` contra una lista de campos permitidos en el DTO/controller.
+- **Lista completa en el navegador** → ordenar ahí antes de paginar, con `useOrdenColumna<Campo>()` + `ordenarPorClaves` (ver `LiquidacionesTenantPage`, y la vista superadmin de Facturas con `lib/facturasOrden.ts`).
+- **Grilla que ya tiene menú "Ordenar por"** (Viajes, Combustible) → los campos de columna se suman al mismo `sortBy` del menú y comparten estado (el menú muestra la columna activa). Sin menú → `useOrdenColumna`, con `orden = null` = el orden de siempre.
+
+**Estado por grilla**:
+
+| Grilla | Estado | Dónde ordena |
+| --- | --- | --- |
+| Viajes | ✅ | backend (`VIAJES_SORT_FIELDS_TEXTO`, `lib/viajesOrdenamiento.ts`) |
+| Facturas | ✅ | backend (`FACTURAS_SORT_FIELDS`); superadmin en el navegador |
+| Liquidaciones | ✅ | navegador |
+| Combustible — Cargas | ✅ | backend (`COMBUSTIBLE_SORT_FIELDS_COLUMNA`, `lib/combustibleOrdenamiento.ts`) |
+| Cuenta corriente (`CuentaContraparteView`) | 🔲 pendiente | |
+| Combustible — Asignación de vehículos (`AsignacionVehiculoSection`) | 🔲 pendiente | |
+| Mantenimiento — Órdenes de trabajo, Vencimientos, Planes | 🔲 pendiente | |
+| Base de datos — Clientes, Transportistas, Choferes, Vehículos, Destinatarios, Direcciones de entrega (tenant y superadmin) | 🔲 pendiente | |
+| Stock — Panel, Movimientos, Ingresos, Egresos, Divisiones, Productos, Presentaciones, Depósitos | 🔲 pendiente | |
+| Usuarios (tenant y superadmin), Empresas (`TenantsTable`) | 🔲 pendiente | |
+
+Al implementar una pendiente, pasarla a ✅ en esta tabla. Toda grilla nueva nace con orden por columna.
+
+Pendientes conocidos (no hechos a propósito): el orden por columna no se guarda al recargar en Viajes/Facturas/Liquidaciones (Combustible sí, por la URL); en mobile no hay encabezados y no se puede ordenar por columna.
 
 ---
 
@@ -635,6 +682,7 @@ Historia: sep 2026 — vencimiento de póliza un día antes (`VehiculoViewModal`
 - Verificar estados de carga, error y vacío.
 - Mantener textos y UX consistentes con el resto del producto.
 - **Aplicar el patrón VER → modal read-only → EDITAR** en la columna de acciones de toda grilla nueva.
+- **Toda grilla nueva ordena con click en el título de cada columna** (flechitas tenues, flecha naranja + ✕ en la activa, criterio de `lib/ordenListado.ts`) — ver "Grillas: ordenar con click en el título de la columna".
 - **Campos obligatorios con asterisco rojo; campos opcionales sin ningún indicador.**
 - **Si el modal carga datos**, usar `useConfirmarDescarte` (× / Cancelar / Escape piden confirmación, click afuera no cierra) — ver "Modales con formulario: confirmar antes de descartar".
 - **Si el módulo agrega una sección al dashboard del tenant**, sumarla a `moduloTabs` en `TenantOwnerDashboard.tsx` en vez de apilarla — ver "Panel del tenant: pestañas por módulo en el dashboard".
