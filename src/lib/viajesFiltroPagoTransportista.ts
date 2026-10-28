@@ -1,5 +1,6 @@
 import { apiJson } from '@/lib/api';
 import {
+  esViajeSortColumna,
   sortViajesListado,
   type ViajeSortDir,
   type ViajeSortField,
@@ -104,6 +105,8 @@ export function viajeListadoRequiereOrdenCliente(
   sortBy: ViajeSortField,
   sortDir: ViajeSortDir,
 ): boolean {
+  // El orden por columna lo resuelve el backend sobre todos los viajes.
+  if (esViajeSortColumna(sortBy)) return false;
   return sortDir === 'desc' || sortBy !== 'fecha_carga';
 }
 

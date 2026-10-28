@@ -130,7 +130,11 @@ import {
   listadoTablaHeadRowClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
-import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import {
+  TituloOrdenable,
+  ViajesListadoHeaderFiltro,
+  type OrdenColumna,
+} from "@/components/viajes/ViajesListadoHeaderFiltro";
 import {
   canAccessEmisionFacturasArca,
   canAccessEmisionLiquidoProductoArca,
@@ -160,6 +164,7 @@ import type {
 import {
   appendViajeSortQuery,
   sortViajesListado,
+  VIAJE_SORT_DEFAULT,
   type ViajeSortDir,
   type ViajeSortField,
 } from "@/lib/viajesOrdenamiento";
@@ -2402,10 +2407,33 @@ export function ViajesTenantPage({
       </span>
     );
   }
+  // Click en el título de la columna: 1er click A→Z, 2do Z→A (orden en el backend,
+  // sobre todos los viajes). Comparte estado con "Ordenar por".
+  function ordenColumna(field: ViajeSortField): OrdenColumna {
+    const activo = sortBy === field;
+    return {
+      dir: activo ? sortDir : null,
+      disabled: listadoRefetching,
+      onClick: () =>
+        aplicarOrdenamiento(field, activo && sortDir === "asc" ? "desc" : "asc"),
+      // Quitar el orden = volver al de siempre (fecha de creación, nueva a vieja).
+      onClear: () =>
+        aplicarOrdenamiento(VIAJE_SORT_DEFAULT.sortBy, VIAJE_SORT_DEFAULT.sortDir),
+    };
+  }
+  const labelIdPropio1 =
+    labelIdentificacionPersonalizadaViajes(currentTenant) ?? "CTG";
+  const labelsOrdenColumna: Partial<Record<ViajeSortField, string>> = {
+    id_propio_1: labelIdPropio1,
+    id_propio_2: idPropio2Label(currentTenant),
+    productos: productoLabelsTenant.plural,
+  };
+
   const viajesHeaderColumnas: Record<ViajeColumnaId, ReactNode> = {
     idSistema: mostrarColumnaIdSistema && (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
         <ViajesListadoHeaderFiltro
+          orden={ordenColumna("id_sistema")}
           title="ID"
           filterActive={!!numeroFiltroActivo.trim()}
           filterSignature={numeroFiltroActivo}
@@ -2426,9 +2454,8 @@ export function ViajesTenantPage({
     idPropio1: mostrarColumnaIdPropio1 && (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
         <ViajesListadoHeaderFiltro
-          title={
-            labelIdentificacionPersonalizadaViajes(currentTenant) ?? "CTG"
-          }
+          orden={ordenColumna("id_propio_1")}
+          title={labelIdPropio1}
           filterActive={!!ctgFiltroActivo.trim()}
           filterSignature={ctgFiltroActivo}
           onClear={() => aplicarFiltroColumnaCTG("")}
@@ -2447,6 +2474,7 @@ export function ViajesTenantPage({
     idPropio2: mostrarColumnaIdPropio2 && (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
         <ViajesListadoHeaderFiltro
+          orden={ordenColumna("id_propio_2")}
           title={idPropio2Label(currentTenant)}
           filterActive={!!idPropio2FiltroActivo.trim()}
           filterSignature={idPropio2FiltroActivo}
@@ -2466,6 +2494,7 @@ export function ViajesTenantPage({
     cliente: (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
         <ViajesListadoHeaderFiltro
+          orden={ordenColumna("cliente")}
           title="Cliente"
           filterActive={!!clienteIdFiltroActivo.trim()}
           filterSignature={clienteIdFiltroActivo}
@@ -2493,6 +2522,7 @@ export function ViajesTenantPage({
     transporte: mostrarColumnaTransporte && (
     <th scope="col" className={`${listadoTablaThClass} align-top`}>
       <ViajesListadoHeaderFiltro
+        orden={ordenColumna("transporte")}
         title="Transporte"
         filterActive={!!transportistaIdFiltroActivo.trim()}
         filterSignature={transportistaIdFiltroActivo}
@@ -2519,6 +2549,7 @@ export function ViajesTenantPage({
     chofer: mostrarColumnaChofer && (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
         <ViajesListadoHeaderFiltro
+          orden={ordenColumna("chofer")}
           title="Chofer"
           filterActive={!!choferIdFiltroActivo.trim()}
           filterSignature={choferIdFiltroActivo}
@@ -2547,6 +2578,7 @@ export function ViajesTenantPage({
     etapa: mostrarColumnaEstado && (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
         <ViajesListadoHeaderFiltro
+          orden={ordenColumna("etapa")}
           title="Etapa"
           filterActive={
             !!estadoFiltro.trim() ||
@@ -2638,6 +2670,7 @@ export function ViajesTenantPage({
     origenDestino: (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
         <ViajesListadoHeaderFiltro
+          orden={ordenColumna("origen_destino")}
           title="Origen — Destino"
           filterActive={!!ubicacionFiltro.trim()}
           filterSignature={`${tipoUbicacionFiltro}|${paisUbicacionFiltro}|${ubicacionFiltro}`}
@@ -2706,6 +2739,7 @@ export function ViajesTenantPage({
     cargaDescarga: (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
         <ViajesListadoHeaderFiltro
+          orden={ordenColumna("fecha_carga")}
           title="Fecha"
           filterActive={
             !!fechaDesdeFiltro.trim() || !!fechaHastaFiltro.trim()
@@ -2770,12 +2804,16 @@ export function ViajesTenantPage({
     ),
     productos: mostrarColumnaProductos && (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
-        {productoLabelsTenant.plural}
+        <TituloOrdenable
+          title={productoLabelsTenant.plural}
+          orden={ordenColumna("productos")}
+        />
       </th>
     ),
     observaciones: mostrarColumnaObservaciones && (
       <th scope="col" className={`${listadoTablaThClass} align-top`}>
         <ViajesListadoHeaderFiltro
+          orden={ordenColumna("observaciones")}
           title="Observaciones"
           filterActive={!!observacionesFiltroActivo.trim()}
           filterSignature={observacionesFiltroActivo}
@@ -3186,6 +3224,7 @@ export function ViajesTenantPage({
             sortDir={sortDir}
             disabled={listadoRefetching}
             onChange={aplicarOrdenamiento}
+            labels={labelsOrdenColumna}
           />
 
           <Link

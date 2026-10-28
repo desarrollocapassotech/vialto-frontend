@@ -68,7 +68,12 @@ import {
   listadoTablaHeadRowClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
-import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import {
+  TituloOrdenable,
+  ViajesListadoHeaderFiltro,
+} from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { ordenarPorClaves, useOrdenColumna } from "@/lib/ordenListado";
+import { clavesOrdenFactura, type FacturaSortField } from "@/lib/facturasOrden";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import {
   FACTURAS_EXPORT_COLUMNS,
@@ -251,6 +256,12 @@ export function FacturacionTenantPage({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [listadoRefetching, setListadoRefetching] = useState(false);
+  // Click en el título de la columna: A→Z / Z→A. Empresa: lo ordena el backend;
+  // superadmin (trae todas): en el navegador, con las mismas claves.
+  const { orden, ordenColumna } = useOrdenColumna<FacturaSortField>(() => {
+    if (!platform) setListadoRefetching(true);
+    setPage(1);
+  });
   const [viajes, setViajes] = useState<Viaje[]>([]);
   const [viajesLoading, setViajesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -397,7 +408,7 @@ export function FacturacionTenantPage({
 
   const facturasFiltradas = useMemo(() => {
     if (!platform || !facturas) return null;
-    return facturas.filter((f) => {
+    const filtradas = facturas.filter((f) => {
       if (
         numFiltro.trim() &&
         !(f.numero ?? "").toLowerCase().includes(numFiltro.trim().toLowerCase())
@@ -429,9 +440,20 @@ export function FacturacionTenantPage({
       if (cobroFiltro === "vencida" && !f.vencida) return false;
       return true;
     });
+    if (!orden) return filtradas;
+    const nombreClienteOrden = (id: string | null | undefined) =>
+      clientes.find((c) => c.id === id)?.nombre ?? "";
+    return ordenarPorClaves(
+      filtradas,
+      (f) => clavesOrdenFactura(f, orden.by, nombreClienteOrden, hasArca),
+      orden.dir,
+    );
   }, [
     platform,
     facturas,
+    orden,
+    clientes,
+    hasArca,
     numFiltro,
     clienteIdFiltro,
     emisionDesdeFiltro,
@@ -539,9 +561,14 @@ export function FacturacionTenantPage({
         params.set("vencimientoHasta", vencimientoHastaFiltro);
       if (estadoFiltro) params.set("estado", estadoFiltro);
       if (cobroFiltro) params.set("cobro", cobroFiltro);
+      if (orden) {
+        params.set("sortBy", orden.by);
+        params.set("sortDir", orden.dir);
+      }
       return params.toString();
     },
     [
+      orden,
       numFiltro,
       clienteIdFiltro,
       emisionDesdeFiltro,
@@ -1507,6 +1534,7 @@ export function FacturacionTenantPage({
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
+                orden={ordenColumna("numero", listadoRefetching)}
                 title="Comprobante"
                 filterActive={!!numFiltro.trim()}
                 filterSignature={numFiltro}
@@ -1545,6 +1573,7 @@ export function FacturacionTenantPage({
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
+                orden={ordenColumna("cliente", listadoRefetching)}
                 title="Cliente"
                 filterActive={!!clienteIdFiltro}
                 filterSignature={clienteIdFiltro}
@@ -1577,6 +1606,7 @@ export function FacturacionTenantPage({
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
+                orden={ordenColumna("emision", listadoRefetching)}
                 title="Emisión"
                 filterActive={!!emisionDesdeFiltro || !!emisionHastaFiltro}
                 filterSignature={`${emisionDesdeFiltro}|${emisionHastaFiltro}`}
@@ -1619,6 +1649,7 @@ export function FacturacionTenantPage({
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
+                orden={ordenColumna("vencimiento", listadoRefetching)}
                 title="Vencimiento"
                 filterActive={
                   !!vencimientoDesdeFiltro || !!vencimientoHastaFiltro
@@ -1663,6 +1694,7 @@ export function FacturacionTenantPage({
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
+                orden={ordenColumna("estado", listadoRefetching)}
                 title="Estado"
                 filterActive={!!estadoFiltro}
                 filterSignature={estadoFiltro}
@@ -1689,7 +1721,11 @@ export function FacturacionTenantPage({
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
-              Importe
+              <TituloOrdenable
+                title="Importe"
+                orden={ordenColumna("importe", listadoRefetching)}
+                className="justify-end"
+              />
             </th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Acciones

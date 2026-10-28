@@ -26,8 +26,13 @@ import {
   type CombustibleSortDir,
   type CombustibleSortField,
   appendCombustibleSortQuery,
+  parseCombustibleSortField,
 } from "@/lib/combustibleOrdenamiento";
-import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import {
+  TituloOrdenable,
+  ViajesListadoHeaderFiltro,
+  type OrdenColumna,
+} from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
@@ -173,12 +178,11 @@ export function CombustibleTenantPage({
   const initialTo = searchParams.get("to");
   const initialEstacion = searchParams.get("estacion") ?? "";
   const initialFormaPago = searchParams.get("formaPago") ?? "";
-  const initialSortBy =
-    (searchParams.get("sortBy") as CombustibleSortField) ||
-    COMBUSTIBLE_SORT_DEFAULT.sortBy;
-  const initialSortDir =
-    (searchParams.get("sortDir") as CombustibleSortDir) ||
-    COMBUSTIBLE_SORT_DEFAULT.sortDir;
+  const initialSortBy = parseCombustibleSortField(searchParams.get("sortBy"));
+  const initialSortDir: CombustibleSortDir =
+    searchParams.get("sortDir") === "asc" || searchParams.get("sortDir") === "desc"
+      ? (searchParams.get("sortDir") as CombustibleSortDir)
+      : COMBUSTIBLE_SORT_DEFAULT.sortDir;
 
   const [vehiculos, setVehiculos] = useState<ConEmpresa<Vehiculo>[]>([]);
   const [choferes, setChoferes] = useState<ConEmpresa<Chofer>[]>([]);
@@ -292,6 +296,32 @@ export function CombustibleTenantPage({
 
   function resetPage() {
     setPage(1);
+  }
+
+  // Click en el título de la columna: 1er click A→Z, 2do Z→A (orden en el backend,
+  // sobre todas las cargas). Comparte estado con "Ordenar por". La ✕ vuelve al orden
+  // por defecto; no aparece si ya es ese (Fecha de carga, nueva a vieja).
+  function ordenColumna(field: CombustibleSortField): OrdenColumna {
+    const activo = sortBy === field;
+    const esDefault =
+      sortBy === COMBUSTIBLE_SORT_DEFAULT.sortBy &&
+      sortDir === COMBUSTIBLE_SORT_DEFAULT.sortDir;
+    return {
+      dir: activo ? sortDir : null,
+      disabled: rows === null,
+      onClick: () => {
+        setSortBy(field);
+        setSortDir(activo && sortDir === "asc" ? "desc" : "asc");
+        resetPage();
+      },
+      onClear: esDefault
+        ? undefined
+        : () => {
+            setSortBy(COMBUSTIBLE_SORT_DEFAULT.sortBy);
+            setSortDir(COMBUSTIBLE_SORT_DEFAULT.sortDir);
+            resetPage();
+          },
+    };
   }
 
   function handleClearFilters() {
@@ -908,6 +938,7 @@ export function CombustibleTenantPage({
                 <th scope="col" className="w-8 px-2 py-2.5 align-top"></th>
                 <th scope="col" className={`${listadoTablaThClass} align-top`}>
                   <ViajesListadoHeaderFiltro
+                    orden={ordenColumna("fecha_carga")}
                     title="Fecha"
                     filterActive={!rangoFechaPorDefecto}
                     filterSignature={`${desde}|${hasta}`}
@@ -951,6 +982,7 @@ export function CombustibleTenantPage({
                 </th>
                 <th scope="col" className={`${listadoTablaThClass} align-top`}>
                   <ViajesListadoHeaderFiltro
+                    orden={ordenColumna("chofer")}
                     title="Conductor"
                     filterActive={!!choferId}
                     filterSignature={choferId}
@@ -975,6 +1007,7 @@ export function CombustibleTenantPage({
                 </th>
                 <th scope="col" className={`${listadoTablaThClass} align-top`}>
                   <ViajesListadoHeaderFiltro
+                    orden={ordenColumna("vehiculo")}
                     title="Vehículo"
                     filterActive={!!vehiculoId}
                     filterSignature={vehiculoId}
@@ -999,6 +1032,7 @@ export function CombustibleTenantPage({
                 </th>
                 <th scope="col" className={`${listadoTablaThClass} align-top`}>
                   <ViajesListadoHeaderFiltro
+                    orden={ordenColumna("estacion")}
                     title="Estación"
                     filterActive={!!estacion}
                     filterSignature={estacion}
@@ -1023,6 +1057,7 @@ export function CombustibleTenantPage({
                 </th>
                 <th scope="col" className={`${listadoTablaThClass} align-top`}>
                   <ViajesListadoHeaderFiltro
+                    orden={ordenColumna("forma_pago")}
                     title="Pago"
                     filterActive={!!formaPago}
                     filterSignature={formaPago}
@@ -1054,10 +1089,10 @@ export function CombustibleTenantPage({
                   </ViajesListadoHeaderFiltro>
                 </th>
                 <th scope="col" className={listadoTablaThClass}>
-                  Litros
+                  <TituloOrdenable title="Litros" orden={ordenColumna("litros")} />
                 </th>
                 <th scope="col" className={listadoTablaThClass}>
-                  Monto
+                  <TituloOrdenable title="Monto" orden={ordenColumna("importe")} />
                 </th>
                 <th scope="col" className={`${listadoTablaThClass} text-right`}>
                   Acciones

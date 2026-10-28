@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 
 /** Ancho del panel flotante de filtro (px). */
 const PANEL_WIDTH_PX = 288;
@@ -33,7 +34,86 @@ type Props = {
   titleNoWrap?: boolean;
   /** Si se pasa y hay filtro aplicado, muestra una ✕ en el encabezado que lo quita. */
   onClear?: () => void;
+  /** Si se pasa, el título ordena la grilla al hacer click (el embudo sigue filtrando). */
+  orden?: OrdenColumna;
 };
+
+export type OrdenColumna = {
+  /** Dirección si esta columna es el orden aplicado; null si no lo es. */
+  dir: 'asc' | 'desc' | null;
+  onClick: () => void;
+  /** Si se pasa y esta columna es el orden aplicado, muestra una ✕ que lo quita. */
+  onClear?: () => void;
+  disabled?: boolean;
+};
+
+/** ✕ de "quitar" del encabezado (misma para filtro y orden). */
+function BotonQuitar({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="shrink-0 rounded p-0.5 text-vialto-steel transition-colors hover:bg-vialto-mist hover:text-vialto-fire"
+      aria-label={label}
+      title={label}
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        className="h-3.5 w-3.5"
+        aria-hidden
+      >
+        <path d="M18 6 6 18M6 6l12 12" />
+      </svg>
+    </button>
+  );
+}
+
+/**
+ * Título de columna que ordena al hacer click: 1er click A→Z, 2do Z→A.
+ * Flecha naranja en la columna activa; en las demás, las dos flechas siempre visibles
+ * en gris muy tenue (se marcan un poco más al pasar el mouse).
+ */
+export function TituloOrdenable({
+  title,
+  orden,
+  className = '',
+}: {
+  title: string;
+  orden: OrdenColumna;
+  className?: string;
+}) {
+  const Flecha = orden.dir === 'desc' ? ArrowDown : orden.dir === 'asc' ? ArrowUp : ArrowUpDown;
+  const siguiente = orden.dir === 'asc' ? 'Z a A' : 'A a Z';
+  return (
+    <span className={`inline-flex items-center gap-1 ${className}`}>
+    <button
+      type="button"
+      onClick={orden.onClick}
+      disabled={orden.disabled}
+      className="group inline-flex min-w-0 items-center gap-1 text-left uppercase leading-tight hover:text-vialto-charcoal disabled:pointer-events-none"
+      title={`Ordenar por ${title} (${siguiente})`}
+      aria-label={`Ordenar por ${title} (${siguiente})`}
+      aria-sort={orden.dir === 'asc' ? 'ascending' : orden.dir === 'desc' ? 'descending' : undefined}
+    >
+      <span>{title}</span>
+      <Flecha
+        className={`h-3.5 w-3.5 shrink-0 ${
+          orden.dir ? 'text-vialto-fire' : 'text-vialto-steel/25 group-hover:text-vialto-steel/60'
+        }`}
+        aria-hidden
+      />
+    </button>
+    {orden.dir && orden.onClear ? (
+      <BotonQuitar label={`Quitar orden: ${title}`} onClick={orden.onClear} />
+    ) : null}
+    </span>
+  );
+}
 
 function IconoFiltro({ marcado }: { marcado: boolean }) {
   return (
@@ -63,6 +143,7 @@ export function ViajesListadoHeaderFiltro({
   minWidthClass = "min-w-0",
   titleNoWrap = false,
   onClear,
+  orden,
 }: Props) {
   const [abierto, setAbierto] = useState(false);
   const iconoMarcado = filterActive || abierto;
@@ -171,37 +252,31 @@ export function ViajesListadoHeaderFiltro({
             </span>
           ) : null}
         </div>
-        <span
-          className={`leading-tight uppercase ${
-            titleNoWrap ? 'whitespace-nowrap' : ''
-          } ${alignRight ? 'shrink-0' : 'min-w-0 flex-1'}`}
-        >
-          {title}
-        </span>
+        {orden ? (
+          <TituloOrdenable
+            title={title}
+            orden={orden}
+            className={`${titleNoWrap ? 'whitespace-nowrap' : ''} ${
+              alignRight ? 'shrink-0' : 'min-w-0'
+            }`}
+          />
+        ) : (
+          <span
+            className={`leading-tight uppercase ${
+              titleNoWrap ? 'whitespace-nowrap' : ''
+            } ${alignRight ? 'shrink-0' : 'min-w-0 flex-1'}`}
+          >
+            {title}
+          </span>
+        )}
         {filterActive && onClear ? (
-          <button
-            type="button"
+          <BotonQuitar
+            label={`Quitar filtro: ${title}`}
             onClick={() => {
               setAbierto(false);
               onClear();
             }}
-            className="shrink-0 rounded p-0.5 text-vialto-steel transition-colors hover:bg-vialto-mist hover:text-vialto-fire"
-            aria-label={`Quitar filtro: ${title}`}
-            title="Quitar filtro"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2.5}
-              strokeLinecap="round"
-              className="h-3.5 w-3.5"
-              aria-hidden
-            >
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
+          />
         ) : null}
       </div>
       {abierto && pos

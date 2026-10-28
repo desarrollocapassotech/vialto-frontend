@@ -17,6 +17,8 @@ type Props = {
   sortDir: ViajeSortDir;
   disabled?: boolean;
   onChange: (sortBy: ViajeSortField, sortDir: ViajeSortDir) => void;
+  /** Etiquetas de la empresa para el orden por columna (ej. "CTG" en vez de "ID propio"). */
+  labels?: Partial<Record<ViajeSortField, string>>;
 };
 
 function useIsMobile() {
@@ -39,7 +41,9 @@ export function ViajesOrdenamientoMenu({
   sortDir,
   disabled,
   onChange,
+  labels,
 }: Props) {
+  const labelActual = labels?.[sortBy] ?? VIAJE_SORT_LABELS[sortBy];
   const [abierto, setAbierto] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
@@ -88,12 +92,12 @@ export function ViajesOrdenamientoMenu({
       onClick={() => setAbierto((v) => !v)}
       aria-haspopup="listbox"
       aria-expanded={abierto}
-      aria-label={`Ordenar por: ${etiquetaViajeOrdenamiento(sortBy, sortDir)}`}
+      aria-label={`Ordenar por: ${etiquetaViajeOrdenamiento(sortBy, sortDir, labelActual)}`}
       className="inline-flex h-10 items-center gap-2 border border-black/15 bg-white px-3 text-sm text-vialto-charcoal hover:bg-vialto-mist/80 disabled:opacity-50 disabled:pointer-events-none"
     >
       <ArrowUpDown className="h-4 w-4 shrink-0 text-vialto-steel" aria-hidden />
       <span className="hidden max-w-[14rem] truncate sm:inline">
-        {VIAJE_SORT_LABELS[sortBy]}
+        {labelActual}
       </span>
       <DirIcon className="h-4 w-4 shrink-0 text-vialto-fire" aria-hidden />
     </button>
