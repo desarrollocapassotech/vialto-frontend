@@ -3,12 +3,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   CircleAlert,
-  History,
 } from 'lucide-react';
-import { AccionesFila } from '@/components/ui/AccionesFila';
-import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import { Spinner } from '@/components/ui/Spinner';
-import { clickFilaAcciones } from '@/lib/accionesFila';
 import {
   compareLotesFefo,
   nivelVencimientoLote,
@@ -71,9 +67,11 @@ function buildMovimientosHref(opts: {
   return `/stock/movimientos?${params.toString()}`;
 }
 
-const TH =
-  'px-3 py-2.5 text-[11px] font-medium uppercase tracking-[0.1em] text-vialto-steel';
-const TD = 'px-3 py-2.5 text-sm text-vialto-charcoal';
+/** Sub-fila de lote: fondo apenas más oscuro que la fila del producto. */
+const SUBFILA = 'bg-vialto-mist/40';
+const TD = 'h-8 px-3 py-1 text-sm text-vialto-charcoal';
+/** Primera celda (bajo el chevron): línea que marca que el lote cuelga del producto de arriba. */
+const TD_VACIA = 'border-l-2 border-l-vialto-charcoal/25';
 
 /** Fecha de vencimiento + indicador visual de urgencia. */
 export function FechaVencimientoLote({
@@ -129,6 +127,32 @@ export function FechaVencimientoLote({
   );
 }
 
+/**
+ * Aviso en la fila del Inventario, sin desplegarla: ícono rojo si algún lote con saldo está
+ * vencido, ámbar si vence en los próximos 30 días. Nada si está todo en fecha o no hay lotes.
+ */
+export function AvisoVencimientoFila({
+  proximoVencimiento,
+}: {
+  proximoVencimiento: string | null | undefined;
+}) {
+  const nivel = nivelVencimientoLote(proximoVencimiento);
+  if (nivel !== 'vencido' && nivel !== 'proximo') return null;
+  const fecha = formatMovimientoStockFechaFromIso(proximoVencimiento, { soloFecha: true });
+  const texto =
+    nivel === 'vencido' ? `Tiene un lote vencido (${fecha})` : `Un lote vence el ${fecha}`;
+  const Icono = nivel === 'vencido' ? CircleAlert : AlertTriangle;
+  return (
+    <span className="inline-flex shrink-0" title={texto} aria-label={texto}>
+      <Icono
+        className={`h-4 w-4 ${nivel === 'vencido' ? 'text-red-600' : 'text-amber-600'}`}
+        strokeWidth={2}
+        aria-hidden
+      />
+    </span>
+  );
+}
+
 export function StockInventarioLotesDetalle({
   colSpan,
   showUnidad2,
@@ -155,118 +179,83 @@ export function StockInventarioLotesDetalle({
   tenantId?: string;
 }) {
   const navigate = useNavigate();
-  return (
-    <tr className="bg-vialto-mist/50">
-      <td colSpan={colSpan} className="px-3 py-3 sm:px-4 sm:pl-12">
-        <div className="overflow-hidden rounded-md border border-black/10 bg-white shadow-sm">
-          <div className="border-b border-black/8 bg-vialto-mist/70 px-3 py-2 sm:px-4">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-vialto-steel">
-              Detalle por lote · vencimiento y trazabilidad
-            </p>
-          </div>
 
-          <div className="px-2 py-2 sm:px-3 sm:py-3">
-            {loading && (
-              <div className="flex items-center gap-2 px-2 py-3 text-sm text-vialto-steel">
-                <Spinner className="h-4 w-4" />
-                Cargando desglose por lote…
-              </div>
-            )}
-            {error && (
-              <p className="mx-1 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                {error}
-              </p>
-            )}
-            {!loading && !error && filas == null && (
-              <div className="flex items-center gap-2 px-2 py-3 text-sm text-vialto-steel">
-                <Spinner className="h-4 w-4" />
-                Cargando desglose por lote…
-              </div>
-            )}
-            {!loading && !error && filas && filas.length === 0 && (
-              <p className="px-2 py-3 text-sm text-vialto-steel">
-                Sin stock por lote para esta presentación.
-              </p>
-            )}
-            {!loading && !error && filas && filas.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[36rem] border-collapse">
-                  <thead>
-                    <tr className="border-b border-black/8 text-left">
-                      <th className={TH}>Lote</th>
-                      <th className={TH}>Vencimiento</th>
-                      <th className={`${TH} text-right`}>{unidad1Nombre}</th>
-                      {showUnidad2 && (
-                        <th className={`${TH} text-right`}>
-                          {unidad2Nombre ?? 'Sueltos'}
-                        </th>
-                      )}
-                      <th className={`${TH} text-right`}>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filas.map((fila) => {
-                      const acciones: AccionOpcion[] = [
-                        {
-                          id: 'ver',
-                          label: 'Ver movimientos',
-                          icon: History,
-                          onClick: () =>
-                            navigate(
-                              buildMovimientosHref({
-                                productoId,
-                                clienteId,
-                                depositoId,
-                                loteParam: fila.loteParam,
-                                tenantId,
-                              }),
-                            ),
-                        },
-                      ];
-                      return (
-                      <tr
-                        key={fila.key}
-                        className="cursor-pointer border-b border-black/5 last:border-b-0 hover:bg-vialto-mist/40"
-                        onClick={() => clickFilaAcciones(acciones, () => {})}
-                      >
-                        <td className={`${TD} font-medium`}>{fila.loteLabel}</td>
-                        <td className={TD}>
-                          <FechaVencimientoLote
-                            fechaVencimiento={fila.fechaVencimiento}
-                          />
-                        </td>
-                        <td className={`${TD} text-right tabular-nums`}>
-                          <span className="font-semibold">{fila.cantidad1}</span>
-                        </td>
-                        {showUnidad2 && (
-                          <td className={`${TD} text-right tabular-nums`}>
-                            {unidad2Nombre === null ? (
-                              <span className="text-vialto-steel">—</span>
-                            ) : (
-                              <span className="font-semibold">{fila.cantidad2}</span>
-                            )}
-                          </td>
-                        )}
-                        <td
-                          className="px-3 py-0 text-right align-middle"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <AccionesFila
-                            options={acciones}
-                            destacadas={['ver']}
-                            subtitle={`Lote ${fila.loteLabel}`}
-                          />
-                        </td>
-                      </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      </td>
-    </tr>
+  // Estados sin filas: un solo renglón liviano debajo de la fila del producto.
+  const mensaje =
+    loading || (!error && filas == null) ? (
+      <span className="inline-flex items-center gap-2 text-vialto-steel">
+        <Spinner className="h-3.5 w-3.5" />
+        Cargando lotes…
+      </span>
+    ) : error ? (
+      <span className="text-red-700">{error}</span>
+    ) : filas && filas.length === 0 ? (
+      <span className="text-vialto-steel">Sin stock por lote para esta presentación.</span>
+    ) : null;
+
+  if (mensaje) {
+    return (
+      <tr className={SUBFILA}>
+        <td className={TD_VACIA} />
+        <td colSpan={colSpan - 1} className={`${TD} pl-6 text-xs`}>
+          {mensaje}
+        </td>
+      </tr>
+    );
+  }
+
+  // Una sub-fila por lote, alineada con las columnas de la tabla:
+  // [chevron] [lote + vencimiento (cliente+producto)] [stock total] [kg] [sueltos] [acciones].
+  // Click en la sub-fila = única acción "Ver movimientos" del lote.
+  return (
+    <>
+      {filas!.map((fila) => (
+        <tr
+          key={fila.key}
+          className={`${SUBFILA} cursor-pointer hover:bg-vialto-mist`}
+          title="Ver movimientos de este lote"
+          onClick={() =>
+            navigate(
+              buildMovimientosHref({
+                productoId,
+                clienteId,
+                depositoId,
+                loteParam: fila.loteParam,
+                tenantId,
+              }),
+            )
+          }
+        >
+          <td className={TD_VACIA} />
+          <td colSpan={2} className={`${TD} pl-6`}>
+            <span className="inline-flex flex-wrap items-center gap-x-4 gap-y-0.5">
+              <span>
+                <span className="text-xs text-vialto-steel">Lote </span>
+                <span className="font-medium">{fila.loteLabel}</span>
+              </span>
+              <span className="text-xs">
+                <span className="text-vialto-steel">Vto. </span>
+                <FechaVencimientoLote fechaVencimiento={fila.fechaVencimiento} />
+              </span>
+            </span>
+          </td>
+          <td className={`${TD} text-right tabular-nums`}>
+            <span className="font-medium">{fila.cantidad1}</span>{' '}
+            <span className="text-xs text-vialto-steel">{unidad1Nombre}</span>
+          </td>
+          <td className={TD} />
+          {showUnidad2 && (
+            <td className={`${TD} text-right tabular-nums`}>
+              {unidad2Nombre === null ? (
+                <span className="text-vialto-steel">—</span>
+              ) : (
+                <span className="font-medium">{fila.cantidad2}</span>
+              )}
+            </td>
+          )}
+          <td className={TD} />
+        </tr>
+      ))}
+    </>
   );
 }

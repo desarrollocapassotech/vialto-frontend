@@ -1124,6 +1124,8 @@ export interface StockItem {
   cantidad2: number;
   updatedAt: string;
   kg: number;
+  /** Vencimiento más próximo entre sus lotes con saldo (solo `GET stock/disponible`). */
+  proximoVencimiento?: string | null;
 }
 
 export interface StockOperacionLinea {

@@ -23,6 +23,7 @@ import { ProductoModal } from "@/components/stock/ProductoModal";
 import {
   FechaVencimientoLote,
   filasDesdeLotesResponse,
+  AvisoVencimientoFila,
   StockInventarioLotesDetalle,
   type StockInventarioLoteFila,
 } from "@/components/stock/StockInventarioLotesDetalle";
@@ -1112,8 +1113,11 @@ export function StockPanelTenantPage({
                         </td>
                         <td className={listadoTablaTdClass}>
                           <div className={sinStock ? "text-vialto-steel" : ""}>
-                            <p className="font-medium text-vialto-charcoal">
+                            <p className="flex items-center gap-1.5 font-medium text-vialto-charcoal">
                               {item.producto?.nombre ?? item.productoId}
+                              <AvisoVencimientoFila
+                                proximoVencimiento={item.proximoVencimiento}
+                              />
                             </p>
                             {presentacion && (
                               <p className="mt-0.5 text-xs text-vialto-steel">
@@ -1193,7 +1197,12 @@ export function StockPanelTenantPage({
                       label: "Producto",
                       value: (
                         <span className={sinStock ? "text-vialto-steel" : ""}>
-                          {productoNombre}
+                          <span className="inline-flex items-center gap-1.5">
+                            {productoNombre}
+                            <AvisoVencimientoFila
+                              proximoVencimiento={item.proximoVencimiento}
+                            />
+                          </span>
                           {presentacion ? (
                             <span className="mt-0.5 block text-xs text-vialto-steel">
                               {presentacion}
