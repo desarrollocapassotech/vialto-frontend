@@ -8,6 +8,7 @@ import { StockOperacionTipoCelda } from "@/components/stock/StockOperacionTipoCe
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import { useVerRemitoInterno } from "@/hooks/useVerRemitoInterno";
+import { ListadoFiltroBuscador } from "@/components/listado/ListadoFiltroBuscador";
 import { StockOperacionViewModal } from "@/components/stock/StockOperacionViewModal";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
@@ -89,6 +90,18 @@ export function StockMovimientosTenantPage({
   const createdBy = searchParams.get("createdBy") ?? "";
   const depositoId = searchParams.get("depositoId") ?? "";
   const lote = searchParams.get("lote") ?? "";
+  /** Texto libre del filtro de la columna Lotes (contiene). `lote` es el exacto que llega desde Inventario. */
+  const loteBuscar = searchParams.get("loteBuscar") ?? "";
+  const remito = searchParams.get("remito") ?? "";
+
+  function setFiltroUrl(clave: string, valor: string) {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (valor) next.set(clave, valor);
+      else next.delete(clave);
+      return next;
+    });
+  }
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -111,6 +124,8 @@ export function StockMovimientosTenantPage({
     createdBy,
     depositoId,
     lote,
+    loteBuscar,
+    remito,
   ]);
 
   const params: Record<string, string> = {};
@@ -123,6 +138,8 @@ export function StockMovimientosTenantPage({
   if (createdBy) params.createdBy = createdBy;
   if (depositoId) params.depositoId = depositoId;
   if (lote) params.lote = lote;
+  if (loteBuscar) params.loteBuscar = loteBuscar;
+  if (remito) params.remito = remito;
 
   params.page = String(page);
   params.pageSize = String(pageSize);
@@ -282,12 +299,12 @@ export function StockMovimientosTenantPage({
             </h1>
           </div>
         )}
-        {(!!productoId || !!tipo || !!fechaDesde || !!fechaHasta || !!clienteId || !!createdBy || !!depositoId || !!lote) && (
+        {(!!productoId || !!tipo || !!fechaDesde || !!fechaHasta || !!clienteId || !!createdBy || !!depositoId || !!lote || !!loteBuscar || !!remito) && (
           <LimpiarFiltrosButton
             onClick={() =>
               setSearchParams((prev) => {
                 const next = new URLSearchParams(prev);
-                for (const k of ["productoId","tipo","fechaDesde","fechaHasta","clienteId","createdBy","depositoId","lote"]) next.delete(k);
+                for (const k of ["productoId","tipo","fechaDesde","fechaHasta","clienteId","createdBy","depositoId","lote","loteBuscar","remito"]) next.delete(k);
                 return next;
               })
             }
@@ -396,7 +413,15 @@ export function StockMovimientosTenantPage({
                 </div>
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (op) => formatMovimientoStockFechaFromIso(op.fecha),
+            // Solo la fecha; fecha y hora en el tooltip.
+            cell: (op) => (
+              <span
+                className="whitespace-nowrap"
+                title={formatMovimientoStockFechaFromIso(op.fecha, { alwaysShowTime: true })}
+              >
+                {formatMovimientoStockFechaFromIso(op.fecha, { soloFecha: true })}
+              </span>
+            ),
           },
           {
             id: "tipo",
@@ -439,7 +464,7 @@ export function StockMovimientosTenantPage({
                 </select>
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (op) => <StockOperacionTipoCelda tipo={op.tipo} />,
+            cell: (op) => <StockOperacionTipoCelda tipo={op.tipo} soloIcono />,
           },
           {
             id: "impacto",
@@ -501,13 +526,35 @@ export function StockMovimientosTenantPage({
               const totalKg = op.movimientos.reduce((s, m) => s + m.kg, 0);
               return `${totalKg} kg`;
             },
-            tdClassName: listadoTablaTdClass,
+            tdClassName: `${listadoTablaTdClass} whitespace-nowrap`,
           },
           {
             id: "remito",
             thClassName: `${listadoTablaThClass} align-top`,
-            header: "Remito",
-            cell: (op) => op.numeroRemito ?? "—",
+            header: (
+              <ViajesListadoHeaderFiltro
+                title="Remito"
+                filterActive={!!remito}
+                filterSignature={remito}
+                onClear={() => setFiltroUrl("remito", "")}
+              >
+                <ListadoFiltroBuscador
+                  value={remito}
+                  onApply={(v) => setFiltroUrl("remito", v)}
+                  placeholder="N° de remito…"
+                  ariaLabel="Filtrar por remito"
+                />
+              </ViajesListadoHeaderFiltro>
+            ),
+            // Últimos 6 caracteres (lo que distingue un remito de otro); completo en el tooltip.
+            cell: (op) =>
+              op.numeroRemito ? (
+                <span className="whitespace-nowrap" title={op.numeroRemito}>
+                  {op.numeroRemito.length > 6 ? `…${op.numeroRemito.slice(-6)}` : op.numeroRemito}
+                </span>
+              ) : (
+                "—"
+              ),
             tdClassName: `${listadoTablaTdClass} font-mono`,
           },
           {
@@ -555,7 +602,14 @@ export function StockMovimientosTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (op) => stockOperacionProductoLabel(op),
+            cell: (op) => {
+              const productos = stockOperacionProductoLabel(op);
+              return (
+                <span className="block max-w-[14rem] truncate" title={productos}>
+                  {productos}
+                </span>
+              );
+            },
             tdClassName: listadoTablaTdClass,
           },
           {
@@ -657,8 +711,36 @@ export function StockMovimientosTenantPage({
           {
             id: "lotes",
             thClassName: `${listadoTablaThClass} align-top`,
-            header: "Lotes",
-            cell: (op) => stockOperacionLotesLabel(op),
+            header: (
+              <ViajesListadoHeaderFiltro
+                title="Lotes"
+                filterActive={!!loteBuscar || !!lote}
+                filterSignature={`${loteBuscar}|${lote}`}
+                onClear={() =>
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.delete("loteBuscar");
+                    next.delete("lote");
+                    return next;
+                  })
+                }
+              >
+                <ListadoFiltroBuscador
+                  value={loteBuscar}
+                  onApply={(v) => setFiltroUrl("loteBuscar", v)}
+                  placeholder="Lote…"
+                  ariaLabel="Filtrar por lote"
+                />
+              </ViajesListadoHeaderFiltro>
+            ),
+            cell: (op) => {
+              const lotes = stockOperacionLotesLabel(op);
+              return (
+                <span className="block max-w-[9rem] truncate" title={lotes}>
+                  {lotes}
+                </span>
+              );
+            },
             tdClassName: `${listadoTablaTdClass} text-xs`,
           },
           {
@@ -707,8 +789,12 @@ export function StockMovimientosTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             ),
+            // El backend resuelve el nombre en Clerk (también usuarios que ya no son de la
+            // empresa); nunca mostrar el id `user_…`.
             cell: (op) =>
-              usuariosById.get(op.createdBy)?.nombre ?? op.createdBy ?? "—",
+              op.createdByNombre ||
+              usuariosById.get(op.createdBy)?.nombre ||
+              (op.createdBy ? "Usuario" : "—"),
             tdClassName: listadoTablaTdClass,
           },
         ]}

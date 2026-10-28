@@ -1167,6 +1167,8 @@ export interface StockOperacion {
   /** Fotos del producto (solo ingresos). */
   fotosUrls?: string[];
   createdBy: string;
+  /** Nombre del usuario que la cargó, resuelto en Clerk (solo en el listado paginado). */
+  createdByNombre?: string | null;
   createdAt: string;
   movimientos: StockOperacionLinea[];
 }
