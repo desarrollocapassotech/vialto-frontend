@@ -1,5 +1,5 @@
 ﻿import { useAuth } from "@clerk/clerk-react";
-import { Download } from "lucide-react";
+import { Download, Eye } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 // Asegúrate de que esta ruta coincida con dónde guardaste el ListadoPagination
@@ -12,7 +12,6 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { buildQs } from "@/lib/queryString";
 import {
-  listadoTablaAccionClass,
   listadoTablaAccionesTdClass, listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
@@ -415,15 +414,9 @@ export function IngresosStockHistorialTenantPage({
         rowKey={(op) => op.id}
         emptyMessage="No hay ingresos registrados."
         loadingMessage="Cargando…"
-        renderActions={(op) => (
-          <button
-            type="button"
-            onClick={() => setViendo(op)}
-            className={listadoTablaAccionClass}
-          >
-            Ver ingreso
-          </button>
-        )}
+        rowActions={(op) => [
+          { id: "ver", label: "Ver ingreso", icon: Eye, onClick: () => setViendo(op) },
+        ]}
         actionsThClassName={`${listadoTablaThClass} align-top text-right`}
         actionsTdClassName={`${listadoTablaAccionesTdClass} text-right whitespace-nowrap`}
       />

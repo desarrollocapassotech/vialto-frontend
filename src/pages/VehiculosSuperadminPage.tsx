@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { Eye, Pencil } from "lucide-react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { VehiculoViewModal } from "@/components/vehiculos/VehiculoViewModal";
@@ -16,7 +17,6 @@ import {
 } from "@/lib/transportistas";
 import { friendlyError } from "@/lib/friendlyError";
 import {
-  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
@@ -29,6 +29,7 @@ import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 export function VehiculosSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const navigate = useNavigate();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const transportistas = useTransportistasList(
     filtroEmpresa || undefined,
@@ -328,26 +329,27 @@ export function VehiculosSuperadminPage() {
                 : "No hay vehículos cargados para esta empresa."
         }
         loadingMessage="Cargando…"
-        renderActions={(v) => (
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setViewingVehiculoId(v.id);
-                setViewingVehiculoPatente(v.patente);
-              }}
-              className={listadoTablaAccionClass}
-            >
-              Ver vehículo
-            </button>
-            <Link
-              to={`/vehiculos/${encodeURIComponent(v.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
-              className={listadoTablaAccionClass}
-            >
-              Editar
-            </Link>
-          </div>
-        )}
+        rowActionsSubtitle={(v) => v.patente}
+        rowActions={(v) => [
+          {
+            id: "ver",
+            label: "Ver vehículo",
+            icon: Eye,
+            onClick: () => {
+              setViewingVehiculoId(v.id);
+              setViewingVehiculoPatente(v.patente);
+            },
+          },
+          {
+            id: "editar",
+            label: "Editar",
+            icon: Pencil,
+            onClick: () =>
+              navigate(
+                `/vehiculos/${encodeURIComponent(v.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`,
+              ),
+          },
+        ]}
       />
 
       {filtroEmpresa && !error && meta && meta.total > 0 && (

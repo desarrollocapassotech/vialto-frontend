@@ -8,11 +8,11 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
 import {
-  listadoTablaAccionClass,
   listadoTablaHeadRowClass,
   listadoTablaAccionesTdClass, listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { Eye, Power, RotateCcw } from "lucide-react";
 import type { Producto, PaginatedMeta } from "@/types/api";
 import { ProductoModal } from "@/components/stock/ProductoModal";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
@@ -443,34 +443,17 @@ export function ProductosSuperadminPage() {
                 : `No hay ${pluralFrase} que coincidan.`
             }
             loadingMessage="Cargando…"
-            renderActions={(r) => (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setModal({ mode: "view", producto: r })}
-                  className={listadoTablaAccionClass}
-                >
-                  Ver {singularFrase}
-                </button>
-                {r.activo ? (
-                  <button
-                    type="button"
-                    onClick={() => void toggleActivo(r)}
-                    className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
-                  >
-                    Desactivar
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void toggleActivo(r)}
-                    className={`${listadoTablaAccionClass} text-emerald-900 hover:bg-emerald-50`}
-                  >
-                    Reactivar
-                  </button>
-                )}
-              </>
-            )}
+            rowActions={(r) => [
+              {
+                id: "ver",
+                label: `Ver ${singularFrase}`,
+                icon: Eye,
+                onClick: () => setModal({ mode: "view", producto: r }),
+              },
+              r.activo
+                ? { id: "desactivar", label: "Desactivar", icon: Power, danger: true, onClick: () => void toggleActivo(r) }
+                : { id: "reactivar", label: "Reactivar", icon: RotateCcw, onClick: () => void toggleActivo(r) },
+            ]}
             actionsTdClassName={`${listadoTablaAccionesTdClass} text-right`}
           />
 

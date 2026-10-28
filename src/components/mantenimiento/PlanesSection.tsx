@@ -4,7 +4,6 @@ import { Eye, Power, PowerOff, Trash2, Truck } from "lucide-react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
-import { AccionesFila } from "@/components/ui/AccionesFila";
 import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { InactivoBadge } from "@/components/mantenimiento/MantenimientoBadges";
@@ -254,13 +253,14 @@ export function PlanesSection({
           ]}
           rows={error ? [] : filtrados}
           rowKey={(p) => p.id}
-          onRowClick={(p) => abrir({ modo: "ver", planId: p.id })}
           emptyMessage={
             error ? "No se pudieron cargar los planes." : "No hay planes que coincidan con los filtros aplicados."
           }
           loadingMessage="Cargando…"
-          actionsTdClassName={listadoTablaAccionesTdClass}
-          renderActions={(p) => {
+          actionsTdClassName={`${listadoTablaAccionesTdClass} text-right`}
+          rowActionsDestacadas={soloLectura ? ["ver"] : ["ver", "asignar"]}
+          rowActionsSubtitle={(p) => p.nombre}
+          rowActions={(p) => {
             const opciones: AccionOpcion[] = [
               { id: "ver", label: "Ver plan", icon: Eye, onClick: () => abrir({ modo: "ver", planId: p.id }) },
             ];
@@ -273,7 +273,7 @@ export function PlanesSection({
                 { id: "eliminar", label: "Eliminar", icon: Trash2, danger: true, onClick: () => setABorrar(p) },
               );
             }
-            return <AccionesFila options={opciones} destacadas={soloLectura ? ["ver"] : ["ver", "asignar"]} />;
+            return opciones;
           }}
         />
       )}

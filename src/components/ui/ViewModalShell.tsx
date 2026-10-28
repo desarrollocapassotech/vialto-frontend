@@ -87,5 +87,9 @@ export const viewModalGridClass = 'grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols
 export const viewModalBtnGhost =
   'inline-flex min-h-11 items-center justify-center px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist';
 
+/** Acción destructiva (Eliminar, Anular): mismo alto que los otros botones del pie. */
+export const viewModalBtnDanger =
+  'inline-flex min-h-11 items-center justify-center gap-1.5 px-3 text-xs uppercase tracking-wider border border-red-300 bg-white text-red-700 hover:bg-red-50 disabled:opacity-50';
+
 export const viewModalBtnPrimary =
   'inline-flex min-h-11 items-center justify-center px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:bg-gray-300 disabled:text-gray-500';

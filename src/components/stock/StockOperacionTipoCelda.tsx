@@ -17,8 +17,27 @@ const TIPO_ICON: Record<StockOperacion['tipo'], typeof Split> = {
   division: Split,
 };
 
-export function StockOperacionTipoCelda({ tipo }: { tipo: StockOperacion['tipo'] }) {
+export function StockOperacionTipoCelda({
+  tipo,
+  soloIcono = false,
+}: {
+  tipo: StockOperacion['tipo'];
+  /** Solo el ícono, con el tipo en el tooltip (grilla de Movimientos). */
+  soloIcono?: boolean;
+}) {
   const Icon = TIPO_ICON[tipo];
+
+  if (soloIcono) {
+    return (
+      <span
+        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${TIPO_ICON_WRAP[tipo]}`}
+        title={movimientoStockTipoLabel(tipo)}
+        aria-label={movimientoStockTipoLabel(tipo)}
+      >
+        <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+      </span>
+    );
+  }
 
   return (
     <span className="inline-flex items-center gap-2">

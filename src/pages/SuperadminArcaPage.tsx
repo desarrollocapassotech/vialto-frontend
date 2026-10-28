@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
-import { Receipt } from "lucide-react";
+import { Ban, Clock, Download, FileMinus, FileSearch, Receipt, Trash2 } from "lucide-react";
+import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { useToast } from "@/lib/toast";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -17,7 +18,6 @@ import { filenameFromContentDisposition } from "@/lib/downloadFilename";
 import { friendlyError } from "@/lib/friendlyError";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import {
-  listadoTablaAccionClass,
   listadoTablaAccionesTdClass, listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
@@ -344,6 +344,74 @@ function LiquidacionesTab({
     }
   }
 
+  function accionesLiquidacion(liq: Liquidacion): AccionOpcion[] {
+    const procesando = Boolean(rowProcessing[liq.id]);
+    const items: AccionOpcion[] = [];
+    if (liq.estado === "borrador" || liq.estado === "error") {
+      items.push({ id: "emitir", label: "Emitir", icon: Receipt, disabled: procesando, onClick: () => setPendingEmitir(liq) });
+    }
+    if (
+      liq.estado === "autorizado" ||
+      liq.estado === "anulado" ||
+      liq.estado === "pendiente_anulacion"
+    ) {
+      items.push({ id: "pdf", label: "Descargar PDF", icon: Download, disabled: procesando, onClick: () => void descargarPdf(liq.id) });
+    }
+    if (liq.estado === "anulado" && liq.anulacionCae) {
+      items.push({
+        id: "pdf-nc",
+        label: "PDF anulación",
+        description: anulacionComprobanteLabel(liq.anulacionCbteTipo),
+        icon: FileMinus,
+        disabled: procesando,
+        onClick: () => void descargarPdfNc(liq.id),
+      });
+    }
+    if (
+      liq.estado === "anulado" &&
+      liq.anulacionMetodo === "manual" &&
+      liq.anulacionManualComprobanteUrl
+    ) {
+      const url = liq.anulacionManualComprobanteUrl;
+      items.push({
+        id: "ver-comprobante",
+        label: "Ver comprobante",
+        icon: FileSearch,
+        onClick: () => window.open(url, "_blank", "noopener,noreferrer"),
+      });
+    }
+    if (liq.estado === "autorizado" && metodoAnulacion !== "manual") {
+      items.push({ id: "anular", label: "Anular", icon: Ban, danger: true, disabled: procesando, onClick: () => setAnularId(liq.id) });
+    }
+    if (liq.estado === "autorizado" && metodoAnulacion === "manual") {
+      items.push({
+        id: "marcar-pendiente-anulacion",
+        label: "Marcar pendiente de anulación",
+        icon: Clock,
+        disabled: procesando,
+        onClick: () => setPendienteAnulacionId(liq.id),
+      });
+    }
+    if (liq.estado === "pendiente_anulacion") {
+      items.push({
+        id: "confirmar-anulacion",
+        label: "Confirmar anulación",
+        icon: Ban,
+        danger: true,
+        disabled: procesando,
+        onClick: () => setConfirmarAnulacionManualId(liq.id),
+      });
+    }
+    if (
+      liq.estado === "borrador" ||
+      liq.estado === "error" ||
+      liq.estado === "pendiente_cae"
+    ) {
+      items.push({ id: "eliminar", label: "Eliminar", icon: Trash2, danger: true, disabled: procesando, onClick: () => setEliminarId(liq.id) });
+    }
+    return items;
+  }
+
   if (loading)
     return (
       <p className="mt-6 text-sm text-vialto-steel">Cargando liquidaciones…</p>
@@ -434,109 +502,13 @@ function LiquidacionesTab({
         rows={items ?? []}
         rowKey={(liq) => liq.id}
         emptyMessage="No hay liquidaciones para esta empresa."
-        renderActions={(liq) => {
-          const isProc = rowProcessing[liq.id];
-          return (
-            <>
-              {(liq.estado === "borrador" || liq.estado === "error") && (
-                <button
-                  type="button"
-                  disabled={!!isProc}
-                  onClick={() => setPendingEmitir(liq)}
-                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-fire hover:text-vialto-bright disabled:opacity-50`}
-                >
-                  Emitir
-                </button>
-              )}
-              {(liq.estado === "autorizado" ||
-                liq.estado === "anulado" ||
-                liq.estado === "pendiente_anulacion") && (
-                <button
-                  type="button"
-                  disabled={!!isProc}
-                  onClick={() => descargarPdf(liq.id)}
-                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal disabled:opacity-50`}
-                >
-                  {isProc === "pdf" ? "…" : "PDF"}
-                </button>
-              )}
-              {liq.estado === "anulado" && liq.anulacionCae && (
-                <button
-                  type="button"
-                  disabled={!!isProc}
-                  onClick={() => descargarPdfNc(liq.id)}
-                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal disabled:opacity-50`}
-                  title={anulacionComprobanteLabel(liq.anulacionCbteTipo)}
-                >
-                  {isProc === "pdf-nc" ? "…" : "PDF anulación"}
-                </button>
-              )}
-              {liq.estado === "anulado" &&
-                liq.anulacionMetodo === "manual" &&
-                liq.anulacionManualComprobanteUrl && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      window.open(
-                        liq.anulacionManualComprobanteUrl as string,
-                        "_blank",
-                        "noopener,noreferrer",
-                      )
-                    }
-                    className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal`}
-                  >
-                    Ver comprobante
-                  </button>
-                )}
-              {liq.estado === "autorizado" && metodoAnulacion !== "manual" && (
-                <button
-                  type="button"
-                  disabled={!!isProc}
-                  onClick={() => setAnularId(liq.id)}
-                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
-                >
-                  {isProc === "anular" ? "…" : "Anular"}
-                </button>
-              )}
-              {liq.estado === "autorizado" && metodoAnulacion === "manual" && (
-                <button
-                  type="button"
-                  disabled={!!isProc}
-                  onClick={() => setPendienteAnulacionId(liq.id)}
-                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
-                >
-                  {isProc === "marcar-pendiente-anulacion" ? "…" : "Marcar pendiente de anulación"}
-                </button>
-              )}
-              {liq.estado === "pendiente_anulacion" && (
-                <button
-                  type="button"
-                  disabled={!!isProc}
-                  onClick={() => setConfirmarAnulacionManualId(liq.id)}
-                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
-                >
-                  {isProc === "confirmar-anulacion-manual" ? "…" : "Confirmar anulación"}
-                </button>
-              )}
-              {(liq.estado === "borrador" ||
-                liq.estado === "error" ||
-                liq.estado === "pendiente_cae") && (
-                <button
-                  type="button"
-                  disabled={!!isProc}
-                  onClick={() => setEliminarId(liq.id)}
-                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-red-600 hover:text-red-700 disabled:opacity-50`}
-                >
-                  {isProc === "eliminar" ? "…" : "Eliminar"}
-                </button>
-              )}
-            </>
-          );
-        }}
-        actionsHeader="Acciones"
+        rowActions={accionesLiquidacion}
+        rowActionsMaxIconos={3}
+        rowActionsSubtitle={(liq) =>
+          `${fmtDate(liq.periodoDesde)} – ${fmtDate(liq.periodoHasta)}`
+        }
         actionsTdClassName={`${listadoTablaAccionesTdClass} text-right`}
-        renderMobileCard={(liq) => {
-          const isProc = rowProcessing[liq.id];
+        renderMobileCard={(liq, { acciones, onClick }) => {
           return (
             <ListadoCard
               primary={`${fmtDate(liq.periodoDesde)} – ${fmtDate(liq.periodoHasta)}`}
@@ -584,107 +556,8 @@ function LiquidacionesTab({
                   ),
                 },
               ]}
-              actions={
-                <>
-                  {(liq.estado === "borrador" || liq.estado === "error") && (
-                    <button
-                      type="button"
-                      disabled={!!isProc}
-                      onClick={() => setPendingEmitir(liq)}
-                      className={`${listadoTablaAccionClass} inline-flex items-center gap-1.5 font-[family-name:var(--font-ui)] text-vialto-fire hover:text-vialto-bright disabled:opacity-50`}
-                    >
-                      <Receipt
-                        className="h-3.5 w-3.5 shrink-0"
-                        strokeWidth={1.75}
-                        aria-hidden
-                      />
-                      Emitir
-                    </button>
-                  )}
-                  {(liq.estado === "autorizado" ||
-                    liq.estado === "anulado" ||
-                    liq.estado === "pendiente_anulacion") && (
-                    <button
-                      type="button"
-                      disabled={!!isProc}
-                      onClick={() => descargarPdf(liq.id)}
-                      className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal disabled:opacity-50`}
-                    >
-                      {isProc === "pdf" ? "…" : "PDF"}
-                    </button>
-                  )}
-                  {liq.estado === "anulado" && liq.anulacionCae && (
-                    <button
-                      type="button"
-                      disabled={!!isProc}
-                      onClick={() => descargarPdfNc(liq.id)}
-                      className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal disabled:opacity-50`}
-                      title={anulacionComprobanteLabel(liq.anulacionCbteTipo)}
-                    >
-                      {isProc === "pdf-nc" ? "…" : "PDF anulación"}
-                    </button>
-                  )}
-                  {liq.estado === "anulado" &&
-                    liq.anulacionMetodo === "manual" &&
-                    liq.anulacionManualComprobanteUrl && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          window.open(
-                            liq.anulacionManualComprobanteUrl as string,
-                            "_blank",
-                            "noopener,noreferrer",
-                          )
-                        }
-                        className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal`}
-                      >
-                        Ver comprobante
-                      </button>
-                    )}
-                  {liq.estado === "autorizado" && metodoAnulacion !== "manual" && (
-                    <button
-                      type="button"
-                      disabled={!!isProc}
-                      onClick={() => setAnularId(liq.id)}
-                      className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
-                    >
-                      {isProc === "anular" ? "…" : "Anular"}
-                    </button>
-                  )}
-                  {liq.estado === "autorizado" && metodoAnulacion === "manual" && (
-                    <button
-                      type="button"
-                      disabled={!!isProc}
-                      onClick={() => setPendienteAnulacionId(liq.id)}
-                      className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
-                    >
-                      {isProc === "marcar-pendiente-anulacion" ? "…" : "Marcar pendiente de anulación"}
-                    </button>
-                  )}
-                  {liq.estado === "pendiente_anulacion" && (
-                    <button
-                      type="button"
-                      disabled={!!isProc}
-                      onClick={() => setConfirmarAnulacionManualId(liq.id)}
-                      className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
-                    >
-                      {isProc === "confirmar-anulacion-manual" ? "…" : "Confirmar anulación"}
-                    </button>
-                  )}
-                  {(liq.estado === "borrador" ||
-                    liq.estado === "error" ||
-                    liq.estado === "pendiente_cae") && (
-                    <button
-                      type="button"
-                      disabled={!!isProc}
-                      onClick={() => setEliminarId(liq.id)}
-                      className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-red-600 hover:text-red-700 disabled:opacity-50`}
-                    >
-                      {isProc === "eliminar" ? "…" : "Eliminar"}
-                    </button>
-                  )}
-                </>
-              }
+              actions={acciones}
+              onClick={onClick}
             />
           );
         }}

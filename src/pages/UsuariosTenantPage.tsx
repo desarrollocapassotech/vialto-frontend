@@ -8,14 +8,15 @@ import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   ViewModalShell,
+  viewModalBtnDanger,
   viewModalBtnGhost,
   viewModalBtnPrimary,
   viewModalGridClass,
 } from "@/components/ui/ViewModalShell";
 import { apiFetch, apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 import {
-  listadoTablaAccionClass,
   listadoTablaHeadRowClass,
   listadoTablaTdClass,
   listadoTablaThClass,
@@ -169,29 +170,32 @@ function UsuarioModal({
     <ViewModalShell
       title={nombre}
       onClose={onClose}
-      maxWidthClass="sm:max-w-md"
+      maxWidthClass="sm:max-w-2xl"
       footer={
         <>
+          {/* Eliminar separado a la izquierda; Cerrar y la acción principal a la derecha. */}
+          {!esMismoUsuario && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className={`${viewModalBtnDanger} sm:mr-auto`}
+            >
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+              Eliminar usuario
+            </button>
+          )}
           <button type="button" onClick={onClose} className={viewModalBtnGhost}>
             Cerrar
           </button>
           {!esMismoUsuario && (
-            <>
-              <button
-                type="button"
-                onClick={onDelete}
-                className="inline-flex min-h-11 items-center px-3 text-xs uppercase tracking-wider border border-red-200 text-red-800 bg-white hover:bg-red-50 md:min-h-0"
-              >
-                Eliminar
-              </button>
-              <button
-                type="button"
-                onClick={onStartEditRole}
-                className={viewModalBtnPrimary}
-              >
-                Editar rol
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={onStartEditRole}
+              className={`${viewModalBtnPrimary} gap-1.5`}
+            >
+              <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+              Editar rol
+            </button>
           )}
         </>
       }
@@ -203,11 +207,12 @@ function UsuarioModal({
           { label: "Rol", value: formatRole(user.role) },
           { label: "Alta", value: formatDate(user.createdAt) },
         ].map((c) => (
-          <div key={c.label}>
+          <div key={c.label} className="min-w-0">
             <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
               {c.label}
             </p>
-            <p className="mt-1 text-sm">{c.value}</p>
+            {/* Un email largo no tiene espacios: que corte en cualquier punto en vez de scrollear. */}
+            <p className="mt-1 text-sm [overflow-wrap:anywhere]">{c.value}</p>
           </div>
         ))}
       </div>
@@ -752,21 +757,20 @@ export function UsuariosTenantPage() {
             : "No hay usuarios en esta organización."
         }
         loadingMessage="Cargando…"
-        renderActions={(u) =>
-          u.userId ? (
-            <button
-              type="button"
-              onClick={() => {
-                setActionError(null);
-                setModal({ mode: "view", user: u });
-              }}
-              className={listadoTablaAccionClass}
-            >
-              Ver usuario
-            </button>
-          ) : (
-            <span className="text-xs text-vialto-steel">—</span>
-          )
+        rowActions={(u) =>
+          u.userId
+            ? [
+                {
+                  id: "ver",
+                  label: "Ver usuario",
+                  icon: Eye,
+                  onClick: () => {
+                    setActionError(null);
+                    setModal({ mode: "view", user: u });
+                  },
+                },
+              ]
+            : []
         }
       />
 

@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Pencil, Power, Trash2 } from 'lucide-react';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudFieldLabel } from '@/components/crud/CrudFields';
+import { AccionesFila } from '@/components/ui/AccionesFila';
+import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Spinner } from '@/components/ui/Spinner';
+import { clickFilaAcciones } from '@/lib/accionesFila';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { ALICUOTAS_IVA_AFIP_LABEL, esAlicuotaIvaAfip } from '@/lib/liquidacionConceptosIva';
@@ -76,6 +80,8 @@ export function ConceptosLiquidacionConfigSection({
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [showForm, setShowForm] = useState(false);
   const [eliminando, setEliminando] = useState<ConceptoLiquidacion | null>(null);
+  /** Fila con el modal de acciones abierto. */
+  const [accionesAbiertasId, setAccionesAbiertasId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -470,8 +476,20 @@ export function ConceptosLiquidacionConfigSection({
               </tr>
             </thead>
             <tbody>
-              {items.map((c) => (
-                <tr key={c.id} className="border-b border-black/5 last:border-0">
+              {items.map((c) => {
+                const acciones: AccionOpcion[] = [
+                  { id: 'editar', label: 'Editar', icon: Pencil, disabled: saving, onClick: () => openEdit(c) },
+                  ...(!c.activo
+                    ? [{ id: 'activar', label: 'Activar', icon: Power, disabled: saving, onClick: () => void activar(c) }]
+                    : []),
+                  { id: 'eliminar', label: 'Eliminar', icon: Trash2, danger: true, disabled: saving, onClick: () => setEliminando(c) },
+                ];
+                return (
+                <tr
+                  key={c.id}
+                  className="cursor-pointer border-b border-black/5 last:border-0 hover:bg-vialto-mist/40"
+                  onClick={() => clickFilaAcciones(acciones, () => setAccionesAbiertasId(c.id))}
+                >
                   <td className="px-3 py-2.5 text-vialto-charcoal">{c.nombre}</td>
                   <td className="px-3 py-2.5 text-vialto-steel">{signoLabel(c.signo)}</td>
                   <td className="px-3 py-2.5 tabular-nums text-vialto-charcoal">{c.ivaPct}%</td>
@@ -510,38 +528,19 @@ export function ConceptosLiquidacionConfigSection({
                       </span>
                     </td>
                   )}
-                  <td className="px-3 py-2.5 text-right">
-                    <div className="inline-flex items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => openEdit(c)}
-                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
-                      >
-                        Editar
-                      </button>
-                      {!c.activo && (
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() => void activar(c)}
-                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
-                        >
-                          Activar
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => setEliminando(c)}
-                        className="text-xs uppercase tracking-wider px-2 py-1 border border-red-300 text-red-800 hover:bg-red-50 disabled:opacity-50"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
+                  <td className="px-3 py-1 text-right align-middle" onClick={(e) => e.stopPropagation()}>
+                    <AccionesFila
+                      options={acciones}
+                      destacadas={acciones.map((o) => o.id)}
+                      maxIconos={3}
+                      subtitle={c.nombre}
+                      open={accionesAbiertasId === c.id}
+                      onOpenChange={(o) => setAccionesAbiertasId(o ? c.id : null)}
+                    />
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

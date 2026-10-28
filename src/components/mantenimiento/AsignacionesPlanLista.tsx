@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
+import { Pencil, Power, PowerOff, Trash2 } from "lucide-react";
 import { FechaPicker } from "@/components/mantenimiento/FechaPicker";
 import { InactivoBadge } from "@/components/mantenimiento/MantenimientoBadges";
+import { AccionesFila } from "@/components/ui/AccionesFila";
+import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner } from "@/components/ui/Spinner";
 import { VehiculoHoverCard } from "@/components/vehiculos/VehiculoHoverCard";
+import { clickFilaAcciones } from "@/lib/accionesFila";
 import { apiJson } from "@/lib/api";
 import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 import { friendlyError } from "@/lib/friendlyError";
@@ -45,6 +49,8 @@ export function AsignacionesPlanLista({
   const [editError, setEditError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [aQuitar, setAQuitar] = useState<AsignacionPlan | null>(null);
+  /** Fila con el modal de acciones abierto. */
+  const [accionesAbiertasId, setAccionesAbiertasId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -132,8 +138,30 @@ export function AsignacionesPlanLista({
             </tr>
           </thead>
           <tbody>
-            {filas.map((a) => (
-              <tr key={a.id} className="border-b border-black/5 align-middle">
+            {filas.map((a) => {
+              const acciones: AccionOpcion[] = [
+                { id: "editar", label: "Editar último service", icon: Pencil, disabled: !!ocupado, onClick: () => empezarEdicion(a) },
+                {
+                  id: "activo",
+                  label: a.activo ? "Desactivar" : "Reactivar",
+                  icon: a.activo ? PowerOff : Power,
+                  disabled: !!ocupado,
+                  onClick: () =>
+                    void patch(
+                      a,
+                      { activo: !a.activo },
+                      a.activo ? `${a.vehiculo.patente}: asignación desactivada` : `${a.vehiculo.patente}: asignación reactivada`,
+                    ),
+                },
+                { id: "eliminar", label: "Quitar del plan", icon: Trash2, danger: true, disabled: !!ocupado, onClick: () => setAQuitar(a) },
+              ];
+              const clickeable = !soloLectura && editando !== a.id;
+              return (
+              <tr
+                key={a.id}
+                className={`border-b border-black/5 align-middle${clickeable ? " cursor-pointer hover:bg-vialto-mist/40" : ""}`}
+                onClick={clickeable ? () => clickFilaAcciones(acciones, () => setAccionesAbiertasId(a.id)) : undefined}
+              >
                 <td className="py-1.5 pr-3">
                   <VehiculoHoverCard vehiculoId={a.vehiculo.id}>{a.vehiculo.patente}</VehiculoHoverCard>
                   <span className="block text-xs text-vialto-steel">{labelTipoVehiculo(a.vehiculo.tipo)}</span>
@@ -165,8 +193,8 @@ export function AsignacionesPlanLista({
                 </td>
                 <td className="py-1.5 pr-3">{a.activo ? "Activa" : <InactivoBadge />}</td>
                 {!soloLectura && (
-                  <td className="py-1.5 text-right">
-                    <div className="flex flex-wrap justify-end gap-3">
+                  <td className="py-1 text-right" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-wrap items-center justify-end gap-3">
                       {ocupado === a.id && <Spinner className="h-3.5 w-3.5" />}
                       {editando === a.id ? (
                         <>
@@ -178,34 +206,20 @@ export function AsignacionesPlanLista({
                           </button>
                         </>
                       ) : (
-                        <>
-                          <button type="button" disabled={!!ocupado} onClick={() => empezarEdicion(a)} className={LINK}>
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            disabled={!!ocupado}
-                            onClick={() =>
-                              void patch(
-                                a,
-                                { activo: !a.activo },
-                                a.activo ? `${a.vehiculo.patente}: asignación desactivada` : `${a.vehiculo.patente}: asignación reactivada`,
-                              )
-                            }
-                            className={LINK}
-                          >
-                            {a.activo ? "Desactivar" : "Reactivar"}
-                          </button>
-                          <button type="button" disabled={!!ocupado} onClick={() => setAQuitar(a)} className={`${LINK} hover:text-red-700`}>
-                            Quitar
-                          </button>
-                        </>
+                        <AccionesFila
+                          options={acciones}
+                          destacadas={["editar", "activo"]}
+                          subtitle={a.vehiculo.patente}
+                          open={accionesAbiertasId === a.id}
+                          onOpenChange={(o) => setAccionesAbiertasId(o ? a.id : null)}
+                        />
                       )}
                     </div>
                   </td>
                 )}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

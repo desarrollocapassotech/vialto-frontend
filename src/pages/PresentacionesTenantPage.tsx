@@ -12,11 +12,11 @@ import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
-  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { Pencil, Trash2 } from "lucide-react";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Presentacion } from "@/types/api";
 import { ConfirmDialog } from "@/components/crud/ConfirmDialog";
@@ -345,27 +345,18 @@ export function PresentacionesTenantPage() {
               : "No hay presentaciones cargadas. Creá una para usarla en los productos."
         }
         loadingMessage="Cargando…"
-        renderActions={(row) => (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                setEditingId(row.id);
-                setIsFormOpen(true);
-              }}
-              className={listadoTablaAccionClass}
-            >
-              Editar
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmTarget(row)} // Modificado para abrir el diálogo
-              className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
-            >
-              Eliminar
-            </button>
-          </>
-        )}
+        rowActions={(row) => [
+          {
+            id: "editar",
+            label: "Editar",
+            icon: Pencil,
+            onClick: () => {
+              setEditingId(row.id);
+              setIsFormOpen(true);
+            },
+          },
+          { id: "eliminar", label: "Eliminar", icon: Trash2, danger: true, onClick: () => setConfirmTarget(row) },
+        ]}
       />
 
       {meta && (rowsFiltradas?.length ?? 0) > 0 && (

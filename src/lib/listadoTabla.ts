@@ -56,7 +56,10 @@ export const listadoColHideMobile = 'hidden md:table-cell';
 /** Oculta columna en mobile y tablet (<1024px). */
 export const listadoColHideUntilLg = 'hidden lg:table-cell';
 
-/** Botón de acción en celdas (Ver, Editar, etc.), alineado con clientes, productos y depósitos. */
+/**
+ * Botón de texto. No usar para la columna de acciones de una grilla: ahí van íconos con
+ * `AccionesFila` (`rowActions` de `ListadoDatos`), ver CLAUDE.md.
+ */
 export const listadoTablaAccionClass =
   'inline-flex min-h-11 min-w-11 items-center justify-center text-xs uppercase tracking-wider px-3 py-2 border border-black/20 hover:bg-vialto-mist md:min-h-0 md:min-w-0 md:px-2 md:py-1';
 

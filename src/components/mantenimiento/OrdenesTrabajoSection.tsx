@@ -6,7 +6,6 @@ import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton"
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { filtrarVehiculos } from "@/components/forms/maestroSearchFilters";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
-import { AccionesFila } from "@/components/ui/AccionesFila";
 import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { VehiculoHoverCard } from "@/components/vehiculos/VehiculoHoverCard";
@@ -274,7 +273,6 @@ export function OrdenesTrabajoSection({
         ]}
         rows={error ? [] : ordenes}
         rowKey={(o) => o.id}
-        onRowClick={(o) => onVer(o.id)}
         emptyMessage={
           error
             ? "No se pudieron cargar las órdenes de trabajo."
@@ -283,8 +281,9 @@ export function OrdenesTrabajoSection({
               : "Todavía no hay órdenes de trabajo registradas."
         }
         loadingMessage="Cargando…"
-        actionsTdClassName={listadoTablaAccionesTdClass}
-        renderActions={(o) => {
+        actionsTdClassName={`${listadoTablaAccionesTdClass} text-right`}
+        rowActionsDestacadas={["ver", "historial"]}
+        rowActions={(o) => {
           const opciones: AccionOpcion[] = [
             { id: "ver", label: "Ver orden de trabajo", icon: Eye, onClick: () => onVer(o.id) },
             { id: "historial", label: "Historial del vehículo", icon: History, onClick: () => onHistorial(o.vehiculo.id) },
@@ -295,7 +294,7 @@ export function OrdenesTrabajoSection({
           if (!soloLectura) {
             opciones.push({ id: "eliminar", label: "Eliminar", icon: Trash2, danger: true, onClick: () => setABorrar(o) });
           }
-          return <AccionesFila options={opciones} destacadas={["ver"]} />;
+          return opciones;
         }}
       />
 

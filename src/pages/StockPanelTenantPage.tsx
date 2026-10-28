@@ -3,9 +3,13 @@ import {
   ChevronDown,
   ChevronRight,
   Download,
+  Eye,
   Package,
   Warehouse,
 } from "lucide-react";
+import { AccionesFila } from "@/components/ui/AccionesFila";
+import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
+import { clickFilaAcciones } from "@/lib/accionesFila";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
@@ -19,6 +23,7 @@ import { ProductoModal } from "@/components/stock/ProductoModal";
 import {
   FechaVencimientoLote,
   filasDesdeLotesResponse,
+  AvisoVencimientoFila,
   StockInventarioLotesDetalle,
   type StockInventarioLoteFila,
 } from "@/components/stock/StockInventarioLotesDetalle";
@@ -39,6 +44,7 @@ import { puedeGestionarComoAdminEmpresa } from "@/lib/roleLabels";
 import { fetchLotesDisponibles } from "@/lib/stockLote";
 import {
   listadoTablaAccionClass,
+  listadoTablaAccionesTdClass,
   listadoTablaBodyRowClass,
   listadoTablaHeadRowClass,
   listadoTablaTdClass,
@@ -238,6 +244,23 @@ export function StockPanelTenantPage({
     productoId: string;
     productoNombre: string;
   } | null>(null);
+  /** Fila con el modal de acciones abierto. */
+  const [accionesAbiertasId, setAccionesAbiertasId] = useState<string | null>(null);
+
+  function accionesItem(item: StockItem): AccionOpcion[] {
+    return [
+      {
+        id: "ver",
+        label: "Ver producto",
+        icon: Eye,
+        onClick: () =>
+          setProductoDetalleModal({
+            productoId: item.productoId,
+            productoNombre: item.producto?.nombre ?? item.productoId,
+          }),
+      },
+    ];
+  }
 
   const load = useCallback(async () => {
     // Short-circuit: Si es admin y no eligió empresa, limpiamos la vista
@@ -710,9 +733,6 @@ export function StockPanelTenantPage({
           <h1 className="text-2xl font-semibold text-vialto-charcoal">
             Inventario
           </h1>
-          <p className="mt-1 text-sm text-vialto-steel">
-            Stock disponible en cada depósito, en tiempo real.
-          </p>
         </div>
         {(!isPlatform || activeTenantId) && activeFilterCount > 0 && (
           <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
@@ -1027,7 +1047,9 @@ export function StockPanelTenantPage({
                         </ViajesListadoHeaderFiltro>
                       </th>
                     )}
-                    <th scope="col" className={`${listadoTablaThClass} w-16`} />
+                    <th scope="col" className={`${listadoTablaThClass} text-right align-top`}>
+                      Acciones
+                    </th>
                   </tr>
                 }
                 renderTableRow={(item) => {
@@ -1039,16 +1061,24 @@ export function StockPanelTenantPage({
                   return (
                     <Fragment key={item.id}>
                       <tr
-                        className={`${listadoTablaBodyRowClass} ${
+                        className={`${listadoTablaBodyRowClass} cursor-pointer ${
                           expanded
                             ? "bg-vialto-mist/40 border-l-2 border-l-vialto-charcoal/25"
                             : ""
                         }`}
+                        onClick={() =>
+                          clickFilaAcciones(accionesItem(item), () =>
+                            setAccionesAbiertasId(item.id),
+                          )
+                        }
                       >
                         <td className={`${listadoTablaTdClass} w-10 pr-1`}>
                           <button
                             type="button"
-                            onClick={() => toggleExpand(item)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleExpand(item);
+                            }}
                             aria-expanded={expanded}
                             aria-label={
                               expanded
@@ -1083,8 +1113,11 @@ export function StockPanelTenantPage({
                         </td>
                         <td className={listadoTablaTdClass}>
                           <div className={sinStock ? "text-vialto-steel" : ""}>
-                            <p className="font-medium text-vialto-charcoal">
+                            <p className="flex items-center gap-1.5 font-medium text-vialto-charcoal">
                               {item.producto?.nombre ?? item.productoId}
+                              <AvisoVencimientoFila
+                                proximoVencimiento={item.proximoVencimiento}
+                              />
                             </p>
                             {presentacion && (
                               <p className="mt-0.5 text-xs text-vialto-steel">
@@ -1115,20 +1148,19 @@ export function StockPanelTenantPage({
                             {cantidad2Cell(item, units.unidad2)}
                           </td>
                         )}
-                        <td className={`${listadoTablaTdClass} text-right`}>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setProductoDetalleModal({
-                                productoId: item.productoId,
-                                productoNombre:
-                                  item.producto?.nombre ?? item.productoId,
-                              })
+                        <td
+                          className={`${listadoTablaAccionesTdClass} text-right`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <AccionesFila
+                            options={accionesItem(item)}
+                            destacadas={["ver"]}
+                            subtitle={item.producto?.nombre ?? item.productoId}
+                            open={accionesAbiertasId === item.id}
+                            onOpenChange={(o) =>
+                              setAccionesAbiertasId(o ? item.id : null)
                             }
-                            className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
-                          >
-                            Ver producto
-                          </button>
+                          />
                         </td>
                       </tr>
                       {expanded && (
@@ -1165,7 +1197,12 @@ export function StockPanelTenantPage({
                       label: "Producto",
                       value: (
                         <span className={sinStock ? "text-vialto-steel" : ""}>
-                          {productoNombre}
+                          <span className="inline-flex items-center gap-1.5">
+                            {productoNombre}
+                            <AvisoVencimientoFila
+                              proximoVencimiento={item.proximoVencimiento}
+                            />
+                          </span>
                           {presentacion ? (
                             <span className="mt-0.5 block text-xs text-vialto-steel">
                               {presentacion}
@@ -1238,6 +1275,11 @@ export function StockPanelTenantPage({
                         </span>
                       }
                       fields={fields}
+                      onClick={() =>
+                        clickFilaAcciones(accionesItem(item), () =>
+                          setAccionesAbiertasId(item.id),
+                        )
+                      }
                       actions={
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           <button
@@ -1248,19 +1290,15 @@ export function StockPanelTenantPage({
                           >
                             {expanded ? "Ocultar lotes" : "Ver lotes"}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setProductoDetalleModal({
-                                productoId: item.productoId,
-                                productoNombre:
-                                  item.producto?.nombre ?? item.productoId,
-                              })
-                            }
-                            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist transition-colors"
-                          >
-                            Ver producto
-                          </button>
+                          {/* La instancia de la tabla es la dueña del modal de acciones. */}
+                          <AccionesFila
+                            options={accionesItem(item)}
+                            destacadas={["ver"]}
+                            open={false}
+                            onOpenChange={(o) => {
+                              if (o) setAccionesAbiertasId(item.id);
+                            }}
+                          />
                         </div>
                       }
                     />

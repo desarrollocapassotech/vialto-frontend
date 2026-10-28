@@ -1124,6 +1124,8 @@ export interface StockItem {
   cantidad2: number;
   updatedAt: string;
   kg: number;
+  /** Vencimiento más próximo entre sus lotes con saldo (solo `GET stock/disponible`). */
+  proximoVencimiento?: string | null;
 }
 
 export interface StockOperacionLinea {
@@ -1167,6 +1169,8 @@ export interface StockOperacion {
   /** Fotos del producto (solo ingresos). */
   fotosUrls?: string[];
   createdBy: string;
+  /** Nombre del usuario que la cargó, resuelto en Clerk (solo en el listado paginado). */
+  createdByNombre?: string | null;
   createdAt: string;
   movimientos: StockOperacionLinea[];
 }

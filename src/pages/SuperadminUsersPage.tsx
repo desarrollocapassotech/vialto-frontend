@@ -11,8 +11,8 @@ import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { Eye } from "lucide-react";
 import {
-  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
@@ -408,18 +408,10 @@ export function SuperadminUsersPage() {
                   : "No hay usuarios en esta empresa."
           }
           loadingMessage="Cargando…"
-          renderActions={(u) =>
-            u.userId ? (
-              <button
-                type="button"
-                onClick={() => setViewingUser(u)}
-                className={listadoTablaAccionClass}
-              >
-                Ver usuario
-              </button>
-            ) : (
-              <span className="text-xs text-vialto-steel">—</span>
-            )
+          rowActions={(u) =>
+            u.userId
+              ? [{ id: "ver", label: "Ver usuario", icon: Eye, onClick: () => setViewingUser(u) }]
+              : []
           }
         />
 

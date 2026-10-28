@@ -40,7 +40,7 @@ export function coerceMovimientoStockFechaIso(raw: unknown): string | null {
  */
 export function formatMovimientoStockFechaFromIso(
   raw: unknown,
-  options?: { alwaysShowTime?: boolean },
+  options?: { alwaysShowTime?: boolean; soloFecha?: boolean },
 ): string {
   const iso = coerceMovimientoStockFechaIso(raw);
   if (!iso) return '—';
@@ -50,6 +50,7 @@ export function formatMovimientoStockFechaFromIso(
   if (parts.length !== 3) return '—';
   const [y, m, d] = parts;
   const soloFecha = `${d}/${m}/${y}`;
+  if (options?.soloFecha) return soloFecha;
   const ht = (hora ?? '').trim();
   if (!options?.alwaysShowTime && (!ht || ht === '00:00')) return soloFecha;
   const timePart = ht || '00:00';

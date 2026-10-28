@@ -1,4 +1,8 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { Eye } from "lucide-react";
+import { CeldaAccionesFila } from "@/components/ui/AccionesFila";
+import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
+import { clickFilaAcciones } from "@/lib/accionesFila";
 import { etapaViajeLabel } from "@/lib/viajesIndicadores";
 import type {
   FinancieroDashboardResponse,
@@ -73,6 +77,29 @@ function StatTile({
     );
   }
   return <div className="flex min-h-[110px] flex-col justify-between bg-vialto-graphite p-5">{inner}</div>;
+}
+
+const FILA_CLICKEABLE = "cursor-pointer border-b border-black/5 last:border-0 hover:bg-vialto-mist/40";
+
+/** "Ver viaje" como acción de fila (patrón de grillas: ícono + click en la fila). */
+function useAccionesVerViaje(
+  onViewViaje: ((id: string) => void) | undefined,
+  loadingViajeId: string | null | undefined,
+) {
+  const navigate = useNavigate();
+  return (id: string): AccionOpcion[] => {
+    const cargando = loadingViajeId === id;
+    return [
+      {
+        id: "ver",
+        label: cargando ? "Cargando…" : "Ver viaje",
+        icon: Eye,
+        disabled: cargando,
+        onClick: () =>
+          onViewViaje ? onViewViaje(id) : navigate(`/viajes?viaje=${encodeURIComponent(id)}`),
+      },
+    ];
+  };
 }
 
 function EmptyState({ text }: { text: string }) {
@@ -205,6 +232,7 @@ export function MargenAlertasList({
   onViewViaje?: (id: string) => void;
   loadingViajeId?: string | null;
 }) {
+  const accionesViaje = useAccionesVerViaje(onViewViaje, loadingViajeId);
   if (alertas.length === 0) {
     return <EmptyState text="Sin viajes con margen bajo o negativo en el período." />;
   }
@@ -229,13 +257,17 @@ export function MargenAlertasList({
               Margen
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              <span className="sr-only">Acciones</span>
+              Acciones
             </th>
           </tr>
         </thead>
         <tbody>
           {alertas.map((a) => (
-            <tr key={a.viajeId} className="border-b border-black/5 last:border-0">
+            <tr
+              key={a.viajeId}
+              className={FILA_CLICKEABLE}
+              onClick={() => clickFilaAcciones(accionesViaje(a.viajeId), () => {})}
+            >
               <td className="py-2 font-medium text-vialto-charcoal">{a.numero || a.viajeId.slice(0, 8)}</td>
               <td className="py-2 text-vialto-charcoal">{a.clienteNombre}</td>
               <td className="py-2 text-vialto-charcoal">{a.transportistaNombre ?? "—"}</td>
@@ -245,25 +277,7 @@ export function MargenAlertasList({
               <td className={`py-2 text-right ${a.margen < 0 ? "text-rose-600" : "text-amber-700"}`}>
                 {a.moneda === "USD" ? fmtMoneyUSD(a.margen) : fmtMoney(a.margen)}
               </td>
-              <td className="py-2 text-right">
-                {onViewViaje ? (
-                  <button
-                    type="button"
-                    disabled={loadingViajeId === a.viajeId}
-                    onClick={() => onViewViaje(a.viajeId)}
-                    className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire disabled:cursor-wait disabled:opacity-60"
-                  >
-                    {loadingViajeId === a.viajeId ? "Cargando…" : "Ver viaje →"}
-                  </button>
-                ) : (
-                  <Link
-                    to={`/viajes?viaje=${encodeURIComponent(a.viajeId)}`}
-                    className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
-                  >
-                    Ver viaje →
-                  </Link>
-                )}
-              </td>
+              <CeldaAccionesFila options={accionesViaje(a.viajeId)} />
             </tr>
           ))}
         </tbody>
@@ -285,32 +299,9 @@ export function ViajesFunnelPanel({
   onViewViaje?: (id: string) => void;
   loadingViajeId?: string | null;
 }) {
+  const accionesViaje = useAccionesVerViaje(onViewViaje, loadingViajeId);
   const funnel = data?.viajesFunnel;
   if (loading || !funnel) return <EmptyState text="Cargando…" />;
-
-  function renderVerViajeAction(id: string) {
-    const cargando = loadingViajeId === id;
-    if (onViewViaje) {
-      return (
-        <button
-          type="button"
-          disabled={cargando}
-          onClick={() => onViewViaje(id)}
-          className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire disabled:cursor-wait disabled:opacity-60"
-        >
-          {cargando ? "Cargando…" : "Ver viaje →"}
-        </button>
-      );
-    }
-    return (
-      <Link
-        to={`/viajes?viaje=${encodeURIComponent(id)}`}
-        className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
-      >
-        Ver viaje →
-      </Link>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -353,18 +344,22 @@ export function ViajesFunnelPanel({
                       Transportista
                     </th>
                     <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                      <span className="sr-only">Acciones</span>
+                      Acciones
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {funnel.sinLiquidar.items.map((it) => (
-                    <tr key={it.id} className="border-b border-black/5 last:border-0">
+                    <tr
+                      key={it.id}
+                      className={FILA_CLICKEABLE}
+                      onClick={() => clickFilaAcciones(accionesViaje(it.id), () => {})}
+                    >
                       <td className="py-2 font-medium text-vialto-charcoal">
                         {it.numero || it.id.slice(0, 8)}
                       </td>
                       <td className="py-2 text-vialto-charcoal">{it.transportistaNombre ?? "—"}</td>
-                      <td className="py-2 text-right">{renderVerViajeAction(it.id)}</td>
+                      <CeldaAccionesFila options={accionesViaje(it.id)} />
                     </tr>
                   ))}
                 </tbody>
@@ -394,18 +389,22 @@ export function ViajesFunnelPanel({
                       Cliente
                     </th>
                     <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                      <span className="sr-only">Acciones</span>
+                      Acciones
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {funnel.sinFacturar.items.map((it) => (
-                    <tr key={it.id} className="border-b border-black/5 last:border-0">
+                    <tr
+                      key={it.id}
+                      className={FILA_CLICKEABLE}
+                      onClick={() => clickFilaAcciones(accionesViaje(it.id), () => {})}
+                    >
                       <td className="py-2 font-medium text-vialto-charcoal">
                         {it.numero || it.id.slice(0, 8)}
                       </td>
                       <td className="py-2 text-vialto-charcoal">{it.clienteNombre}</td>
-                      <td className="py-2 text-right">{renderVerViajeAction(it.id)}</td>
+                      <CeldaAccionesFila options={accionesViaje(it.id)} />
                     </tr>
                   ))}
                 </tbody>

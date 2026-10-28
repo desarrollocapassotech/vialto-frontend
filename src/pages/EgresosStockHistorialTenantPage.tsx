@@ -1,9 +1,9 @@
 ﻿import { useAuth } from "@clerk/clerk-react";
-import { Download } from "lucide-react";
+import { Download, Eye, FileText } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
-import { ImprimirRemitoButton } from "@/components/stock/ImprimirRemitoButton";
+import { useVerRemitoInterno } from "@/hooks/useVerRemitoInterno";
 import { StockOperacionViewModal } from "@/components/stock/StockOperacionViewModal";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
@@ -12,7 +12,6 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { buildQs } from "@/lib/queryString";
 import {
-  listadoTablaAccionClass,
   listadoTablaAccionesTdClass, listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
@@ -48,6 +47,7 @@ export function EgresosStockHistorialTenantPage({
   embeddedInSuperadmin?: boolean;
 }) {
   const { getToken } = useAuth();
+  const { verRemito, visorRemito } = useVerRemitoInterno(tenantId);
   const platform = Boolean(tenantId);
   const { isVisible } = useFieldConfig("stock");
   const mostrarConductor = isVisible("alta_egreso", "choferId");
@@ -423,26 +423,19 @@ export function EgresosStockHistorialTenantPage({
         rowKey={(op) => op.id}
         emptyMessage="No hay egresos registrados."
         loadingMessage="Cargando…"
-        renderActions={(op) => (
-          <div className="flex flex-wrap justify-end gap-2">
-            <ImprimirRemitoButton
-              variant="listado"
-              className={listadoTablaAccionClass}
-              egresoId={op.id}
-              tenantId={tenantId}
-              titulo={
-                op.numeroRemito ? `Remito ${op.numeroRemito}` : "Remito interno"
-              }
-            />
-            <button
-              type="button"
-              onClick={() => setViendo(op)}
-              className={listadoTablaAccionClass}
-            >
-              Ver egreso
-            </button>
-          </div>
-        )}
+        rowActions={(op) => [
+          { id: "ver", label: "Ver egreso", icon: Eye, onClick: () => setViendo(op) },
+          {
+            id: "remito",
+            label: "Ver remito",
+            icon: FileText,
+            onClick: () =>
+              void verRemito(
+                op.id,
+                op.numeroRemito ? `Remito ${op.numeroRemito}` : "Remito interno",
+              ),
+          },
+        ]}
         actionsThClassName={`${listadoTablaThClass} align-top text-right`}
         actionsTdClassName={`${listadoTablaAccionesTdClass} text-right whitespace-nowrap`}
       />
@@ -460,6 +453,8 @@ export function EgresosStockHistorialTenantPage({
           }}
         />
       )}
+
+      {visorRemito}
 
       {viendo && (
         <StockOperacionViewModal

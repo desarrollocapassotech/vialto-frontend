@@ -7,8 +7,8 @@ import { TransportistaViewModal } from "@/components/transportistas/Transportist
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { pageSizeListadoValido } from "@/lib/listadoPaginacion";
+import { Eye } from "lucide-react";
 import {
-  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
@@ -238,15 +238,9 @@ export function TransportistasTenantPage() {
               : "Todavía no hay transportistas cargados."
         }
         loadingMessage="Cargando…"
-        renderActions={(t) => (
-          <button
-            type="button"
-            onClick={() => setViewingTransportista(t)}
-            className={listadoTablaAccionClass}
-          >
-            Ver transportista
-          </button>
-        )}
+        rowActions={(t) => [
+          { id: "ver", label: "Ver transportista", icon: Eye, onClick: () => setViewingTransportista(t) },
+        ]}
       />
 
       {serverMeta && serverMeta.total > 0 && (

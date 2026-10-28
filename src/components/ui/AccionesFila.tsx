@@ -35,7 +35,7 @@ type Props = {
  * El modal con todas las acciones sigue disponible (click en la fila, vía `open`/`onOpenChange`).
  */
 export function AccionesFila({
-  options,
+  options: optionsProp,
   destacadas,
   maxIconos = MAX_ICONOS_DEFAULT,
   subtitle,
@@ -46,6 +46,8 @@ export function AccionesFila({
   const controlado = openProp !== undefined;
   const sheetOpen = controlado ? openProp : internalOpen;
   const setSheetOpen = controlado ? (onOpenChange ?? (() => {})) : setInternalOpen;
+  // "Ver …" (id `ver`) siempre primero: en los íconos, el desplegable y el modal.
+  const options = ordenarVerPrimero(optionsProp);
 
   const iconos = destacadas
     .map((id) => options.find((o) => o.id === id))
@@ -64,8 +66,12 @@ export function AccionesFila({
   if (eliminar && iconos.length < maxIconos && !iconos.includes(eliminar)) {
     iconos.push(eliminar);
   }
-  // Las acciones peligrosas (Anular, Eliminar) nunca van primero: siempre al final.
-  iconos.sort((a, b) => Number(Boolean(a.danger)) - Number(Boolean(b.danger)));
+  // "Ver" primero; las acciones peligrosas (Anular, Eliminar) nunca van primero: siempre al final.
+  iconos.sort(
+    (a, b) =>
+      Number(b.id === ID_VER) - Number(a.id === ID_VER) ||
+      Number(Boolean(a.danger)) - Number(Boolean(b.danger)),
+  );
 
   return (
     <>
@@ -112,6 +118,28 @@ export function AccionesFila({
       />
     </>
   );
+}
+
+/**
+ * `<td>` de acciones para tablas armadas a mano (sin `ListadoDatos`): no propaga el click
+ * a la fila. La fila usa `clickFilaAcciones` (`lib/accionesFila.ts`) con las mismas opciones.
+ */
+export function CeldaAccionesFila({
+  options,
+  destacadas,
+  className = 'py-1 text-right align-middle',
+  ...props
+}: Omit<Props, 'destacadas'> & { destacadas?: string[]; className?: string }) {
+  return (
+    <td className={className} onClick={(e) => e.stopPropagation()}>
+      <AccionesFila {...props} options={options} destacadas={destacadas ?? options.map((o) => o.id)} />
+    </td>
+  );
+}
+
+function ordenarVerPrimero(options: AccionOpcion[]): AccionOpcion[] {
+  const i = options.findIndex((o) => o.id === ID_VER);
+  return i <= 0 ? options : [options[i], ...options.slice(0, i), ...options.slice(i + 1)];
 }
 
 /** Flecha + desplegable anclado con todas las acciones (portal + fixed, no lo recorta la tabla). */
