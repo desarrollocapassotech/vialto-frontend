@@ -8,11 +8,11 @@ import { LISTADO_PAGE_SIZE_OPTIONS } from "@/lib/listadoPaginacion";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
-  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { Eye } from "lucide-react";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { DireccionEntrega, PaginatedMeta } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
@@ -228,18 +228,17 @@ export function DireccionesEntregaTenantPage() {
               : "Todavía no hay direcciones cargadas."
         }
         loadingMessage="Cargando…"
-        renderActions={(d) => (
-          <button
-            type="button"
-            onClick={() => {
+        rowActions={(d) => [
+          {
+            id: "ver",
+            label: "Ver dirección",
+            icon: Eye,
+            onClick: () => {
               setViewingId(d.id);
               setViewingDireccion(d.direccion);
-            }}
-            className={listadoTablaAccionClass}
-          >
-            Ver dirección
-          </button>
-        )}
+            },
+          },
+        ]}
       />
 
       {/* COMPONENTE DE PAGINACIÓN */}

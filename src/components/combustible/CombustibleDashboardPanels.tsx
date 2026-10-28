@@ -6,7 +6,10 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { Eye, Fuel, TrendingUp, TrendingDown } from "lucide-react";
+import { CeldaAccionesFila } from "@/components/ui/AccionesFila";
+import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
+import { clickFilaAcciones } from "@/lib/accionesFila";
 import { fmtTipoVehiculo, fmtFormaPago } from "@/lib/combustibleLabels";
 import { explicarErrorChofer } from "@/lib/combustibleErrorExplicacion";
 import { CargaCombustibleViewModal } from "./CargaCombustibleViewModal";
@@ -41,6 +44,18 @@ function fmtNum(n: number): string {
 }
 
 const fmtFecha = fmtDateUtc;
+
+const FILA_CLICKEABLE = "cursor-pointer border-b border-black/5 last:border-0 hover:bg-vialto-mist/40";
+
+/** "Ver cargas" filtradas como acción de fila (patrón de grillas: ícono + click en la fila). */
+function accionesVerCargas(
+  navigate: ReturnType<typeof useNavigate>,
+  qs: URLSearchParams,
+): AccionOpcion[] {
+  return [
+    { id: "ver", label: "Ver cargas", icon: Fuel, onClick: () => navigate(`/combustible?${qs.toString()}`) },
+  ];
+}
 
 function SemaforoDot({ color }: { color: "verde" | "amarillo" | "rojo" }) {
   const cls =
@@ -246,6 +261,7 @@ export function VehiculoRankingTable({
   /** Rango del dashboard actual, para armar el link "Ver cargas" filtrado. */
   periodo?: { from: string; to: string } | null;
 }) {
+  const navigate = useNavigate();
   if (items.length === 0) {
     return (
       <p className="text-sm text-vialto-steel">
@@ -277,7 +293,7 @@ export function VehiculoRankingTable({
               Cargas
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              <span className="sr-only">Acciones</span>
+              Acciones
             </th>
           </tr>
         </thead>
@@ -286,10 +302,12 @@ export function VehiculoRankingTable({
             const qs = new URLSearchParams({ vehiculoId: v.vehiculoId });
             if (periodo?.from) qs.set("from", periodo.from);
             if (periodo?.to) qs.set("to", periodo.to);
+            const acciones = accionesVerCargas(navigate, qs);
             return (
               <tr
                 key={v.vehiculoId}
-                className="border-b border-black/5 last:border-0"
+                className={FILA_CLICKEABLE}
+                onClick={() => clickFilaAcciones(acciones, () => {})}
               >
                 <td className="py-2">
                   <span className="inline-flex flex-wrap items-center gap-2">
@@ -324,14 +342,7 @@ export function VehiculoRankingTable({
                 <td className="py-2 text-right text-vialto-charcoal">
                   {v.cantidad}
                 </td>
-                <td className="py-2 text-right">
-                  <Link
-                    to={`/combustible?${qs.toString()}`}
-                    className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
-                  >
-                    Ver cargas →
-                  </Link>
-                </td>
+                <CeldaAccionesFila options={acciones} />
               </tr>
             );
           })}
@@ -351,6 +362,7 @@ export function ChoferRankingTable({
   /** Rango del dashboard actual, para armar el link "Ver cargas" filtrado. */
   periodo?: { from: string; to: string } | null;
 }) {
+  const navigate = useNavigate();
   if (items.length === 0) {
     return (
       <p className="text-sm text-vialto-steel">
@@ -376,7 +388,7 @@ export function ChoferRankingTable({
               Cargas
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              <span className="sr-only">Acciones</span>
+              Acciones
             </th>
           </tr>
         </thead>
@@ -389,10 +401,12 @@ export function ChoferRankingTable({
               if (periodo?.from) qs.set("from", periodo.from);
               if (periodo?.to) qs.set("to", periodo.to);
             }
+            const acciones = qs ? accionesVerCargas(navigate, qs) : [];
             return (
               <tr
                 key={c.choferId ?? "sin-chofer"}
-                className="border-b border-black/5 last:border-0"
+                className={qs ? FILA_CLICKEABLE : "border-b border-black/5 last:border-0"}
+                onClick={() => clickFilaAcciones(acciones, () => {})}
               >
                 <td className="py-2 text-vialto-charcoal">{c.nombre}</td>
                 <td className="py-2 text-right text-vialto-charcoal">
@@ -404,16 +418,7 @@ export function ChoferRankingTable({
                 <td className="py-2 text-right text-vialto-charcoal">
                   {c.cantidad}
                 </td>
-                <td className="py-2 text-right">
-                  {qs && (
-                    <Link
-                      to={`/combustible?${qs.toString()}`}
-                      className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
-                    >
-                      Ver cargas →
-                    </Link>
-                  )}
-                </td>
+                <CeldaAccionesFila options={acciones} />
               </tr>
             );
           })}
@@ -784,7 +789,7 @@ export function AlertasList({
               Monto
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              <span className="sr-only">Acciones</span>
+              Acciones
             </th>
           </tr>
         </thead>
@@ -792,10 +797,14 @@ export function AlertasList({
           {filas.map((fila) => {
             if (fila.kind === "sospechosa") {
               const a = fila.data;
+              const acciones: AccionOpcion[] = [
+                { id: "ver", label: "Ver carga", icon: Eye, onClick: () => setViewingCargaId(a.cargaId) },
+              ];
               return (
                 <tr
                   key={`sospechosa-${a.cargaId}`}
-                  className="border-b border-black/5 last:border-0"
+                  className={FILA_CLICKEABLE}
+                  onClick={() => clickFilaAcciones(acciones, () => {})}
                 >
                   <td className="py-2">
                     <span className="inline-flex items-center gap-2 whitespace-nowrap">
@@ -821,15 +830,7 @@ export function AlertasList({
                   <td className="py-2 text-right text-vialto-charcoal">
                     {fmtMoney(a.importe)}
                   </td>
-                  <td className="py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setViewingCargaId(a.cargaId)}
-                      className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
-                    >
-                      Ver carga →
-                    </button>
-                  </td>
+                  <CeldaAccionesFila options={acciones} />
                 </tr>
               );
             }
@@ -839,10 +840,14 @@ export function AlertasList({
               e.litros != null && e.litros > 0 && e.importe != null
                 ? e.importe / e.litros
                 : null;
+            const acciones: AccionOpcion[] = [
+              { id: "ver", label: "Ver qué pasó", icon: Eye, onClick: () => setViewingError(e) },
+            ];
             return (
               <tr
                 key={`sync-${e.id}`}
-                className="border-b border-black/5 last:border-0"
+                className={FILA_CLICKEABLE}
+                onClick={() => clickFilaAcciones(acciones, () => {})}
               >
                 <td className="py-2">
                   <div className="flex flex-col items-start gap-0.5">
@@ -875,15 +880,7 @@ export function AlertasList({
                 <td className="py-2 text-right text-vialto-charcoal">
                   {e.importe != null ? fmtMoney(e.importe) : "—"}
                 </td>
-                <td className="py-2 text-right">
-                  <button
-                    type="button"
-                    onClick={() => setViewingError(e)}
-                    className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
-                  >
-                    Ver qué pasó →
-                  </button>
-                </td>
+                <CeldaAccionesFila options={acciones} />
               </tr>
             );
           })}

@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowDown, ArrowUp, FileText, Gauge, History, Wrench } from "lucide-react";
-import { AccionesOpcionesSheet, type AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
+import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { FiltrosRapidos, type FiltroRapidoOpcion } from "@/components/listado/FiltrosRapidos";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { filtrarVehiculos } from "@/components/forms/maestroSearchFilters";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
-import { AccionesFila } from "@/components/ui/AccionesFila";
 import { VehiculoHoverCard } from "@/components/vehiculos/VehiculoHoverCard";
 import { EstadoVencimientoBadge } from "@/components/mantenimiento/MantenimientoBadges";
 import { useMaestroData } from "@/hooks/useMaestroData";
@@ -67,7 +66,6 @@ export function VencimientosSection({
   const [vehiculoId, setVehiculoId] = useState("");
   const [categoria, setCategoria] = useState("");
   const [ordenFecha, setOrdenFecha] = useState<"asc" | "desc">("asc");
-  const [accionesDeFila, setAccionesDeFila] = useState<FilaVencimiento | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -315,19 +313,10 @@ export function VencimientosSection({
               : "Todavía no hay planes asignados a los vehículos."
         }
         loadingMessage="Calculando vencimientos…"
-        actionsTdClassName={listadoTablaAccionesTdClass}
-        onRowClick={(f) => setAccionesDeFila(f)}
-        renderActions={(f) => (
-          <AccionesFila options={accionesDe(f)} destacadas={soloLectura ? ["historial"] : ["registrar", "historial"]} />
-        )}
-      />
-
-      <AccionesOpcionesSheet
-        open={accionesDeFila != null}
-        onClose={() => setAccionesDeFila(null)}
-        title="Acciones"
-        subtitle={accionesDeFila ? `${accionesDeFila.vehiculo.patente} · ${accionesDeFila.plan.nombre}` : undefined}
-        options={accionesDeFila ? accionesDe(accionesDeFila) : []}
+        actionsTdClassName={`${listadoTablaAccionesTdClass} text-right`}
+        rowActions={accionesDe}
+        rowActionsDestacadas={soloLectura ? ["historial"] : ["registrar", "historial"]}
+        rowActionsSubtitle={(f) => `${f.vehiculo.patente} · ${f.plan.nombre}`}
       />
     </div>
   );

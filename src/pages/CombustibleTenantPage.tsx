@@ -8,7 +8,6 @@ import {
 } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
-import { AccionesFila } from "@/components/ui/AccionesFila";
 import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { ChevronDown, Eye, Fuel, Trash2, UserRoundCog } from "lucide-react";
 import {
@@ -665,44 +664,33 @@ export function CombustibleTenantPage({
         tdClassName: "w-8 px-2 py-2",
       },
       ...BASE_COLUMNS,
-      {
-        id: "acciones",
-        header: "Acciones",
-        cell: (r) => {
-          const options: AccionOpcion[] = [
-            {
-              id: "ver",
-              label: "Ver carga",
-              icon: Eye,
-              onClick: () => setViewTargetId(r.id),
-            },
-          ];
-          if (!isReadOnly) {
-            options.push({
-              id: "eliminar",
-              label: "Eliminar",
-              icon: Trash2,
-              danger: true,
-              onClick: () => {
-                setDeleteError(null);
-                setDeleteTarget(r);
-              },
-            });
-          }
-          return (
-            <div className="flex justify-end">
-              <AccionesFila
-                options={options}
-                destacadas={["ver"]}
-                subtitle={`Carga del ${fmtFecha(r.fecha)}`}
-              />
-            </div>
-          );
-        },
-      },
     ],
-    [isReadOnly],
+    [],
   );
+
+  function accionesCarga(r: CargaCombustible): AccionOpcion[] {
+    const options: AccionOpcion[] = [
+      {
+        id: "ver",
+        label: "Ver carga",
+        icon: Eye,
+        onClick: () => setViewTargetId(r.id),
+      },
+    ];
+    if (!isReadOnly) {
+      options.push({
+        id: "eliminar",
+        label: "Eliminar",
+        icon: Trash2,
+        danger: true,
+        onClick: () => {
+          setDeleteError(null);
+          setDeleteTarget(r);
+        },
+      });
+    }
+    return options;
+  }
 
   return (
     <div className="w-full">
@@ -1102,7 +1090,9 @@ export function CombustibleTenantPage({
             columns={columns}
             rows={!activeTenantId || error ? [] : rows}
             rowKey={(r) => r.id}
-            onRowClick={(r) => setViewTargetId(r.id)}
+            rowActions={accionesCarga}
+            rowActionsDestacadas={["ver"]}
+            rowActionsSubtitle={(r) => `Carga del ${fmtFecha(r.fecha)}`}
             emptyMessage={
               !activeTenantId
                 ? embeddedInSuperadmin
@@ -1113,7 +1103,7 @@ export function CombustibleTenantPage({
                   : "Sin cargas registradas para esta empresa."
             }
             loadingMessage="Cargando…"
-            actionsTdClassName={listadoTablaAccionesTdClass}
+            actionsTdClassName={`${listadoTablaAccionesTdClass} text-right`}
           />
 
           {activeTenantId && (!error || !embeddedInSuperadmin) && total > 0 && (

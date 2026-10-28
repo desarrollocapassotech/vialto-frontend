@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { Download } from "lucide-react";
+import { Download, Eye, FileText } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -7,7 +7,7 @@ import { DivisionImpactoLinea } from "@/components/stock/DivisionImpactoLinea";
 import { StockOperacionTipoCelda } from "@/components/stock/StockOperacionTipoCelda";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
-import { ImprimirRemitoButton } from "@/components/stock/ImprimirRemitoButton";
+import { useVerRemitoInterno } from "@/hooks/useVerRemitoInterno";
 import { StockOperacionViewModal } from "@/components/stock/StockOperacionViewModal";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
@@ -15,7 +15,6 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { paginatedItems } from "@/lib/paginatedItems";
 import {
-  listadoTablaAccionClass,
   listadoTablaAccionesTdClass, listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
@@ -72,6 +71,7 @@ export function StockMovimientosTenantPage({
   tenantId?: string;
 }) {
   const { getToken } = useAuth();
+  const { verRemito, visorRemito } = useVerRemitoInterno(tenantId);
   const platform = Boolean(tenantId);
   const { isVisible } = useFieldConfig("stock");
 
@@ -280,10 +280,6 @@ export function StockMovimientosTenantPage({
             <h1 className="text-2xl font-semibold text-vialto-charcoal">
               Movimientos
             </h1>
-            <p className="mt-1 text-sm text-vialto-steel">
-              Ingresos, egresos y divisiones consolidados por comprobante (una
-              fila por operación).
-            </p>
           </div>
         )}
         {(!!productoId || !!tipo || !!fechaDesde || !!fechaHasta || !!clienteId || !!createdBy || !!depositoId || !!lote) && (
@@ -720,7 +716,7 @@ export function StockMovimientosTenantPage({
         rowKey={(op) => op.id}
         emptyMessage="No hay movimientos para mostrar."
         loadingMessage="Cargando…"
-        renderMobileCard={(op) => {
+        renderMobileCard={(op, { acciones, onClick }) => {
           const impacto =
             op.tipo === "division" ? getDivisionImpacto(op) : null;
           return (
@@ -756,55 +752,28 @@ export function StockMovimientosTenantPage({
                   ? [{ label: "Remito", value: op.numeroRemito }]
                   : []),
               ]}
-              actions={
-                <div className="flex flex-wrap justify-end gap-2">
-                  {op.tipo === "egreso" && (
-                    <ImprimirRemitoButton
-                      variant="listado"
-                      className={listadoTablaAccionClass}
-                      egresoId={op.id}
-                      tenantId={tenantId}
-                      titulo={
-                        op.numeroRemito
-                          ? `Remito ${op.numeroRemito}`
-                          : "Remito interno"
-                      }
-                    />
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setViendoOperacion(op)}
-                    className={listadoTablaAccionClass}
-                  >
-                    Ver movimiento
-                  </button>
-                </div>
-              }
+              actions={acciones}
+              onClick={onClick}
             />
           );
         }}
-        renderActions={(op) => (
-          <div className="flex flex-wrap justify-end gap-2">
-            {op.tipo === "egreso" && (
-              <ImprimirRemitoButton
-                variant="listado"
-                className={listadoTablaAccionClass}
-                egresoId={op.id}
-                tenantId={tenantId}
-                titulo={
-                  op.numeroRemito ? `Remito ${op.numeroRemito}` : "Remito interno"
-                }
-              />
-            )}
-            <button
-              type="button"
-              onClick={() => setViendoOperacion(op)}
-              className={listadoTablaAccionClass}
-            >
-              Ver movimiento
-            </button>
-          </div>
-        )}
+        rowActions={(op) => [
+          { id: "ver", label: "Ver movimiento", icon: Eye, onClick: () => setViendoOperacion(op) },
+          ...(op.tipo === "egreso"
+            ? [
+                {
+                  id: "remito",
+                  label: "Ver remito",
+                  icon: FileText,
+                  onClick: () =>
+                    void verRemito(
+                      op.id,
+                      op.numeroRemito ? `Remito ${op.numeroRemito}` : "Remito interno",
+                    ),
+                },
+              ]
+            : []),
+        ]}
         actionsThClassName={`${listadoTablaThClass} align-top text-right`}
         actionsTdClassName={`${listadoTablaAccionesTdClass} text-right whitespace-nowrap`}
       />
@@ -822,6 +791,8 @@ export function StockMovimientosTenantPage({
           }}
         />
       )}
+
+      {visorRemito}
 
       {viendoOperacion && (
         <StockOperacionViewModal

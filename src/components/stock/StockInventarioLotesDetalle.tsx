@@ -1,11 +1,14 @@
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   CheckCircle2,
   CircleAlert,
-  ExternalLink,
+  History,
 } from 'lucide-react';
+import { AccionesFila } from '@/components/ui/AccionesFila';
+import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import { Spinner } from '@/components/ui/Spinner';
+import { clickFilaAcciones } from '@/lib/accionesFila';
 import {
   compareLotesFefo,
   nivelVencimientoLote,
@@ -151,6 +154,7 @@ export function StockInventarioLotesDetalle({
   depositoId: string;
   tenantId?: string;
 }) {
+  const navigate = useNavigate();
   return (
     <tr className="bg-vialto-mist/50">
       <td colSpan={colSpan} className="px-3 py-3 sm:px-4 sm:pl-12">
@@ -201,10 +205,29 @@ export function StockInventarioLotesDetalle({
                     </tr>
                   </thead>
                   <tbody>
-                    {filas.map((fila) => (
+                    {filas.map((fila) => {
+                      const acciones: AccionOpcion[] = [
+                        {
+                          id: 'ver',
+                          label: 'Ver movimientos',
+                          icon: History,
+                          onClick: () =>
+                            navigate(
+                              buildMovimientosHref({
+                                productoId,
+                                clienteId,
+                                depositoId,
+                                loteParam: fila.loteParam,
+                                tenantId,
+                              }),
+                            ),
+                        },
+                      ];
+                      return (
                       <tr
                         key={fila.key}
-                        className="border-b border-black/5 last:border-b-0 hover:bg-vialto-mist/40"
+                        className="cursor-pointer border-b border-black/5 last:border-b-0 hover:bg-vialto-mist/40"
+                        onClick={() => clickFilaAcciones(acciones, () => {})}
                       >
                         <td className={`${TD} font-medium`}>{fila.loteLabel}</td>
                         <td className={TD}>
@@ -224,27 +247,19 @@ export function StockInventarioLotesDetalle({
                             )}
                           </td>
                         )}
-                        <td className={`${TD} text-right`}>
-                          <Link
-                            to={buildMovimientosHref({
-                              productoId,
-                              clienteId,
-                              depositoId,
-                              loteParam: fila.loteParam,
-                              tenantId,
-                            })}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs text-vialto-charcoal transition-colors hover:border-black/25 hover:bg-vialto-mist"
-                          >
-                            <ExternalLink
-                              className="h-3 w-3 shrink-0 text-vialto-steel"
-                              strokeWidth={1.75}
-                              aria-hidden
-                            />
-                            Ver movimiento
-                          </Link>
+                        <td
+                          className="px-3 py-0 text-right align-middle"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <AccionesFila
+                            options={acciones}
+                            destacadas={['ver']}
+                            subtitle={`Lote ${fila.loteLabel}`}
+                          />
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

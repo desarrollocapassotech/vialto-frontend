@@ -1,7 +1,10 @@
-import { useRef, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { ListadoFiltrosSheet } from '@/components/listado/ListadoFiltrosSheet';
 import { TablaScrollHorizontal } from '@/components/listado/TablaScrollHorizontal';
+import { AccionesFila } from '@/components/ui/AccionesFila';
+import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import { TooltipsDelegados } from '@/components/ui/TooltipsDelegados';
+import { clickFilaAcciones } from '@/lib/accionesFila';
 import {
   listadoCardActionsClass,
   listadoCardClass,
@@ -53,12 +56,29 @@ export type ListadoDatosProps<T> = {
   onClearFilters?: () => void;
   clearFiltersDisabled?: boolean;
   filtersTitle?: string;
-  /** Tarjeta mobile personalizada (anula el layout por columnas). */
-  renderMobileCard?: (row: T) => ReactNode;
+  /**
+   * Tarjeta mobile personalizada (anula el layout por columnas). Con `rowActions`, `ctx`
+   * trae las acciones y el click de la tarjeta para pasarle a `ListadoCard`
+   * (`actions={ctx.acciones} onClick={ctx.onClick}`).
+   */
+  renderMobileCard?: (row: T, ctx: { acciones: ReactNode; onClick?: () => void }) => ReactNode;
   /** Fila de tabla desktop personalizada (anula celdas por columnas). */
   renderTableRow?: (row: T) => ReactNode;
   /** Si se pasa (y no hay `renderTableRow`/`renderMobileCard`), la fila/tarjeta es clickable. */
   onRowClick?: (row: T) => void;
+  /**
+   * Acciones de la fila con el patrón de Viajes (`AccionesFila`): íconos + flecha con el
+   * resto, "Ver …" primero, y click en la fila = ejecuta la única acción o abre el modal
+   * de acciones. Tiene prioridad sobre `onRowClick` y `renderActions`.
+   */
+  rowActions?: (row: T) => AccionOpcion[];
+  /** Ids a mostrar como ícono, en orden de prioridad (default: el orden de `rowActions`). */
+  rowActionsDestacadas?: string[];
+  /** Íconos visibles en desktop (default 2; 3 si la tabla tiene lugar). */
+  rowActionsMaxIconos?: number;
+  /** Subtítulo del modal de acciones (ej. nombre del registro). */
+  rowActionsSubtitle?: (row: T) => ReactNode;
+  /** @deprecated Usar `rowActions`. */
   renderActions?: (row: T) => ReactNode;
   actionsHeader?: ReactNode;
   actionsThClassName?: string;
@@ -98,14 +118,52 @@ export function ListadoDatos<T>({
   filtersTitle,
   renderMobileCard,
   renderTableRow,
-  onRowClick,
-  renderActions,
+  onRowClick: onRowClickProp,
+  rowActions,
+  rowActionsDestacadas,
+  rowActionsMaxIconos,
+  rowActionsSubtitle,
+  renderActions: renderActionsProp,
   actionsHeader = 'Acciones',
   actionsThClassName = `${listadoTablaThClass} text-right`,
   actionsTdClassName = `${listadoTablaAccionesTdClass} text-right`,
   tableColSpan,
 }: ListadoDatosProps<T>) {
   const contenedorRef = useRef<HTMLDivElement>(null);
+  /** Fila con el modal de acciones abierto (solo con `rowActions`). */
+  const [accionesAbiertasKey, setAccionesAbiertasKey] = useState<string | null>(null);
+
+  // La instancia de la tabla es la dueña del modal; la de la tarjeta mobile solo lo abre
+  // (si las dos lo controlaran se abrirían dos modales superpuestos).
+  function renderAccionesFila(row: T, enTarjeta: boolean) {
+    const opciones = rowActions!(row);
+    if (opciones.length === 0) return null;
+    const key = rowKey(row);
+    return (
+      <AccionesFila
+        options={opciones}
+        destacadas={rowActionsDestacadas ?? opciones.map((o) => o.id)}
+        maxIconos={rowActionsMaxIconos}
+        subtitle={rowActionsSubtitle?.(row)}
+        open={enTarjeta ? false : accionesAbiertasKey === key}
+        onOpenChange={(o) => {
+          if (o) setAccionesAbiertasKey(key);
+          else if (!enTarjeta) setAccionesAbiertasKey(null);
+        }}
+      />
+    );
+  }
+
+  const onRowClick = rowActions
+    ? (row: T) => clickFilaAcciones(rowActions(row), () => setAccionesAbiertasKey(rowKey(row)))
+    : onRowClickProp;
+  const renderActions = rowActions
+    ? (row: T) => renderAccionesFila(row, false)
+    : renderActionsProp;
+  const renderActionsTarjeta = rowActions
+    ? (row: T) => renderAccionesFila(row, true)
+    : renderActionsProp;
+
   const loading = rows == null;
   const isEmpty = !loading && rows.length === 0;
   const colSpan = tableColSpan ?? columns.length + (renderActions ? 1 : 0);
@@ -135,12 +193,12 @@ export function ListadoDatos<T>({
             ))}
           </dl>
         )}
-        {renderActions && (
+        {renderActionsTarjeta && (
           <div
             className={listadoCardActionsClass}
             onClick={(e) => e.stopPropagation()}
           >
-            {renderActions(row)}
+            {renderActionsTarjeta(row)}
           </div>
         )}
       </article>
@@ -179,7 +237,12 @@ export function ListadoDatos<T>({
         {!loading &&
           rows.map((row) =>
             renderMobileCard ? (
-              <div key={rowKey(row)}>{renderMobileCard(row)}</div>
+              <div key={rowKey(row)}>
+                {renderMobileCard(row, {
+                  acciones: renderActionsTarjeta?.(row) ?? null,
+                  onClick: onRowClick ? () => onRowClick(row) : undefined,
+                })}
+              </div>
             ) : (
               renderDefaultMobileCard(row)
             ),

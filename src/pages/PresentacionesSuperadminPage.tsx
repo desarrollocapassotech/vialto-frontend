@@ -16,11 +16,11 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
 import {
-  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { Pencil, Trash2 } from "lucide-react";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Presentacion } from "@/types/api";
 import { ConfirmDialog } from "@/components/crud/ConfirmDialog";
@@ -381,27 +381,18 @@ export function PresentacionesSuperadminPage() {
                   : "No hay presentaciones para esta empresa."
             }
             loadingMessage="Cargando…"
-            renderActions={(row) => (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingId(row.id);
-                    setIsFormOpen(true);
-                  }}
-                  className={listadoTablaAccionClass}
-                >
-                  Editar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmTarget(row)}
-                  className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
-                >
-                  Eliminar
-                </button>
-              </>
-            )}
+            rowActions={(row) => [
+              {
+                id: "editar",
+                label: "Editar",
+                icon: Pencil,
+                onClick: () => {
+                  setEditingId(row.id);
+                  setIsFormOpen(true);
+                },
+              },
+              { id: "eliminar", label: "Eliminar", icon: Trash2, danger: true, onClick: () => setConfirmTarget(row) },
+            ]}
           />
 
           {meta && (rowsFiltradas?.length ?? 0) > 0 && (

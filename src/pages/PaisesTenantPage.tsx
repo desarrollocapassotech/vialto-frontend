@@ -7,11 +7,11 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ApiError, apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
-  listadoTablaAccionClass,
   listadoTablaHeadRowClass,
   listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 import type { Pais } from "@/types/api";
 
 export function PaisesTenantPage() {
@@ -141,38 +141,25 @@ export function PaisesTenantPage() {
             : "Todavía no tenés países cargados."
         }
         loadingMessage="Cargando…"
-        renderActions={(p) => (
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              onClick={() => setViewingPais(p)}
-              className={listadoTablaAccionClass}
-            >
-              Ver país
-            </button>
-            {!p.esPredefinido && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setEditingPais(p)}
-                  className={listadoTablaAccionClass}
-                >
-                  Editar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
+        rowActionsMaxIconos={3}
+        rowActions={(p) => [
+          { id: "ver", label: "Ver país", icon: Eye, onClick: () => setViewingPais(p) },
+          ...(p.esPredefinido
+            ? []
+            : [
+                { id: "editar", label: "Editar", icon: Pencil, onClick: () => setEditingPais(p) },
+                {
+                  id: "eliminar",
+                  label: "Eliminar",
+                  icon: Trash2,
+                  danger: true,
+                  onClick: () => {
                     setDeleteError(null);
                     setConfirmDelete(p);
-                  }}
-                  className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
-                >
-                  Eliminar
-                </button>
-              </>
-            )}
-          </div>
-        )}
+                  },
+                },
+              ]),
+        ]}
       />
 
       {viewingPais && (

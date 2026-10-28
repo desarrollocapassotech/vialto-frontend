@@ -11,11 +11,11 @@ import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
-  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { Eye } from "lucide-react";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { ConEmpresa, Destinatario, PaginatedMeta } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
@@ -314,18 +314,17 @@ export function DestinatariosSuperadminPage() {
                 : "No hay destinatarios para esta empresa."
         }
         loadingMessage="Cargando…"
-        renderActions={(d) => (
-          <button
-            type="button"
-            onClick={() => {
+        rowActions={(d) => [
+          {
+            id: "ver",
+            label: "Ver destinatario",
+            icon: Eye,
+            onClick: () => {
               setViewingId(d.id);
               setViewingNombre(d.nombre);
-            }}
-            className={listadoTablaAccionClass}
-          >
-            Ver destinatario
-          </button>
-        )}
+            },
+          },
+        ]}
       />
 
       {meta && rows && rows.length > 0 && (

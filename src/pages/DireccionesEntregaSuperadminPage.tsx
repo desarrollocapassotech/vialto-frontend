@@ -11,11 +11,11 @@ import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
-  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { Eye } from "lucide-react";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { ConEmpresa, DireccionEntrega, PaginatedMeta } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
@@ -317,18 +317,17 @@ export function DireccionesEntregaSuperadminPage() {
                 : "No hay direcciones para esta empresa."
         }
         loadingMessage="Cargando…"
-        renderActions={(d) => (
-          <button
-            type="button"
-            onClick={() => {
+        rowActions={(d) => [
+          {
+            id: "ver",
+            label: "Ver dirección",
+            icon: Eye,
+            onClick: () => {
               setViewingId(d.id);
               setViewingDireccion(d.direccion);
-            }}
-            className={listadoTablaAccionClass}
-          >
-            Ver dirección
-          </button>
-        )}
+            },
+          },
+        ]}
       />
 
       {/* COMPONENTE DE PAGINACIÓN */}

@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { Eye, Power, RotateCcw, Upload } from "lucide-react";
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import {
-  listadoTablaAccionClass,
   listadoTablaAccionesTdClass, listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
@@ -231,70 +231,29 @@ export function TenantsTable({
             : "No encontramos empresas para este criterio."
         }
         loadingMessage="Cargando empresas…"
-        actionsTdClassName={listadoTablaAccionesTdClass}
-        renderActions={(tenant) => (
-          <div className="flex items-center justify-end gap-3">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={!isDisabledStatus(tenant.billingStatus)}
-              aria-label={`Estado de ${tenant.name}`}
-              disabled={Boolean(statusUpdatingByOrgId[tenant.clerkOrgId])}
-              onClick={() =>
-                onToggleEnabled(
-                  tenant.clerkOrgId,
-                  isDisabledStatus(tenant.billingStatus),
-                )
-              }
-              className={[
-                "group relative inline-flex h-7 w-28 items-center rounded-full border transition-colors px-2",
-                isDisabledStatus(tenant.billingStatus)
-                  ? "bg-white border-black/20"
-                  : "bg-vialto-charcoal border-vialto-charcoal",
-                statusUpdatingByOrgId[tenant.clerkOrgId]
-                  ? "opacity-60 cursor-wait"
-                  : "cursor-pointer",
-              ].join(" ")}
-            >
-              <span
-                className={[
-                  "w-full text-[10px] uppercase tracking-wider text-center select-none",
-                  isDisabledStatus(tenant.billingStatus)
-                    ? "text-vialto-steel"
-                    : "text-white",
-                ].join(" ")}
-              >
-                {isDisabledStatus(tenant.billingStatus)
-                  ? "Deshabilitado"
-                  : "Habilitado"}
-              </span>
-              <span
-                className={[
-                  "absolute h-5 w-5 rounded-full shadow-sm transition-transform",
-                  isDisabledStatus(tenant.billingStatus)
-                    ? "left-1 bg-vialto-steel/70"
-                    : "left-[5.5rem] bg-white",
-                ].join(" ")}
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                navigate(`/superadmin/empresas/${tenant.clerkOrgId}/importar`)
-              }
-              className={listadoTablaAccionClass}
-            >
-              Importar
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewingTenant(tenant)}
-              className={listadoTablaAccionClass}
-            >
-              Ver empresa
-            </button>
-          </div>
-        )}
+        actionsTdClassName={`${listadoTablaAccionesTdClass} text-right`}
+        rowActionsMaxIconos={3}
+        rowActionsSubtitle={(tenant) => tenant.name}
+        rowActions={(tenant) => {
+          const deshabilitada = isDisabledStatus(tenant.billingStatus);
+          return [
+            { id: "ver", label: "Ver empresa", icon: Eye, onClick: () => setViewingTenant(tenant) },
+            {
+              id: "importar",
+              label: "Importar",
+              icon: Upload,
+              onClick: () => navigate(`/superadmin/empresas/${tenant.clerkOrgId}/importar`),
+            },
+            {
+              id: deshabilitada ? "habilitar" : "deshabilitar",
+              label: deshabilitada ? "Habilitar empresa" : "Deshabilitar empresa",
+              icon: deshabilitada ? RotateCcw : Power,
+              danger: !deshabilitada,
+              disabled: Boolean(statusUpdatingByOrgId[tenant.clerkOrgId]),
+              onClick: () => onToggleEnabled(tenant.clerkOrgId, deshabilitada),
+            },
+          ];
+        }}
       />
     </>
   );

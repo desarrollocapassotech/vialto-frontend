@@ -15,8 +15,8 @@ import {
   metaPaginacionCliente,
   slicePaginaCliente,
 } from "@/lib/listadoPaginacion";
+import { Eye } from "lucide-react";
 import {
-  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
@@ -397,15 +397,9 @@ export function TransportistasSuperadminPage() {
                 : "No hay transportistas cargados para esta empresa."
         }
         loadingMessage="Cargando…"
-        renderActions={(t) => (
-          <button
-            type="button"
-            onClick={() => setViewingTransportista(t)}
-            className={listadoTablaAccionClass}
-          >
-            Ver transportista
-          </button>
-        )}
+        rowActions={(t) => [
+          { id: "ver", label: "Ver transportista", icon: Eye, onClick: () => setViewingTransportista(t) },
+        ]}
       />
 
       {metaListado.total > 0 && filtroEmpresa && !error && (

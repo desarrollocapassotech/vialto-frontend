@@ -8,11 +8,11 @@ import { LISTADO_PAGE_SIZE_OPTIONS } from "@/lib/listadoPaginacion";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
-  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { Eye } from "lucide-react";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Destinatario, PaginatedMeta } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
@@ -222,18 +222,17 @@ export function DestinatariosTenantPage() {
               : "Todavía no hay destinatarios cargados."
         }
         loadingMessage="Cargando…"
-        renderActions={(d) => (
-          <button
-            type="button"
-            onClick={() => {
+        rowActions={(d) => [
+          {
+            id: "ver",
+            label: "Ver destinatario",
+            icon: Eye,
+            onClick: () => {
               setViewingId(d.id);
               setViewingNombre(d.nombre);
-            }}
-            className={listadoTablaAccionClass}
-          >
-            Ver destinatario
-          </button>
-        )}
+            },
+          },
+        ]}
       />
 
       {/* COMPONENTE DE PAGINACIÓN */}

@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { Eye, Pencil, Power, RotateCcw } from "lucide-react";
 import { ChoferViewModal } from "@/components/choferes/ChoferViewModal";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -8,7 +9,6 @@ import { useMaestroData } from "@/hooks/useMaestroData";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
-  listadoTablaAccionClass,
   listadoTablaHeadRowClass,
   listadoTablaTdClass,
   listadoTablaThClass,
@@ -27,6 +27,7 @@ type ChoferesPaginatedResponse = {
 
 export function ChoferesTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const navigate = useNavigate();
   const maestro = useMaestroData();
   const hasCombustible = canAccessCombustible(maestro.tenant?.modules ?? []);
   const [rows, setRows] = useState<Chofer[] | null>(null);
@@ -275,43 +276,28 @@ export function ChoferesTenantPage() {
               : "Todavía no tenés choferes cargados."
         }
         loadingMessage="Cargando…"
-        renderActions={(c) => (
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setViewingChoferId(c.id);
-                setViewingChoferNombre(c.nombre);
-              }}
-              className={listadoTablaAccionClass}
-            >
-              Ver chofer
-            </button>
-            <Link
-              to={`/choferes/${encodeURIComponent(c.id)}/editar`}
-              className={listadoTablaAccionClass}
-            >
-              Editar
-            </Link>
-            {c.activo ? (
-              <button
-                type="button"
-                onClick={() => setConfirmToggle(c)}
-                className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
-              >
-                Desactivar
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirmToggle(c)}
-                className={`${listadoTablaAccionClass} text-emerald-900 hover:bg-emerald-50`}
-              >
-                Reactivar
-              </button>
-            )}
-          </div>
-        )}
+        rowActionsMaxIconos={3}
+        rowActionsSubtitle={(c) => c.nombre}
+        rowActions={(c) => [
+          {
+            id: "ver",
+            label: "Ver chofer",
+            icon: Eye,
+            onClick: () => {
+              setViewingChoferId(c.id);
+              setViewingChoferNombre(c.nombre);
+            },
+          },
+          {
+            id: "editar",
+            label: "Editar",
+            icon: Pencil,
+            onClick: () => navigate(`/choferes/${encodeURIComponent(c.id)}/editar`),
+          },
+          c.activo
+            ? { id: "desactivar", label: "Desactivar", icon: Power, danger: true, onClick: () => setConfirmToggle(c) }
+            : { id: "reactivar", label: "Reactivar", icon: RotateCcw, onClick: () => setConfirmToggle(c) },
+        ]}
       />
 
       {serverMeta && (

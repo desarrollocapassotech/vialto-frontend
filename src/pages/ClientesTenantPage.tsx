@@ -7,8 +7,8 @@ import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { apiJson } from "@/lib/api";
 import { condicionIvaLabel } from "@/lib/arcaCbteTipo";
 import { friendlyError } from "@/lib/friendlyError";
+import { Eye } from "lucide-react";
 import {
-  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
@@ -286,15 +286,9 @@ export function ClientesTenantPage() {
               : "Todavía no tenés clientes cargados."
         }
         loadingMessage="Cargando…"
-        renderActions={(c) => (
-          <button
-            type="button"
-            onClick={() => setViewingCliente(c)}
-            className={listadoTablaAccionClass}
-          >
-            Ver cliente
-          </button>
-        )}
+        rowActions={(c) => [
+          { id: "ver", label: "Ver cliente", icon: Eye, onClick: () => setViewingCliente(c) },
+        ]}
       />
 
       {serverMeta && (

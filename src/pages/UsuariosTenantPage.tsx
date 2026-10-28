@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/ViewModalShell";
 import { apiFetch, apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { Eye } from "lucide-react";
 import {
-  listadoTablaAccionClass,
   listadoTablaHeadRowClass,
   listadoTablaTdClass,
   listadoTablaThClass,
@@ -752,21 +752,20 @@ export function UsuariosTenantPage() {
             : "No hay usuarios en esta organización."
         }
         loadingMessage="Cargando…"
-        renderActions={(u) =>
-          u.userId ? (
-            <button
-              type="button"
-              onClick={() => {
-                setActionError(null);
-                setModal({ mode: "view", user: u });
-              }}
-              className={listadoTablaAccionClass}
-            >
-              Ver usuario
-            </button>
-          ) : (
-            <span className="text-xs text-vialto-steel">—</span>
-          )
+        rowActions={(u) =>
+          u.userId
+            ? [
+                {
+                  id: "ver",
+                  label: "Ver usuario",
+                  icon: Eye,
+                  onClick: () => {
+                    setActionError(null);
+                    setModal({ mode: "view", user: u });
+                  },
+                },
+              ]
+            : []
         }
       />
 

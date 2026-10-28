@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { Eye, Pencil } from "lucide-react";
 import { ChoferViewModal } from "@/components/choferes/ChoferViewModal";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -15,7 +16,6 @@ import {
 } from "@/lib/transportistas";
 import { friendlyError } from "@/lib/friendlyError";
 import {
-  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
@@ -28,6 +28,7 @@ import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 export function ChoferesSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const navigate = useNavigate();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const transportistas = useTransportistasList(
     filtroEmpresa || undefined,
@@ -323,26 +324,27 @@ export function ChoferesSuperadminPage() {
                 : "No hay choferes cargados para esta empresa."
         }
         loadingMessage="Cargando…"
-        renderActions={(c) => (
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setViewingChoferId(c.id);
-                setViewingChoferNombre(c.nombre);
-              }}
-              className={listadoTablaAccionClass}
-            >
-              Ver chofer
-            </button>
-            <Link
-              to={`/choferes/${encodeURIComponent(c.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
-              className={listadoTablaAccionClass}
-            >
-              Editar
-            </Link>
-          </div>
-        )}
+        rowActionsSubtitle={(c) => c.nombre}
+        rowActions={(c) => [
+          {
+            id: "ver",
+            label: "Ver chofer",
+            icon: Eye,
+            onClick: () => {
+              setViewingChoferId(c.id);
+              setViewingChoferNombre(c.nombre);
+            },
+          },
+          {
+            id: "editar",
+            label: "Editar",
+            icon: Pencil,
+            onClick: () =>
+              navigate(
+                `/choferes/${encodeURIComponent(c.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`,
+              ),
+          },
+        ]}
       />
 
       {filtroEmpresa && !error && meta && meta.total > 0 && (

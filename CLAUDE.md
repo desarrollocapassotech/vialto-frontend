@@ -179,11 +179,25 @@ VITE_SENTRY_TRACES_SAMPLE_RATE=0.1
 
 ---
 
-## Patrón de grilla: VER + modal read-only → EDITAR
+## Columna de acciones de toda grilla: formato de Viajes (oct 2026)
 
-**Regla global para todos los módulos actuales y futuros.**
+**Regla global para toda tabla, actual y futura** (listados, sub-tablas, tablas de configuración y paneles del dashboard). Nada de botones de texto (`listadoTablaAccionClass`, pills "Ver producto", links "Ver viaje →"): las acciones van siempre con `AccionesFila` (`components/ui/AccionesFila.tsx`).
 
-La columna de acciones de cualquier listado debe exponer **únicamente el botón "Ver"** por fila. Al hacer clic se abre un modal en modo solo lectura (read-only). Dentro del modal hay un botón "Editar" que transiciona al formulario de edición.
+1. **Header "Acciones"** visible (no `sr-only`, no vacío), alineado a la derecha.
+2. **Íconos**: 2 en desktop por defecto, 3 si la tabla tiene lugar (`maxIconos` / `rowActionsMaxIconos`). Si hay más acciones que íconos aparece la flecha con el desplegable del resto. En mobile, botón "Acciones" que abre el modal.
+3. **"Ver …" primero**: la opción con `id: 'ver'` siempre va primera (ícono, desplegable y modal; `AccionesFila` la reordena sola). Las peligrosas (`danger`: Eliminar, Anular, Desactivar) siempre al final.
+4. **Click en la fila**: con una sola acción la ejecuta directo; con varias abre el modal de acciones (`AccionesOpcionesSheet`) con las mismas opciones. Nunca "click en la fila = Ver" si hay otras acciones.
+
+**Cómo implementarlo:**
+
+- **Con `ListadoDatos`** (lo normal): pasar `rowActions={(row) => AccionOpcion[]}` — arma header, íconos, desplegable, modal y click en la fila. Opcionales: `rowActionsDestacadas` (ids a mostrar como ícono, en orden; default todas), `rowActionsMaxIconos`, `rowActionsSubtitle` (subtítulo del modal). No pasar `onRowClick` ni `renderActions` (`renderActions` está deprecado). Con tarjeta mobile propia, `renderMobileCard={(row, { acciones, onClick }) => <ListadoCard actions={acciones} onClick={onClick} … />}`.
+- **Tabla armada a mano** (filas custom, sub-tablas, dashboard): `<CeldaAccionesFila options={…} />` como `<td>` (no propaga el click) + en el `<tr>` `onClick={() => clickFilaAcciones(opciones, abrirModal)}` (`lib/accionesFila.ts`) y `cursor-pointer`. Si hay más de una acción, controlar el modal con `open`/`onOpenChange` y un estado `accionesAbiertasId`. Si la misma fila se renderiza en tabla y en tarjeta mobile, solo la instancia de la tabla controla el modal (la de la tarjeta usa `open={false}` y solo lo abre), si no se abren dos modales.
+- Cada opción: `{ id, label, icon (lucide), onClick, danger?, disabled?, description? }`. Links (`<Link>`) se pasan a `onClick: () => navigate(…)`. Acciones que eran componentes con estado propio se vuelven imperativas (ej. `useVerRemitoInterno` en vez de `ImprimirRemitoButton`).
+- Ids estándar: `ver`, `editar`, `eliminar`, `desactivar`/`reactivar`.
+
+### Patrón VER + modal read-only → EDITAR
+
+La acción principal de cualquier listado es **"Ver"**: abre un modal en modo solo lectura (read-only). Dentro del modal hay un botón "Editar" que transiciona al formulario de edición.
 
 **El botón dice "Ver" + la entidad (oct 2026)**: "Ver viaje", "Ver cliente", "Ver factura", "Ver vehículo", etc. — nunca "Ver" a secas. Aplica también al `label` de la opción `id: 'ver'` de `AccionesFila` (tooltip del ícono y desplegable). En Productos fuera de Stock se usa el label de la empresa: `Ver {singularFrase}`.
 
@@ -235,10 +249,10 @@ function Campo({ label, value }: { label: string; value: string | number | null 
 // Estado
 const [viewingEntidad, setViewingEntidad] = useState<Entidad | null>(null);
 
-// Botón en la grilla
-<button onClick={() => setViewingEntidad(e)} className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist">
-  Ver
-</button>
+// Acciones en la grilla (ListadoDatos)
+rowActions={(e) => [
+  { id: 'ver', label: 'Ver entidad', icon: Eye, onClick: () => setViewingEntidad(e) },
+]}
 
 // Modal al final del JSX
 {viewingEntidad && (
@@ -256,8 +270,10 @@ const [viewingEntidad, setViewingEntidad] = useState<Entidad | null>(null);
 // Estado
 | { mode: 'view'; producto: Producto }
 
-// Botón en grilla
-<button onClick={() => setModal({ mode: 'view', producto: r })}>Ver</button>
+// Acción en grilla
+rowActions={(r) => [
+  { id: 'ver', label: `Ver ${singularFrase}`, icon: Eye, onClick: () => setModal({ mode: 'view', producto: r }) },
+]}
 
 // Modal
 {modal.mode === 'view' && (
@@ -682,6 +698,7 @@ Pendientes conocidos (no hechos a propósito): el orden por columna no se guarda
 - Verificar estados de carga, error y vacío.
 - Mantener textos y UX consistentes con el resto del producto.
 - **Aplicar el patrón VER → modal read-only → EDITAR** en la columna de acciones de toda grilla nueva.
+- **Toda tabla nueva usa el formato de acciones de Viajes**: header "Acciones", 2–3 íconos + flecha con el resto (`AccionesFila`), "Ver …" primero, click en la fila = única acción o modal de acciones. Con `ListadoDatos`, `rowActions`; a mano, `CeldaAccionesFila` + `clickFilaAcciones` — ver "Columna de acciones de toda grilla: formato de Viajes".
 - **Toda grilla nueva ordena con click en el título de cada columna** (flechitas tenues, flecha naranja + ✕ en la activa, criterio de `lib/ordenListado.ts`) — ver "Grillas: ordenar con click en el título de la columna".
 - **Campos obligatorios con asterisco rojo; campos opcionales sin ningún indicador.**
 - **Si el modal carga datos**, usar `useConfirmarDescarte` (× / Cancelar / Escape piden confirmación, click afuera no cierra) — ver "Modales con formulario: confirmar antes de descartar".

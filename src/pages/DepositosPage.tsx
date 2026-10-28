@@ -8,11 +8,11 @@ import { useTenantsList } from "@/hooks/useTenantsList";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
-  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { Pencil } from "lucide-react";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Deposito, PaginatedMeta } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
@@ -460,15 +460,9 @@ export function DepositosPage({
                   : "Todavía no tenés depósitos cargados."
             }
             loadingMessage="Cargando…"
-            renderActions={(deposito) => (
-              <button
-                type="button"
-                onClick={() => openEditForm(deposito)}
-                className={listadoTablaAccionClass}
-              >
-                Editar
-              </button>
-            )}
+            rowActions={(deposito) => [
+              { id: "editar", label: "Editar depósito", icon: Pencil, onClick: () => openEditForm(deposito) },
+            ]}
           />
 
           {meta && (rowsFiltradas?.length ?? 0) > 0 && (

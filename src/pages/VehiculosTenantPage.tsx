@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { Eye, Pencil, Power, RotateCcw } from "lucide-react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { VehiculoViewModal } from "@/components/vehiculos/VehiculoViewModal";
@@ -10,7 +11,6 @@ import { labelVehiculoTipo } from "@/lib/labels";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { friendlyError } from "@/lib/friendlyError";
 import {
-  listadoTablaAccionClass,
   listadoTablaHeadRowClass,
   listadoTablaTdClass,
   listadoTablaThClass,
@@ -36,6 +36,7 @@ const TIPO_OPCIONES = [
 
 export function VehiculosTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const navigate = useNavigate();
   const { isVisible } = useFieldConfig("vehiculos");
   const [rows, setRows] = useState<Vehiculo[] | null>(null);
   const [serverMeta, setServerMeta] = useState<PaginatedMeta | null>(null);
@@ -374,43 +375,28 @@ export function VehiculosTenantPage() {
               : "Todavía no tenés vehículos cargados."
         }
         loadingMessage="Cargando…"
-        renderActions={(v) => (
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setViewingVehiculoId(v.id);
-                setViewingVehiculoPatente(v.patente);
-              }}
-              className={listadoTablaAccionClass}
-            >
-              Ver vehículo
-            </button>
-            <Link
-              to={`/vehiculos/${encodeURIComponent(v.id)}/editar`}
-              className={listadoTablaAccionClass}
-            >
-              Editar
-            </Link>
-            {v.activo ? (
-              <button
-                type="button"
-                onClick={() => void toggleActivo(v)}
-                className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
-              >
-                Desactivar
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void toggleActivo(v)}
-                className={`${listadoTablaAccionClass} text-emerald-900 hover:bg-emerald-50`}
-              >
-                Reactivar
-              </button>
-            )}
-          </div>
-        )}
+        rowActionsMaxIconos={3}
+        rowActionsSubtitle={(v) => v.patente}
+        rowActions={(v) => [
+          {
+            id: "ver",
+            label: "Ver vehículo",
+            icon: Eye,
+            onClick: () => {
+              setViewingVehiculoId(v.id);
+              setViewingVehiculoPatente(v.patente);
+            },
+          },
+          {
+            id: "editar",
+            label: "Editar",
+            icon: Pencil,
+            onClick: () => navigate(`/vehiculos/${encodeURIComponent(v.id)}/editar`),
+          },
+          v.activo
+            ? { id: "desactivar", label: "Desactivar", icon: Power, danger: true, onClick: () => void toggleActivo(v) }
+            : { id: "reactivar", label: "Reactivar", icon: RotateCcw, onClick: () => void toggleActivo(v) },
+        ]}
       />
 
       {serverMeta && (

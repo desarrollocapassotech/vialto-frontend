@@ -11,11 +11,11 @@ import { apiJson } from "@/lib/api";
 import { condicionIvaLabel } from "@/lib/arcaCbteTipo";
 import { friendlyError } from "@/lib/friendlyError";
 import {
-  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { Eye } from "lucide-react";
 import { LISTADO_PAGE_SIZE_OPTIONS } from "@/lib/listadoPaginacion";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
@@ -389,15 +389,9 @@ export function ClientesSuperadminPage() {
                 : "No hay clientes cargados para esta empresa."
         }
         loadingMessage="Cargando…"
-        renderActions={(c) => (
-          <button
-            type="button"
-            onClick={() => setViewingCliente(c)}
-            className={listadoTablaAccionClass}
-          >
-            Ver cliente
-          </button>
-        )}
+        rowActions={(c) => [
+          { id: "ver", label: "Ver cliente", icon: Eye, onClick: () => setViewingCliente(c) },
+        ]}
       />
 
       {filtroEmpresa && !error && meta && meta.total > 0 && (

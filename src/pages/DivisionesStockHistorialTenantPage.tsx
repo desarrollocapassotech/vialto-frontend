@@ -15,7 +15,6 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { buildQs } from "@/lib/queryString";
 import {
-  listadoTablaAccionClass,
   listadoTablaAccionesTdClass, listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
@@ -32,6 +31,7 @@ import type {
   PaginatedMeta,
 } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { Eye } from "lucide-react";
 
 type DivisionesPaginatedResponse = {
   items: StockOperacion[];
@@ -415,15 +415,9 @@ export function DivisionesStockHistorialTenantPage({
             rowKey={(op) => op.id}
             emptyMessage="No hay divisiones registradas."
             loadingMessage="Cargando…"
-            renderActions={(op) => (
-              <button
-                type="button"
-                onClick={() => setViendo(op)}
-                className={listadoTablaAccionClass}
-              >
-                Ver división
-              </button>
-            )}
+            rowActions={(op) => [
+              { id: "ver", label: "Ver división", icon: Eye, onClick: () => setViendo(op) },
+            ]}
             actionsThClassName={`${listadoTablaThClass} align-top text-right`}
             actionsTdClassName={`${listadoTablaAccionesTdClass} text-right whitespace-nowrap`}
           />
