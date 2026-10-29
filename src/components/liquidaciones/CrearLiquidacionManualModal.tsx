@@ -29,6 +29,14 @@ import { ParteFacturaResumen } from "@/components/facturacion/ParteFacturaResume
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { ComprobanteManualFields } from "@/components/shared/ComprobanteManualFields";
+import {
+  comprobanteManualDraftDesde,
+  payloadComprobanteLiquidacion,
+  validarComprobanteManual,
+  type ComprobanteManualDraft,
+  type ComprobanteManualErrores,
+} from "@/lib/comprobanteManual";
 import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { ConfirmarEmisionArcaDialog } from "@/components/shared/ConfirmarEmisionArcaDialog";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
@@ -381,6 +389,19 @@ export function CrearLiquidacionManualModal({
   const [numeroComprobanteProveedor, setNumeroComprobanteProveedor] = useState(
     existente?.numeroComprobanteProveedor ?? "",
   );
+  // Liquidación manual (empresa con ARCA, transportista monotributista): la factura del
+  // transportista va por separado — tipo, punto de venta, número y fecha (Libro IVA).
+  const [cbteProveedor, setCbteProveedor] = useState<ComprobanteManualDraft>(() =>
+    comprobanteManualDraftDesde({
+      cbteTipo: existente?.proveedorCbteTipo,
+      ptoVenta: existente?.proveedorPtoVenta,
+      cbteNro: existente?.proveedorCbteNro,
+      numero: existente?.numeroComprobanteProveedor,
+      fecha: existente?.proveedorCbteFecha,
+    }),
+  );
+  const [cbteProveedorErrores, setCbteProveedorErrores] =
+    useState<ComprobanteManualErrores>({});
 
   // — Estado del submit / éxito —
   const [step, setStep] = useState<"form" | "autorizada">("form");
@@ -997,6 +1018,15 @@ export function CrearLiquidacionManualModal({
       setError("Seleccioná al menos un viaje.");
       return;
     }
+    if (liquidacionManual) {
+      const errsCbte = validarComprobanteManual(cbteProveedor, true);
+      setCbteProveedorErrores(errsCbte);
+      const primero = Object.values(errsCbte)[0];
+      if (primero) {
+        setError(primero);
+        return;
+      }
+    }
     if (missingHiddenFields.length > 0) {
       const todosLosFaltantes = [
         ...missingTransportistaFields,
@@ -1102,7 +1132,10 @@ export function CrearLiquidacionManualModal({
       if (comprobanteUrl) body.comprobanteUrl = comprobanteUrl;
       if (existente) body.proveedorContrato = proveedorContrato?.trim() || null;
       else if (proveedorContrato?.trim()) body.proveedorContrato = proveedorContrato.trim();
-      if (showComprobante) {
+      if (liquidacionManual) {
+        // El backend arma `numeroComprobanteProveedor` con tipo + punto de venta + número.
+        Object.assign(body, payloadComprobanteLiquidacion(cbteProveedor));
+      } else if (showComprobante) {
         const nro = numeroComprobanteProveedor.trim();
         if (existente) body.numeroComprobanteProveedor = nro || null;
         else if (nro) body.numeroComprobanteProveedor = nro;
@@ -1840,7 +1873,26 @@ export function CrearLiquidacionManualModal({
                     </p>
                   )}
 
-                  {showComprobante && (
+                  {liquidacionManual && (
+                    <div>
+                      <p className={labelClass}>Factura del transportista</p>
+                      <ComprobanteManualFields
+                        value={cbteProveedor}
+                        onChange={(v) => {
+                          setCbteProveedor(v);
+                          setCbteProveedorErrores({});
+                        }}
+                        errores={cbteProveedorErrores}
+                        conFecha
+                        disabled={submitting}
+                        labelClassName={labelClass}
+                        inputClassName={inputClass}
+                        className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+                      />
+                    </div>
+                  )}
+
+                  {showComprobante && !liquidacionManual && (
                     <div>
                       <label htmlFor="numeroComprobanteProveedor" className={labelClass}>
                         Número de comprobante

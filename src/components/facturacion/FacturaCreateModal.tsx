@@ -41,8 +41,12 @@ import {
   filterFacturaTramosByViajeIds,
   validateFacturaDraftTramos,
   ViajesVinculadosEditor,
+  erroresComprobanteFacturaManual,
+  comprobanteManualDeDraft,
   type FacturaDraft,
 } from "@/components/facturacion/FacturaEditModal";
+import { ComprobanteManualFields } from "@/components/shared/ComprobanteManualFields";
+import type { ComprobanteManualErrores } from "@/lib/comprobanteManual";
 import {
   FacturaTramosEditor,
   emptyFacturaTramoDraft,
@@ -365,6 +369,7 @@ export function FacturaCreateModal({
 
   const [lineasIncomplete, setLineasIncomplete] = useState<number[]>([]);
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
+  const [cbteManualErrores, setCbteManualErrores] = useState<ComprobanteManualErrores>({});
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
 
   // No se restringe a los clientes de los viajes ya tildados: cambiar de cliente limpia
@@ -847,7 +852,15 @@ export function FacturaCreateModal({
   async function handleManualSave() {
     if (busy) return;
 
-    if (!conArca && !draft.numero.trim()) {
+    if (draft.manual) {
+      const errsCbte = erroresComprobanteFacturaManual(draft);
+      setCbteManualErrores(errsCbte);
+      const primerErrorCbte = Object.values(errsCbte)[0];
+      if (primerErrorCbte) {
+        notifyError(primerErrorCbte);
+        return;
+      }
+    } else if (!conArca && !draft.numero.trim()) {
       notifyError("Ingresá el número de comprobante.");
       return;
     }
@@ -1106,20 +1119,36 @@ export function FacturaCreateModal({
     <>
       {manualCheckbox}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* Con ARCA el número lo asigna AFIP al emitir: no se carga a mano. */}
-        {!conArca && (
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-              Número de comprobante <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={draft.numero}
-              onChange={(e) => patch({ numero: e.target.value })}
-              placeholder="0001-00000001"
-              className="h-9 border border-black/20 bg-white px-3 text-sm"
-            />
-          </div>
+        {/* Con ARCA el número lo asigna AFIP al emitir: no se carga a mano. Factura
+            manual: tipo + punto de venta + número por separado (Libro IVA). */}
+        {draft.manual ? (
+          <ComprobanteManualFields
+            value={comprobanteManualDeDraft(draft)}
+            onChange={(comprobanteManual) => {
+              patch({ comprobanteManual });
+              setCbteManualErrores({});
+            }}
+            errores={cbteManualErrores}
+            disabled={busy}
+            labelClassName="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel"
+            inputClassName="h-9 w-full border border-black/20 bg-white px-3 text-sm"
+            className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-3"
+          />
+        ) : (
+          !conArca && (
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                Número de comprobante <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={draft.numero}
+                onChange={(e) => patch({ numero: e.target.value })}
+                placeholder="0001-00000001"
+                className="h-9 border border-black/20 bg-white px-3 text-sm"
+              />
+            </div>
+          )
         )}
         <FacturaContraparteField
           clienteId={draft.clienteId}

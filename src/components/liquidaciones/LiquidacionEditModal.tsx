@@ -5,6 +5,14 @@ import { HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { liquidacionConArca } from "@/lib/arcaCbteTipo";
+import { ComprobanteManualFields } from "@/components/shared/ComprobanteManualFields";
+import {
+  comprobanteManualDraftDesde,
+  payloadComprobanteLiquidacion,
+  validarComprobanteManual,
+  type ComprobanteManualDraft,
+  type ComprobanteManualErrores,
+} from "@/lib/comprobanteManual";
 import { unidadCantidadViajes } from "@/lib/pdfDetalleViaje";
 import {
   ConceptosLiquidacionLineasEditor,
@@ -170,6 +178,8 @@ export function LiquidacionEditModal({
   // entra al circuito de emisión, el conjunto de viajes ya se comunicó a ARCA.
   const canEditViajes = liq.estado === "borrador";
   const showComprobante = !hasArca;
+  // Liquidación manual: la factura del transportista va por separado, obligatoria (Libro IVA).
+  const liquidacionManual = Boolean(liq.manual);
 
   const { isVisible, isLoading: isFieldConfigLoading } = useFieldConfig("liquidaciones");
   const showFechaDesde = isVisible("edicion_liquidacion", "fechaDesde");
@@ -200,6 +210,17 @@ export function LiquidacionEditModal({
   const [numeroComprobanteProveedor, setNumeroComprobanteProveedor] = useState(
     liq.numeroComprobanteProveedor ?? "",
   );
+  const [cbteProveedor, setCbteProveedor] = useState<ComprobanteManualDraft>(() =>
+    comprobanteManualDraftDesde({
+      cbteTipo: liq.proveedorCbteTipo,
+      ptoVenta: liq.proveedorPtoVenta,
+      cbteNro: liq.proveedorCbteNro,
+      numero: liq.numeroComprobanteProveedor,
+      fecha: liq.proveedorCbteFecha,
+    }),
+  );
+  const [cbteProveedorErrores, setCbteProveedorErrores] =
+    useState<ComprobanteManualErrores>({});
 
   const [viajesDisponibles, setViajesDisponibles] = useState<
     ViajeOpcionDraft[]
@@ -423,6 +444,9 @@ export function LiquidacionEditModal({
         errs.ivaPct = "El IVA debe ser un número entre 0 y 100.";
       }
     }
+    const errsCbte = liquidacionManual ? validarComprobanteManual(cbteProveedor, true) : {};
+    setCbteProveedorErrores(errsCbte);
+    Object.assign(errs, errsCbte);
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
@@ -483,7 +507,13 @@ export function LiquidacionEditModal({
       }
       if (showComprobante) {
         body.comprobanteUrl = nextComprobanteUrl ?? null;
-        body.numeroComprobanteProveedor = numeroComprobanteProveedor.trim() || null;
+        if (!liquidacionManual) {
+          body.numeroComprobanteProveedor = numeroComprobanteProveedor.trim() || null;
+        }
+      }
+      if (liquidacionManual) {
+        // El backend arma `numeroComprobanteProveedor` con tipo + punto de venta + número.
+        Object.assign(body, payloadComprobanteLiquidacion(cbteProveedor));
       }
 
       const updated = await apiJson<LiquidacionConTransportista>(
@@ -777,7 +807,26 @@ export function LiquidacionEditModal({
           </p>
         )}
 
-        {showComprobante && (
+        {liquidacionManual && (
+          <div>
+            <p className={LABEL}>Factura del transportista</p>
+            <ComprobanteManualFields
+              value={cbteProveedor}
+              onChange={(v) => {
+                setCbteProveedor(v);
+                setCbteProveedorErrores({});
+              }}
+              errores={cbteProveedorErrores}
+              conFecha
+              disabled={saving}
+              labelClassName={LABEL}
+              inputClassName={INPUT}
+              className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+            />
+          </div>
+        )}
+
+        {showComprobante && !liquidacionManual && (
           <div>
             <label htmlFor="liq-numero-comprobante-proveedor" className={LABEL}>
               Número de comprobante

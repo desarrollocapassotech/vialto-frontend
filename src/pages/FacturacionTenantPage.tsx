@@ -38,6 +38,11 @@ import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { apiJson } from "@/lib/api";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
+import {
+  comprobanteManualDraftDesde,
+  payloadComprobanteFactura,
+  type ComprobanteManualDraft,
+} from "@/lib/comprobanteManual";
 import { friendlyError } from "@/lib/friendlyError";
 import { esImagenAdjunto } from "@/lib/abrirAdjunto";
 import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
@@ -982,7 +987,7 @@ export function FacturacionTenantPage({
    */
   async function guardarAdjuntoFactura(
     f: Factura,
-    datos: { numero: string; file: File },
+    datos: { numero: string; file: File; comprobante?: ComprobanteManualDraft },
   ) {
     const comprobanteUrl = await uploadComprobante(
       () => getToken(),
@@ -990,7 +995,12 @@ export function FacturacionTenantPage({
       "facturacion",
     );
     const body: Record<string, unknown> = { comprobanteUrl };
-    if (datos.numero && datos.numero !== (f.numero ?? "")) body.numero = datos.numero;
+    if (datos.comprobante) {
+      // Factura manual: el backend arma el número con tipo + punto de venta + número.
+      Object.assign(body, payloadComprobanteFactura(datos.comprobante));
+    } else if (datos.numero && datos.numero !== (f.numero ?? "")) {
+      body.numero = datos.numero;
+    }
     const updated = await apiJson<Factura>(facturaUrl(f.id), () => getToken(), {
       method: "PATCH",
       body: JSON.stringify(body),
@@ -2041,6 +2051,18 @@ export function FacturacionTenantPage({
         <AdjuntarComprobanteModal
           titulo={`Factura a ${nombreContraparte(adjuntarFactura)}`}
           numeroInicial={adjuntarFactura.numero}
+          comprobanteManual={
+            adjuntarFactura.manual
+              ? {
+                  inicial: comprobanteManualDraftDesde({
+                    cbteTipo: adjuntarFactura.manualCbteTipo,
+                    ptoVenta: adjuntarFactura.manualPtoVenta,
+                    cbteNro: adjuntarFactura.manualCbteNro,
+                    numero: adjuntarFactura.numero,
+                  }),
+                }
+              : undefined
+          }
           onClose={() => setAdjuntarFactura(null)}
           onGuardar={(datos) => guardarAdjuntoFactura(adjuntarFactura, datos)}
         />

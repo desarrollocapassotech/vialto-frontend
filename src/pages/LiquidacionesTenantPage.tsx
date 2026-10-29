@@ -3,6 +3,11 @@ import {
   ComprobanteAdjuntoClip,
 } from "@/components/shared/ComprobanteAdjuntoClip";
 import { AdjuntarComprobanteModal } from "@/components/shared/AdjuntarComprobanteModal";
+import {
+  comprobanteManualDraftDesde,
+  payloadComprobanteLiquidacion,
+  type ComprobanteManualDraft,
+} from "@/lib/comprobanteManual";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
@@ -666,7 +671,7 @@ export function LiquidacionesTenantPage() {
    */
   async function guardarAdjuntoLiquidacion(
     liq: LiquidacionConTransportista,
-    datos: { numero: string; file: File },
+    datos: { numero: string; file: File; comprobante?: ComprobanteManualDraft },
   ) {
     const comprobanteUrl = await uploadComprobante(
       () => getToken(),
@@ -682,6 +687,8 @@ export function LiquidacionesTenantPage() {
         body: JSON.stringify({
           comprobanteUrl,
           numeroComprobanteProveedor: datos.numero || null,
+          // Liquidación manual: factura del transportista por separado (Libro IVA).
+          ...(datos.comprobante ? payloadComprobanteLiquidacion(datos.comprobante) : {}),
         }),
       },
     );
@@ -1834,6 +1841,20 @@ export function LiquidacionesTenantPage() {
           titulo={`Liquidación a ${transportistaNombre(adjuntarLiq)}`}
 
           numeroInicial={adjuntarLiq.numeroComprobanteProveedor}
+          comprobanteManual={
+            adjuntarLiq.manual
+              ? {
+                  inicial: comprobanteManualDraftDesde({
+                    cbteTipo: adjuntarLiq.proveedorCbteTipo,
+                    ptoVenta: adjuntarLiq.proveedorPtoVenta,
+                    cbteNro: adjuntarLiq.proveedorCbteNro,
+                    numero: adjuntarLiq.numeroComprobanteProveedor,
+                    fecha: adjuntarLiq.proveedorCbteFecha,
+                  }),
+                  conFecha: true,
+                }
+              : undefined
+          }
           onClose={() => setAdjuntarLiq(null)}
           onGuardar={(datos) => guardarAdjuntoLiquidacion(adjuntarLiq, datos)}
         />

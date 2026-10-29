@@ -38,6 +38,16 @@ import {
   importeNetoViajeParaFactura,
 } from "@/lib/facturaTotales";
 import { hoyArgentinaIso, vencimientoPorDefecto } from "@/lib/facturaFechaEmision";
+import {
+  comprobanteManualDraftDesde,
+  emptyComprobanteManualDraft,
+  numeroDesdeComprobanteManual,
+  payloadComprobanteFactura,
+  validarComprobanteManual,
+  type ComprobanteManualDraft,
+  type ComprobanteManualErrores,
+} from "@/lib/comprobanteManual";
+import { ComprobanteManualFields } from "@/components/shared/ComprobanteManualFields";
 import type { Cliente, Factura, Viaje } from "@/types/api";
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -80,7 +90,23 @@ export type FacturaDraft = {
   comprobanteFile: File | null;
   /** Empresa con ARCA: factura hecha por fuera del sistema (no se emite; número + adjunto). */
   manual?: boolean;
+  /** Factura manual: tipo + punto de venta + número por separado (obligatorios, Libro IVA). */
+  comprobanteManual?: ComprobanteManualDraft;
 };
+
+export function comprobanteManualDeDraft(draft: FacturaDraft): ComprobanteManualDraft {
+  return draft.comprobanteManual ?? emptyComprobanteManualDraft();
+}
+
+/**
+ * Errores del comprobante de una factura manual (vacío si no es manual o está completo).
+ * Solo existe en empresas con ARCA: `draft.manual` nunca es true sin ARCA.
+ */
+export function erroresComprobanteFacturaManual(
+  draft: FacturaDraft,
+): ComprobanteManualErrores {
+  return draft.manual ? validarComprobanteManual(comprobanteManualDeDraft(draft), false) : {};
+}
 
 // Hoy en Argentina, no en UTC (desde las 21 h el UTC ya es el día siguiente).
 const todayIso = hoyArgentinaIso;
@@ -105,6 +131,7 @@ export function emptyFacturaDraft(): FacturaDraft {
     letraComprobante: null,
     comprobanteUrl: null,
     comprobanteFile: null,
+    comprobanteManual: emptyComprobanteManualDraft(),
   };
 }
 
@@ -148,7 +175,14 @@ export function facturaPayloadFromDraft(
   if (comprobanteUrl !== undefined) {
     base.comprobanteUrl = comprobanteUrl ?? "";
   }
-  if (draft.manual) base.manual = true;
+  if (draft.manual) {
+    base.manual = true;
+    // El backend arma `numero` con estos tres campos.
+    const cbte = comprobanteManualDeDraft(draft);
+    Object.assign(base, payloadComprobanteFactura(cbte), {
+      numero: numeroDesdeComprobanteManual(cbte) || undefined,
+    });
+  }
   return {
     ...base,
     clienteId: draft.clienteId || undefined,
@@ -189,6 +223,12 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
     comprobanteUrl: f.comprobanteUrl ?? null,
     comprobanteFile: null,
     manual: Boolean(f.manual),
+    comprobanteManual: comprobanteManualDraftDesde({
+      cbteTipo: f.manualCbteTipo,
+      ptoVenta: f.manualPtoVenta,
+      cbteNro: f.manualCbteNro,
+      numero: f.numero,
+    }),
   };
 }
 
@@ -549,6 +589,7 @@ export function FacturaEditModal({
   useEscapeKey(open, saving, descarte.solicitarCierre);
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [tramosLocalError, setTramosLocalError] = useState<string | null>(null);
+  const [cbteManualErrores, setCbteManualErrores] = useState<ComprobanteManualErrores>({});
 
   useEffect(() => {
     if (!open) {
@@ -651,8 +692,11 @@ export function FacturaEditModal({
   }
 
   function handleSave() {
-    if (draft.manual && !draft.numero.trim()) {
-      setTramosLocalError("Ingresá el número de comprobante.");
+    const errsCbte = erroresComprobanteFacturaManual(draft);
+    setCbteManualErrores(errsCbte);
+    const primerErrorCbte = Object.values(errsCbte)[0];
+    if (primerErrorCbte) {
+      setTramosLocalError(primerErrorCbte);
       return;
     }
     const check = validateFacturaDraftTramos(draft);
@@ -750,20 +794,31 @@ export function FacturaEditModal({
             />
           )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {!conArca && (
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                  Número de comprobante
-                  {draft.manual && <span className="text-red-500"> *</span>}
-                </label>
-                <input
-                  type="text"
-                  value={draft.numero}
-                  onChange={(e) => patch({ numero: e.target.value })}
-                  placeholder="0001-00000001"
-                  className="h-9 border border-black/20 bg-white px-3 text-sm"
-                />
-              </div>
+            {draft.manual ? (
+              <ComprobanteManualFields
+                value={comprobanteManualDeDraft(draft)}
+                onChange={(comprobanteManual) => patch({ comprobanteManual })}
+                errores={cbteManualErrores}
+                disabled={saving}
+                labelClassName="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel"
+                inputClassName="h-9 w-full border border-black/20 bg-white px-3 text-sm"
+                className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-3"
+              />
+            ) : (
+              !conArca && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                    Número de comprobante
+                  </label>
+                  <input
+                    type="text"
+                    value={draft.numero}
+                    onChange={(e) => patch({ numero: e.target.value })}
+                    placeholder="0001-00000001"
+                    className="h-9 border border-black/20 bg-white px-3 text-sm"
+                  />
+                </div>
+              )
             )}
 
             <FacturaContraparteField

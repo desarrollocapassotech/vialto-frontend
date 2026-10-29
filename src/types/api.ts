@@ -525,6 +525,10 @@ export interface Factura {
   tipo: "cliente";
   /** Empresa con ARCA: factura hecha por fuera del sistema (no se emite). Ver `facturaConArca`. */
   manual?: boolean;
+  /** Factura manual: tipo AFIP, punto de venta y número por separado (Libro IVA). */
+  manualCbteTipo?: number | null;
+  manualPtoVenta?: number | null;
+  manualCbteNro?: number | null;
   clienteId: string | null;
   transportistaId: string | null;
   viajeIds: string[];
@@ -1091,6 +1095,11 @@ export interface Liquidacion {
    * anula en ARCA, se muestra y opera como la de una empresa sin ARCA. Ver `liquidacionConArca`.
    */
   manual?: boolean;
+  /** Liquidación manual: factura del transportista por separado (Libro IVA). Fecha a medianoche UTC. */
+  proveedorCbteTipo?: number | null;
+  proveedorPtoVenta?: number | null;
+  proveedorCbteNro?: number | null;
+  proveedorCbteFecha?: string | null;
   conceptosLineas?: LiquidacionConceptoLinea[];
   /** Presente en GET detalle; no siempre en el listado. */
   viajes?: LiquidacionViajeItem[];

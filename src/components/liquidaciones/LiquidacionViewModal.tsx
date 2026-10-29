@@ -622,6 +622,11 @@ export function LiquidacionViewModal({
                 <Dato
                   label="Número de comprobante"
                   value={source.numeroComprobanteProveedor}
+                  sub={
+                    source.proveedorCbteFecha
+                      ? `Fecha ${fmtDate(source.proveedorCbteFecha)}`
+                      : undefined
+                  }
                 />
               )
             )}

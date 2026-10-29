@@ -8,16 +8,25 @@ import { CrudFieldLabel, CrudInput } from "@/components/crud/CrudFields";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
+import { ComprobanteManualFields } from "@/components/shared/ComprobanteManualFields";
+import {
+  numeroDesdeComprobanteManual,
+  validarComprobanteManual,
+  type ComprobanteManualDraft,
+} from "@/lib/comprobanteManual";
 
 /**
  * "Adjuntar comprobante" de una factura o liquidación sin ARCA que todavía no tiene
  * archivo: número de comprobante + archivo, en un solo paso. El host sube el archivo y
  * guarda (`onGuardar`); este modal solo junta los datos y muestra el error en el pie.
+ * Con `comprobanteManual` (factura/liquidación manual de una empresa con ARCA) el número
+ * se carga como tipo + punto de venta + número (+ fecha), obligatorios.
  */
 export function AdjuntarComprobanteModal({
   titulo,
   numeroLabel = "Número de comprobante",
   numeroInicial,
+  comprobanteManual,
   onClose,
   onGuardar,
 }: {
@@ -25,10 +34,16 @@ export function AdjuntarComprobanteModal({
   titulo: string;
   numeroLabel?: string;
   numeroInicial?: string | null;
+  comprobanteManual?: { inicial: ComprobanteManualDraft; conFecha?: boolean };
   onClose: () => void;
-  onGuardar: (datos: { numero: string; file: File }) => Promise<void>;
+  onGuardar: (datos: {
+    numero: string;
+    file: File;
+    comprobante?: ComprobanteManualDraft;
+  }) => Promise<void>;
 }) {
   const [numero, setNumero] = useState(numeroInicial ?? "");
+  const [comprobante, setComprobante] = useState(comprobanteManual?.inicial);
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const descarte = useConfirmarDescarte(onClose);
@@ -36,7 +51,9 @@ export function AdjuntarComprobanteModal({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   async function guardar() {
-    const errs: Record<string, string> = {};
+    const errs: Record<string, string> = comprobante
+      ? { ...validarComprobanteManual(comprobante, Boolean(comprobanteManual?.conFecha)) }
+      : {};
     if (!file) errs.file = "Adjuntá el archivo del comprobante.";
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
@@ -46,7 +63,11 @@ export function AdjuntarComprobanteModal({
     setError(null);
     setSaving(true);
     try {
-      await onGuardar({ numero: numero.trim(), file: file! });
+      await onGuardar(
+        comprobante
+          ? { numero: numeroDesdeComprobanteManual(comprobante), file: file!, comprobante }
+          : { numero: numero.trim(), file: file! },
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo adjuntar el comprobante.");
     } finally {
@@ -83,15 +104,26 @@ export function AdjuntarComprobanteModal({
     >
       <div className="grid gap-4">
         <p className="text-sm text-vialto-steel">{titulo}</p>
-        <label className="grid gap-1.5">
-          <CrudFieldLabel>{numeroLabel}</CrudFieldLabel>
-          <CrudInput
-            value={numero}
-            onChange={(e) => setNumero(e.target.value)}
+        {comprobante ? (
+          <ComprobanteManualFields
+            value={comprobante}
+            onChange={setComprobante}
+            errores={fieldErrors}
+            conFecha={comprobanteManual?.conFecha}
             disabled={saving}
-            placeholder="Ej. 0001-00000123"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2"
           />
-        </label>
+        ) : (
+          <label className="grid gap-1.5">
+            <CrudFieldLabel>{numeroLabel}</CrudFieldLabel>
+            <CrudInput
+              value={numero}
+              onChange={(e) => setNumero(e.target.value)}
+              disabled={saving}
+              placeholder="Ej. 0001-00000123"
+            />
+          </label>
+        )}
         <ComprobanteAdjuntoField
           file={file}
           onFileChange={(f) => {
