@@ -271,10 +271,13 @@ export function FacturacionTenantPage({
   const [listadoRefetching, setListadoRefetching] = useState(false);
   // Click en el título de la columna: A→Z / Z→A. Empresa: lo ordena el backend;
   // superadmin (trae todas): en el navegador, con las mismas claves.
-  const { orden, ordenColumna } = useOrdenColumna<FacturaSortField>(() => {
-    if (!platform) setListadoRefetching(true);
-    setPage(1);
-  });
+  const { orden, ordenColumna } = useOrdenColumna<FacturaSortField>(
+    () => {
+      if (!platform) setListadoRefetching(true);
+      setPage(1);
+    },
+    { numero: "numero", emision: "fecha", vencimiento: "fecha", importe: "numero" },
+  );
   const [viajes, setViajes] = useState<Viaje[]>([]);
   const [viajesLoading, setViajesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

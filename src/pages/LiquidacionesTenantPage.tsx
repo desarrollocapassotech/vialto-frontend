@@ -411,8 +411,16 @@ export function LiquidacionesTenantPage() {
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const { orden, ordenColumna } = useOrdenColumna<LiquidacionSortField>(() =>
-    setPage(1),
+  const { orden, ordenColumna } = useOrdenColumna<LiquidacionSortField>(
+    () => setPage(1),
+    {
+      comprobante: "numero",
+      periodo: "fecha",
+      bruto: "numero",
+      comision: "numero",
+      iva: "numero",
+      liquido: "numero",
+    },
   );
 
   const [estadoFilter, setEstadoFilter] = useState<LiquidacionEstado | "todos">(

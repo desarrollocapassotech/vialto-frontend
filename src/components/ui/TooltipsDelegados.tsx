@@ -36,6 +36,21 @@ export function TooltipsDelegados({
     const contenedor = contenedorRef.current;
     if (!contenedor) return;
     let actual: HTMLElement | null = null;
+    // Elemento bajo el mouse (sigue aunque el click haya ocultado el tooltip): si React le
+    // cambia el `title` mientras tanto (ej. "A a Z" → "Z a A" al ordenar), se vuelve a
+    // mostrar con el texto nuevo. Si no, quedaba el viejo en `data-tooltip`.
+    let observado: HTMLElement | null = null;
+    const observer = new MutationObserver(() => {
+      if (observado?.hasAttribute('title')) {
+        actual = observado;
+        mostrar(observado);
+      }
+    });
+
+    function dejarDeObservar() {
+      observer.disconnect();
+      observado = null;
+    }
 
     function objetivo(target: EventTarget | null): HTMLElement | null {
       if (!(target instanceof Element)) return null;
@@ -44,6 +59,11 @@ export function TooltipsDelegados({
     }
 
     function mostrar(el: HTMLElement) {
+      if (observado !== el) {
+        observer.disconnect();
+        observado = el;
+        observer.observe(el, { attributes: true, attributeFilter: ['title'] });
+      }
       const title = el.getAttribute('title');
       if (title !== null) {
         el.setAttribute('data-tooltip', title);
@@ -69,7 +89,10 @@ export function TooltipsDelegados({
       if (el === actual) return;
       actual = el;
       if (el) mostrar(el);
-      else setTip(null);
+      else {
+        dejarDeObservar();
+        setTip(null);
+      }
     }
 
     function ocultar() {
@@ -77,22 +100,29 @@ export function TooltipsDelegados({
       setTip(null);
     }
 
-    function onOut(e: MouseEvent) {
-      if (!actual) return;
-      const destino = e.relatedTarget;
-      if (destino instanceof Node && actual.contains(destino)) return;
+    function ocultarYOlvidar() {
       ocultar();
+      dejarDeObservar();
+    }
+
+    function onOut(e: MouseEvent) {
+      const saliendoDe = actual ?? observado;
+      if (!saliendoDe) return;
+      const destino = e.relatedTarget;
+      if (destino instanceof Node && saliendoDe.contains(destino)) return;
+      ocultarYOlvidar();
     }
 
     contenedor.addEventListener('mouseover', onOver);
     contenedor.addEventListener('mouseout', onOut);
     contenedor.addEventListener('mousedown', ocultar);
-    window.addEventListener('scroll', ocultar, true);
+    window.addEventListener('scroll', ocultarYOlvidar, true);
     return () => {
+      observer.disconnect();
       contenedor.removeEventListener('mouseover', onOver);
       contenedor.removeEventListener('mouseout', onOut);
       contenedor.removeEventListener('mousedown', ocultar);
-      window.removeEventListener('scroll', ocultar, true);
+      window.removeEventListener('scroll', ocultarYOlvidar, true);
     };
   }, [contenedorRef]);
 

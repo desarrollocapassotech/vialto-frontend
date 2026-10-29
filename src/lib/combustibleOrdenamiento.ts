@@ -1,3 +1,5 @@
+import { etiquetaDirOrden, type TipoOrden } from "@/lib/ordenListado";
+
 /** Opciones del menú "Ordenar por". */
 export const COMBUSTIBLE_SORT_FIELDS = [
   "fecha_creacion",
@@ -56,17 +58,19 @@ function esCampoFecha(field: CombustibleSortField): boolean {
   return field === "fecha_creacion" || field === "fecha_carga";
 }
 
+/** Tipo de dato de cada orden (tooltip del título y etiqueta del menú). */
+export function tipoOrdenCombustible(field: CombustibleSortField): TipoOrden {
+  if (esCampoFecha(field)) return "fecha";
+  if (field === "litros" || field === "importe") return "numero";
+  return "texto";
+}
+
 export function etiquetaCombustibleOrdenamiento(
   sortBy: CombustibleSortField,
   sortDir: CombustibleSortDir,
 ): string {
   const base = COMBUSTIBLE_SORT_LABELS[sortBy];
-  if (!esCampoFecha(sortBy)) {
-    return sortDir === "asc" ? `${base} (A a Z)` : `${base} (Z a A)`;
-  }
-  return sortDir === "asc"
-    ? `${base} (de vieja a nueva)`
-    : `${base} (de nueva a vieja)`;
+  return `${base} (${etiquetaDirOrden(tipoOrdenCombustible(sortBy), sortDir)})`;
 }
 
 export function etiquetaDirDesc(_field: CombustibleSortField): string {

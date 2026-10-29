@@ -685,7 +685,11 @@ Historia: sep 2026 — vencimiento de póliza un día antes (`VehiculoViewModal`
 
 Al implementar una pendiente, pasarla a ✅ en esta tabla. Toda grilla nueva nace con orden por columna.
 
-Pendientes conocidos (no hechos a propósito): el orden por columna no se guarda al recargar en Viajes/Facturas/Liquidaciones (Combustible sí, por la URL); en mobile no hay encabezados y no se puede ordenar por columna.
+**Tooltip según el tipo de columna**: dice lo que hace el próximo click — texto "(A a Z)"/"(Z a A)", número "(menor a mayor)"/"(mayor a menor)", fecha "(más antigua a más reciente)"/"(más reciente a más antigua)". Helper `etiquetaDirOrden` (`lib/ordenListado.ts`); el tipo va en `OrdenColumna.tipo` (default texto), con `useOrdenColumna(onCambio, tipos)` o `tipoOrdenViaje`/`tipoOrdenCombustible`. Columna nueva de número o fecha: pasarle el tipo.
+
+**Viajes guarda filtros, orden y tamaño de página al recargar** (`lib/viajesListadoPersistido.ts`, `sessionStorage`, una clave por empresa; un `?etapa=`/`?pagoTransportista=` en la URL manda sobre lo guardado). Filtro nuevo en Viajes: sumarlo a `ViajesFiltrosAplicados`/`VIAJES_FILTROS_VACIOS`.
+
+Pendientes conocidos (no hechos a propósito): Facturas/Liquidaciones no guardan orden ni filtros al recargar (Combustible sí, por la URL); en mobile no hay encabezados y no se puede ordenar por columna.
 
 ---
 

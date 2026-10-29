@@ -37,7 +37,9 @@ export function ViajesSuperadminPage() {
 
       {filtroEmpresa ? (
         <div className="mt-8">
+          {/* key: al cambiar de empresa arranca con sus propios filtros guardados. */}
           <ViajesTenantPage
+            key={filtroEmpresa}
             tenantId={filtroEmpresa}
             embeddedInSuperadmin
             tenantModules={

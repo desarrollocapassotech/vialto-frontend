@@ -26,6 +26,7 @@ import {
   type CombustibleSortField,
   appendCombustibleSortQuery,
   parseCombustibleSortField,
+  tipoOrdenCombustible,
 } from "@/lib/combustibleOrdenamiento";
 import {
   TituloOrdenable,
@@ -307,6 +308,7 @@ export function CombustibleTenantPage({
       sortDir === COMBUSTIBLE_SORT_DEFAULT.sortDir;
     return {
       dir: activo ? sortDir : null,
+      tipo: tipoOrdenCombustible(field),
       disabled: rows === null,
       onClick: () => {
         setSortBy(field);

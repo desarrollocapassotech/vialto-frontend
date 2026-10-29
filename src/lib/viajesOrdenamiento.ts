@@ -1,5 +1,10 @@
 import type { Viaje } from "@/types/api";
-import { ordenarPorClaves, type ValorOrden } from "@/lib/ordenListado";
+import {
+  etiquetaDirOrden,
+  ordenarPorClaves,
+  type TipoOrden,
+  type ValorOrden,
+} from "@/lib/ordenListado";
 
 const TZ_LISTADOS_AR = "America/Argentina/Buenos_Aires";
 
@@ -182,26 +187,21 @@ export const VIAJE_SORT_LABELS: Record<ViajeSortField, string> = {
   observaciones: "Observaciones",
 };
 
+/** Tipo de dato de cada orden (tooltip del título y etiqueta del menú). */
+export function tipoOrdenViaje(field: ViajeSortField): TipoOrden {
+  if (esCampoFecha(field)) return "fecha";
+  if (field === "id_sistema" || field === "id_propio_1" || field === "id_propio_2") {
+    return "numero";
+  }
+  return "texto";
+}
+
 export function etiquetaViajeOrdenamiento(
   sortBy: ViajeSortField,
   sortDir: ViajeSortDir,
   base: string = VIAJE_SORT_LABELS[sortBy],
 ): string {
-  if (esViajeSortColumna(sortBy)) {
-    return sortDir === "asc" ? `${base} (A a Z)` : `${base} (Z a A)`;
-  }
-  if (
-    sortBy === "fecha_creacion" ||
-    sortBy === "fecha_carga" ||
-    sortBy === "fecha_descarga"
-  ) {
-    return sortDir === "asc"
-      ? `${base} (de vieja a nueva)`
-      : `${base} (de nueva a vieja)`;
-  }
-  return sortDir === "desc"
-    ? `${base} (mayor primero)`
-    : `${base} (menor primero)`;
+  return `${base} (${etiquetaDirOrden(tipoOrdenViaje(sortBy), sortDir)})`;
 }
 
 function esCampoFecha(field: ViajeSortField): boolean {
@@ -218,6 +218,14 @@ export function etiquetaDirDesc(field: ViajeSortField): string {
 
 export function etiquetaDirAsc(field: ViajeSortField): string {
   return esCampoFecha(field) ? "De vieja a nueva" : "Menor primero";
+}
+
+/** `sortBy` guardado/recibido validado (un valor desconocido cae al orden por defecto). */
+export function parseViajeSortField(raw: unknown): ViajeSortField {
+  const todos: readonly string[] = [...VIAJE_SORT_FIELDS, ...VIAJE_SORT_FIELDS_COLUMNA];
+  return typeof raw === "string" && todos.includes(raw)
+    ? (raw as ViajeSortField)
+    : VIAJE_SORT_DEFAULT.sortBy;
 }
 
 export function appendViajeSortQuery(
