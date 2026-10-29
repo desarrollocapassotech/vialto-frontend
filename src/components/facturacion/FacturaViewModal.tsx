@@ -41,6 +41,7 @@ import {
   facturaLetraFromCondicionIva,
   facturaLetraLabel,
   facturaNcCbteTipoFromFactura,
+  facturaConArca,
   facturaEditable,
   facturaNcLabel,
   nroComprobante,
@@ -93,7 +94,7 @@ export function FacturaViewModal({
   factura,
   clienteNombre,
   cliente,
-  hasArca = false,
+  hasArca: hasArcaTenant = false,
   getToken,
   onClose,
   onEditar,
@@ -133,6 +134,8 @@ export function FacturaViewModal({
   /** Label configurable de "ID Propio 2". Sin prop, el de la empresa propia. */
   idPropio2Label?: string;
 }) {
+  // Factura manual (hecha por fuera del sistema): se muestra como en una empresa sin ARCA.
+  const hasArca = facturaConArca(hasArcaTenant, factura);
   const { tenant: tenantPropio } = useCurrentTenant();
   const mostrarIdPropio2 = idPropio2HabilitadoProp ?? idPropio2HabilitadoTenant(tenantPropio);
   const labelIdPropio2 = idPropio2LabelProp ?? idPropio2LabelTenant(tenantPropio);

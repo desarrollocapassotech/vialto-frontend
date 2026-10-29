@@ -35,6 +35,7 @@ import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { PadronValidacionEstado } from "@/components/shared/PadronValidacionEstado";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import {
+  FacturaManualCheckbox,
   FacturaTotalesPreview,
   facturaPayloadFromDraft,
   filterFacturaTramosByViajeIds,
@@ -248,8 +249,13 @@ export function FacturaCreateModal({
   const navigate = useNavigate();
   const { showToast } = useToast();
   const platform = Boolean(tenantId?.trim());
+  // Factura hecha por fuera del sistema (empresa con ARCA): el formulario queda como sin
+  // ARCA (número + comprobante adjunto) y se guarda sin emitir.
+  const conArca = hasArca && !draft.manual;
   const unifiedArca =
-    hasArca && Boolean(getToken) && Boolean(facturasCreateUrl);
+    conArca && Boolean(getToken) && Boolean(facturasCreateUrl);
+  const adjuntoVisible =
+    !conArca && (showComprobanteAdjunto || (Boolean(draft.manual) && !platform));
 
   const [submitAction, setSubmitAction] = useState<
     "borrador" | "emitir" | null
@@ -418,10 +424,10 @@ export function FacturaCreateModal({
     draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0;
 
   const bloqueadoUsd = useMemo(() => {
-    if (!hasArca) return false;
+    if (!conArca) return false;
     const moneda = monedaUnicaDeViajes(draft.viajeIds, viajes);
     return moneda != null && arcaBloqueaFacturarUsd(true, moneda);
-  }, [hasArca, draft.viajeIds, viajes]);
+  }, [conArca, draft.viajeIds, viajes]);
 
   const missingEmitFields = useMemo(() => {
     if (!clienteDetalle) return [];
@@ -692,7 +698,7 @@ export function FacturaCreateModal({
   }
 
   async function resolveComprobanteUrl(): Promise<string | null | undefined> {
-    if (!showComprobanteAdjunto) return undefined;
+    if (!adjuntoVisible) return undefined;
     if (draft.comprobanteFile) {
       return uploadComprobante(
         () => getToken(),
@@ -713,7 +719,7 @@ export function FacturaCreateModal({
 
   async function handleUnifiedSubmit(action: "borrador" | "emitir") {
     if (busy) return;
-    const validationError = validateFacturaDraft(draft, viajes, hasArca);
+    const validationError = validateFacturaDraft(draft, viajes, conArca);
     if (validationError) {
       notifyError(validationError);
       return;
@@ -841,7 +847,7 @@ export function FacturaCreateModal({
   async function handleManualSave() {
     if (busy) return;
 
-    if (!hasArca && !draft.numero.trim()) {
+    if (!conArca && !draft.numero.trim()) {
       notifyError("Ingresá el número de comprobante.");
       return;
     }
@@ -869,7 +875,12 @@ export function FacturaCreateModal({
     setSubmitAction("borrador");
     try {
       const factura = await persistFactura();
-      showToast("Factura guardada correctamente.", "success");
+      showToast(
+        draft.manual
+          ? "Factura registrada como facturada."
+          : "Factura guardada correctamente.",
+        "success",
+      );
       onFacturaGuardada?.(factura);
       onClose();
     } catch (err) {
@@ -948,8 +959,20 @@ export function FacturaCreateModal({
     </div>
   );
 
+  const manualCheckbox = hasArca ? (
+    <FacturaManualCheckbox
+      checked={Boolean(draft.manual)}
+      disabled={busy}
+      onChange={(manual) => {
+        patch({ manual });
+        setLocalError(null);
+      }}
+    />
+  ) : null;
+
   const compactFields = (
     <div className="flex flex-1 flex-col gap-3">
+      {manualCheckbox}
       <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
         {!hasArca && (
           <div className="flex flex-col gap-1">
@@ -1081,9 +1104,10 @@ export function FacturaCreateModal({
 
   const standardFields = (
     <>
+      {manualCheckbox}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {/* Con ARCA el número lo asigna AFIP al emitir: no se carga a mano. */}
-        {!hasArca && (
+        {!conArca && (
           <div className="flex flex-col gap-1">
             <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
               Número de comprobante <span className="text-red-500">*</span>
@@ -1214,7 +1238,7 @@ export function FacturaCreateModal({
           moneda.
         </p>
       )}
-      {showComprobanteAdjunto && (
+      {adjuntoVisible && (
         <div className="mt-4">
           <ComprobanteAdjuntoField
             file={draft.comprobanteFile}
@@ -1615,7 +1639,11 @@ export function FacturaCreateModal({
                   className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
                 >
                   {busy && <Spinner className="h-3.5 w-3.5" />}
-                  {busy ? "Guardando…" : "Guardar"}
+                  {busy
+                    ? "Guardando…"
+                    : draft.manual
+                      ? "Marcar como facturada"
+                      : "Guardar"}
                 </button>
               )}
             </footer>

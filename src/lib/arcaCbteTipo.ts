@@ -53,6 +53,18 @@ export function liquidacionConArca(
 }
 
 /**
+ * Lo mismo para una factura: con la empresa con ARCA pero la factura `manual` (hecha por
+ * fuera del sistema) se trata como en una empresa sin ARCA (número, comprobante adjunto,
+ * sin emitir ni anular).
+ */
+export function facturaConArca(
+  hasArca: boolean,
+  factura: { manual?: boolean | null } | null | undefined,
+): boolean {
+  return hasArca && !factura?.manual;
+}
+
+/**
  * true si la condición IVA del transportista corresponde a un CVLP clase B (061:
  * exento, consumidor final, no categorizado…), que no se emite — ver "Gotchas
  * operativos de ARCA" en vialto-backend/CLAUDE.md. RI recibe 060 y el monotributista

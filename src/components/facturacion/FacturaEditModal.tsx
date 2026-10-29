@@ -78,6 +78,8 @@ export type FacturaDraft = {
   comprobanteUrl: string | null;
   /** Archivo local pendiente de subir. */
   comprobanteFile: File | null;
+  /** Empresa con ARCA: factura hecha por fuera del sistema (no se emite; número + adjunto). */
+  manual?: boolean;
 };
 
 // Hoy en Argentina, no en UTC (desde las 21 h el UTC ya es el día siguiente).
@@ -146,6 +148,7 @@ export function facturaPayloadFromDraft(
   if (comprobanteUrl !== undefined) {
     base.comprobanteUrl = comprobanteUrl ?? "";
   }
+  if (draft.manual) base.manual = true;
   return {
     ...base,
     clienteId: draft.clienteId || undefined,
@@ -185,7 +188,44 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
           : [],
     comprobanteUrl: f.comprobanteUrl ?? null,
     comprobanteFile: null,
+    manual: Boolean(f.manual),
   };
+}
+
+/**
+ * Empresa con ARCA: tilde para registrar una factura hecha por fuera del sistema. Con el
+ * tilde el formulario queda como en una empresa sin ARCA (número + comprobante adjunto)
+ * y la factura no se emite.
+ */
+export function FacturaManualCheckbox({
+  checked,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="mb-4 space-y-1.5">
+      <label className="inline-flex items-center gap-2 text-sm text-vialto-charcoal">
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+          className="h-4 w-4 border-black/20"
+        />
+        Factura hecha por fuera del sistema
+      </label>
+      {checked && (
+        <p className="rounded border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+          No se emite en ARCA: la factura queda registrada como facturada. Cargá su número y
+          adjuntá el comprobante.
+        </p>
+      )}
+    </div>
+  );
 }
 
 function fmtTotalesMoney(n: number) {
@@ -476,7 +516,10 @@ export type FacturaEditModalProps = {
   idPropio2Label?: string;
   /** Encabezado de la columna de cantidad ("TN"/"UD", ver `unidadCantidadViajes`). */
   unidadCantidad?: string;
-  /** Tenant con ARCA: el número lo asigna AFIP al emitir, no se edita a mano. */
+  /**
+   * Tenant con ARCA: el número lo asigna AFIP al emitir, no se edita a mano. Excepción:
+   * factura manual (`draft.manual`), que se edita como sin ARCA.
+   */
   hasArca?: boolean;
 };
 
@@ -608,6 +651,10 @@ export function FacturaEditModal({
   }
 
   function handleSave() {
+    if (draft.manual && !draft.numero.trim()) {
+      setTramosLocalError("Ingresá el número de comprobante.");
+      return;
+    }
     const check = validateFacturaDraftTramos(draft);
     if (!check.ok) {
       setTramosIncomplete(check.indices);
@@ -623,6 +670,8 @@ export function FacturaEditModal({
     ? "IVA (%) viajes sin tramo"
     : "IVA (%)";
   const displayError = tramosLocalError || error;
+  // Factura manual (hecha por fuera del sistema): número y adjunto, como sin ARCA.
+  const conArca = hasArca && !draft.manual;
 
   return (
     <div
@@ -692,11 +741,20 @@ export function FacturaEditModal({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+          {/* Borrador con ARCA: se puede pasar a factura hecha por fuera del sistema. */}
+          {hasArca && !snapshotFactura.manual && (
+            <FacturaManualCheckbox
+              checked={Boolean(draft.manual)}
+              disabled={saving}
+              onChange={(manual) => patch({ manual })}
+            />
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {!hasArca && (
+            {!conArca && (
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
                   Número de comprobante
+                  {draft.manual && <span className="text-red-500"> *</span>}
                 </label>
                 <input
                   type="text"

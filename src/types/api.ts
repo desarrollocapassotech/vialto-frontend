@@ -523,6 +523,8 @@ export interface Factura {
   numero: string | null;
   /** Siempre "cliente" — el pago a transportistas externos se gestiona en Liquidaciones, no como Factura. */
   tipo: "cliente";
+  /** Empresa con ARCA: factura hecha por fuera del sistema (no se emite). Ver `facturaConArca`. */
+  manual?: boolean;
   clienteId: string | null;
   transportistaId: string | null;
   viajeIds: string[];
