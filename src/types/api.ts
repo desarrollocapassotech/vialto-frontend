@@ -1035,6 +1035,63 @@ export interface LiquidacionViajeItem {
   } | null;
 }
 
+/** Libro IVA (Ventas = facturas, Compras = liquidaciones). Ver backend `shared/util/libro-iva.util.ts`. */
+export type LibroIvaTipo = "ventas" | "compras";
+
+export interface LibroIvaAlicuota {
+  pct: number;
+  neto: number;
+  iva: number;
+}
+
+export interface LibroIvaComprobante {
+  origenTipo: "factura" | "liquidacion";
+  origenId: string;
+  /** YYYY-MM-DD. */
+  fecha: string;
+  cbteTipo: number | null;
+  ptoVenta: number | null;
+  cbteNro: number | null;
+  numeroTexto: string;
+  docTipo: number;
+  docNro: string;
+  contraparte: string;
+  alicuotas: LibroIvaAlicuota[];
+  noGravado: number;
+  exento: number;
+  otrosTributos: number;
+  total: number;
+  /** PES | DOL. */
+  moneda: string;
+  cotizacion: number | null;
+  cae: string | null;
+  origen: "arca" | "manual";
+  /** NC/ND que anula otro comprobante: en el Excel va en negativo. */
+  anulacion: boolean;
+  /** Emitido en homologación (solo con la configuración ARCA en homologación). */
+  prueba: boolean;
+  comision: number | null;
+  ivaComision: number | null;
+  observaciones: string[];
+  /** Motivo por el que no entra al TXT (sí sale en el Excel). */
+  incompleto: string | null;
+}
+
+export interface LibroIvaResultado {
+  tipo: LibroIvaTipo;
+  desde: string;
+  hasta: string;
+  /** Libro de prueba: la configuración ARCA está en homologación. */
+  esPrueba: boolean;
+  informante: { cuit: string | null; razonSocial: string | null };
+  comprobantes: LibroIvaComprobante[];
+}
+
+export interface LibroIvaTxt {
+  archivos: Array<{ nombre: string; contenidoBase64: string }>;
+  excluidos: Array<{ comprobante: string; motivo: string }>;
+}
+
 export interface Liquidacion {
   id: string;
   tenantId: string;

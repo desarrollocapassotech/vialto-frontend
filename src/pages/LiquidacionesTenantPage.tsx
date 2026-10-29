@@ -25,7 +25,9 @@ import {
   RotateCw,
   Trash2,
   Paperclip,
+  BookOpen,
 } from "lucide-react";
+import { LibroIvaExportModal } from "@/components/shared/LibroIvaExportModal";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -423,6 +425,7 @@ export function LiquidacionesTenantPage() {
   const [periodoHastaFilter, setPeriodoHastaFilter] = useState("");
 
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [libroIvaOpen, setLibroIvaOpen] = useState(false);
   const [exportandoExcel, setExportandoExcel] = useState(false);
 
   function aplicarFiltroEstado(val: LiquidacionEstado | "todos") {
@@ -1195,6 +1198,14 @@ export function LiquidacionesTenantPage() {
         {activeTenantId && (!error || !isSuperAdmin) && (
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {exportButton}
+            <button
+              type="button"
+              onClick={() => setLibroIvaOpen(true)}
+              className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
+            >
+              <BookOpen className="h-4 w-4" aria-hidden />
+              Libro IVA
+            </button>
 
             <button
               type="button"
@@ -1834,6 +1845,17 @@ export function LiquidacionesTenantPage() {
             <span className="text-sm text-vialto-charcoal">Abriendo…</span>
           </div>
         </div>
+      )}
+
+      {libroIvaOpen && (
+        <LibroIvaExportModal
+          tipo="compras"
+          url="/api/integracion-arca/libro-iva/compras"
+          tenantId={isSuperAdmin ? activeTenantId : undefined}
+          ambientePrueba={hasArca && (config?.ambiente ?? "homologacion") === "homologacion"}
+          getToken={() => getToken()}
+          onClose={() => setLibroIvaOpen(false)}
+        />
       )}
 
       {adjuntarLiq && (

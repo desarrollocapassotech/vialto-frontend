@@ -53,7 +53,8 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
-import { Clock, Download, FlaskConical } from "lucide-react";
+import { BookOpen, Clock, Download, FlaskConical } from "lucide-react";
+import { LibroIvaExportModal } from "@/components/shared/LibroIvaExportModal";
 import {
   clientesConViajesPendientesFactura,
   monedaUnicaDeViajes,
@@ -323,6 +324,7 @@ export function FacturacionTenantPage({
     vencidas: number;
   } | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [libroIvaOpen, setLibroIvaOpen] = useState(false);
   const [exportandoExcel, setExportandoExcel] = useState(false);
 
   const fetchRef = useRef(0);
@@ -1513,6 +1515,14 @@ export function FacturacionTenantPage({
 
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {exportButton}
+          <button
+            type="button"
+            onClick={() => setLibroIvaOpen(true)}
+            className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
+          >
+            <BookOpen className="h-4 w-4" aria-hidden />
+            Libro IVA
+          </button>
 
           <button
             type="button"
@@ -2044,6 +2054,17 @@ export function FacturacionTenantPage({
               ? () => setAdjuntarFactura(viewingFactura)
               : undefined
           }
+        />
+      )}
+
+      {libroIvaOpen && (
+        <LibroIvaExportModal
+          tipo="ventas"
+          url="/api/facturacion/libro-iva/ventas"
+          tenantId={platform ? tid : undefined}
+          ambientePrueba={hasArca && ambienteArca === "homologacion"}
+          getToken={() => getToken()}
+          onClose={() => setLibroIvaOpen(false)}
         />
       )}
 
