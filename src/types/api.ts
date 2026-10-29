@@ -1084,6 +1084,11 @@ export interface Liquidacion {
   proveedorContrato?: string | null;
   /** N° de la factura que emitió el proveedor (liquidaciones sin ARCA); se ve en Cuenta corriente. */
   numeroComprobanteProveedor?: string | null;
+  /**
+   * Liquidación manual en empresa con ARCA (transportista monotributista): no se emite ni se
+   * anula en ARCA, se muestra y opera como la de una empresa sin ARCA. Ver `liquidacionConArca`.
+   */
+  manual?: boolean;
   conceptosLineas?: LiquidacionConceptoLinea[];
   /** Presente en GET detalle; no siempre en el listado. */
   viajes?: LiquidacionViajeItem[];

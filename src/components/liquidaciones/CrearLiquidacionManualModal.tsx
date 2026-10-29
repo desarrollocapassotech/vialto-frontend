@@ -52,6 +52,7 @@ import {
   condicionIvaLabel,
   cvlpCbteLabel,
   cvlpClaseBEsperada,
+  esCondicionIvaMonotributo,
 } from "@/lib/arcaCbteTipo";
 import {
   MSG_ARCA_NO_LIQUIDA_USD,
@@ -248,7 +249,6 @@ export function CrearLiquidacionManualModal({
   copiaDe,
   rutasPlataforma = false,
 }: Props) {
-  const showComprobante = !hasLiquidoProductoArca;
   const { showToast } = useToast();
 
   const { solicitarCierre, marcarGuardado, dialogo } = useConfirmarDescarte(onClose);
@@ -533,8 +533,15 @@ export function CrearLiquidacionManualModal({
   }, [viajeInicial, transportistas, transportistaId, transportistaActualizado, detalleExistente]);
 
   const condicionIva = transportistaSeleccionado?.condicionIva ?? null;
-  const cvlpClaseBAlerta =
-    hasLiquidoProductoArca && cvlpClaseBEsperada(condicionIva);
+  // Monotributista en empresa con ARCA: no se emite Líquido Producto. La liquidación queda
+  // manual con la factura del transportista adjunta, igual que en una empresa sin ARCA.
+  const liquidacionManual =
+    hasLiquidoProductoArca &&
+    (Boolean(existente?.manual) || esCondicionIvaMonotributo(condicionIva));
+  /** Esta liquidación va por ARCA (emisión, pto. de venta, datos fiscales completos). */
+  const conArca = hasLiquidoProductoArca && !liquidacionManual;
+  const showComprobante = !conArca;
+  const cvlpClaseBAlerta = conArca && cvlpClaseBEsperada(condicionIva);
 
   useEffect(() => {
     if (viajeInicial || !transportistaId) {
@@ -683,7 +690,7 @@ export function CrearLiquidacionManualModal({
   const clienteSeleccionado = clienteDetalle;
 
   const missingEmitFields = useMemo(() => {
-    if (!hasLiquidoProductoArca || transportistaId === "") return [];
+    if (!conArca || transportistaId === "") return [];
     return collectCvlpEmitMissingFields({
       emisor: resolvedConfig,
       transportista: transportistaSeleccionado ?? {
@@ -694,7 +701,7 @@ export function CrearLiquidacionManualModal({
       cliente: clienteSeleccionado,
     });
   }, [
-    hasLiquidoProductoArca,
+    conArca,
     resolvedConfig,
     transportistaSeleccionado,
     clienteSeleccionado,
@@ -712,7 +719,7 @@ export function CrearLiquidacionManualModal({
       : [];
 
   const missingHiddenFields = useHiddenFiscalFields(
-    hasLiquidoProductoArca
+    conArca
       ? [...missingTransportistaFields, ...missingClienteFields]
       : [],
   );
@@ -724,8 +731,7 @@ export function CrearLiquidacionManualModal({
     ...missingEmitFields.filter((f) => !f.startsWith("Cliente:")),
     ...missingClienteFields,
   ];
-  const datosEmitIncompletos =
-    hasLiquidoProductoArca && faltantesEmision.length > 0;
+  const datosEmitIncompletos = conArca && faltantesEmision.length > 0;
   const mensajeFaltantes = faltantesEmision.every((f) => f.startsWith("Cliente:"))
     ? "Faltan datos del cliente para poder liquidar."
     : faltantesEmision.every((f) => f.startsWith("Transportista:"))
@@ -801,7 +807,7 @@ export function CrearLiquidacionManualModal({
   const receptorTransportista = useReceptorPadronBloqueado({
     entidad: "transportistas",
     id: transportistaSeleccionadoId,
-    habilitado: hasLiquidoProductoArca,
+    habilitado: conArca,
     tenantId,
     getToken,
     datosKey: transportistaSeleccionado?.idFiscal ?? null,
@@ -883,7 +889,7 @@ export function CrearLiquidacionManualModal({
 
   const bloqueadoUsd = selectedViajes.some((v) =>
     arcaBloqueaLiquidarUsd(
-      hasLiquidoProductoArca,
+      conArca,
       v.monedaPrecioTransportistaExterno,
     ),
   );
@@ -1048,11 +1054,7 @@ export function CrearLiquidacionManualModal({
       );
       return;
     }
-    if (
-      action === "emitir" &&
-      hasLiquidoProductoArca &&
-      cvlpClaseBEsperada(condicionIva)
-    ) {
+    if (action === "emitir" && cvlpClaseBAlerta) {
       setError(
         "No se puede emitir: la condición frente al IVA del transportista no corresponde a CVLP 060.",
       );
@@ -1163,9 +1165,11 @@ export function CrearLiquidacionManualModal({
         showToast(
           existente
             ? "Liquidación guardada."
-            : hasLiquidoProductoArca
-              ? "Liquidación guardada en borrador."
-              : "Liquidación creada en borrador.",
+            : liquidacionManual
+              ? "Liquidación registrada como liquidada."
+              : hasLiquidoProductoArca
+                ? "Liquidación guardada en borrador."
+                : "Liquidación creada en borrador.",
         );
         onSuccess(liq);
       }
@@ -1444,9 +1448,13 @@ export function CrearLiquidacionManualModal({
             <div className="flex shrink-0 items-center justify-between border-b border-black/10 px-6 py-3.5">
               <div className="flex items-center gap-2">
                 <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
-                  {existente ? "Emitir liquidación" : "Nueva liquidación"}
+                  {existente
+                    ? conArca
+                      ? "Emitir liquidación"
+                      : "Editar liquidación"
+                    : "Nueva liquidación"}
                 </h2>
-                {hasLiquidoProductoArca && (
+                {conArca && (
                   <AmbienteTestBadge ambiente={resolvedConfig?.ambiente} />
                 )}
               </div>
@@ -1824,6 +1832,14 @@ export function CrearLiquidacionManualModal({
                     </p>
                   )}
 
+                  {liquidacionManual && (
+                    <p className="border border-black/10 bg-vialto-mist px-3 py-2 text-xs text-vialto-charcoal">
+                      El transportista es monotributista: no se le emite Líquido Producto en
+                      ARCA. La liquidación queda registrada como liquidada; adjuntá la factura
+                      que te emitió el transportista.
+                    </p>
+                  )}
+
                   {showComprobante && (
                     <div>
                       <label htmlFor="numeroComprobanteProveedor" className={labelClass}>
@@ -1880,7 +1896,7 @@ export function CrearLiquidacionManualModal({
                   <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
                     <DetalleComprobanteEncabezado onOcultar={() => setDetalleAbierto(false)} />
                     <div className="grid grid-cols-2 gap-4">
-                      {hasLiquidoProductoArca && (
+                      {conArca && (
                         <>
                           <ParteFacturaResumen
                             titulo="Tipo"
@@ -2088,7 +2104,7 @@ export function CrearLiquidacionManualModal({
               >
                 Cancelar
               </button>
-              {hasLiquidoProductoArca ? (
+              {conArca ? (
                 <>
                   <button
                     type="button"
@@ -2163,7 +2179,13 @@ export function CrearLiquidacionManualModal({
                   className="inline-flex items-center gap-2 h-9 px-5 rounded bg-vialto-charcoal font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-white hover:bg-vialto-charcoal/90 disabled:opacity-50"
                 >
                   {submitting && <Spinner />}
-                  {submitting ? "Creando…" : "Crear liquidación"}
+                  {submitting
+                    ? "Guardando…"
+                    : existente
+                      ? "Guardar cambios"
+                      : liquidacionManual
+                        ? "Marcar como liquidada"
+                        : "Crear liquidación"}
                 </button>
               )}
             </div>

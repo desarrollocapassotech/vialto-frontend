@@ -76,7 +76,11 @@ import { modalOverlayClass } from "@/lib/modalLayers";
 import { listadoTablaHeadRowClass, listadoTablaAccionesTdClass, listadoTablaTdClass, listadoTablaThClass } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
-import { anulacionComprobanteLabel, nroComprobante } from "@/lib/arcaCbteTipo";
+import {
+  anulacionComprobanteLabel,
+  liquidacionConArca,
+  nroComprobante,
+} from "@/lib/arcaCbteTipo";
 import { canAccessEmisionLiquidoProductoArca } from "@/lib/tenantModules";
 import {
   idSistemaHabilitado,
@@ -122,6 +126,14 @@ const ESTADO_CLASS: Record<LiquidacionEstado, string> = {
   anulado: "bg-gray-100 text-gray-500 line-through",
   pendiente_anulacion: "bg-amber-100 text-amber-800",
 };
+
+/**
+ * Estado que se muestra (badge, filtro y orden). Una liquidación manual (monotributista en
+ * empresa con ARCA) queda en `borrador` para siempre pero ya está liquidada: se ve LIQUIDADO.
+ */
+function estadoMostrado(liq: { estado: LiquidacionEstado; manual?: boolean }): LiquidacionEstado {
+  return liq.manual && liq.estado === "borrador" ? "autorizado" : liq.estado;
+}
 
 function fmtMoney(n: number) {
   return `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -483,7 +495,7 @@ export function LiquidacionesTenantPage() {
   >(null);
 
   function canEditLiquidacion(liq: LiquidacionConTransportista) {
-    if (!hasArca) return true;
+    if (!liquidacionConArca(hasArca, liq)) return true;
     return (
       liq.estado === "borrador" ||
       liq.estado === "error" ||
@@ -933,7 +945,7 @@ export function LiquidacionesTenantPage() {
       case "liquido":
         return [liq.liquido];
       case "estado":
-        return [LIQUIDACION_ESTADO_ORDEN[liq.estado] ?? 9];
+        return [LIQUIDACION_ESTADO_ORDEN[estadoMostrado(liq)] ?? 9];
     }
   }
 
@@ -942,7 +954,7 @@ export function LiquidacionesTenantPage() {
     const proveedor = liq.numeroComprobanteProveedor?.trim();
     if (proveedor) return proveedor;
     // Sin ARCA y sin adjunto se ofrece "Adjuntar comprobante" en lugar del "—".
-    return liq.comprobanteUrl?.trim() || !hasArca ? "" : "—";
+    return liq.comprobanteUrl?.trim() || !liquidacionConArca(hasArca, liq) ? "" : "—";
   }
 
   /**
@@ -991,9 +1003,11 @@ export function LiquidacionesTenantPage() {
   }
 
   function accionesProps(liq: LiquidacionConTransportista) {
+    // Liquidación manual (monotributista) en empresa con ARCA: mismas acciones que sin ARCA.
+    const conArca = liquidacionConArca(hasArca, liq);
     return {
       liq,
-      hasArca,
+      hasArca: conArca,
       metodoAnulacion,
       isBusy: busyId === liq.id,
       open: accionesAbiertoLiqId === liq.id,
@@ -1045,11 +1059,11 @@ export function LiquidacionesTenantPage() {
       onConfirmarAnulacionManual: () => setConfirmarAnulacionManualTarget(liq),
       onEliminar: () => setEliminarConfirm(liq),
       onVerComprobante: () => {
-        if (hasArca) void verPdf(liq);
+        if (conArca) void verPdf(liq);
         else verAdjunto(liq.comprobanteUrl);
       },
-      onAdjuntarComprobante: !hasArca ? () => setAdjuntarLiq(liq) : undefined,
-      onVerPdfLiquidacion: !hasArca ? () => verPdfLiquidacionFila(liq) : undefined,
+      onAdjuntarComprobante: !conArca ? () => setAdjuntarLiq(liq) : undefined,
+      onVerPdfLiquidacion: !conArca ? () => verPdfLiquidacionFila(liq) : undefined,
     };
   }
 
@@ -1059,7 +1073,7 @@ export function LiquidacionesTenantPage() {
 
   const filteredRows = rows
     ? rows.filter((r) => {
-        if (hasArca && estadoFilter !== "todos" && r.estado !== estadoFilter)
+        if (hasArca && estadoFilter !== "todos" && estadoMostrado(r) !== estadoFilter)
           return false;
         if (transportistaFilter && r.transportistaId !== transportistaFilter)
           return false;
@@ -1135,6 +1149,9 @@ export function LiquidacionesTenantPage() {
       {exportandoExcel ? "Generando..." : "Exportar"}
     </button>
   );
+
+  /** La liquidación abierta en detalle/edición va por ARCA (no es manual). */
+  const detailConArca = detail ? liquidacionConArca(hasArca, detail.liq) : false;
 
   return (
     <div className="w-full">
@@ -1497,9 +1514,10 @@ export function LiquidacionesTenantPage() {
                   cell: (liq: LiquidacionConTransportista) => (
                     <div className="flex flex-nowrap items-center gap-1">
                       <span
-                        className={`inline-block whitespace-nowrap px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
+                        className={`inline-block whitespace-nowrap px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[estadoMostrado(liq)]}`}
+                        title={liq.manual ? "Liquidación manual: no se emite en ARCA" : undefined}
                       >
-                        {ESTADO_LABEL[liq.estado]}
+                        {ESTADO_LABEL[estadoMostrado(liq)]}
                       </span>
                       <LiquidacionPagoBadge estadoPago={liq.estadoPago} />
                       {liq.ambiente === "homologacion" && (
@@ -1576,9 +1594,9 @@ export function LiquidacionesTenantPage() {
                       value: (
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span
-                            className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
+                            className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[estadoMostrado(liq)]}`}
                           >
-                            {ESTADO_LABEL[liq.estado]}
+                            {ESTADO_LABEL[estadoMostrado(liq)]}
                           </span>
                           <LiquidacionPagoBadge estadoPago={liq.estadoPago} />
                           <AmbienteTestBadge ambiente={liq.ambiente} />
@@ -1826,7 +1844,7 @@ export function LiquidacionesTenantPage() {
           liq={detail.liq}
           ivaPct={detail.liq.ivaPct ?? config?.ivaGastosAdmin}
           canEdit={canEditLiquidacion(detail.liq)}
-          hasArca={hasArca}
+          hasArca={detailConArca}
           metodoAnulacion={metodoAnulacion}
           getToken={getToken}
           idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
@@ -1838,14 +1856,14 @@ export function LiquidacionesTenantPage() {
             setDetail(null);
           }}
           onVerComprobante={
-            hasArca && detail.liq.cbteNro != null
+            detailConArca && detail.liq.cbteNro != null
               ? () => void verPdf(detail.liq)
-              : !hasArca && detail.liq.comprobanteUrl?.trim()
+              : !detailConArca && detail.liq.comprobanteUrl?.trim()
                 ? () => verAdjunto(detail.liq.comprobanteUrl)
                 : undefined
           }
           onVerPdfLiquidacion={
-            !hasArca ? () => verPdfLiquidacionFila(detail.liq) : undefined
+            !detailConArca ? () => verPdfLiquidacionFila(detail.liq) : undefined
           }
           onVerAnulacion={
             detail.liq.estado === "anulado" &&
@@ -1879,26 +1897,26 @@ export function LiquidacionesTenantPage() {
               : undefined
           }
           onAnular={
-            hasArca &&
+            detailConArca &&
             detail.liq.estado === "autorizado" &&
             metodoAnulacion !== "manual"
               ? () => setAnularConfirm(detail.liq)
               : undefined
           }
           onMarcarPendienteAnulacion={
-            hasArca &&
+            detailConArca &&
             detail.liq.estado === "autorizado" &&
             metodoAnulacion === "manual"
               ? () => setPendienteAnulacionConfirm(detail.liq)
               : undefined
           }
           onConfirmarAnulacionManual={
-            hasArca && detail.liq.estado === "pendiente_anulacion"
+            detailConArca && detail.liq.estado === "pendiente_anulacion"
               ? () => setConfirmarAnulacionManualTarget(detail.liq)
               : undefined
           }
           onAdjuntarComprobante={
-            !hasArca ? () => setAdjuntarLiq(detail.liq) : undefined
+            !detailConArca ? () => setAdjuntarLiq(detail.liq) : undefined
           }
         />
       )}
@@ -1906,7 +1924,7 @@ export function LiquidacionesTenantPage() {
       {detail?.mode === "edit" && activeTenantId && (
         <LiquidacionEditModal
           liq={detail.liq}
-          hasArca={hasArca}
+          hasArca={detailConArca}
           getToken={getToken}
           tenantId={activeTenantId}
           idSistemaHabilitado={idSistemaHabilitado(empresaTenant)}

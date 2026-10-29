@@ -4,6 +4,7 @@ import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import { liquidacionConArca } from "@/lib/arcaCbteTipo";
 import { unidadCantidadViajes } from "@/lib/pdfDetalleViaje";
 import {
   ConceptosLiquidacionLineasEditor,
@@ -126,7 +127,7 @@ function extraerViajesDeLiquidacion(data: any): ViajeOpcionDraft[] {
 
 export function LiquidacionEditModal({
   liq,
-  hasArca,
+  hasArca: hasArcaTenant,
   getToken,
   onClose,
   onSaved,
@@ -159,6 +160,8 @@ export function LiquidacionEditModal({
 }) {
   const { showToast } = useToast();
   const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
+  // Liquidación manual (monotributista): se edita como en una empresa sin ARCA.
+  const hasArca = liquidacionConArca(hasArcaTenant, liq);
   const canEditDatos =
     liq.estado === "borrador" ||
     liq.estado === "error" ||

@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Ban, FileDown, FileText, Paperclip, Receipt, RotateCw, Trash2 } from "lucide-react";
-import { anulacionComprobanteLabel, nroComprobante } from "@/lib/arcaCbteTipo";
+import {
+  anulacionComprobanteLabel,
+  liquidacionConArca,
+  nroComprobante,
+} from "@/lib/arcaCbteTipo";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import {
   idPropio2Habilitado as idPropio2HabilitadoTenant,
@@ -122,7 +126,7 @@ export function LiquidacionViewModal({
   liq,
   ivaPct,
   canEdit = true,
-  hasArca = false,
+  hasArca: hasArcaTenant = false,
   metodoAnulacion = "nota_credito_debito",
   getToken,
   detalleUrl,
@@ -190,6 +194,8 @@ export function LiquidacionViewModal({
   /** Label configurable de "ID Propio 2". Sin prop, el de la empresa propia. */
   idPropio2Label?: string;
 }) {
+  // Liquidación manual (monotributista) en empresa con ARCA: se muestra como sin ARCA.
+  const hasArca = liquidacionConArca(hasArcaTenant, liq);
   const { tenant: tenantPropio } = useCurrentTenant();
   const mostrarIdPropio2 = idPropio2HabilitadoProp ?? idPropio2HabilitadoTenant(tenantPropio);
   const labelIdPropio2 = idPropio2LabelProp ?? idPropio2LabelTenant(tenantPropio);
@@ -396,6 +402,9 @@ export function LiquidacionViewModal({
     Boolean(onConfirmarAnulacionManual) &&
     hasArca &&
     source.estado === "pendiente_anulacion";
+  // Manual (monotributista): queda en borrador pero ya está liquidada.
+  const estadoBadge =
+    liq.manual && source.estado === "borrador" ? "autorizado" : source.estado;
 
   return (
     <>
@@ -406,10 +415,10 @@ export function LiquidacionViewModal({
             <span
               className={[
                 "text-xs font-medium border rounded px-2 py-0.5",
-                ESTADO_BADGE[source.estado],
+                ESTADO_BADGE[estadoBadge],
               ].join(" ")}
             >
-              {ESTADO_LABEL[source.estado]}
+              {ESTADO_LABEL[estadoBadge]}
             </span>
             <LiquidacionPagoBadge estadoPago={source.estadoPago} />
             <AmbienteTestBadge ambiente={source.ambiente} />
