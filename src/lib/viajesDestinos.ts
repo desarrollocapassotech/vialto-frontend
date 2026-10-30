@@ -116,8 +116,13 @@ export function textoRutaViaje(
   return partes.length > 0 ? partes.join(' → ') : '—';
 }
 
+/**
+ * `validarCatalogo = false` (`Tenant.recomendacionCiudadesHabilitada` apagado): el destino es
+ * texto libre y no se contrasta con el catálogo de ciudades.
+ */
 export async function validarDestinosRows(
   rows: ViajeDestinoRowDraft[],
+  validarCatalogo = true,
 ): Promise<
   | { ok: true; destinos: ViajeDestinoApiItem[] }
   | { ok: false; message: string; rowErrors: Record<number, string> }
@@ -131,6 +136,7 @@ export async function validarDestinosRows(
     const msg = 'Ingresá al menos un destino.';
     return { ok: false, message: msg, rowErrors: { 0: msg } };
   }
+  if (!validarCatalogo) return { ok: true, destinos };
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const etiqueta = row.etiqueta.trim();

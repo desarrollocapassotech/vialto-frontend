@@ -38,6 +38,16 @@ import {
   importeNetoViajeParaFactura,
 } from "@/lib/facturaTotales";
 import { hoyArgentinaIso, vencimientoPorDefecto } from "@/lib/facturaFechaEmision";
+import {
+  comprobanteManualDraftDesde,
+  emptyComprobanteManualDraft,
+  numeroDesdeComprobanteManual,
+  payloadComprobanteFactura,
+  validarComprobanteManual,
+  type ComprobanteManualDraft,
+  type ComprobanteManualErrores,
+} from "@/lib/comprobanteManual";
+import { ComprobanteManualFields } from "@/components/shared/ComprobanteManualFields";
 import type { Cliente, Factura, Viaje } from "@/types/api";
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -78,7 +88,25 @@ export type FacturaDraft = {
   comprobanteUrl: string | null;
   /** Archivo local pendiente de subir. */
   comprobanteFile: File | null;
+  /** Empresa con ARCA: factura hecha por fuera del sistema (no se emite; número + adjunto). */
+  manual?: boolean;
+  /** Factura manual: tipo + punto de venta + número por separado (obligatorios, Libro IVA). */
+  comprobanteManual?: ComprobanteManualDraft;
 };
+
+export function comprobanteManualDeDraft(draft: FacturaDraft): ComprobanteManualDraft {
+  return draft.comprobanteManual ?? emptyComprobanteManualDraft();
+}
+
+/**
+ * Errores del comprobante de una factura manual (vacío si no es manual o está completo).
+ * Solo existe en empresas con ARCA: `draft.manual` nunca es true sin ARCA.
+ */
+export function erroresComprobanteFacturaManual(
+  draft: FacturaDraft,
+): ComprobanteManualErrores {
+  return draft.manual ? validarComprobanteManual(comprobanteManualDeDraft(draft), false) : {};
+}
 
 // Hoy en Argentina, no en UTC (desde las 21 h el UTC ya es el día siguiente).
 const todayIso = hoyArgentinaIso;
@@ -103,6 +131,7 @@ export function emptyFacturaDraft(): FacturaDraft {
     letraComprobante: null,
     comprobanteUrl: null,
     comprobanteFile: null,
+    comprobanteManual: emptyComprobanteManualDraft(),
   };
 }
 
@@ -146,6 +175,14 @@ export function facturaPayloadFromDraft(
   if (comprobanteUrl !== undefined) {
     base.comprobanteUrl = comprobanteUrl ?? "";
   }
+  if (draft.manual) {
+    base.manual = true;
+    // El backend arma `numero` con estos tres campos.
+    const cbte = comprobanteManualDeDraft(draft);
+    Object.assign(base, payloadComprobanteFactura(cbte), {
+      numero: numeroDesdeComprobanteManual(cbte) || undefined,
+    });
+  }
   return {
     ...base,
     clienteId: draft.clienteId || undefined,
@@ -185,7 +222,50 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
           : [],
     comprobanteUrl: f.comprobanteUrl ?? null,
     comprobanteFile: null,
+    manual: Boolean(f.manual),
+    comprobanteManual: comprobanteManualDraftDesde({
+      cbteTipo: f.manualCbteTipo,
+      ptoVenta: f.manualPtoVenta,
+      cbteNro: f.manualCbteNro,
+      numero: f.numero,
+    }),
   };
+}
+
+/**
+ * Empresa con ARCA: tilde para registrar una factura hecha por fuera del sistema. Con el
+ * tilde el formulario queda como en una empresa sin ARCA (número + comprobante adjunto)
+ * y la factura no se emite.
+ */
+export function FacturaManualCheckbox({
+  checked,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="mb-4 space-y-1.5">
+      <label className="inline-flex items-center gap-2 text-sm text-vialto-charcoal">
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+          className="h-4 w-4 border-black/20"
+        />
+        Factura hecha por fuera del sistema
+      </label>
+      {checked && (
+        <p className="rounded border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+          No se emite en ARCA: la factura queda registrada como facturada. Cargá su número y
+          adjuntá el comprobante.
+        </p>
+      )}
+    </div>
+  );
 }
 
 function fmtTotalesMoney(n: number) {
@@ -476,7 +556,10 @@ export type FacturaEditModalProps = {
   idPropio2Label?: string;
   /** Encabezado de la columna de cantidad ("TN"/"UD", ver `unidadCantidadViajes`). */
   unidadCantidad?: string;
-  /** Tenant con ARCA: el número lo asigna AFIP al emitir, no se edita a mano. */
+  /**
+   * Tenant con ARCA: el número lo asigna AFIP al emitir, no se edita a mano. Excepción:
+   * factura manual (`draft.manual`), que se edita como sin ARCA.
+   */
   hasArca?: boolean;
 };
 
@@ -506,6 +589,7 @@ export function FacturaEditModal({
   useEscapeKey(open, saving, descarte.solicitarCierre);
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [tramosLocalError, setTramosLocalError] = useState<string | null>(null);
+  const [cbteManualErrores, setCbteManualErrores] = useState<ComprobanteManualErrores>({});
 
   useEffect(() => {
     if (!open) {
@@ -608,6 +692,13 @@ export function FacturaEditModal({
   }
 
   function handleSave() {
+    const errsCbte = erroresComprobanteFacturaManual(draft);
+    setCbteManualErrores(errsCbte);
+    const primerErrorCbte = Object.values(errsCbte)[0];
+    if (primerErrorCbte) {
+      setTramosLocalError(primerErrorCbte);
+      return;
+    }
     const check = validateFacturaDraftTramos(draft);
     if (!check.ok) {
       setTramosIncomplete(check.indices);
@@ -623,6 +714,8 @@ export function FacturaEditModal({
     ? "IVA (%) viajes sin tramo"
     : "IVA (%)";
   const displayError = tramosLocalError || error;
+  // Factura manual (hecha por fuera del sistema): número y adjunto, como sin ARCA.
+  const conArca = hasArca && !draft.manual;
 
   return (
     <div
@@ -692,20 +785,40 @@ export function FacturaEditModal({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+          {/* Borrador con ARCA: se puede pasar a factura hecha por fuera del sistema. */}
+          {hasArca && !snapshotFactura.manual && (
+            <FacturaManualCheckbox
+              checked={Boolean(draft.manual)}
+              disabled={saving}
+              onChange={(manual) => patch({ manual })}
+            />
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {!hasArca && (
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                  Número de comprobante
-                </label>
-                <input
-                  type="text"
-                  value={draft.numero}
-                  onChange={(e) => patch({ numero: e.target.value })}
-                  placeholder="0001-00000001"
-                  className="h-9 border border-black/20 bg-white px-3 text-sm"
-                />
-              </div>
+            {draft.manual ? (
+              <ComprobanteManualFields
+                value={comprobanteManualDeDraft(draft)}
+                onChange={(comprobanteManual) => patch({ comprobanteManual })}
+                errores={cbteManualErrores}
+                disabled={saving}
+                labelClassName="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel"
+                inputClassName="h-9 w-full border border-black/20 bg-white px-3 text-sm"
+                className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-3"
+              />
+            ) : (
+              !conArca && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                    Número de comprobante
+                  </label>
+                  <input
+                    type="text"
+                    value={draft.numero}
+                    onChange={(e) => patch({ numero: e.target.value })}
+                    placeholder="0001-00000001"
+                    className="h-9 border border-black/20 bg-white px-3 text-sm"
+                  />
+                </div>
+              )
             )}
 
             <FacturaContraparteField

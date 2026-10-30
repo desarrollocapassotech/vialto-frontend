@@ -9,6 +9,22 @@ import type { OrdenColumna } from "@/components/viajes/ViajesListadoHeaderFiltro
 
 export type OrdenDir = "asc" | "desc";
 export type ValorOrden = string | number | null | undefined;
+/** Qué muestra la columna: define cómo se lee el sentido del orden en el tooltip. */
+export type TipoOrden = "texto" | "numero" | "fecha";
+
+/** "A a Z" / "menor a mayor" / "más antigua a más reciente" (y al revés con `desc`). */
+export function etiquetaDirOrden(tipo: TipoOrden, dir: OrdenDir): string {
+  switch (tipo) {
+    case "numero":
+      return dir === "asc" ? "menor a mayor" : "mayor a menor";
+    case "fecha":
+      return dir === "asc"
+        ? "más antigua a más reciente"
+        : "más reciente a más antigua";
+    default:
+      return dir === "asc" ? "A a Z" : "Z a A";
+  }
+}
 
 const collatorEs = new Intl.Collator("es", { sensitivity: "base", numeric: true });
 
@@ -61,9 +77,12 @@ export function ordenarPorClaves<T extends { id: string }>(
 /**
  * Estado del orden por columna de una grilla. `orden = null` = sin orden de columna
  * (la grilla usa su orden de siempre). `onCambio` corre en cada cambio (ej. volver a
- * la página 1).
+ * la página 1). `tipos`: tipo de cada columna para el tooltip (default texto).
  */
-export function useOrdenColumna<F extends string>(onCambio?: () => void) {
+export function useOrdenColumna<F extends string>(
+  onCambio?: () => void,
+  tipos?: Partial<Record<F, TipoOrden>>,
+) {
   const [orden, setOrden] = useState<{ by: F; dir: OrdenDir } | null>(null);
 
   function cambiar(next: { by: F; dir: OrdenDir } | null) {
@@ -76,6 +95,7 @@ export function useOrdenColumna<F extends string>(onCambio?: () => void) {
     const activo = orden?.by === field;
     return {
       dir: activo ? orden.dir : null,
+      tipo: tipos?.[field],
       disabled,
       onClick: () =>
         cambiar({ by: field, dir: activo && orden.dir === "asc" ? "desc" : "asc" }),

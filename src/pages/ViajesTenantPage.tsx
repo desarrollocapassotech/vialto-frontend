@@ -163,11 +163,19 @@ import type {
 } from "@/types/api";
 import {
   appendViajeSortQuery,
+  parseViajeSortField,
   sortViajesListado,
+  tipoOrdenViaje,
   VIAJE_SORT_DEFAULT,
   type ViajeSortDir,
   type ViajeSortField,
 } from "@/lib/viajesOrdenamiento";
+import {
+  claveListadoViajes,
+  guardarListadoViajes,
+  leerListadoViajes,
+  VIAJES_FILTROS_VACIOS,
+} from "@/lib/viajesListadoPersistido";
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
 import { Columns3, CornerDownRight, Download, Upload, X } from "lucide-react";
 import { mutate } from "swr";
@@ -376,7 +384,7 @@ export function ViajesTenantPage({
    */
   filtroRapidoPortalTarget?: HTMLElement | null;
 } = {}) {
-  const { getToken, isLoaded, isSignedIn, orgRole } = useAuth();
+  const { getToken, isLoaded, isSignedIn, orgRole, orgId } = useAuth();
   const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
   const { user } = useUser();
   const navigate = useNavigate();
@@ -541,70 +549,80 @@ export function ViajesTenantPage({
   } | null>(null);
   const [deletingViajeId, setDeletingViajeId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [sortBy, setSortBy] = useState<ViajeSortField>("fecha_creacion");
-  const [sortDir, setSortDir] = useState<ViajeSortDir>("desc");
+  // Filtros y orden guardados (sobreviven a F5, ver `viajesListadoPersistido.ts`).
+  // En superadmin, uno por empresa elegida.
+  const claveListado = claveListadoViajes(platform ? `platform:${tid}` : (orgId ?? ""));
+  const [guardado] = useState(() => leerListadoViajes(claveListado));
+  const [pageSize, setPageSize] = useState(guardado?.pageSize ?? 10);
+  const sortInicial = guardado
+    ? { sortBy: parseViajeSortField(guardado.sortBy), sortDir: guardado.sortDir }
+    : VIAJE_SORT_DEFAULT;
+  const [sortBy, setSortBy] = useState<ViajeSortField>(sortInicial.sortBy);
+  const [sortDir, setSortDir] = useState<ViajeSortDir>(sortInicial.sortDir);
 
-  const ordenamientoAplicadoRef = useRef({
-    sortBy: "fecha_creacion" as ViajeSortField,
-    sortDir: "desc" as ViajeSortDir,
-  });
+  const ordenamientoAplicadoRef = useRef<{
+    sortBy: ViajeSortField;
+    sortDir: ViajeSortDir;
+  }>(sortInicial);
 
+  // Un link con ?etapa= o ?pagoTransportista= (ej. desde el panel) manda sobre lo guardado.
   const initialEstadoFromUrl = searchParams.get("etapa")?.trim() ?? "";
   const initialPagoTransportistaFromUrl = (() => {
     const p = searchParams.get(VIAJE_PAGO_TRANSPORTISTA_QUERY)?.trim() ?? "";
     return esFiltroPagoTransportistaValido(p) ? p : "";
   })();
+  const filtrosIniciales = (() => {
+    const f = { ...(guardado?.filtros ?? VIAJES_FILTROS_VACIOS) };
+    if (initialEstadoFromUrl) f.estado = initialEstadoFromUrl;
+    if (initialPagoTransportistaFromUrl) {
+      f.pagoTransportista = initialPagoTransportistaFromUrl as ViajePagoTransportistaFiltro;
+    }
+    return f;
+  })();
 
-  const filtrosAplicadosRef = useRef({
-    numero: "",
-    ctg: "",
-    idPropio2: "",
-    observaciones: "",
-    clienteId: "",
-    transportistaId: "",
-    choferId: "",
-    estado: initialEstadoFromUrl,
-    facturacionEstado: "",
-    liquidacionEstado: "",
-    pagoTransportista:
-      initialPagoTransportistaFromUrl as ViajePagoTransportistaFiltro,
-    tipoFecha: "" as "" | "carga" | "descarga",
-    fechaDesde: "",
-    fechaHasta: "",
-    tipoUbicacion: "" as "" | "origen" | "destino",
-    ubicacion: "",
-    periodo: "todos" as "todos" | "desde_hoy" | "anteriores",
-  });
+  const filtrosAplicadosRef = useRef(filtrosIniciales);
 
-  const [numeroFiltroActivo, setNumeroFiltroActivo] = useState("");
-  const [ctgFiltroActivo, setCtgFiltroActivo] = useState("");
-  const [idPropio2FiltroActivo, setIdPropio2FiltroActivo] = useState("");
-  const [observacionesFiltroActivo, setObservacionesFiltroActivo] = useState("");
-  const [clienteIdFiltroActivo, setClienteIdFiltroActivo] = useState("");
+  const [numeroFiltroActivo, setNumeroFiltroActivo] = useState(filtrosIniciales.numero);
+  const [ctgFiltroActivo, setCtgFiltroActivo] = useState(filtrosIniciales.ctg);
+  const [idPropio2FiltroActivo, setIdPropio2FiltroActivo] = useState(
+    filtrosIniciales.idPropio2,
+  );
+  const [observacionesFiltroActivo, setObservacionesFiltroActivo] = useState(
+    filtrosIniciales.observaciones,
+  );
+  const [clienteIdFiltroActivo, setClienteIdFiltroActivo] = useState(
+    filtrosIniciales.clienteId,
+  );
   const [transportistaIdFiltroActivo, setTransportistaIdFiltroActivo] =
-    useState("");
-  const [choferIdFiltroActivo, setChoferIdFiltroActivo] = useState("");
-  const [estadoFiltro, setEstadoFiltro] = useState(initialEstadoFromUrl);
-  const [facturacionFiltro, setFacturacionFiltro] = useState("");
-  const [liquidacionFiltro, setLiquidacionFiltro] = useState("");
+    useState(filtrosIniciales.transportistaId);
+  const [choferIdFiltroActivo, setChoferIdFiltroActivo] = useState(
+    filtrosIniciales.choferId,
+  );
+  const [estadoFiltro, setEstadoFiltro] = useState(filtrosIniciales.estado);
+  const [facturacionFiltro, setFacturacionFiltro] = useState(
+    filtrosIniciales.facturacionEstado,
+  );
+  const [liquidacionFiltro, setLiquidacionFiltro] = useState(
+    filtrosIniciales.liquidacionEstado,
+  );
   const [pagoTransportistaFiltro, setPagoTransportistaFiltro] =
-    useState<ViajePagoTransportistaFiltro>(initialPagoTransportistaFromUrl);
+    useState<ViajePagoTransportistaFiltro>(filtrosIniciales.pagoTransportista);
   const [showFiltrosRapidos, setShowFiltrosRapidos] = useState(false);
   const [tipoFechaFiltro, setTipoFechaFiltro] = useState<
     "" | "carga" | "descarga"
-  >("");
-  const [fechaDesdeFiltro, setFechaDesdeFiltro] = useState("");
-  const [fechaHastaFiltro, setFechaHastaFiltro] = useState("");
+  >(filtrosIniciales.tipoFecha);
+  const [fechaDesdeFiltro, setFechaDesdeFiltro] = useState(filtrosIniciales.fechaDesde);
+  const [fechaHastaFiltro, setFechaHastaFiltro] = useState(filtrosIniciales.fechaHasta);
   const [tipoUbicacionFiltro, setTipoUbicacionFiltro] = useState<
     "" | "origen" | "destino"
-  >("");
-  const [paisUbicacionFiltro, setPaisUbicacionFiltro] =
-    useState<PaisCodigo>("AR");
-  const [ubicacionFiltro, setUbicacionFiltro] = useState("");
+  >(filtrosIniciales.tipoUbicacion);
+  const [paisUbicacionFiltro, setPaisUbicacionFiltro] = useState<PaisCodigo>(
+    (guardado?.paisUbicacion ?? "AR") as PaisCodigo,
+  );
+  const [ubicacionFiltro, setUbicacionFiltro] = useState(filtrosIniciales.ubicacion);
   const [periodoFiltro, setPeriodoFiltro] = useState<
     "todos" | "desde_hoy" | "anteriores"
-  >("todos");
+  >(filtrosIniciales.periodo);
   const [listadoQueryVersion, setListadoQueryVersion] = useState(0);
 
   const [listadoRefetching, setListadoRefetching] = useState(false);
@@ -820,6 +838,7 @@ export function ViajesTenantPage({
     transportistas,
     vehiculos,
     hasFacturasArca: hasFacturasArca,
+    validarCiudades: tenantEfectivo?.recomendacionCiudadesHabilitada !== false,
     refreshMaestroListas: fetchMaestroListasFresh,
     onEntityCreated: (key, item) => {
       if (!platform) return;
@@ -1157,6 +1176,26 @@ export function ViajesTenantPage({
     tid,
   ]);
 
+  // Cada filtro aplicado sube `listadoQueryVersion`; tipo/país de ubicación sin ciudad
+  // no, por eso van aparte.
+  useEffect(() => {
+    guardarListadoViajes(claveListado, {
+      filtros: filtrosAplicadosRef.current,
+      paisUbicacion: paisUbicacionFiltro,
+      sortBy,
+      sortDir,
+      pageSize,
+    });
+  }, [
+    claveListado,
+    listadoQueryVersion,
+    tipoUbicacionFiltro,
+    paisUbicacionFiltro,
+    sortBy,
+    sortDir,
+    pageSize,
+  ]);
+
   function aplicarOrdenamiento(
     nuevoSortBy: ViajeSortField,
     nuevoSortDir: ViajeSortDir,
@@ -1480,25 +1519,7 @@ export function ViajesTenantPage({
   }
 
   function limpiarFiltrosColumnas() {
-    filtrosAplicadosRef.current = {
-      numero: "",
-      ctg: "",
-      idPropio2: "",
-      observaciones: "",
-      clienteId: "",
-      transportistaId: "",
-      choferId: "",
-      estado: "",
-      facturacionEstado: "",
-      liquidacionEstado: "",
-      pagoTransportista: "",
-      tipoFecha: "",
-      fechaDesde: "",
-      fechaHasta: "",
-      tipoUbicacion: "",
-      ubicacion: "",
-      periodo: "todos",
-    };
+    filtrosAplicadosRef.current = { ...VIAJES_FILTROS_VACIOS };
     setListadoRefetching(true);
     setNumeroFiltroActivo("");
     setCtgFiltroActivo("");
@@ -2413,6 +2434,7 @@ export function ViajesTenantPage({
     const activo = sortBy === field;
     return {
       dir: activo ? sortDir : null,
+      tipo: tipoOrdenViaje(field),
       disabled: listadoRefetching,
       onClick: () =>
         aplicarOrdenamiento(field, activo && sortDir === "asc" ? "desc" : "asc"),

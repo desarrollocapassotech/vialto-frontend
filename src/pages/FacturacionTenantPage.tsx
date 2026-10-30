@@ -18,8 +18,12 @@ import {
   type FacturaDraft,
 } from "@/components/facturacion/FacturaEditModal";
 import { FacturaCreateModal } from "@/components/facturacion/FacturaCreateModal";
-import { facturaEditable, facturaLetraFromCbteTipo } from "@/lib/arcaCbteTipo";
-import { verPdfFacturaArca } from "@/lib/facturaPdfArca";
+import {
+  facturaConArca,
+  facturaEditable,
+  facturaLetraFromCbteTipo,
+} from "@/lib/arcaCbteTipo";
+import { descargarPdfFacturaArca, verPdfFacturaArca } from "@/lib/facturaPdfArca";
 import { FacturaAccionesMenu } from "@/components/facturacion/FacturaAccionesMenu";
 import { AnularFacturaModal } from "@/components/facturacion/AnularFacturaModal";
 import { EmitirFacturaModal } from "@/components/facturacion/EmitirFacturaModal";
@@ -34,6 +38,11 @@ import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { apiJson } from "@/lib/api";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
+import {
+  comprobanteManualDraftDesde,
+  payloadComprobanteFactura,
+  type ComprobanteManualDraft,
+} from "@/lib/comprobanteManual";
 import { friendlyError } from "@/lib/friendlyError";
 import { esImagenAdjunto } from "@/lib/abrirAdjunto";
 import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
@@ -44,7 +53,8 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
-import { Clock, Download, FlaskConical } from "lucide-react";
+import { BookOpen, Clock, Download, FlaskConical } from "lucide-react";
+import { LibroIvaExportModal } from "@/components/shared/LibroIvaExportModal";
 import {
   clientesConViajesPendientesFactura,
   monedaUnicaDeViajes,
@@ -176,6 +186,9 @@ export function FacturacionTenantPage({
   const hasArca = canAccessEmisionFacturasArca(tenantModules);
   /** Adjunto manual solo para tenants sin integración ARCA (vista org, no plataforma). */
   const showComprobanteAdjunto = !platform && !hasArca;
+  /** Con ARCA, una factura manual (hecha por fuera del sistema) también lleva adjunto. */
+  const puedeAdjuntarComprobante = (f: { manual?: boolean | null }) =>
+    !platform && !facturaConArca(hasArca, f);
   const tenantParaIdPropio2 = platform ? platformTenant : maestro.tenant;
   /** `Tenant.marcarCobradaHabilitada` (default false), switch de superadmin. */
   const marcarCobradaHabilitada =
@@ -258,10 +271,13 @@ export function FacturacionTenantPage({
   const [listadoRefetching, setListadoRefetching] = useState(false);
   // Click en el título de la columna: A→Z / Z→A. Empresa: lo ordena el backend;
   // superadmin (trae todas): en el navegador, con las mismas claves.
-  const { orden, ordenColumna } = useOrdenColumna<FacturaSortField>(() => {
-    if (!platform) setListadoRefetching(true);
-    setPage(1);
-  });
+  const { orden, ordenColumna } = useOrdenColumna<FacturaSortField>(
+    () => {
+      if (!platform) setListadoRefetching(true);
+      setPage(1);
+    },
+    { numero: "numero", emision: "fecha", vencimiento: "fecha", importe: "numero" },
+  );
   const [viajes, setViajes] = useState<Viaje[]>([]);
   const [viajesLoading, setViajesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -311,6 +327,7 @@ export function FacturacionTenantPage({
     vencidas: number;
   } | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [libroIvaOpen, setLibroIvaOpen] = useState(false);
   const [exportandoExcel, setExportandoExcel] = useState(false);
 
   const fetchRef = useRef(0);
@@ -445,7 +462,8 @@ export function FacturacionTenantPage({
       clientes.find((c) => c.id === id)?.nombre ?? "";
     return ordenarPorClaves(
       filtradas,
-      (f) => clavesOrdenFactura(f, orden.by, nombreClienteOrden, hasArca),
+      (f) =>
+        clavesOrdenFactura(f, orden.by, nombreClienteOrden, facturaConArca(hasArca, f)),
       orden.dir,
     );
   }, [
@@ -820,7 +838,7 @@ export function FacturacionTenantPage({
   async function resolveComprobanteUrl(
     d: FacturaDraft,
   ): Promise<string | null | undefined> {
-    if (!showComprobanteAdjunto) return undefined;
+    if (!puedeAdjuntarComprobante(d)) return undefined;
     if (d.comprobanteFile) {
       return uploadComprobante(
         () => getToken(),
@@ -974,7 +992,7 @@ export function FacturacionTenantPage({
    */
   async function guardarAdjuntoFactura(
     f: Factura,
-    datos: { numero: string; file: File },
+    datos: { numero: string; file: File; comprobante?: ComprobanteManualDraft },
   ) {
     const comprobanteUrl = await uploadComprobante(
       () => getToken(),
@@ -982,7 +1000,12 @@ export function FacturacionTenantPage({
       "facturacion",
     );
     const body: Record<string, unknown> = { comprobanteUrl };
-    if (datos.numero && datos.numero !== (f.numero ?? "")) body.numero = datos.numero;
+    if (datos.comprobante) {
+      // Factura manual: el backend arma el número con tipo + punto de venta + número.
+      Object.assign(body, payloadComprobanteFactura(datos.comprobante));
+    } else if (datos.numero && datos.numero !== (f.numero ?? "")) {
+      body.numero = datos.numero;
+    }
     const updated = await apiJson<Factura>(facturaUrl(f.id), () => getToken(), {
       method: "PATCH",
       body: JSON.stringify(body),
@@ -1183,6 +1206,13 @@ export function FacturacionTenantPage({
     }
     // Anulación sin CAE todavía: abrir el modal de anulación en modo ya-anulada.
     abrirAnularFactura(f);
+  }
+
+  /** Baja el PDF de ARCA con su nombre ("Factura B 00001-00000009.pdf"), pedido NyM oct 2026. */
+  function descargarComprobanteArca(f: Factura, kind: "factura" | "nc") {
+    descargarPdfFacturaArca(f.id, kind, () => getToken(), platform ? tid : undefined).catch((e) =>
+      showToast(friendlyError(e, "arca"), "error"),
+    );
   }
 
   function nombreContraparte(f: Factura) {
@@ -1495,6 +1525,14 @@ export function FacturacionTenantPage({
 
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {exportButton}
+          <button
+            type="button"
+            onClick={() => setLibroIvaOpen(true)}
+            className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
+          >
+            <BookOpen className="h-4 w-4" aria-hidden />
+            Libro IVA
+          </button>
 
           <button
             type="button"
@@ -1742,7 +1780,7 @@ export function FacturacionTenantPage({
               <span className="flex items-center gap-1.5">
                 {/* Sin número: con adjunto queda solo el clip; sin adjunto (y se puede
                     adjuntar) va "Adjuntar comprobante" en vez de "—". */}
-                {(f.numero || (!f.comprobanteUrl?.trim() && !showComprobanteAdjunto)) && (
+                {(f.numero || (!f.comprobanteUrl?.trim() && !puedeAdjuntarComprobante(f))) && (
                   <span
                     className="block max-w-[8rem] truncate"
                     title={f.numero || undefined}
@@ -1756,7 +1794,7 @@ export function FacturacionTenantPage({
                     conTexto={!f.numero}
                   />
                 ) : (
-                  showComprobanteAdjunto && (
+                  puedeAdjuntarComprobante(f) && (
                     <AdjuntarComprobanteClip
                       onClick={() => setAdjuntarFactura(f)}
                       conTexto={!f.numero}
@@ -1797,7 +1835,7 @@ export function FacturacionTenantPage({
               <div className="flex items-center justify-end gap-1.5">
                 {/* Saldo pendiente (por tramo, sin ARCA, cobro parcial): ícono con
                     tooltip para que la fila no crezca a dos líneas. */}
-                {!hasArca &&
+                {!facturaConArca(hasArca, f) &&
                   f.facturarPorTramo &&
                   !f.cobrado &&
                   (f.saldoPendiente ?? 0) > 0.005 && (
@@ -1810,7 +1848,7 @@ export function FacturacionTenantPage({
                     </span>
                   )}
                 <span>
-                  {textoImporteFacturaListado(f, viajes, { hasArca })}
+                  {textoImporteFacturaListado(f, viajes, { hasArca: facturaConArca(hasArca, f) })}
                 </span>
               </div>
             </td>
@@ -1821,7 +1859,7 @@ export function FacturacionTenantPage({
               <FacturaAccionesMenu
                 factura={f}
                 deleting={deletingId === f.id}
-                hasArca={hasArca}
+                hasArca={facturaConArca(hasArca, f)}
                 open={accionesAbiertoFacturaId === f.id}
                 onOpenChange={(o) => setAccionesAbiertoFacturaId(o ? f.id : null)}
                 onVer={() => setViewingFactura(f)}
@@ -1829,10 +1867,14 @@ export function FacturacionTenantPage({
                 onMarcarCobrada={
                   marcarCobradaHabilitada ? () => abrirMarcarCobrada(f) : undefined
                 }
-                onEmitirArca={hasArca ? () => abrirEmitirArca(f) : undefined}
-                onAnular={hasArca ? () => abrirAnularFactura(f) : undefined}
+                onEmitirArca={
+                  facturaConArca(hasArca, f) ? () => abrirEmitirArca(f) : undefined
+                }
+                onAnular={
+                  facturaConArca(hasArca, f) ? () => abrirAnularFactura(f) : undefined
+                }
                 onAdjuntarComprobante={
-                  showComprobanteAdjunto ? () => setAdjuntarFactura(f) : undefined
+                  puedeAdjuntarComprobante(f) ? () => setAdjuntarFactura(f) : undefined
                 }
                 onVerComprobante={
                   f.comprobanteUrl
@@ -1844,6 +1886,8 @@ export function FacturacionTenantPage({
                     ? () => verNotaCredito(f)
                     : undefined
                 }
+                onDescargarComprobante={() => descargarComprobanteArca(f, "factura")}
+                onDescargarNotaCredito={() => descargarComprobanteArca(f, "nc")}
               />
             </td>
           </tr>
@@ -1874,9 +1918,9 @@ export function FacturacionTenantPage({
                 value: (
                   <span className="flex flex-col items-end gap-0.5">
                     <span>
-                      {textoImporteFacturaListado(f, viajes, { hasArca })}
+                      {textoImporteFacturaListado(f, viajes, { hasArca: facturaConArca(hasArca, f) })}
                     </span>
-                    {!hasArca &&
+                    {!facturaConArca(hasArca, f) &&
                       f.facturarPorTramo &&
                       !f.cobrado &&
                       (f.saldoPendiente ?? 0) > 0.005 && (
@@ -1896,7 +1940,7 @@ export function FacturacionTenantPage({
               <FacturaAccionesMenu
                 factura={f}
                 deleting={deletingId === f.id}
-                hasArca={hasArca}
+                hasArca={facturaConArca(hasArca, f)}
                 open={accionesAbiertoFacturaId === f.id}
                 onOpenChange={(o) => setAccionesAbiertoFacturaId(o ? f.id : null)}
                 onVer={() => setViewingFactura(f)}
@@ -1904,10 +1948,14 @@ export function FacturacionTenantPage({
                 onMarcarCobrada={
                   marcarCobradaHabilitada ? () => abrirMarcarCobrada(f) : undefined
                 }
-                onEmitirArca={hasArca ? () => abrirEmitirArca(f) : undefined}
-                onAnular={hasArca ? () => abrirAnularFactura(f) : undefined}
+                onEmitirArca={
+                  facturaConArca(hasArca, f) ? () => abrirEmitirArca(f) : undefined
+                }
+                onAnular={
+                  facturaConArca(hasArca, f) ? () => abrirAnularFactura(f) : undefined
+                }
                 onAdjuntarComprobante={
-                  showComprobanteAdjunto ? () => setAdjuntarFactura(f) : undefined
+                  puedeAdjuntarComprobante(f) ? () => setAdjuntarFactura(f) : undefined
                 }
                 onVerComprobante={
                   f.comprobanteUrl
@@ -1919,6 +1967,8 @@ export function FacturacionTenantPage({
                     ? () => verNotaCredito(f)
                     : undefined
                 }
+                onDescargarComprobante={() => descargarComprobanteArca(f, "factura")}
+                onDescargarNotaCredito={() => descargarComprobanteArca(f, "nc")}
               />
             }
           />
@@ -2014,10 +2064,21 @@ export function FacturacionTenantPage({
           }
           onVolverAEmitir={() => void volverAEmitirFactura(viewingFactura.id)}
           onAdjuntarComprobante={
-            showComprobanteAdjunto
+            puedeAdjuntarComprobante(viewingFactura)
               ? () => setAdjuntarFactura(viewingFactura)
               : undefined
           }
+        />
+      )}
+
+      {libroIvaOpen && (
+        <LibroIvaExportModal
+          tipo="ventas"
+          url="/api/facturacion/libro-iva/ventas"
+          tenantId={platform ? tid : undefined}
+          ambientePrueba={hasArca && ambienteArca === "homologacion"}
+          getToken={() => getToken()}
+          onClose={() => setLibroIvaOpen(false)}
         />
       )}
 
@@ -2025,6 +2086,18 @@ export function FacturacionTenantPage({
         <AdjuntarComprobanteModal
           titulo={`Factura a ${nombreContraparte(adjuntarFactura)}`}
           numeroInicial={adjuntarFactura.numero}
+          comprobanteManual={
+            adjuntarFactura.manual
+              ? {
+                  inicial: comprobanteManualDraftDesde({
+                    cbteTipo: adjuntarFactura.manualCbteTipo,
+                    ptoVenta: adjuntarFactura.manualPtoVenta,
+                    cbteNro: adjuntarFactura.manualCbteNro,
+                    numero: adjuntarFactura.numero,
+                  }),
+                }
+              : undefined
+          }
           onClose={() => setAdjuntarFactura(null)}
           onGuardar={(datos) => guardarAdjuntoFactura(adjuntarFactura, datos)}
         />
@@ -2073,7 +2146,7 @@ export function FacturacionTenantPage({
           onSave={() => void saveEdit()}
           saving={savingEditId === editingId}
           error={editError}
-          showComprobanteAdjunto={showComprobanteAdjunto}
+          showComprobanteAdjunto={puedeAdjuntarComprobante(editDraft)}
           idSistemaHabilitado={idSistemaHabilitado(tenantParaIdPropio2)}
           idPropio1Habilitado={idPropio1Habilitado(tenantParaIdPropio2)}
           idPropio1Label={labelIdentificacionPersonalizadaViajes(tenantParaIdPropio2)}

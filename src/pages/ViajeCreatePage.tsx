@@ -518,7 +518,7 @@ export function ViajeCreatePage() {
       return;
     }
 
-    const clientesValidacion = await validarClientesRows(clientesRows);
+    const clientesValidacion = await validarClientesRows(clientesRows, sugerenciasCiudad);
     if (!clientesValidacion.ok) {
       setClientesRowErrors(clientesValidacion.rowErrors);
       setError(clientesValidacion.message);
@@ -677,7 +677,7 @@ export function ViajeCreatePage() {
     }
     setFieldErrors({});
 
-    const clientesValidacion = await validarClientesRows(clientesRows);
+    const clientesValidacion = await validarClientesRows(clientesRows, sugerenciasCiudad);
     if (!clientesValidacion.ok) {
       setClientesRowErrors(clientesValidacion.rowErrors);
       setError(clientesValidacion.message);
@@ -731,13 +731,20 @@ export function ViajeCreatePage() {
     }
 
     // 4. Validación de la ubicación de origen y destinos
-    const okOrigen = await esEtiquetaCiudadValida(principal.paisOrigen, principal.origen);
-    if (!okOrigen) {
-      setError("El origen debe elegirse de la lista de ciudades (no se admite texto libre).");
+    if (!sugerenciasCiudad && !principal.origen.trim()) {
+      setError("Ingresá el origen.");
       setStep(1);
       return;
     }
-    const destinosVal = await validarDestinosRows(principal.destinosRows);
+    if (sugerenciasCiudad) {
+      const okOrigen = await esEtiquetaCiudadValida(principal.paisOrigen, principal.origen);
+      if (!okOrigen) {
+        setError("El origen debe elegirse de la lista de ciudades (no se admite texto libre).");
+        setStep(1);
+        return;
+      }
+    }
+    const destinosVal = await validarDestinosRows(principal.destinosRows, sugerenciasCiudad);
     if (!destinosVal.ok) {
       setError(destinosVal.message);
       setStep(1);

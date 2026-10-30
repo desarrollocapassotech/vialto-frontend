@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Ban, FileDown, FileText, Paperclip, Receipt, RotateCw, Trash2 } from "lucide-react";
-import { anulacionComprobanteLabel, nroComprobante } from "@/lib/arcaCbteTipo";
+import {
+  anulacionComprobanteLabel,
+  liquidacionConArca,
+  nroComprobante,
+} from "@/lib/arcaCbteTipo";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import {
   idPropio2Habilitado as idPropio2HabilitadoTenant,
@@ -27,6 +31,8 @@ import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { apiFetch, apiJson } from "@/lib/api";
+import { descargarPdfLiquidacionArca } from "@/lib/liquidacionPdfArca";
+import { BotonDescargarPdf } from "@/components/shared/BotonDescargarPdf";
 import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import { friendlyError } from "@/lib/friendlyError";
@@ -122,7 +128,7 @@ export function LiquidacionViewModal({
   liq,
   ivaPct,
   canEdit = true,
-  hasArca = false,
+  hasArca: hasArcaTenant = false,
   metodoAnulacion = "nota_credito_debito",
   getToken,
   detalleUrl,
@@ -190,6 +196,8 @@ export function LiquidacionViewModal({
   /** Label configurable de "ID Propio 2". Sin prop, el de la empresa propia. */
   idPropio2Label?: string;
 }) {
+  // Liquidación manual (monotributista) en empresa con ARCA: se muestra como sin ARCA.
+  const hasArca = liquidacionConArca(hasArcaTenant, liq);
   const { tenant: tenantPropio } = useCurrentTenant();
   const mostrarIdPropio2 = idPropio2HabilitadoProp ?? idPropio2HabilitadoTenant(tenantPropio);
   const labelIdPropio2 = idPropio2LabelProp ?? idPropio2LabelTenant(tenantPropio);
@@ -352,6 +360,18 @@ export function LiquidacionViewModal({
       showToast(friendlyError(e, "arca"), "error");
     }
   }
+  /** Baja el PDF del CVLP o de su NC/ND con su nombre ("Liquido Producto A 00002-…"). */
+  function descargarPdfArca(kind: "liquidacion" | "anulacion") {
+    return descargarPdfLiquidacionArca(
+      liq.id,
+      kind,
+      () => (getToken ? getToken() : getAuthToken()),
+      tenantIdUrl || undefined,
+    ).catch((e) => showToast(friendlyError(e, "arca"), "error"));
+  }
+  const puedeDescargarComprobante = hasArca && !liq.manual && source.cbteNro != null;
+  const puedeDescargarAnulacion = anulada && !anulacionManual && Boolean(source.anulacionCae);
+
   // Viajes que componen el bruto: se ven al desplegar la fila "Bruto" del detalle.
   const viajesDetalle = (
     <ViajesDetalleLista
@@ -396,6 +416,9 @@ export function LiquidacionViewModal({
     Boolean(onConfirmarAnulacionManual) &&
     hasArca &&
     source.estado === "pendiente_anulacion";
+  // Manual (monotributista): queda en borrador pero ya está liquidada.
+  const estadoBadge =
+    liq.manual && source.estado === "borrador" ? "autorizado" : source.estado;
 
   return (
     <>
@@ -406,10 +429,10 @@ export function LiquidacionViewModal({
             <span
               className={[
                 "text-xs font-medium border rounded px-2 py-0.5",
-                ESTADO_BADGE[source.estado],
+                ESTADO_BADGE[estadoBadge],
               ].join(" ")}
             >
-              {ESTADO_LABEL[source.estado]}
+              {ESTADO_LABEL[estadoBadge]}
             </span>
             <LiquidacionPagoBadge estadoPago={source.estadoPago} />
             <AmbienteTestBadge ambiente={source.ambiente} />
@@ -436,6 +459,12 @@ export function LiquidacionViewModal({
                 <FileText className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
                 {verAnulacion ? "Ver comprobante original" : "Ver comprobante"}
               </button>
+            )}
+            {puedeDescargarComprobante && (
+              <BotonDescargarPdf
+                label={verAnulacion ? "Descargar comprobante original" : "Descargar comprobante"}
+                onClick={() => descargarPdfArca("liquidacion")}
+              />
             )}
             {onVerPdfLiquidacion && !hasArca && (
               <button
@@ -466,6 +495,12 @@ export function LiquidacionViewModal({
                 <FileText className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
                 {verAnulacion.label}
               </button>
+            )}
+            {puedeDescargarAnulacion && (
+              <BotonDescargarPdf
+                label={`Descargar ${anulacionNcNd!.toLowerCase()}`}
+                onClick={() => descargarPdfArca("anulacion")}
+              />
             )}
             {hasArca &&
               onEmitir &&
@@ -613,6 +648,11 @@ export function LiquidacionViewModal({
                 <Dato
                   label="Número de comprobante"
                   value={source.numeroComprobanteProveedor}
+                  sub={
+                    source.proveedorCbteFecha
+                      ? `Fecha ${fmtDate(source.proveedorCbteFecha)}`
+                      : undefined
+                  }
                 />
               )
             )}

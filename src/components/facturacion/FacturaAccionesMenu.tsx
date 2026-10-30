@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   Ban,
   Banknote,
+  Download,
   Eye,
   FileMinus,
   FileText,
@@ -26,6 +27,9 @@ interface Props {
   onEmitirArca?: () => void;
   onAnular?: () => void;
   onVerNotaCredito?: () => void;
+  /** Solo emitidas en ARCA: baja el PDF con su nombre ("Factura B 00001-00000009.pdf"). */
+  onDescargarComprobante?: () => void;
+  onDescargarNotaCredito?: () => void;
   /** Solo facturas a cliente, no anuladas y no ya cobradas. */
   onMarcarCobrada?: () => void;
   /** Si se pasa junto con `onOpenChange`, el abierto/cerrado pasa a ser controlado por el padre (ej. click en la fila de la tabla). */
@@ -44,6 +48,8 @@ export function FacturaAccionesMenu({
   onEmitirArca,
   onAnular,
   onVerNotaCredito,
+  onDescargarComprobante,
+  onDescargarNotaCredito,
   onMarcarCobrada,
   open: openProp,
   onOpenChange,
@@ -119,6 +125,14 @@ export function FacturaAccionesMenu({
         onClick: onVerComprobante,
       });
     }
+    if (onDescargarComprobante && tieneCaeOriginal) {
+      opts.push({
+        id: 'descargar-comprobante',
+        label: 'Descargar comprobante',
+        icon: Download,
+        onClick: onDescargarComprobante,
+      });
+    }
     if (onAdjuntarComprobante && !factura.comprobanteUrl?.trim()) {
       opts.push({
         id: 'adjuntar-comprobante',
@@ -137,6 +151,14 @@ export function FacturaAccionesMenu({
         label: 'Ver Nota de Crédito',
         icon: FileMinus,
         onClick: onVerNotaCredito,
+      });
+    }
+    if (anulada && onDescargarNotaCredito && factura.anulacionCae) {
+      opts.push({
+        id: 'descargar-nota-credito',
+        label: 'Descargar Nota de Crédito',
+        icon: Download,
+        onClick: onDescargarNotaCredito,
       });
     }
     const puedeEliminar = !autorizada && !anulada;
@@ -161,6 +183,8 @@ export function FacturaAccionesMenu({
     onVerComprobante,
     onAdjuntarComprobante,
     onVerNotaCredito,
+    onDescargarComprobante,
+    onDescargarNotaCredito,
     onEliminar,
     deleting,
   ]);

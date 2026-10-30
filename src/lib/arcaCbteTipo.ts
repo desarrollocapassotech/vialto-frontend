@@ -26,18 +26,60 @@ export function isResponsableInscripto(
   return condicionIva === 1;
 }
 
+/** Monotributo, Monotributista Social y Monotributo Trabajador Independiente Promovido. */
+const CONDICIONES_IVA_MONOTRIBUTO = new Set([6, 13, 16]);
+
 /**
- * true si la condición IVA del transportista normalmente correspondería a un
- * CVLP clase B (061), que ya no se emite — el sistema emite siempre CVLP 060
- * (clase A), ver "Gotchas operativos de ARCA" en vialto-backend/CLAUDE.md.
- * No bloquea nada: solo dispara la leyenda de advertencia antes de
- * crear/emitir. Si la condición IVA todavía no está cargada, no advierte
- * acá — ese caso ya lo cubre la validación existente de datos faltantes.
+ * Transportista monotributista: no se le emite Líquido Producto. La liquidación queda
+ * manual (`Liquidacion.manual`) con la factura del transportista adjunta, como en una
+ * empresa sin ARCA. Espejo de `esCondicionIvaMonotributo` del backend (`arca.util.ts`).
+ */
+export function esCondicionIvaMonotributo(
+  condicionIva: number | null | undefined,
+): boolean {
+  return condicionIva != null && CONDICIONES_IVA_MONOTRIBUTO.has(condicionIva);
+}
+
+/**
+ * Si una liquidación puntual va por ARCA (emitir, anular, PDF del CVLP, estados de AFIP).
+ * Con la empresa con Líquido Producto pero la liquidación `manual`, se trata como en una
+ * empresa sin ARCA (adjuntar comprobante, PDF de liquidación, sin badge de estado AFIP).
+ */
+export function liquidacionConArca(
+  hasArca: boolean,
+  liq: { manual?: boolean | null } | null | undefined,
+): boolean {
+  return hasArca && !liq?.manual;
+}
+
+/**
+ * Lo mismo para una factura: con la empresa con ARCA pero la factura `manual` (hecha por
+ * fuera del sistema) se trata como en una empresa sin ARCA (número, comprobante adjunto,
+ * sin emitir ni anular).
+ */
+export function facturaConArca(
+  hasArca: boolean,
+  factura: { manual?: boolean | null } | null | undefined,
+): boolean {
+  return hasArca && !factura?.manual;
+}
+
+/**
+ * true si la condición IVA del transportista corresponde a un CVLP clase B (061:
+ * exento, consumidor final, no categorizado…), que no se emite — ver "Gotchas
+ * operativos de ARCA" en vialto-backend/CLAUDE.md. RI recibe 060 y el monotributista
+ * va por liquidación manual (`esCondicionIvaMonotributo`), así que ninguno de los dos
+ * entra acá. Si la condición IVA todavía no está cargada, no advierte — ese caso ya lo
+ * cubre la validación de datos faltantes.
  */
 export function cvlpClaseBEsperada(
   condicionIva: number | null | undefined,
 ): boolean {
-  return condicionIva != null && !isResponsableInscripto(condicionIva);
+  return (
+    condicionIva != null &&
+    !isResponsableInscripto(condicionIva) &&
+    !esCondicionIvaMonotributo(condicionIva)
+  );
 }
 
 export const CVLP_CLASE_B_WARNING =
@@ -133,6 +175,10 @@ export function condicionIvaLabel(condicionIva: number | null | undefined): stri
       return "Consumidor Final";
     case 6:
       return "Responsable Monotributo";
+    case 13:
+      return "Monotributista Social";
+    case 16:
+      return "Monotributo Trabajador Independiente Promovido";
     default:
       return condicionIva != null
         ? `Condición IVA ${condicionIva}`

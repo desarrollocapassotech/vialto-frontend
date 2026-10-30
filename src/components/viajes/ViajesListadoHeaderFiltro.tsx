@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { etiquetaDirOrden, type TipoOrden } from '@/lib/ordenListado';
 
 /** Ancho del panel flotante de filtro (px). */
 const PANEL_WIDTH_PX = 288;
@@ -41,6 +42,8 @@ type Props = {
 export type OrdenColumna = {
   /** Dirección si esta columna es el orden aplicado; null si no lo es. */
   dir: 'asc' | 'desc' | null;
+  /** Tipo de dato de la columna, para el texto del tooltip. Default: texto ("A a Z"). */
+  tipo?: TipoOrden;
   onClick: () => void;
   /** Si se pasa y esta columna es el orden aplicado, muestra una ✕ que lo quita. */
   onClear?: () => void;
@@ -88,7 +91,8 @@ export function TituloOrdenable({
   className?: string;
 }) {
   const Flecha = orden.dir === 'desc' ? ArrowDown : orden.dir === 'asc' ? ArrowUp : ArrowUpDown;
-  const siguiente = orden.dir === 'asc' ? 'Z a A' : 'A a Z';
+  // El tooltip describe lo que hace el próximo click (1ro ascendente, 2do descendente).
+  const siguiente = etiquetaDirOrden(orden.tipo ?? 'texto', orden.dir === 'asc' ? 'desc' : 'asc');
   return (
     <span className={`inline-flex items-center gap-1 ${className}`}>
     <button
