@@ -5,6 +5,7 @@ import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoF
 import { modalOverlayClass } from "@/lib/modalLayers";
 import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
+import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
 
 const btnGhost =
   "inline-flex min-h-11 items-center text-xs uppercase tracking-wider px-3 py-2 border border-black/20 hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none md:min-h-0 md:py-1.5";
@@ -17,13 +18,36 @@ type Props = {
   getToken: () => Promise<string | null>;
   /** Solo en vistas superadmin (embedded), para pegarle a /api/platform/integracion-arca/upload-comprobante. */
   tenantId?: string;
-  onConfirm: (args: { motivo: string; comprobanteUrl: string }) => void | Promise<void>;
+  onConfirm: (args: {
+    motivo: string;
+    comprobanteUrl: string;
+    ptoVenta: number;
+    cbteNro: number;
+    fecha: string;
+  }) => void | Promise<void>;
   onCancel: () => void;
 };
 
+type FieldErrors = {
+  motivo?: string;
+  file?: string;
+  ptoVenta?: string;
+  cbteNro?: string;
+  fecha?: string;
+};
+
+const inputClass = (conError: boolean) =>
+  `h-10 w-full rounded border bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 disabled:opacity-50 ${
+    conError ? "border-red-400" : "border-black/15"
+  }`;
+
+const labelClass =
+  "text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel";
+
 /**
  * Paso 2 de la anulación manual del CVLP (060): comprobante pre-impreso adjunto (PDF o
- * foto) + motivo. No emite nada a ARCA — solo registra el respaldo del usuario.
+ * foto) + motivo + punto de venta, número y fecha del pre-impreso (el 060 en negativo, que
+ * va al Libro IVA Compras). No emite nada a ARCA — solo registra el respaldo del usuario.
  */
 export function ConfirmarAnulacionManualModal({
   open,
@@ -38,7 +62,10 @@ export function ConfirmarAnulacionManualModal({
   const descId = useId();
   const [motivo, setMotivo] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<{ motivo?: string; file?: string }>({});
+  const [ptoVenta, setPtoVenta] = useState("");
+  const [cbteNro, setCbteNro] = useState("");
+  const [fecha, setFecha] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -46,6 +73,9 @@ export function ConfirmarAnulacionManualModal({
     if (!open) return;
     setMotivo("");
     setFile(null);
+    setPtoVenta("");
+    setCbteNro("");
+    setFecha(hoyArgentinaIso());
     setFieldErrors({});
     setUploadError(null);
   }, [open]);
@@ -69,9 +99,12 @@ export function ConfirmarAnulacionManualModal({
 
   async function handleConfirm() {
     const trimmed = motivo.trim();
-    const errs: { motivo?: string; file?: string } = {};
+    const errs: FieldErrors = {};
     if (!trimmed) errs.motivo = "Ingresá el motivo de anulación.";
     if (!file) errs.file = "Adjuntá el comprobante pre-impreso (PDF o foto).";
+    if (!(Number(ptoVenta) > 0)) errs.ptoVenta = "Ingresá el punto de venta del pre-impreso.";
+    if (!(Number(cbteNro) > 0)) errs.cbteNro = "Ingresá el número del pre-impreso.";
+    if (!fecha) errs.fecha = "Ingresá la fecha del pre-impreso.";
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
@@ -87,7 +120,13 @@ export function ConfirmarAnulacionManualModal({
         tenantId,
       );
       setUploading(false);
-      void onConfirm({ motivo: trimmed, comprobanteUrl });
+      void onConfirm({
+        motivo: trimmed,
+        comprobanteUrl,
+        ptoVenta: Number(ptoVenta),
+        cbteNro: Number(cbteNro),
+        fecha,
+      });
     } catch (e) {
       setUploading(false);
       setUploadError(
@@ -114,7 +153,8 @@ export function ConfirmarAnulacionManualModal({
         </h2>
         <p id={descId} className="mt-2 text-sm text-vialto-steel">
           Adjuntá el comprobante pre-impreso con el que se anuló este CVLP fuera del
-          sistema. No se emite nada a ARCA — el CVLP original se conserva.
+          sistema e indicá su punto de venta, número y fecha (va al Libro IVA Compras con
+          los importes en negativo). No se emite nada a ARCA — el CVLP original se conserva.
         </p>
 
         <label className="mt-4 grid gap-1.5">
@@ -138,6 +178,60 @@ export function ConfirmarAnulacionManualModal({
             }`}
           />
         </label>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <label className="grid gap-1.5">
+            <span className={labelClass}>
+              Punto de venta <span className="text-red-500">*</span>
+            </span>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={5}
+              value={ptoVenta}
+              disabled={isBusy}
+              placeholder="0001"
+              onChange={(e) => {
+                setPtoVenta(e.target.value.replace(/\D/g, ""));
+                if (fieldErrors.ptoVenta) setFieldErrors((p) => ({ ...p, ptoVenta: undefined }));
+              }}
+              className={inputClass(!!fieldErrors.ptoVenta)}
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className={labelClass}>
+              Número <span className="text-red-500">*</span>
+            </span>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={8}
+              value={cbteNro}
+              disabled={isBusy}
+              placeholder="00000123"
+              onChange={(e) => {
+                setCbteNro(e.target.value.replace(/\D/g, ""));
+                if (fieldErrors.cbteNro) setFieldErrors((p) => ({ ...p, cbteNro: undefined }));
+              }}
+              className={inputClass(!!fieldErrors.cbteNro)}
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className={labelClass}>
+              Fecha <span className="text-red-500">*</span>
+            </span>
+            <input
+              type="date"
+              value={fecha}
+              disabled={isBusy}
+              onChange={(e) => {
+                setFecha(e.target.value);
+                if (fieldErrors.fecha) setFieldErrors((p) => ({ ...p, fecha: undefined }));
+              }}
+              className={inputClass(!!fieldErrors.fecha)}
+            />
+          </label>
+        </div>
 
         <div className="mt-4">
           <ComprobanteAdjuntoField
