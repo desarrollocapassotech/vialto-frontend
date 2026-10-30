@@ -43,7 +43,7 @@ export function ComprobanteManualFields({
 
   return (
     <div className={conFecha ? `${className} sm:grid-cols-4` : className}>
-      <label className="flex flex-col gap-1">
+      <label className="flex flex-col justify-end gap-1">
         <span className={labelClassName}>
           Tipo de comprobante <span className="text-red-500">*</span>
         </span>
@@ -61,7 +61,7 @@ export function ComprobanteManualFields({
           ))}
         </select>
       </label>
-      <label className="flex flex-col gap-1">
+      <label className="flex flex-col justify-end gap-1">
         <span className={labelClassName}>
           Punto de venta <span className="text-red-500">*</span>
         </span>
@@ -76,7 +76,7 @@ export function ComprobanteManualFields({
           className={claseInput("ptoVenta")}
         />
       </label>
-      <label className="flex flex-col gap-1">
+      <label className="flex flex-col justify-end gap-1">
         <span className={labelClassName}>
           Número <span className="text-red-500">*</span>
         </span>
@@ -92,7 +92,7 @@ export function ComprobanteManualFields({
         />
       </label>
       {conFecha && (
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col justify-end gap-1">
           <span className={labelClassName}>
             {fechaLabel} <span className="text-red-500">*</span>
           </span>

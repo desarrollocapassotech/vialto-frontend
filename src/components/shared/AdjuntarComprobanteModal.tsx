@@ -78,6 +78,8 @@ export function AdjuntarComprobanteModal({
   return (
     <ViewModalShell
       title="Adjuntar comprobante"
+      // Con fecha son 4 campos en una fila: en el ancho por defecto los títulos se parten.
+      maxWidthClass={comprobanteManual?.conFecha ? "sm:max-w-3xl" : undefined}
       onClose={saving ? () => {} : descarte.solicitarCierre}
       descarte={descarte}
       footer={
