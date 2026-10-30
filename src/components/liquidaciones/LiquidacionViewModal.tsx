@@ -31,6 +31,8 @@ import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { apiFetch, apiJson } from "@/lib/api";
+import { descargarPdfLiquidacionArca } from "@/lib/liquidacionPdfArca";
+import { BotonDescargarPdf } from "@/components/shared/BotonDescargarPdf";
 import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import { friendlyError } from "@/lib/friendlyError";
@@ -358,6 +360,18 @@ export function LiquidacionViewModal({
       showToast(friendlyError(e, "arca"), "error");
     }
   }
+  /** Baja el PDF del CVLP o de su NC/ND con su nombre ("Liquido Producto A 00002-…"). */
+  function descargarPdfArca(kind: "liquidacion" | "anulacion") {
+    return descargarPdfLiquidacionArca(
+      liq.id,
+      kind,
+      () => (getToken ? getToken() : getAuthToken()),
+      tenantIdUrl || undefined,
+    ).catch((e) => showToast(friendlyError(e, "arca"), "error"));
+  }
+  const puedeDescargarComprobante = hasArca && !liq.manual && source.cbteNro != null;
+  const puedeDescargarAnulacion = anulada && !anulacionManual && Boolean(source.anulacionCae);
+
   // Viajes que componen el bruto: se ven al desplegar la fila "Bruto" del detalle.
   const viajesDetalle = (
     <ViajesDetalleLista
@@ -446,6 +460,12 @@ export function LiquidacionViewModal({
                 {verAnulacion ? "Ver comprobante original" : "Ver comprobante"}
               </button>
             )}
+            {puedeDescargarComprobante && (
+              <BotonDescargarPdf
+                label={verAnulacion ? "Descargar comprobante original" : "Descargar comprobante"}
+                onClick={() => descargarPdfArca("liquidacion")}
+              />
+            )}
             {onVerPdfLiquidacion && !hasArca && (
               <button
                 type="button"
@@ -475,6 +495,12 @@ export function LiquidacionViewModal({
                 <FileText className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
                 {verAnulacion.label}
               </button>
+            )}
+            {puedeDescargarAnulacion && (
+              <BotonDescargarPdf
+                label={`Descargar ${anulacionNcNd!.toLowerCase()}`}
+                onClick={() => descargarPdfArca("anulacion")}
+              />
             )}
             {hasArca &&
               onEmitir &&

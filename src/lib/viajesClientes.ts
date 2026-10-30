@@ -157,9 +157,12 @@ export function clientesPayloadParaApi(rows: ViajeClienteDraft[]): ViajeClienteA
  * Valida las filas con cliente cargado: origen/destino (misma regla que el cliente principal:
  * ciudad de catálogo, no texto libre) y el cobro (cantidad×precioUnitario o monto, detectado
  * por qué campos tiene cargados la fila — mismo criterio que `clientesPayloadParaApi`).
+ * `validarCiudades = false` (`Tenant.recomendacionCiudadesHabilitada` apagado): origen y
+ * destinos en texto libre, sin contrastar con el catálogo.
  */
 export async function validarClientesRows(
   rows: ViajeClienteDraft[],
+  validarCiudades = true,
 ): Promise<{ ok: true } | { ok: false; message: string; rowErrors: Record<number, string> }> {
   const rowErrors: Record<number, string> = {};
   const seen = new Set<string>();
@@ -185,7 +188,7 @@ export async function validarClientesRows(
     seen.add(clienteId);
 
     const origen = row.origen.trim();
-    if (origen) {
+    if (origen && validarCiudades) {
       const okOrigen = await esEtiquetaCiudadValida(row.paisOrigen, origen);
       if (!okOrigen) {
         rowErrors[i] = 'El origen debe elegirse de la lista de ciudades (no se admite texto libre).';
@@ -193,7 +196,7 @@ export async function validarClientesRows(
       }
     }
 
-    const destinosVal = await validarDestinosRows(row.destinosRows);
+    const destinosVal = await validarDestinosRows(row.destinosRows, validarCiudades);
     if (!destinosVal.ok) {
       rowErrors[i] = destinosVal.message;
       continue;

@@ -838,6 +838,7 @@ export function ViajesTenantPage({
     transportistas,
     vehiculos,
     hasFacturasArca: hasFacturasArca,
+    validarCiudades: tenantEfectivo?.recomendacionCiudadesHabilitada !== false,
     refreshMaestroListas: fetchMaestroListasFresh,
     onEntityCreated: (key, item) => {
       if (!platform) return;

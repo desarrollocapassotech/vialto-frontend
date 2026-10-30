@@ -16,7 +16,8 @@ import {
 } from '@/components/shared/DetalleComprobante';
 import { useAuth } from '@clerk/clerk-react';
 import { apiJson } from '@/lib/api';
-import { verPdfFacturaArca } from '@/lib/facturaPdfArca';
+import { descargarPdfFacturaArca, verPdfFacturaArca } from '@/lib/facturaPdfArca';
+import { BotonDescargarPdf } from '@/components/shared/BotonDescargarPdf';
 import { usuarioLabel } from '@/lib/usuarioLabel';
 import { friendlyError } from '@/lib/friendlyError';
 import { useToast } from '@/lib/toast';
@@ -342,6 +343,16 @@ export function FacturaViewModal({
     ).catch((e) => showToast(friendlyError(e, 'arca'), 'error'));
   }
 
+  /** Baja el PDF con su nombre ("Factura B 00001-00000009.pdf"); el visor le pone uno al azar. */
+  function descargarPdfArca(kind: 'factura' | 'nc') {
+    return descargarPdfFacturaArca(
+      factura.id,
+      kind,
+      () => (getToken ? getToken() : getAuthToken()),
+      tenantIdUrl || undefined,
+    ).catch((e) => showToast(friendlyError(e, 'arca'), 'error'));
+  }
+
   const arcaErrorTexto = formatStoredArcaError(factura.arcaError);
   const mostrarArcaError =
     Boolean(arcaErrorTexto) &&
@@ -423,6 +434,12 @@ export function FacturaViewModal({
               {puedeVerNotaCredito ? 'Ver comprobante original' : 'Ver comprobante'}
             </button>
           )}
+          {emitidaEnArca && (
+            <BotonDescargarPdf
+              label={puedeVerNotaCredito ? 'Descargar comprobante original' : 'Descargar comprobante'}
+              onClick={() => descargarPdfArca('factura')}
+            />
+          )}
           {onAdjuntarComprobante && !emitidaEnArca && !factura.comprobanteUrl?.trim() && (
             <button
               type="button"
@@ -442,6 +459,12 @@ export function FacturaViewModal({
               <FileText className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
               Ver nota de crédito
             </button>
+          )}
+          {puedeVerNotaCredito && (
+            <BotonDescargarPdf
+              label="Descargar nota de crédito"
+              onClick={() => descargarPdfArca('nc')}
+            />
           )}
           {puedeEmitirArca && onEmitirArca && (
             <button

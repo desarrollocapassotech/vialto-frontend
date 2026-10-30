@@ -23,7 +23,7 @@ import {
   facturaEditable,
   facturaLetraFromCbteTipo,
 } from "@/lib/arcaCbteTipo";
-import { verPdfFacturaArca } from "@/lib/facturaPdfArca";
+import { descargarPdfFacturaArca, verPdfFacturaArca } from "@/lib/facturaPdfArca";
 import { FacturaAccionesMenu } from "@/components/facturacion/FacturaAccionesMenu";
 import { AnularFacturaModal } from "@/components/facturacion/AnularFacturaModal";
 import { EmitirFacturaModal } from "@/components/facturacion/EmitirFacturaModal";
@@ -1208,6 +1208,13 @@ export function FacturacionTenantPage({
     abrirAnularFactura(f);
   }
 
+  /** Baja el PDF de ARCA con su nombre ("Factura B 00001-00000009.pdf"), pedido NyM oct 2026. */
+  function descargarComprobanteArca(f: Factura, kind: "factura" | "nc") {
+    descargarPdfFacturaArca(f.id, kind, () => getToken(), platform ? tid : undefined).catch((e) =>
+      showToast(friendlyError(e, "arca"), "error"),
+    );
+  }
+
   function nombreContraparte(f: Factura) {
     return nombreCliente(f.clienteId);
   }
@@ -1879,6 +1886,8 @@ export function FacturacionTenantPage({
                     ? () => verNotaCredito(f)
                     : undefined
                 }
+                onDescargarComprobante={() => descargarComprobanteArca(f, "factura")}
+                onDescargarNotaCredito={() => descargarComprobanteArca(f, "nc")}
               />
             </td>
           </tr>
@@ -1958,6 +1967,8 @@ export function FacturacionTenantPage({
                     ? () => verNotaCredito(f)
                     : undefined
                 }
+                onDescargarComprobante={() => descargarComprobanteArca(f, "factura")}
+                onDescargarNotaCredito={() => descargarComprobanteArca(f, "nc")}
               />
             }
           />

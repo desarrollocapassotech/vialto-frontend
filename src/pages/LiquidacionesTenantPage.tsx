@@ -76,6 +76,7 @@ import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { useToast } from "@/lib/toast";
 import { apiFetch, apiJson } from "@/lib/api";
 import { verPdfLiquidacion } from "@/lib/liquidacionContratoPdf";
+import { descargarPdfLiquidacionArca } from "@/lib/liquidacionPdfArca";
 import { friendlyError } from "@/lib/friendlyError";
 import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
@@ -200,6 +201,8 @@ function LiquidacionAccionesMenu({
   onVerComprobante,
   onAdjuntarComprobante,
   onVerPdfLiquidacion,
+  onDescargarComprobante,
+  onDescargarAnulacion,
   open: openProp,
   onOpenChange,
 }: {
@@ -219,6 +222,9 @@ function LiquidacionAccionesMenu({
   onAdjuntarComprobante?: () => void;
   /** Sin ARCA: "PDF de liquidación" (resumen que genera Vialto), aparte del comprobante adjunto. */
   onVerPdfLiquidacion?: () => void;
+  /** Con ARCA: bajan el PDF del CVLP / de su NC-ND con su nombre ("Liquido Producto A 00002-…"). */
+  onDescargarComprobante?: () => void;
+  onDescargarAnulacion?: () => void;
   /** Si se pasa junto con `onOpenChange`, el abierto/cerrado pasa a ser controlado por el padre (ej. click en la fila de la tabla). */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -279,6 +285,14 @@ function LiquidacionAccionesMenu({
       onClick: onVerComprobante,
     });
   }
+  if (onDescargarComprobante && tienePdf && liq.cbteNro != null) {
+    options.push({
+      id: "descargar-comprobante",
+      label: "Descargar comprobante",
+      icon: Download,
+      onClick: onDescargarComprobante,
+    });
+  }
   if (onVerPdfLiquidacion && !hasArca) {
     options.push({
       id: "pdf-liquidacion",
@@ -305,6 +319,15 @@ function LiquidacionAccionesMenu({
         : anulacionComprobanteLabel(liq.anulacionCbteTipo),
       icon: FileMinus,
       onClick: onVerAnulacion,
+    });
+  }
+  if (onDescargarAnulacion && tieneComprobanteAnulacion && !anulacionManual) {
+    options.push({
+      id: "descargar-anulacion",
+      label: "Descargar anulación",
+      description: anulacionComprobanteLabel(liq.anulacionCbteTipo),
+      icon: Download,
+      onClick: onDescargarAnulacion,
     });
   }
   if (puedeAnular) {
@@ -998,6 +1021,21 @@ export function LiquidacionesTenantPage() {
     );
   }
 
+  /** Baja el PDF del CVLP o de su anulación con su nombre (pedido NyM, oct 2026). */
+  function descargarPdfArca(
+    liq: LiquidacionConTransportista,
+    kind: "liquidacion" | "anulacion",
+  ) {
+    return descargarPdfLiquidacionArca(liq.id, kind, () => getToken(), activeTenantId).catch(
+      (err) =>
+        setActionError({
+          id: liq.id,
+          msg: friendlyError(err, "arca"),
+          detalle: getArcaErrorDetalle(err),
+        }),
+    );
+  }
+
   function verPdfAnulacion(liq: LiquidacionConTransportista) {
     const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
     return verPdfEnPestania(
@@ -1082,6 +1120,8 @@ export function LiquidacionesTenantPage() {
       },
       onAdjuntarComprobante: !conArca ? () => setAdjuntarLiq(liq) : undefined,
       onVerPdfLiquidacion: !conArca ? () => verPdfLiquidacionFila(liq) : undefined,
+      onDescargarComprobante: conArca ? () => descargarPdfArca(liq, "liquidacion") : undefined,
+      onDescargarAnulacion: conArca ? () => descargarPdfArca(liq, "anulacion") : undefined,
     };
   }
 

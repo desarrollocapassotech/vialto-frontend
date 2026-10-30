@@ -89,6 +89,8 @@ export type UseViajeEditorConfig = {
   /** Catálogo de productos activos (stock) para el selector del modal; si se omite, solo se ven los ya cargados en el viaje. */
   fetchProductosCatalogo?: () => Promise<Producto[]>;
   hasFacturasArca?: boolean;
+  /** `Tenant.recomendacionCiudadesHabilitada` (default true): false = origen/destinos en texto libre, sin validar contra el catálogo. */
+  validarCiudades?: boolean;
 };
 
 function mensajeErrorTransportistaEfectivoExternoLocal(
@@ -512,8 +514,9 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
         }
       }
     }
+    const validarCiudades = configRef.current.validarCiudades !== false;
     const o = draft.origen.trim();
-    if (o) {
+    if (o && validarCiudades) {
       const okO = await esEtiquetaCiudadValida(draft.paisOrigen, o);
       if (!okO) {
         setError(
@@ -522,13 +525,13 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
         return;
       }
     }
-    const destinosVal = await validarDestinosRows(draft.destinosRows);
+    const destinosVal = await validarDestinosRows(draft.destinosRows, validarCiudades);
     if (!destinosVal.ok) {
       setDestinosError(destinosVal.message);
       return;
     }
     setDestinosError(null);
-    const clientesValidacion = await validarClientesRows(draft.clientesRows);
+    const clientesValidacion = await validarClientesRows(draft.clientesRows, validarCiudades);
     if (!clientesValidacion.ok) {
       setClientesRowErrors(clientesValidacion.rowErrors);
       setError(clientesValidacion.message);

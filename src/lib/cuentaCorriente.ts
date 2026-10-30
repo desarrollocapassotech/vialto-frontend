@@ -1,5 +1,5 @@
 import { apiFetch, apiJson, ApiError, extractApiErrorMessage } from '@/lib/api';
-import { filenameFromContentDisposition } from '@/lib/downloadFilename';
+import { descargarRespuesta } from '@/lib/downloadFilename';
 import { roundMoney2 } from '@/lib/facturaTotales';
 
 /** Lo que se carga a mano: venta/compra (cargo) o cobro/pago. */
@@ -450,14 +450,7 @@ async function descargarBlobODescartarError(res: Response, fallbackFilename: str
     }
     throw new ApiError(extractApiErrorMessage(data, res.statusText), res.status, data);
   }
-  const filename = filenameFromContentDisposition(res.headers.get('Content-Disposition'), fallbackFilename);
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  await descargarRespuesta(res, fallbackFilename);
 }
 
 /** Descarga el PDF del estado de cuenta de una contraparte, por período (dispara el download del navegador). */

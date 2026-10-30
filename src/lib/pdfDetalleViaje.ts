@@ -45,8 +45,14 @@ function idPropio2(v: Pick<Viaje, "idPropio2">, tenant: TenantPdfDetalle): [stri
 
 type ViajeFactura = Pick<
   Viaje,
-  "numero" | "numeroIdentificacionPersonalizado" | "idPropio2" | "origen" | "destino" | "productosViaje"
->;
+  | "numero"
+  | "numeroIdentificacionPersonalizado"
+  | "idPropio2"
+  | "origen"
+  | "destino"
+  | "productosViaje"
+> &
+  Partial<Pick<Viaje, "observaciones">>;
 
 /** Texto de la columna "Detalle" del PDF de factura (sin pasar a mayúsculas). */
 export function detalleFleteFactura(v: ViajeFactura, tenant: TenantPdfDetalle): string {
@@ -67,6 +73,8 @@ export function detalleFleteFactura(v: ViajeFactura, tenant: TenantPdfDetalle): 
     .filter(Boolean)
     .join(", ");
   if (producto) detalle += ` - ${productoLabels(tenant).singular.toUpperCase()}: ${producto}`;
+  const obs = v.observaciones?.trim();
+  if (obs) detalle += `\nOBS.: ${obs}`;
   return detalle;
 }
 
@@ -112,7 +120,8 @@ type ViajeLiquidacion = Pick<
   | "precioTransportistaExterno"
   | "cantidadTransportista"
   | "precioUnitarioTransportista"
->;
+> &
+  Partial<Pick<Viaje, "observaciones">>;
 
 /** Identificación del viaje en el CVLP: "CTG 101…-CP 0-1761" (ID propio + ID propio 2) o "Viaje #N". */
 function refViajeCvlp(v: ViajeLiquidacion, tenant: TenantPdfDetalle): string {
@@ -136,9 +145,11 @@ export function detalleViajeCvlp(v: ViajeLiquidacion, tenant: TenantPdfDetalle):
     .map((p) => p.producto?.nombre?.trim())
     .filter(Boolean)
     .join(", ");
-  return [v.chofer?.nombre?.trim(), refViajeCvlp(v, tenant), ruta, productos]
+  const detalle = [v.chofer?.nombre?.trim(), refViajeCvlp(v, tenant), ruta, productos]
     .filter(Boolean)
     .join(" — ");
+  const obs = v.observaciones?.trim();
+  return obs ? `${detalle}\nObs.: ${obs}` : detalle;
 }
 
 /** Fila de un viaje en el PDF del CVLP (columnas Cantidad | Detalle | Tarifa | IVA % | Importe). */

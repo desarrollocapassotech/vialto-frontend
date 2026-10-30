@@ -84,6 +84,7 @@ export function TenantHomePage() {
     transportistas: maestro.transportistas,
     vehiculos: maestro.vehiculos,
     hasFacturasArca: hasFacturasArca,
+    validarCiudades: tenant?.recomendacionCiudadesHabilitada !== false,
     refreshMaestroListas: async () => {
       const [clientes, choferes, transportistas, vehiculos] = await Promise.all(
         [
