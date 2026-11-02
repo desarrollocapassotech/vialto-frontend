@@ -1,4 +1,5 @@
 import { FacturaLineaDetalle } from "@/components/facturacion/FacturaLineaDetalle";
+import { formatIdFiscal } from "@/lib/ciudades/paises";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import {
   useEffect,
@@ -432,7 +433,7 @@ export function EmitirFacturaModal({
                         clienteDetalle
                           ? [
                               condicionIvaLabel(condicionIva),
-                              clienteDetalle.idFiscal ? `CUIT ${clienteDetalle.idFiscal}` : null,
+                              clienteDetalle.idFiscal ? `CUIT ${formatIdFiscal(clienteDetalle.idFiscal)}` : null,
                               clienteDetalle.direccion?.trim(),
                               clienteDetalle.pais ? `País: ${clienteDetalle.pais}` : null,
                             ]

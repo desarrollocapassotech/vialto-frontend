@@ -9,6 +9,7 @@ import {
   type ComprobanteManualDraft,
 } from "@/lib/comprobanteManual";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
+import { formatIdFiscal } from "@/lib/ciudades/paises";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -1492,7 +1493,7 @@ export function LiquidacionesTenantPage() {
                 className="flex items-center gap-1.5 font-medium"
                 title={
                   liq.transportista?.idFiscal
-                    ? `CUIT: ${liq.transportista.idFiscal}`
+                    ? `CUIT: ${formatIdFiscal(liq.transportista.idFiscal)}`
                     : undefined
                 }
               >

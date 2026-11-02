@@ -1,4 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
+import { formatIdFiscal } from "@/lib/ciudades/paises";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ClienteViewModal } from "@/components/clientes/ClienteViewModal";
@@ -341,7 +342,7 @@ export function ClientesSuperadminPage() {
           ...(idFiscalVisible ? [{
             id: "idFiscal",
             header: idFiscalLabel,
-            cell: (c: Cliente) => c.idFiscal ?? "—",
+            cell: (c: Cliente) => (c.idFiscal ? formatIdFiscal(c.idFiscal, c.pais) : "—"),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           }] : []),
           ...(paisVisible ? [{

@@ -5,6 +5,7 @@ export {
   paisCodigoDesdeTexto,
   inferirPaisDesdeUbicacion,
   idFiscalPorPais,
+  formatIdFiscal,
   validarIdFiscal,
   cuitDigitoVerificadorValido,
   condicionTributariaPorPais,

@@ -20,6 +20,7 @@ import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import {
   paisCodigoDesdeTexto,
   idFiscalPorPais,
+  formatIdFiscal,
   validarIdFiscal,
   condicionTributariaPorPais,
 } from "@/lib/ciudades";
@@ -114,8 +115,8 @@ export function TransportistaEditPage() {
         if (!cancelled) {
           setNombre(row.nombre);
           setPais(paisCodigoDesdeTexto(row.pais ?? ""));
-          setIdFiscal(row.idFiscal ?? "");
-          setIdFiscalGuardado(row.idFiscal ?? "");
+          setIdFiscal(formatIdFiscal(row.idFiscal, row.pais));
+          setIdFiscalGuardado(formatIdFiscal(row.idFiscal, row.pais));
           setEmail(row.email ?? "");
           setTelefono(row.telefono ?? "");
           setDomicilio(row.domicilio ?? "");

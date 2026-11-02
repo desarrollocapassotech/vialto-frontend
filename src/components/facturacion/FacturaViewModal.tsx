@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formatIdFiscal } from '@/lib/ciudades/paises';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Ban, Banknote, FileText, Paperclip, Receipt, RotateCw } from 'lucide-react';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
@@ -533,7 +534,7 @@ export function FacturaViewModal({
           <Dato
             label="Cliente"
             value={clienteNombre}
-            sub={cliente?.idFiscal ? `CUIT ${cliente.idFiscal}` : undefined}
+            sub={cliente?.idFiscal ? `CUIT ${formatIdFiscal(cliente.idFiscal)}` : undefined}
             className="col-span-2 sm:col-span-1"
           />
           <Dato

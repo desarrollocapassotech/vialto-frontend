@@ -19,6 +19,7 @@ import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { BloqueoModal } from "@/components/ui/BloqueoModal";
 import { Spinner } from "@/components/ui/Spinner";
 import { ApiError, apiFetch, apiJson } from "@/lib/api";
+import { formatIdFiscal } from "@/lib/ciudades/paises";
 import {
   condicionIvaLabel,
   facturaLetraFromCbteTipo,
@@ -369,7 +370,7 @@ export function AnularFacturaModal({
                       label="Cliente"
                       value={clienteDetalle?.nombre ?? "—"}
                       sub={[
-                        clienteDetalle?.idFiscal ? `CUIT ${clienteDetalle.idFiscal}` : null,
+                        clienteDetalle?.idFiscal ? `CUIT ${formatIdFiscal(clienteDetalle.idFiscal)}` : null,
                         condicionIva != null ? condicionIvaLabel(condicionIva) : null,
                       ]
                         .filter(Boolean)
