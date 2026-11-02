@@ -8,6 +8,7 @@ import {
   condicionTributariaPorPais,
   paisCodigoDesdeTexto,
   idFiscalPorPais,
+  formatIdFiscal,
   validarIdFiscal,
 } from '@/lib/ciudades';
 import type { PaisCodigo } from '@/lib/ciudades';
@@ -65,7 +66,7 @@ export function CompletarDatosFiscalesInline({
   const [pais, setPais] = useState<PaisCodigo | ''>(
     paisCodigoDesdeTexto(initial.pais ?? ''),
   );
-  const [idFiscal, setIdFiscal] = useState(initial.idFiscal ?? '');
+  const [idFiscal, setIdFiscal] = useState(formatIdFiscal(initial.idFiscal, initial.pais));
   const [condicionIva, setCondicionIva] = useState<number | null>(initial.condicionIva);
   const [condicionTributaria, setCondicionTributaria] = useState(
     initial.condicionTributaria ?? '',

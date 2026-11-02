@@ -1,4 +1,5 @@
 import type { Chofer } from '@/types/api';
+import { formatIdFiscal } from '@/lib/ciudades';
 
 export type ChoferFormState = {
   nombre: string;
@@ -32,7 +33,7 @@ export function choferFormStateFromApi(row: Chofer): ChoferFormState {
   return {
     nombre: row.nombre ?? '',
     dni: row.dni ?? '',
-    cuit: row.cuit ?? '',
+    cuit: formatIdFiscal(row.cuit, 'AR'),
     telefono: row.telefono ?? '',
     licencia: row.licencia ?? '',
     licenciaVence: choferLicenciaVenceInputValue(row.licenciaVence),

@@ -1,4 +1,5 @@
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
+import { formatIdFiscal } from '@/lib/ciudades/paises';
 import { labelTipoVehiculo } from '@/lib/vehiculoTipos';
 import {
   filtrarChoferes,
@@ -66,7 +67,7 @@ export function ClienteSearchSelect({
       inputClassName={inputClassName}
       filterItems={filtrarClientesPorQuery}
       getPrimaryLabel={(c) => c.nombre}
-      getSecondaryLabel={(c) => c.idFiscal}
+      getSecondaryLabel={(c) => (c.idFiscal ? formatIdFiscal(c.idFiscal) : c.idFiscal)}
       placeholderCerrado={placeholderCerrado}
       placeholderBuscar={placeholderBuscar}
       allowEmptyValue={allowEmptyValue}
@@ -287,7 +288,7 @@ export function TransportistaSearchSelect({
       inputClassName={inputClassName}
       filterItems={filtrarTransportistas}
       getPrimaryLabel={(t) => t.nombre}
-      getSecondaryLabel={(t) => t.idFiscal}
+      getSecondaryLabel={(t) => (t.idFiscal ? formatIdFiscal(t.idFiscal) : t.idFiscal)}
       placeholderCerrado={placeholderCerrado}
       placeholderBuscar={placeholderBuscar}
       searchAriaLabel="Filtrar transportistas"

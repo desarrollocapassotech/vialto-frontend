@@ -16,6 +16,7 @@ import { numeroVisibleViaje } from '@/lib/viajesFlota';
 import {
   computeFacturaTotalesFromBases,
   importeNetoViajeParaFactura,
+  restoSinTramoDeViaje,
   roundMoney2,
 } from '@/lib/facturaTotales';
 
@@ -106,7 +107,13 @@ function lineasFromTramos(
   const completos = tramos.filter(isFacturaTramoCompleto);
   if (completos.length === 0) return null;
 
-  const viajeIdsConTramo = new Set(completos.map((t) => t.viajeId));
+  const porViaje = new Map<string, FacturaTramoDraft[]>();
+  for (const t of completos) {
+    if (!t.viajeId) continue;
+    const list = porViaje.get(t.viajeId);
+    if (list) list.push(t);
+    else porViaje.set(t.viajeId, [t]);
+  }
   const lineas: FacturaLineaDraft[] = completos.map((t) => {
     const v = viajes.find((x) => x.id === t.viajeId);
     const nro = v ? numeroVisibleViaje(v) : '—';
@@ -118,14 +125,15 @@ function lineasFromTramos(
   });
 
   for (const id of viajeIds) {
-    if (viajeIdsConTramo.has(id)) continue;
     const v = viajes.find((x) => x.id === id);
     if (!v) continue;
+    const tramosDelViaje = porViaje.get(id) ?? [];
+    const resto = restoSinTramoDeViaje(v, tramosDelViaje);
+    if (resto <= 0.005) continue;
     const ruta = v.origen && v.destino ? ` ${v.origen} — ${v.destino}` : '';
-    const monto = importeNetoViajeParaFactura(v);
     lineas.push({
       descripcion: `Viaje #${numeroVisibleViaje(v)}${ruta}`,
-      importe: monto,
+      importe: resto,
       ivaPct: ivaPctHeader,
     });
   }

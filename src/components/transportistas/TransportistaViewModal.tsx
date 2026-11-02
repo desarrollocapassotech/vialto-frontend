@@ -10,7 +10,7 @@ import {
 import type { Transportista } from '@/types/api';
 import { useFieldConfig } from '@/hooks/useFieldConfig';
 import { condicionIvaLabel } from '@/lib/arcaCbteTipo';
-import { idFiscalPorPais, paisCodigoDesdeTexto } from '@/lib/ciudades/paises';
+import { formatIdFiscal, idFiscalPorPais, paisCodigoDesdeTexto } from '@/lib/ciudades/paises';
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return '—';
@@ -54,7 +54,7 @@ export function TransportistaViewModal({
       <div className={viewModalGridClass}>
         {[
           { label: 'Nombre', value: transportista.nombre, visible: true },
-          { label: idFiscalPorPais(paisCodigoDesdeTexto(transportista.pais ?? '')).label, value: transportista.idFiscal, visible: isVisible("detalle_transportista", "idFiscal") },
+          { label: idFiscalPorPais(paisCodigoDesdeTexto(transportista.pais ?? '')).label, value: transportista.idFiscal ? formatIdFiscal(transportista.idFiscal, transportista.pais) : transportista.idFiscal, visible: isVisible("detalle_transportista", "idFiscal") },
           { label: 'País', value: transportista.pais, visible: isVisible("detalle_transportista", "pais") },
           { label: 'Email', value: transportista.email, visible: isVisible("detalle_transportista", "email") },
           { label: 'Teléfono', value: transportista.telefono, visible: isVisible("detalle_transportista", "telefono") },

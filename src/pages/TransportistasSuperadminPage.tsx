@@ -1,4 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
+import { formatIdFiscal } from "@/lib/ciudades/paises";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -363,7 +364,7 @@ export function TransportistasSuperadminPage() {
           ...(idFiscalVisible ? [{
             id: "idFiscal",
             header: idFiscalLabel,
-            cell: (t: Transportista) => t.idFiscal ?? "—",
+            cell: (t: Transportista) => (t.idFiscal ? formatIdFiscal(t.idFiscal, t.pais) : "—"),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           }] : []),
           ...(paisVisible ? [{

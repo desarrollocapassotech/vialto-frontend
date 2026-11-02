@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatIdFiscal } from "@/lib/ciudades/paises";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Ban, FileDown, FileText, Paperclip, Receipt, RotateCw, Trash2 } from "lucide-react";
@@ -628,7 +629,7 @@ export function LiquidacionViewModal({
               value={transportistaNombre}
               sub={
                 source.transportista?.idFiscal
-                  ? `CUIT ${source.transportista.idFiscal}`
+                  ? `CUIT ${formatIdFiscal(source.transportista.idFiscal)}`
                   : undefined
               }
               className="col-span-2 sm:col-span-1"

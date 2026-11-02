@@ -1,4 +1,5 @@
 import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
+import { formatIdFiscal } from "@/lib/ciudades/paises";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Receipt, HelpCircle } from "lucide-react";
 import {
@@ -1965,7 +1966,7 @@ export function CrearLiquidacionManualModal({
                             ? [
                                 condicionIvaLabel(condicionIva),
                                 transportistaSeleccionado.idFiscal
-                                  ? `CUIT ${transportistaSeleccionado.idFiscal}`
+                                  ? `CUIT ${formatIdFiscal(transportistaSeleccionado.idFiscal)}`
                                   : null,
                                 transportistaSeleccionado.domicilio?.trim(),
                               ]
@@ -1995,7 +1996,7 @@ export function CrearLiquidacionManualModal({
                           detalle={[
                             condicionIvaLabel(clienteDetalle.condicionIva ?? null),
                             clienteDetalle.idFiscal
-                              ? `CUIT ${clienteDetalle.idFiscal}`
+                              ? `CUIT ${formatIdFiscal(clienteDetalle.idFiscal)}`
                               : null,
                             clienteDetalle.direccion?.trim(),
                           ]

@@ -125,6 +125,43 @@ export function cuitDigitoVerificadorValido(cuit: string): boolean {
 }
 
 /**
+ * Cómo se muestra un ID fiscal. El backend lo guarda sin guiones ni puntos
+ * (`normalizarIdFiscal`), así que los separadores se agregan solo acá:
+ * AR 30-71674179-2 · CL 12345678-K · PY 8000123-4 · BR 12.345.678/0001-90 (CNPJ)
+ * o 123.456.789-01 (CPF) · UY 21 234567 0001. Sin país, un CUIT válido de 11
+ * dígitos se muestra como AR. Lo que no encaja se muestra tal cual.
+ * `pais` acepta el código o el texto guardado ("Argentina").
+ */
+export function formatIdFiscal(
+  valor: string | null | undefined,
+  pais?: string | null,
+): string {
+  const v = (valor ?? "").trim();
+  const s = v.toUpperCase().replace(/[^0-9A-Z]/g, "");
+  if (!s) return v;
+  let codigo = paisCodigoDesdeTexto(pais ?? "");
+  if (!codigo && cuitDigitoVerificadorValido(s)) codigo = "AR";
+
+  switch (codigo) {
+    case "AR":
+      return /^\d{11}$/.test(s) ? `${s.slice(0, 2)}-${s.slice(2, 10)}-${s.slice(10)}` : v;
+    case "CL":
+    case "PY":
+      return /^\d{5,9}[\dK]$/.test(s) ? `${s.slice(0, -1)}-${s.slice(-1)}` : v;
+    case "BR":
+      if (/^\d{14}$/.test(s))
+        return `${s.slice(0, 2)}.${s.slice(2, 5)}.${s.slice(5, 8)}/${s.slice(8, 12)}-${s.slice(12)}`;
+      if (/^\d{11}$/.test(s))
+        return `${s.slice(0, 3)}.${s.slice(3, 6)}.${s.slice(6, 9)}-${s.slice(9)}`;
+      return v;
+    case "UY":
+      return /^\d{12}$/.test(s) ? `${s.slice(0, 2)} ${s.slice(2, 8)} ${s.slice(8)}` : v;
+    default:
+      return v;
+  }
+}
+
+/**
  * Valida el formato del identificador fiscal según el país.
  * Retorna un mensaje de error o null si el valor es válido (o vacío).
  */
@@ -165,9 +202,9 @@ export function validarIdFiscal(
       break;
     }
     case "CL": {
-      // Dígitos, puntos y guión: 12.345.678-9 o 12345678-9
+      // Dígitos, puntos y guión: 12.345.678-9, 12345678-9 o 123456789 (como se guarda)
       const rut = valor.replace(/[.\s]/g, "").toUpperCase();
-      if (!/^\d{7,8}-[\dK]$/.test(rut))
+      if (!/^\d{7,8}-?[\dK]$/.test(rut))
         return "El RUT debe tener el formato 12.345.678-9 (7 u 8 dígitos más dígito verificador).";
       break;
     }

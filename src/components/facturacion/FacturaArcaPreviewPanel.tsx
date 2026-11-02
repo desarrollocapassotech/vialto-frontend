@@ -22,7 +22,7 @@ import { ParteFacturaResumen } from "@/components/facturacion/ParteFacturaResume
 import type { ResumenTotalFila } from "@/components/facturacion/ResumenDetalleColapsable";
 import type { ArcaConfig, Cliente } from "@/types/api";
 import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
-import { paisCodigoDesdeTexto, idFiscalPorPais } from "@/lib/ciudades/paises";
+import { formatIdFiscal, paisCodigoDesdeTexto, idFiscalPorPais } from "@/lib/ciudades/paises";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -153,7 +153,9 @@ export function FacturaArcaPreviewPanel({
             clienteDetalle
               ? [
                   condicionLabel,
-                  clienteDetalle.idFiscal ? `${idFiscalLabel} ${clienteDetalle.idFiscal}` : null,
+                  clienteDetalle.idFiscal
+                    ? `${idFiscalLabel} ${formatIdFiscal(clienteDetalle.idFiscal, clienteDetalle.pais)}`
+                    : null,
                   clienteDetalle.direccion?.trim(),
                   clienteDetalle.pais ? `País: ${clienteDetalle.pais}` : null,
                 ]

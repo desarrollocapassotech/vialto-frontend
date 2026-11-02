@@ -1,4 +1,5 @@
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
+import { formatIdFiscal } from "@/lib/ciudades/paises";
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -118,7 +119,7 @@ export function ChoferViewModal({
           {[
             { label: 'Nombre', value: chofer.nombre },
             { label: 'DNI', value: chofer.dni },
-            { label: 'CUIT', value: chofer.cuit },
+            { label: 'CUIT', value: chofer.cuit ? formatIdFiscal(chofer.cuit, 'AR') : chofer.cuit },
             { label: 'N.° Licencia', value: chofer.licencia },
             {
               label: 'Vto. Licencia',
