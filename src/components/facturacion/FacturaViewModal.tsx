@@ -29,7 +29,11 @@ import {
   viewModalBtnPrimary,
 } from '@/components/ui/ViewModalShell';
 import { AmbienteTestBadge } from '@/components/liquidaciones/AmbienteTestBadge';
-import { importeTotalConIvaPorTramo, roundMoney2 } from '@/lib/facturaTotales';
+import {
+  importeTotalConIvaPorTramo,
+  restoSinTramoDeViaje,
+  roundMoney2,
+} from '@/lib/facturaTotales';
 import {
   AfipInfraErrorBanner,
   ArcaErrorMessage,
@@ -216,10 +220,24 @@ export function FacturaViewModal({
   const ivaN = source.ivaPct ?? 0;
   const tramos = source.tramos ?? [];
   const porTramo = Boolean(factura.facturarPorTramo) && tramos.length > 0;
-  const viajeIdsConTramo = new Set(tramos.map((t) => t.viajeId).filter(Boolean));
-  const tieneViajesSinTramo = (source.viajes ?? []).some(
-    (v) => v.id && !viajeIdsConTramo.has(v.id),
-  );
+  const tieneRestoSinTramo = (() => {
+    if (!porTramo) return false;
+    const viajes = source.viajes ?? [];
+    if (viajes.length > 0) {
+      const porViaje = new Map<string, typeof tramos>();
+      for (const t of tramos) {
+        if (!t.viajeId) continue;
+        const list = porViaje.get(t.viajeId);
+        if (list) list.push(t);
+        else porViaje.set(t.viajeId, [t]);
+      }
+      return viajes.some(
+        (v) => restoSinTramoDeViaje(v, v.id ? (porViaje.get(v.id) ?? []) : []) > 0.005,
+      );
+    }
+    const sumaTramos = roundMoney2(tramos.reduce((s, t) => s + t.monto, 0));
+    return roundMoney2(factura.importe - sumaTramos) > 0.005;
+  })();
 
   let muestraIva = false;
   let totalConIva = factura.importe;
@@ -620,7 +638,7 @@ export function FacturaViewModal({
             <FilaMontoDesplegable
               label="IVA por tramo"
               resumen={`${tramos.length} tramo${tramos.length === 1 ? '' : 's'}${
-                tieneViajesSinTramo && ivaN > 0 ? ` · viajes sin tramo ${ivaN}%` : ''
+                tieneRestoSinTramo && ivaN > 0 ? ` · resto ${ivaN}%` : ''
               }`}
               value={`+ ${fmt2(ivaTotal)}`}
             >

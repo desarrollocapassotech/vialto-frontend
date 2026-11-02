@@ -6,7 +6,9 @@ import type { Viaje } from "@/types/api";
 import {
   importeNetoViajeParaFactura,
   ivaMontoDeTramos,
+  restoSinTramoDeViaje,
   roundMoney2,
+  viajeReemplazaMontoPorTramos,
 } from "@/lib/facturaTotales";
 import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
 import { marcarModalModificado } from "@/lib/descarteModal";
@@ -112,9 +114,9 @@ export function toFacturaTramosPayload(tramos: FacturaTramoDraft[]) {
 }
 
 /**
- * Neto = suma de los tramos cargados (para viajes con tramo) + viajes sin tramo.
- * La suma de los tramos pisa el monto del viaje.
- * IVA = tramos cargados + viajes sin tramo con IVA de cabecera.
+ * Neto = suma de los tramos cargados + resto de viajes sin tramo o con un único tramo parcial.
+ * Cuando un viaje tiene 2 o más tramos cargados (o 1 tramo que supera su monto), la suma de sus tramos pisa el monto del viaje.
+ * IVA = IVA propio de los tramos cargados + resto con el IVA de cabecera.
  */
 export function computeTotalesFacturaPorTramo(
   viajeIds: string[],
@@ -124,20 +126,25 @@ export function computeTotalesFacturaPorTramo(
 ): { neto: number; iva: number; total: number } {
   const completos = tramos.filter(isFacturaTramoCompleto);
   const viajesVinculados = viajes.filter((x) => viajeIds.includes(x.id));
-  const viajeIdsConTramo = new Set(
-    completos.map((t) => t.viajeId).filter(Boolean),
-  );
+  const porViaje = new Map<string, FacturaTramoDraft[]>();
+  for (const t of completos) {
+    if (!t.viajeId) continue;
+    const list = porViaje.get(t.viajeId);
+    if (list) list.push(t);
+    else porViaje.set(t.viajeId, [t]);
+  }
   const sumaTramos = roundMoney2(
     completos.reduce((s, t) => s + (t.monto ?? 0), 0),
   );
-  const sumaViajesSinTramo = roundMoney2(
-    viajesVinculados
-      .filter((v) => !viajeIdsConTramo.has(v.id))
-      .reduce((s, v) => s + importeNetoViajeParaFactura(v), 0),
+  const sumaRestos = roundMoney2(
+    viajesVinculados.reduce(
+      (s, v) => s + restoSinTramoDeViaje(v, porViaje.get(v.id) ?? []),
+      0,
+    ),
   );
   const neto = roundMoney2(
     completos.length > 0
-      ? sumaTramos + sumaViajesSinTramo
+      ? sumaTramos + sumaRestos
       : viajesVinculados.reduce((s, v) => s + importeNetoViajeParaFactura(v), 0),
   );
   const iva = ivaMontoDeTramos(
@@ -195,20 +202,23 @@ export function FacturaTramosEditor({
   const hayTramoIncompleto = tramos.some((t) => !isFacturaTramoCompleto(t));
 
   const viajesConDiferencia = useMemo(() => {
-    const tramosPorViaje = new Map<string, number>();
+    const tramosPorViaje = new Map<string, FacturaTramoDraft[]>();
     for (const t of tramos) {
       if (isFacturaTramoCompleto(t) && t.viajeId) {
-        tramosPorViaje.set(
-          t.viajeId,
-          roundMoney2((tramosPorViaje.get(t.viajeId) ?? 0) + t.monto),
-        );
+        const list = tramosPorViaje.get(t.viajeId);
+        if (list) list.push(t);
+        else tramosPorViaje.set(t.viajeId, [t]);
       }
     }
     const lista: Array<{ viaje: Viaje; sumaTramos: number; montoOriginal: number }> = [];
     for (const v of vinculados) {
-      if (!tramosPorViaje.has(v.id)) continue;
-      const suma = tramosPorViaje.get(v.id) ?? 0;
+      const tramosDelViaje = tramosPorViaje.get(v.id);
+      if (!tramosDelViaje || tramosDelViaje.length === 0) continue;
       const original = importeNetoViajeParaFactura(v);
+      if (!viajeReemplazaMontoPorTramos(original, tramosDelViaje)) continue;
+      const suma = roundMoney2(
+        tramosDelViaje.reduce((s, t) => s + t.monto, 0),
+      );
       if (Math.abs(suma - original) > 0.005) {
         lista.push({ viaje: v, sumaTramos: suma, montoOriginal: original });
       }
