@@ -640,7 +640,9 @@ export function LiquidacionViewModal({
                 value={CBTE_TIPO[source.cbteTipo] ?? `Tipo ${source.cbteTipo}`}
                 sub={
                   source.cbteNro != null
-                    ? `N° ${nroComprobante(source.ptoVenta, source.cbteNro)}`
+                    ? `N° ${nroComprobante(source.ptoVenta, source.cbteNro)}${
+                        source.fechaEmision ? ` · Emitido ${fmtDate(source.fechaEmision)}` : ""
+                      }`
                     : undefined
                 }
               />
