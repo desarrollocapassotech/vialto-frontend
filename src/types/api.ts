@@ -967,6 +967,8 @@ export interface ArcaConfig {
   /** En homologación se usa el CUIT de prueba de AFIP sin certificado propio; solo hace falta para producción. */
   certConfiguradoProduccion: boolean;
   keyConfiguradoProduccion: boolean;
+  /** Solo en la respuesta de guardar cuando cambió el ambiente: ajuste automático de los puntos de venta. */
+  ajustePuntosVenta?: { ok: boolean; mensaje: string };
 }
 
 /** Pago de una liquidación según su movimiento en Cuenta corriente. */

@@ -386,13 +386,24 @@ export function ArcaConfigTenantPage({
       setExisting(config);
       const merged = configToForm(config);
       setSavedValues(merged);
+      // Al cambiar de ambiente el backend ajusta solo los puntos de venta.
+      const ajuste = config.ajustePuntosVenta;
+      if (ajuste) {
+        touched.add("ptoVentaCvlp");
+        touched.add("ptoVentaFactura");
+      }
       setValues((prev) => {
         const next = { ...prev };
         for (const k of touched)
           (next as Record<string, string>)[k] = merged[k];
         return next;
       });
-      showToast("Configuración guardada correctamente.");
+      if (ajuste && !ajuste.ok) setError(ajuste.mensaje);
+      showToast(
+        ajuste?.ok
+          ? `Configuración guardada. ${ajuste.mensaje}`
+          : "Configuración guardada correctamente.",
+      );
     } catch (e) {
       const msg = friendlyError(e, "arca");
       setError(msg);
@@ -916,6 +927,14 @@ export function ArcaConfigTenantPage({
               <p className="text-xs text-red-700">
                 Los comprobantes emitidos en producción son reales y tienen
                 validez fiscal ante AFIP.
+              </p>
+            )}
+            {canEditAmbiente && values.ambiente !== savedValues.ambiente && (
+              <p className="text-xs text-vialto-steel">
+                Al guardar, los puntos de venta se ajustan solos:{" "}
+                {values.ambiente === "produccion"
+                  ? "se toman de AFIP los habilitados para Web Services con el certificado de producción."
+                  : "pasan al 1 de homologación."}
               </p>
             )}
           </SectionCard>
