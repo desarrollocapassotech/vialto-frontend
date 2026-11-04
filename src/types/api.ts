@@ -967,6 +967,8 @@ export interface ArcaConfig {
   /** En homologación se usa el CUIT de prueba de AFIP sin certificado propio; solo hace falta para producción. */
   certConfiguradoProduccion: boolean;
   keyConfiguradoProduccion: boolean;
+  /** Solo en la respuesta de guardar cuando cambió el ambiente: ajuste automático de los puntos de venta. */
+  ajustePuntosVenta?: { ok: boolean; mensaje: string };
 }
 
 /** Pago de una liquidación según su movimiento en Cuenta corriente. */
@@ -1112,6 +1114,8 @@ export interface Liquidacion {
   ptoVenta: number | null;
   cae: string | null;
   caeFechaVto: string | null;
+  /** Fecha del CVLP informada a ARCA (medianoche UTC); null si no se emitió o es anterior al campo. */
+  fechaEmision?: string | null;
   /** Ambiente ARCA en el que se emitió el comprobante (homologacion | produccion). */
   ambiente?: string | null;
   /** Datos del comprobante de anulación (Nota de Crédito o Débito); el CVLP original se conserva arriba. */

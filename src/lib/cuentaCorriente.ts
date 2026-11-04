@@ -433,6 +433,35 @@ export function esDebeCc(m: { tipo: TipoMovimientoCcRegistrado }): boolean {
   return m.tipo === 'cargo';
 }
 
+/** Estado de imputación de un comprobante, para el filtro de la cuenta. */
+export type EstadoImputacionComprobanteCc = 'sin_imputar' | 'parcial' | 'imputado';
+
+export const ESTADO_IMPUTACION_COMPROBANTE_LABEL: Record<EstadoImputacionComprobanteCc, string> = {
+  sin_imputar: 'Sin imputar',
+  parcial: 'Imputado en parte',
+  imputado: 'Imputado',
+};
+
+const EPS_CC = 0.005;
+
+/**
+ * Estado de imputación de una venta/compra (cuánto de su importe cubren los cobros/pagos)
+ * o de un cobro/pago (cuánto se aplicó a ventas/compras). Sale solo de `pendiente`, que el
+ * backend calcula como importe − lo imputado, así que cada comprobante cae en un único estado.
+ * Anulaciones y comprobantes anulados no tienen estado de imputación (`null`).
+ */
+export function estadoImputacionComprobanteCc(
+  m: Pick<MovimientoCc, 'tipo' | 'importe' | 'pendiente' | 'estadoDisponibilidad'>,
+): EstadoImputacionComprobanteCc | null {
+  if (m.tipo !== 'cargo' && m.tipo !== 'pago') return null;
+  if (m.estadoDisponibilidad === 'anulado') return null;
+  const pendiente = m.pendiente ?? m.importe;
+  const imputado = m.importe - pendiente;
+  if (imputado <= EPS_CC) return 'sin_imputar';
+  if (pendiente <= EPS_CC) return 'imputado';
+  return 'parcial';
+}
+
 export const ESTADO_IMPUTACION_LABEL: Record<string, string> = {
   no_imputado: 'A cuenta',
   imputado_parcial: 'Imputado parcial',

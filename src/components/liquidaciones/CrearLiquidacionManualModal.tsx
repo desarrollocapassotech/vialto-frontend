@@ -1,4 +1,8 @@
-import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
+import {
+  errorFechaEmisionArca,
+  hoyArgentinaIso,
+  rangoFechaEmisionArca,
+} from "@/lib/facturaFechaEmision";
 import { formatIdFiscal } from "@/lib/ciudades/paises";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Receipt, HelpCircle } from "lucide-react";
@@ -372,6 +376,9 @@ export function CrearLiquidacionManualModal({
     configProp?.ptoVentaCvlp != null ? String(configProp.ptoVentaCvlp) : "",
   );
   const ptoVentaSyncedFromConfig = useRef(configProp?.ptoVentaCvlp != null);
+  // Fecha del CVLP que se informa a ARCA al emitir (editable dentro del rango que admite
+  // ARCA, ej. para cerrar liquidaciones del mes anterior los primeros días del mes).
+  const [fechaEmision, setFechaEmision] = useState(() => hoyArgentinaIso());
   const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(
     [],
   );
@@ -563,6 +570,8 @@ export function CrearLiquidacionManualModal({
   /** Esta liquidación va por ARCA (emisión, pto. de venta, datos fiscales completos). */
   const conArca = hasLiquidoProductoArca && !liquidacionManual;
   const showComprobante = !conArca;
+  const rangoFechaArca = rangoFechaEmisionArca();
+  const errorFechaEmision = conArca ? errorFechaEmisionArca(fechaEmision) : null;
   const cvlpClaseBAlerta = conArca && cvlpClaseBEsperada(condicionIva);
 
   useEffect(() => {
@@ -1085,6 +1094,14 @@ export function CrearLiquidacionManualModal({
       );
       return;
     }
+    if (action === "emitir" && !fechaEmision) {
+      setError("Ingresá la fecha de emisión.");
+      return;
+    }
+    if (action === "emitir" && errorFechaEmision) {
+      setError(errorFechaEmision);
+      return;
+    }
     if (action === "emitir" && cvlpClaseBAlerta) {
       setError(
         "No se puede emitir: la condición frente al IVA del transportista no corresponde a CVLP 060.",
@@ -1159,7 +1176,7 @@ export function CrearLiquidacionManualModal({
             () => getToken(),
             {
               method: "POST",
-              body: JSON.stringify({ ptoVenta: ptoVentaNum }),
+              body: JSON.stringify({ ptoVenta: ptoVentaNum, fechaEmision }),
             },
           );
         } catch (emitErr) {
@@ -1570,6 +1587,26 @@ export function CrearLiquidacionManualModal({
                     </div>
                     {/* La condición frente al IVA del transportista se ve en el tooltip del Receptor (panel derecho). */}
                     {/* El punto de venta no se muestra: sale de Configuración ARCA (ptoVentaCvlp). */}
+                    {conArca && (
+                      <div>
+                        <label htmlFor="fechaEmisionCvlp" className={labelClass}>
+                          Fecha de emisión <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          id="fechaEmisionCvlp"
+                          type="date"
+                          value={fechaEmision}
+                          min={rangoFechaArca.min}
+                          max={rangoFechaArca.max}
+                          onChange={(e) => setFechaEmision(e.target.value)}
+                          className={
+                            errorFechaEmision
+                              ? `${inputClass} !border-red-400`
+                              : inputClass
+                          }
+                        />
+                      </div>
+                    )}
                     <div>
                       <label htmlFor="comisionPct" className={labelClass}>
                         Comisión por flete (%)
