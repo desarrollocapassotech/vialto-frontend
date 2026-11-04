@@ -90,7 +90,7 @@ export function ViajeLiquidacionDetalleModal({
               No aplica
             </span>
             <p className="text-sm text-vialto-charcoal">
-              Este viaje no tiene transportista externo o el tenant no tiene
+              Este viaje no tiene transporte / porteador o el tenant no tiene
               integración ARCA.
             </p>
           </>

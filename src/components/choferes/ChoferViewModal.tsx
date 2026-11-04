@@ -129,7 +129,7 @@ export function ChoferViewModal({
             {
               label: 'Pertenencia',
               value: chofer.transportistaId
-                ? (transportistaNombre ?? 'Transportista externo')
+                ? (transportistaNombre ?? 'Transporte / Porteador')
                 : 'Flota propia',
             },
             { label: 'Alta', value: fmtDate(chofer.createdAt) },

@@ -212,7 +212,7 @@ export function VehiculoViewModal({
               campo: "transportistaId",
               label: "Pertenencia",
               value: vehiculo.transportistaId
-                ? (transportistaNombre ?? "Transportista externo")
+                ? (transportistaNombre ?? "Transporte / Porteador")
                 : "Flota propia",
             },
             { campo: "createdAt", label: "Alta", value: fmtDate(vehiculo.createdAt) },

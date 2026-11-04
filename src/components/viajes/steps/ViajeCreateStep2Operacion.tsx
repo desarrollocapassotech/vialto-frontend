@@ -206,18 +206,68 @@ export function ViajeCreateStep2Operacion({
           <div className="grid gap-3">
             <div className="flex min-w-0 flex-col gap-1">
               <span className={fieldLabelClass}>
-                Transportista externo <span className="text-red-500">*</span>
+                Transporte / Porteador <span className="text-red-500">*</span>
               </span>
               <TransportistaSearchSelect
                 transportistas={transportistas}
                 value={transportistaId}
                 onChange={onTransportistaIdChange}
                 inputClassName={inputClass}
-                aria-label="Transportista externo"
+                placeholderCerrado="Elegí un transporte / porteador…"
+                placeholderBuscar="Buscar transporte / porteador…"
+                emptyListChoiceLabel="Elegí un transporte / porteador…"
+                aria-label="Transporte / Porteador"
                 onNuevo={onNuevoTransportista}
               />
               <CrudFieldError message={fieldErrorTransportistaId} />
             </div>
+            {transportistaId && (
+              <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
+                <span className={fieldLabelClass}>
+                  ¿El transportista seleccionado realiza el flete?
+                </span>
+                <div className="flex gap-5">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="realiza-flete-create"
+                      checked={realizaFlete}
+                      onChange={() => onRealizaFleteChange(true)}
+                      className="accent-vialto-charcoal"
+                    />
+                    Sí
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="realiza-flete-create"
+                      checked={!realizaFlete}
+                      onChange={() => onRealizaFleteChange(false)}
+                      className="accent-vialto-charcoal"
+                    />
+                    No
+                  </label>
+                </div>
+                {!realizaFlete && (
+                  <div className="flex min-w-0 flex-col gap-1 mt-1">
+                    <span className={fieldLabelClass}>
+                      Transportista que realiza el flete <span className="text-red-500">*</span>
+                    </span>
+                    <TransportistaSearchSelect
+                      transportistas={transportistas.filter((t) => t.id !== transportistaId)}
+                      value={transportistaEfectivoId}
+                      onChange={onTransportistaEfectivoIdChange}
+                      inputClassName={`${inputClass}${transportistaEfectivoError ? " border-red-400" : ""}`}
+                      aria-label="Transportista que realiza el flete"
+                      onNuevo={onNuevoTransportista}
+                    />
+                    {transportistaEfectivoError && (
+                      <span className="text-xs text-red-600">{transportistaEfectivoError}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             {desgloseActivo ? (
               <>
                 <div
@@ -322,7 +372,7 @@ export function ViajeCreateStep2Operacion({
                       <MonedaSelect
                         value={monedaPrecioTransportista}
                         onChange={onMonedaPrecioTransportistaChange}
-                        aria-label="Moneda precio transportista externo"
+                        aria-label="Moneda precio transporte / porteador"
                       />
                     </div>
                     <CrudFieldError message={fieldErrorPrecioTransportistaExterno} />
@@ -369,53 +419,6 @@ export function ViajeCreateStep2Operacion({
                 )}
               </>
             )}
-            {transportistaId && (
-              <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
-                <span className={fieldLabelClass}>
-                  ¿El transportista seleccionado realiza el flete?
-                </span>
-                <div className="flex gap-5">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="realiza-flete-create"
-                      checked={realizaFlete}
-                      onChange={() => onRealizaFleteChange(true)}
-                      className="accent-vialto-charcoal"
-                    />
-                    Sí
-                  </label>
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="realiza-flete-create"
-                      checked={!realizaFlete}
-                      onChange={() => onRealizaFleteChange(false)}
-                      className="accent-vialto-charcoal"
-                    />
-                    No
-                  </label>
-                </div>
-                {!realizaFlete && (
-                  <div className="flex min-w-0 flex-col gap-1 mt-1">
-                    <span className={fieldLabelClass}>
-                      Transportista que realiza el flete <span className="text-red-500">*</span>
-                    </span>
-                    <TransportistaSearchSelect
-                      transportistas={transportistas.filter((t) => t.id !== transportistaId)}
-                      value={transportistaEfectivoId}
-                      onChange={onTransportistaEfectivoIdChange}
-                      inputClassName={`${inputClass}${transportistaEfectivoError ? " border-red-400" : ""}`}
-                      aria-label="Transportista que realiza el flete"
-                      onNuevo={onNuevoTransportista}
-                    />
-                    {transportistaEfectivoError && (
-                      <span className="text-xs text-red-600">{transportistaEfectivoError}</span>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
             <div className="grid gap-3">
               {mostrarChoferExterno && (
                 <div className="flex min-w-0 flex-col gap-1 max-w-md">
@@ -425,7 +428,7 @@ export function ViajeCreateStep2Operacion({
                     value={choferExternoId}
                     onChange={onChoferExternoIdChange}
                     inputClassName={inputClass}
-                    aria-label="Chofer transportista externo"
+                    aria-label="Chofer transporte / porteador"
                     onNuevo={onNuevoChoferExterno}
                   />
                 </div>

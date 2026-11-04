@@ -506,7 +506,7 @@ export function ImportWizard({
                     <p className="text-sm text-vialto-steel">
                       {hasLiquidoProductoArca && wizard.liquidacionesOmitidasUsdCount > 0
                         ? "No hay viajes en pesos para liquidar. La emisión de liquidaciones por ARCA (Líquido Producto) solo admite comprobantes en ARS."
-                        : "No hay viajes con transportista externo para liquidar."}
+                        : "No hay viajes con transporte / porteador para liquidar."}
                     </p>
                   )
                 }

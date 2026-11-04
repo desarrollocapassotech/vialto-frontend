@@ -250,13 +250,13 @@ export function ViajeInlineEditForm({
               <div className="grid gap-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="flex min-w-0 flex-col gap-1">
-                    <span className={LABEL}>Transportista externo</span>
+                    <span className={LABEL}>Transporte / Porteador</span>
                     <TransportistaSearchSelect
                       transportistas={transportistas}
                       value={draft.transportistaId}
                       onChange={(id) => set({ transportistaId: id })}
                       inputClassName={INPUT}
-                      aria-label="Transportista externo"
+                      aria-label="Transporte / Porteador"
                     />
                   </div>
                   {desgloseActivo ? (
@@ -345,7 +345,7 @@ export function ViajeInlineEditForm({
                               ),
                             })
                           }
-                          aria-label="Moneda precio transportista externo"
+                          aria-label="Moneda precio transporte / porteador"
                         />
                       </div>
                     </div>
@@ -359,7 +359,7 @@ export function ViajeInlineEditForm({
                       value={draft.choferExternoId}
                       onChange={(id) => set({ choferExternoId: id })}
                       inputClassName={INPUT}
-                      aria-label="Chofer transportista externo"
+                      aria-label="Chofer transporte / porteador"
                     />
                   </div>
                   <ViajeVehiculosLista

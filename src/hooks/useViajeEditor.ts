@@ -207,7 +207,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     const partes: string[] = [];
     if (!esExterno && v.choferId && chRow?.transportistaId) {
       partes.push(
-        "El chofer asociado a este viaje figura con transportista externo en su ficha; elegí uno de flota propia o actualizá el chofer.",
+        "El chofer asociado a este viaje figura con transporte / porteador en su ficha; elegí uno de flota propia o actualizá el chofer.",
       );
     }
     if (!esExterno && v.vehiculosViaje?.length) {
@@ -215,7 +215,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
         const vr = listas.vehiculos.find((x) => x.id === vv.vehiculoId);
         if (vr?.transportistaId) {
           partes.push(
-            "Algún vehículo del viaje figura con transportista externo en su ficha; elegí flota propia o actualizá el maestro.",
+            "Algún vehículo del viaje figura con transporte / porteador en su ficha; elegí flota propia o actualizá el maestro.",
           );
           break;
         }
@@ -473,7 +473,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     }
     const externo = draft.operacionModo === "externo";
     if (externo && !draft.transportistaId.trim()) {
-      setError("Seleccioná un transportista externo.");
+      setError("Seleccioná un transporte / porteador.");
       return;
     }
     const teErr = mensajeErrorTransportistaEfectivoExternoLocal(draft);
