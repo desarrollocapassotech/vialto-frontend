@@ -59,7 +59,7 @@ export function ViajeOperacionTipoFieldset({
               checked={modo === "externo"}
               onChange={() => onModoChange("externo")}
             />
-            <span>Transporte externo</span>
+            <span>Transporte / Porteador</span>
           </label>
         )}
         {mostrarPropio && (
@@ -78,14 +78,14 @@ export function ViajeOperacionTipoFieldset({
       </div>
       {modo === "externo" && !externoVisible && (
         <p className="text-xs text-amber-800/90">
-          La empresa no trabaja con transporte externo. Cambiá este viaje a
+          La empresa no trabaja con transporte / porteador. Cambiá este viaje a
           flota propia si corresponde.
         </p>
       )}
       {modo === "propio" && !propioVisible && (
         <p className="text-xs text-amber-800/90">
-          La empresa no trabaja con flota propia. Cambiá este viaje a transporte
-          externo si corresponde.
+          La empresa no trabaja con flota propia. Cambiá este viaje a transporte /
+          porteador si corresponde.
         </p>
       )}
       <div className="pt-1">

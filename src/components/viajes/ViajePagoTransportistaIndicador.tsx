@@ -60,7 +60,7 @@ export function ViajePagoTransportistaIndicador({ viaje, onClick, variante = 'ba
       <Tag
         {...commonProps}
         className={`${badgeBase} ${onClick ? badgeInteractive : ''} border-emerald-500/80 bg-emerald-100 text-emerald-950`}
-        title="El transportista externo está pagado en su totalidad"
+        title="El transporte / porteador está pagado en su totalidad"
       >
         <span aria-hidden>✓</span>
         Pagado
@@ -72,7 +72,7 @@ export function ViajePagoTransportistaIndicador({ viaje, onClick, variante = 'ba
     <Tag
       {...commonProps}
       className={`${badgeBase} ${onClick ? badgeInteractive : ''} border-red-400/90 bg-red-50 text-red-900`}
-      title="Saldo pendiente con el transportista externo"
+      title="Saldo pendiente con el transporte / porteador"
     >
       Sin pagar
       <span className="font-normal normal-case tracking-normal tabular-nums">

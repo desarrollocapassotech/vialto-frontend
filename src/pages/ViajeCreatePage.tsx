@@ -532,7 +532,7 @@ export function ViajeCreatePage() {
   async function handleContinuar2() {
     const externo = modoOperacion === "externo";
     if (externo && !transportistaId.trim()) {
-      setError("Seleccioná un transportista externo.");
+      setError("Seleccioná un transporte / porteador.");
       return;
     }
     setFieldErrors({});
@@ -671,7 +671,7 @@ export function ViajeCreatePage() {
       return;
     }
     if (externo && !transportistaId.trim()) {
-      setError("Seleccioná un transportista externo.");
+      setError("Seleccioná un transporte / porteador.");
       setStep(2);
       return;
     }

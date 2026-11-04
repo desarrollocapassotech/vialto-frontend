@@ -64,7 +64,7 @@ export function TransportistaAsignacionFields({
                 disabled={disabled}
                 onChange={() => onModoChange('externo')}
               />
-              Transportista externo
+              Transporte / Porteador
             </label>
           </div>
         </>

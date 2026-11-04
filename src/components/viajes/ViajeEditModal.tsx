@@ -1046,10 +1046,13 @@ export function ViajeEditModal({
                 externoContent={
                   <div className="grid gap-3">
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={labelClass}>Transportista externo</span>
+                      <span className={labelClass}>Transporte / Porteador</span>
                       <TransportistaSearchSelect
                         transportistas={todosTransportistas}
                         value={draft.transportistaId}
+                        placeholderCerrado="Elegí un transporte / porteador…"
+                        placeholderBuscar="Buscar transporte / porteador…"
+                        emptyListChoiceLabel="Elegí un transporte / porteador…"
                         onChange={(id) =>
                           setDraft((p) =>
                             p
@@ -1066,7 +1069,7 @@ export function ViajeEditModal({
                         }
                         inputClassName={inputClass}
                         disabled={datosTransporteBloqueados || saving}
-                        aria-label="Transportista externo"
+                        aria-label="Transporte / Porteador"
                         onNuevo={
                           getToken && !datosTransporteBloqueados
                             ? () => setQuickCreate("transportista")
@@ -1074,6 +1077,89 @@ export function ViajeEditModal({
                         }
                       />
                     </div>
+                    {draft.transportistaId && (
+                      <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
+                        <span className={labelClass}>
+                          ¿El transportista seleccionado realiza el flete?
+                        </span>
+                        <div className="flex gap-5">
+                          <label
+                            className={`flex items-center gap-2 text-sm ${datosTransporteBloqueados ? "cursor-not-allowed text-vialto-steel/70" : "cursor-pointer"}`}
+                          >
+                            <input
+                              type="radio"
+                              disabled={datosTransporteBloqueados}
+                              name={`realiza-flete-edit-${draft.numero || "e"}`}
+                              checked={draft.realizaFlete}
+                              onChange={() => {
+                                onClearTransportistaEfectivoError?.();
+                                setDraft((p) =>
+                                  p
+                                    ? {
+                                        ...p,
+                                        realizaFlete: true,
+                                        transportistaEfectivoId: "",
+                                      }
+                                    : p,
+                                );
+                              }}
+                              className="accent-vialto-charcoal disabled:opacity-60"
+                            />
+                            Sí
+                          </label>
+                          <label
+                            className={`flex items-center gap-2 text-sm ${datosTransporteBloqueados ? "cursor-not-allowed text-vialto-steel/70" : "cursor-pointer"}`}
+                          >
+                            <input
+                              type="radio"
+                              disabled={datosTransporteBloqueados}
+                              name={`realiza-flete-edit-${draft.numero || "e"}`}
+                              checked={!draft.realizaFlete}
+                              onChange={() => {
+                                onClearTransportistaEfectivoError?.();
+                                setDraft((p) =>
+                                  p ? { ...p, realizaFlete: false } : p,
+                                );
+                              }}
+                              className="accent-vialto-charcoal disabled:opacity-60"
+                            />
+                            No
+                          </label>
+                        </div>
+                        {!draft.realizaFlete && (
+                          <div className="flex min-w-0 flex-col gap-1 mt-1">
+                            <span className={labelClass}>
+                              Transportista que realiza el flete{" "}
+                              <span className="text-red-500">*</span>
+                            </span>
+                            <TransportistaSearchSelect
+                              transportistas={todosTransportistas.filter(
+                                (t) => t.id !== draft.transportistaId,
+                              )}
+                              value={draft.transportistaEfectivoId}
+                              onChange={(id) => {
+                                onClearTransportistaEfectivoError?.();
+                                setDraft((p) =>
+                                  p ? { ...p, transportistaEfectivoId: id } : p,
+                                );
+                              }}
+                              disabled={datosTransporteBloqueados || saving}
+                              inputClassName={`${inputClass}${
+                                transportistaEfectivoError
+                                  ? " border-red-400"
+                                  : ""
+                              }`}
+                              aria-label="Transportista que realiza el flete"
+                              onNuevo={
+                                getToken && !datosTransporteBloqueados
+                                  ? () => setQuickCreate("transportista")
+                                  : undefined
+                              }
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {desgloseActivo ? (
                       <>
                         <div
@@ -1270,7 +1356,7 @@ export function ViajeEditModal({
                                       : p,
                                   )
                                 }
-                                aria-label="Moneda precio transportista externo"
+                                aria-label="Moneda precio transporte / porteador"
                               />
                             </div>
                           </div>
@@ -1334,89 +1420,6 @@ export function ViajeEditModal({
                         )}
                       </>
                     )}
-                    {draft.transportistaId && (
-                      <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
-                        <span className={labelClass}>
-                          ¿El transportista seleccionado realiza el flete?
-                        </span>
-                        <div className="flex gap-5">
-                          <label
-                            className={`flex items-center gap-2 text-sm ${datosTransporteBloqueados ? "cursor-not-allowed text-vialto-steel/70" : "cursor-pointer"}`}
-                          >
-                            <input
-                              type="radio"
-                              disabled={datosTransporteBloqueados}
-                              name={`realiza-flete-edit-${draft.numero || "e"}`}
-                              checked={draft.realizaFlete}
-                              onChange={() => {
-                                onClearTransportistaEfectivoError?.();
-                                setDraft((p) =>
-                                  p
-                                    ? {
-                                        ...p,
-                                        realizaFlete: true,
-                                        transportistaEfectivoId: "",
-                                      }
-                                    : p,
-                                );
-                              }}
-                              className="accent-vialto-charcoal disabled:opacity-60"
-                            />
-                            Sí
-                          </label>
-                          <label
-                            className={`flex items-center gap-2 text-sm ${datosTransporteBloqueados ? "cursor-not-allowed text-vialto-steel/70" : "cursor-pointer"}`}
-                          >
-                            <input
-                              type="radio"
-                              disabled={datosTransporteBloqueados}
-                              name={`realiza-flete-edit-${draft.numero || "e"}`}
-                              checked={!draft.realizaFlete}
-                              onChange={() => {
-                                onClearTransportistaEfectivoError?.();
-                                setDraft((p) =>
-                                  p ? { ...p, realizaFlete: false } : p,
-                                );
-                              }}
-                              className="accent-vialto-charcoal disabled:opacity-60"
-                            />
-                            No
-                          </label>
-                        </div>
-                        {!draft.realizaFlete && (
-                          <div className="flex min-w-0 flex-col gap-1 mt-1">
-                            <span className={labelClass}>
-                              Transportista que realiza el flete{" "}
-                              <span className="text-red-500">*</span>
-                            </span>
-                            <TransportistaSearchSelect
-                              transportistas={todosTransportistas.filter(
-                                (t) => t.id !== draft.transportistaId,
-                              )}
-                              value={draft.transportistaEfectivoId}
-                              onChange={(id) => {
-                                onClearTransportistaEfectivoError?.();
-                                setDraft((p) =>
-                                  p ? { ...p, transportistaEfectivoId: id } : p,
-                                );
-                              }}
-                              disabled={datosTransporteBloqueados || saving}
-                              inputClassName={`${inputClass}${
-                                transportistaEfectivoError
-                                  ? " border-red-400"
-                                  : ""
-                              }`}
-                              aria-label="Transportista que realiza el flete"
-                              onNuevo={
-                                getToken && !datosTransporteBloqueados
-                                  ? () => setQuickCreate("transportista")
-                                  : undefined
-                              }
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
                     <div className="grid gap-3">
                       {isVisible("edicion_viaje", "choferExternoId") && (
                         <div className="flex min-w-0 flex-col gap-1 max-w-md">
@@ -1430,7 +1433,7 @@ export function ViajeEditModal({
                               )
                             }
                             inputClassName={inputClass}
-                            aria-label="Chofer transportista externo"
+                            aria-label="Chofer transporte / porteador"
                             onNuevo={
                               getToken
                                 ? () => setQuickCreate("chofer-ext")

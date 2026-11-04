@@ -300,10 +300,10 @@ function parrafosTooltipPorMoneda(
   if (d.costoTransportista > 0) {
     const label = esCostoReal(v) ? "Real liquidado" : "Estimado";
     lines.push(
-      `Transportista externo (${moneda}): −${formatViajeImporteForListado(d.costoTransportista, moneda)} (${label})`,
+      `Transporte / Porteador (${moneda}): −${formatViajeImporteForListado(d.costoTransportista, moneda)} (${label})`,
     );
   } else if (!flotaPropia && d.ingresos > 0 && monedaTieneMovimiento(d)) {
-    lines.push(`Transportista externo (${moneda}): sin cargo (0).`);
+    lines.push(`Transporte / Porteador (${moneda}): sin cargo (0).`);
   }
   if (d.gastosExtra > 0) {
     lines.push(
@@ -375,7 +375,7 @@ function gananciaBrutaMetaAutomatica(
   const d = desglose[moneda];
   paragraphs.push("Imp. a facturar − Trans. ext. − Gastos extra");
   if (flotaPropia) {
-    paragraphs.push("Transportista externo: sin cargo (flota propia).");
+    paragraphs.push("Transporte / Porteador: sin cargo (flota propia).");
   }
   paragraphs.push(...parrafosTooltipPorMoneda(moneda, d, flotaPropia, v));
   if (d.gastosExtra <= 0) {
@@ -434,7 +434,7 @@ export function gananciaBrutaDesgloseDetalle(v: Viaje): GananciaBrutaDetalleFila
     }
     if (d.costoTransportista > 0) {
       filas.push({
-        label: 'Transportista externo',
+        label: 'Transporte / Porteador',
         monto: -d.costoTransportista,
         moneda,
         tag: esCostoReal(v) ? 'Real liquidado' : 'Estimado',
