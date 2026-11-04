@@ -37,6 +37,9 @@ import {
   fetchSaldoProveedor,
   cuentaEnHistorialCc,
   esDebeCc,
+  estadoImputacionComprobanteCc,
+  ESTADO_IMPUTACION_COMPROBANTE_LABEL,
+  type EstadoImputacionComprobanteCc,
   type MovimientoCc,
   type SaldoPorMoneda,
   type TipoContraparte,
@@ -299,6 +302,8 @@ export function CuentaContraparteView({
   const [hastaFiltro, setHastaFiltro] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('');
   const [comprobanteFiltro, setComprobanteFiltro] = useState('');
+  // Estado de imputación (Sin imputar / Imputado en parte / Imputado). Vacío = todos.
+  const [imputacionFiltro, setImputacionFiltro] = useState<EstadoImputacionComprobanteCc | ''>('');
   // Se elige tocando la tarjeta de saldo de esa moneda (solo si la cuenta tiene más de una).
   const [monedaFiltro, setMonedaFiltro] = useState('');
   const multimoneda = (saldos?.length ?? 0) > 1;
@@ -320,10 +325,11 @@ export function CuentaContraparteView({
     if (desdeFiltro || hastaFiltro) n += 1;
     if (tipoFiltro.trim()) n += 1;
     if (comprobanteFiltro.trim()) n += 1;
+    if (imputacionFiltro) n += 1;
     if (monedaFiltro) n += 1;
     if (filtroRapido) n += 1;
     return n;
-  }, [desdeFiltro, hastaFiltro, tipoFiltro, comprobanteFiltro, monedaFiltro, filtroRapido]);
+  }, [desdeFiltro, hastaFiltro, tipoFiltro, comprobanteFiltro, imputacionFiltro, monedaFiltro, filtroRapido]);
   const anyFiltroActivo = activeFilterCount > 0;
 
   // Filtro solo de despliegue: se aplica sobre `movimientosConSaldo` (ya calculado con
@@ -336,6 +342,7 @@ export function CuentaContraparteView({
       if (filtroRapido === 'sin_imputar' && !estaSinImputar(m)) return false;
       if (filtroRapido === 'vencidos' && !estaVencido(m, hoy)) return false;
       if (filtroRapido === 'sin_cobrar' && !estaSinCobrar(m)) return false;
+      if (imputacionFiltro && estadoImputacionComprobanteCc(m) !== imputacionFiltro) return false;
       if (monedaFiltro && m.moneda !== monedaFiltro) return false;
       const fecha = fechaDiaYmd(m.fecha) ?? '';
       if (desdeFiltro && fecha < desdeFiltro) return false;
@@ -350,10 +357,20 @@ export function CuentaContraparteView({
         return false;
       return true;
     });
-  }, [movimientosConSaldo, monedaFiltro, desdeFiltro, hastaFiltro, tipoFiltro, comprobanteFiltro, filtroRapido]);
+  }, [
+    movimientosConSaldo,
+    imputacionFiltro,
+    monedaFiltro,
+    desdeFiltro,
+    hastaFiltro,
+    tipoFiltro,
+    comprobanteFiltro,
+    filtroRapido,
+  ]);
 
   function limpiarFiltros() {
     setFiltroRapido('');
+    setImputacionFiltro('');
     setMonedaFiltro('');
     setDesdeFiltro('');
     setHastaFiltro('');
@@ -625,6 +642,23 @@ export function CuentaContraparteView({
       className={`${filtroInputClass} ${comprobanteFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'}`}
       aria-label="Filtrar por comprobante"
     />
+  );
+
+  // Orden lógico del circuito (no alfabético): sin imputar → en parte → imputado.
+  const imputacionFiltroInput = (
+    <select
+      value={imputacionFiltro}
+      onChange={(e) => setImputacionFiltro(e.target.value as EstadoImputacionComprobanteCc | '')}
+      className={`${filtroInputClass} ${imputacionFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'}`}
+      aria-label="Filtrar por estado de imputación"
+    >
+      <option value="">Todos</option>
+      {(['sin_imputar', 'parcial', 'imputado'] as const).map((estado) => (
+        <option key={estado} value={estado}>
+          {ESTADO_IMPUTACION_COMPROBANTE_LABEL[estado]}
+        </option>
+      ))}
+    </select>
   );
 
   // Opciones: las monedas que hay en esta cuenta.
@@ -910,6 +944,9 @@ export function CuentaContraparteView({
             <ListadoFiltroCampo label="Comprobante" active={!!comprobanteFiltro.trim()}>
               {comprobanteFiltroInput}
             </ListadoFiltroCampo>
+            <ListadoFiltroCampo label="Imputación" active={!!imputacionFiltro}>
+              {imputacionFiltroInput}
+            </ListadoFiltroCampo>
             <ListadoFiltroCampo label="Moneda" active={!!monedaFiltro}>
               {monedaFiltroInput}
             </ListadoFiltroCampo>
@@ -965,7 +1002,15 @@ export function CuentaContraparteView({
               <TituloSinFiltro>Haber</TituloSinFiltro>
             </th>
             <th scope="col" rowSpan={filasHead} className={`${listadoTablaThClass} align-top`}>
-              <TituloSinFiltro>Saldo</TituloSinFiltro>
+              {/* El saldo pendiente de cada comprobante es lo que define su estado de imputación. */}
+              <ViajesListadoHeaderFiltro
+                title="Saldo"
+                filterActive={!!imputacionFiltro}
+                filterSignature={imputacionFiltro}
+                onClear={() => setImputacionFiltro('')}
+              >
+                {imputacionFiltroInput}
+              </ViajesListadoHeaderFiltro>
             </th>
             {/* "Saldo acumulado" ocupa una subcolumna por moneda (con varias). El embudo de
                 moneda es el mismo filtro que las tarjetas de saldo. */}
