@@ -1,4 +1,5 @@
 import { apiFetch, apiJson, ApiError, extractApiErrorMessage } from '@/lib/api';
+import { formatCurrencyArFromNumber } from '@/lib/currencyMask';
 import { descargarRespuesta } from '@/lib/downloadFilename';
 import { roundMoney2 } from '@/lib/facturaTotales';
 
@@ -149,6 +150,21 @@ export function fetchMovimientos(
     `/api/cuenta-corriente/movimientos${qs ? `?${qs}` : ''}`,
     getToken,
   );
+}
+
+/** Saldo por moneda de todas las cuentas de un lado. Una cuenta sin movimientos no viene. */
+export function fetchSaldosCuentas(getToken: GetToken, lado: TipoContraparte) {
+  return apiJson<{ contraparteId: string; saldos: SaldoPorMoneda[] }[]>(
+    `/api/cuenta-corriente/saldos?lado=${lado}`,
+    getToken,
+  );
+}
+
+/** Saldo con signo pesos adelante: "$ 1.234,00" / "-$ 1.234,00". */
+export function fmtSaldoCc(valor: number): string {
+  return valor < 0
+    ? `-$ ${formatCurrencyArFromNumber(-valor)}`
+    : `$ ${formatCurrencyArFromNumber(valor)}`;
 }
 
 export function fetchSaldoCliente(getToken: GetToken, clienteId: string) {

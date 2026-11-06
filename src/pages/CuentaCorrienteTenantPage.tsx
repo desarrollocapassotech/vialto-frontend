@@ -1,11 +1,12 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronDown, FileDown, Truck, Users } from 'lucide-react';
+import { ChevronDown, FileDown, Plus, Truck, Users } from 'lucide-react';
 import { SelectorOpcionesSheet, selectorTriggerClass } from '@/components/ui/SelectorOpcionesSheet';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { useTipoFlotaVisible } from '@/hooks/useTipoFlotaVisible';
-import { ClienteSearchSelect, TransportistaSearchSelect } from '@/components/forms/MaestroSearchSelects';
+import { useBreadcrumbOverride } from '@/hooks/useBreadcrumbOverride';
+import { ListadoCuentasCc } from '@/components/cuenta-corriente/ListadoCuentasCc';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { TransportistaModal } from '@/components/viajes/TransportistaModal';
 import { CuentaContraparteView } from '@/components/cuenta-corriente/CuentaContraparteView';
@@ -23,14 +24,15 @@ const TABS: { id: TipoContraparte; label: string; icon: typeof Users }[] = [
 
 export function CuentaCorrienteTenantPage() {
   const { getToken } = useAuth();
+  // Pestaña y cuenta abierta en la URL (`?tipo=proveedor&id=...`): el Atrás del navegador vuelve
+  // al listado, y es el mismo link que usa el tablero del dashboard.
   const [searchParams, setSearchParams] = useSearchParams();
-  const [tipoElegido, setTipoContraparte] = useState<TipoContraparte>('cliente');
+  const tipoElegido: TipoContraparte = searchParams.get('tipo') === 'proveedor' ? 'proveedor' : 'cliente';
   // Empresa solo de flota propia (Tenant.tipoFlota): no tiene transportistas,
   // así que no hay cuentas de proveedores — queda fijo en Clientes, sin selector.
   const { transportistaExternoVisible: hayProveedores } = useTipoFlotaVisible();
   const tipoContraparte: TipoContraparte = hayProveedores ? tipoElegido : 'cliente';
-  const [contraparteId, setContraparteId] = useState('');
-  const [contraparteNombre, setContraparteNombre] = useState<string | null>(null);
+  const contraparteId = searchParams.get('id') ?? '';
   const [descargando, setDescargando] = useState(false);
   const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
   const maestro = useMaestroData();
@@ -69,34 +71,35 @@ export function CuentaCorrienteTenantPage() {
     }
   }
 
-  // Deep link desde el tablero del dashboard: `/cuenta-corriente?tipo=cliente&id=...`
-  useEffect(() => {
-    const tipo = searchParams.get('tipo');
-    const id = searchParams.get('id');
-    if ((tipo === 'cliente' || tipo === 'proveedor') && id) {
-      setTipoContraparte(tipo);
-      setContraparteId(id);
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.delete('tipo');
-          next.delete('id');
-          return next;
-        },
-        { replace: true },
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const cuentas = tipoContraparte === 'cliente' ? clientes : transportistas;
+  const contraparteNombre = contraparteId
+    ? (cuentas.find((x) => x.id === contraparteId)?.nombre ?? null)
+    : null;
 
-  useEffect(() => {
-    if (!contraparteId) {
-      setContraparteNombre(null);
-      return;
-    }
-    const lista = tipoContraparte === 'cliente' ? clientes : transportistas;
-    setContraparteNombre(lista.find((x) => x.id === contraparteId)?.nombre ?? null);
-  }, [contraparteId, tipoContraparte, clientes, transportistas]);
+  /** Link a la cuenta o al listado de una pestaña, sin perder otros parámetros de la URL. */
+  function urlDe(tipo: TipoContraparte, id?: string) {
+    const next = new URLSearchParams(searchParams);
+    next.delete('id');
+    next.delete('tipo');
+    if (tipo === 'proveedor') next.set('tipo', tipo);
+    if (id) next.set('id', id);
+    return next;
+  }
+
+  const hrefListado = (() => {
+    const qs = urlDe(tipoContraparte).toString();
+    return qs ? `/cuenta-corriente?${qs}` : '/cuenta-corriente';
+  })();
+  // Cuenta abierta: su nombre en el breadcrumb, que es también el camino de vuelta al listado.
+  useBreadcrumbOverride(
+    contraparteNombre
+      ? [
+          { label: 'Inicio', to: '/' },
+          { label: 'Cuenta corriente', to: hrefListado },
+          { label: contraparteNombre },
+        ]
+      : null,
+  );
 
   const [sectionSheetOpen, setSectionSheetOpen] = useState(false);
   const activeTabDef = TABS.find((t) => t.id === tipoContraparte);
@@ -104,9 +107,9 @@ export function CuentaCorrienteTenantPage() {
 
   function elegirTipo(tipo: TipoContraparte) {
     setSectionSheetOpen(false);
-    if (tipo === tipoContraparte) return;
-    setTipoContraparte(tipo);
-    setContraparteId('');
+    // También vuelve al listado si se toca la pestaña actual con una cuenta abierta.
+    if (tipo === tipoContraparte && !contraparteId) return;
+    setSearchParams(urlDe(tipo));
   }
 
   return (
@@ -118,20 +121,32 @@ export function CuentaCorrienteTenantPage() {
           <div ref={setFiltrosRapidosSlot} className="flex min-w-0 items-center gap-2 empty:hidden" />
           <div ref={setLimpiarSlot} className="empty:hidden" />
         </div>
-        {/* PDF del lado de la pestaña: pendientes de cobro (clientes) o de pago (proveedores). */}
-        <button
-          type="button"
-          onClick={handleDescargarListado}
-          disabled={descargando}
-          className="inline-flex h-10 items-center gap-2 px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-50"
-        >
-          <FileDown className="h-4 w-4" />
-          {descargando
-            ? 'Generando…'
-            : tipoContraparte === 'cliente'
-              ? 'Pendientes de cobro'
-              : 'Pendientes de pago'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {!contraparteId && (
+            <button
+              type="button"
+              onClick={() => setQuickCreate(tipoContraparte === 'cliente' ? 'cliente' : 'transportista')}
+              className="inline-flex h-10 items-center gap-2 px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+            >
+              <Plus className="h-4 w-4" />
+              {tipoContraparte === 'cliente' ? 'Nuevo cliente' : 'Nuevo proveedor'}
+            </button>
+          )}
+          {/* PDF del lado de la pestaña: pendientes de cobro (clientes) o de pago (proveedores). */}
+          <button
+            type="button"
+            onClick={handleDescargarListado}
+            disabled={descargando}
+            className="inline-flex h-10 items-center gap-2 px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-50"
+          >
+            <FileDown className="h-4 w-4" />
+            {descargando
+              ? 'Generando…'
+              : tipoContraparte === 'cliente'
+                ? 'Pendientes de cobro'
+                : 'Pendientes de pago'}
+          </button>
+        </div>
       </div>
 
       {errorDescarga && (
@@ -194,33 +209,24 @@ export function CuentaCorrienteTenantPage() {
       )}
 
       <div className="mt-6">
-        {/* items-end: las tarjetas de saldo (con su título arriba) quedan a la altura del select. */}
-        <div className="mb-6 flex flex-wrap items-end gap-3">
-          <div className="w-full sm:w-80">
-            {tipoContraparte === 'cliente' ? (
-              <ClienteSearchSelect
-                clientes={clientes}
-                value={contraparteId}
-                onChange={setContraparteId}
-                loading={maestroLoading}
-                onNuevo={() => setQuickCreate('cliente')}
-              />
-            ) : (
-              <TransportistaSearchSelect
-                transportistas={transportistas}
-                value={contraparteId}
-                onChange={setContraparteId}
-                onNuevo={() => setQuickCreate('transportista')}
-              />
-            )}
-          </div>
+        {/* Siempre montada: los portales de CuentaContraparteView ya tienen dónde dibujar. */}
+        <div className={contraparteId ? 'mb-6 flex flex-wrap items-end gap-3' : 'hidden'}>
           {/* Las tarjetas de saldo de la cuenta elegida se dibujan acá (portal desde CuentaContraparteView). */}
           <div ref={setSaldosSlot} className="flex flex-wrap gap-2" />
           {/* Exportar / Nueva venta / Registrar cobro, a la derecha en la misma fila (portal). */}
           <div ref={setAccionesSlot} className="ml-auto flex empty:hidden" />
         </div>
 
-        {contraparteId && contraparteNombre ? (
+        {!contraparteId ? (
+          <ListadoCuentasCc
+            key={tipoContraparte}
+            tipoContraparte={tipoContraparte}
+            cuentas={cuentas}
+            cargandoCuentas={maestroLoading}
+            onAbrir={(id) => setSearchParams(urlDe(tipoContraparte, id))}
+            limpiarFiltrosSlot={limpiarSlot}
+          />
+        ) : contraparteNombre ? (
           <CuentaContraparteView
             key={`${tipoContraparte}-${contraparteId}`}
             tipoContraparte={tipoContraparte}
@@ -233,7 +239,9 @@ export function CuentaCorrienteTenantPage() {
           />
         ) : (
           <p className="text-vialto-steel">
-            Elegí un {tipoContraparte === 'cliente' ? 'cliente' : 'proveedor'} para ver su cuenta.
+            {maestroLoading
+              ? 'Cargando…'
+              : `No se encontró ese ${tipoContraparte === 'cliente' ? 'cliente' : 'proveedor'}.`}
           </p>
         )}
       </div>
@@ -244,7 +252,7 @@ export function CuentaCorrienteTenantPage() {
           onClose={() => setQuickCreate(null)}
           onSaved={(c) => {
             setSessionClientes((prev) => [...prev, c]);
-            setContraparteId(c.id);
+            setSearchParams(urlDe('cliente', c.id));
             setQuickCreate(null);
             void maestro.refreshClientes();
           }}
@@ -256,7 +264,7 @@ export function CuentaCorrienteTenantPage() {
           onClose={() => setQuickCreate(null)}
           onSaved={(t) => {
             setSessionTransportistas((prev) => [...prev, t]);
-            setContraparteId(t.id);
+            setSearchParams(urlDe('proveedor', t.id));
             setQuickCreate(null);
             void maestro.refreshTransportistas();
           }}

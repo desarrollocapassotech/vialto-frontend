@@ -80,6 +80,9 @@ const ENTRIES: Entry[] = [
   },
   { pattern: "/notificaciones", build: (_p, ctx) => [homeCrumb(ctx), { label: "Notificaciones" }] },
 
+  // Cuenta corriente (con una cuenta abierta, la página agrega su nombre con useBreadcrumbOverride)
+  { pattern: "/cuenta-corriente", build: (_p, ctx) => [homeCrumb(ctx), { label: "Cuenta corriente" }] },
+
   // Base de datos
   { pattern: "/base-de-datos", build: (_p, ctx) => [homeCrumb(ctx), { label: "Base de datos" }] },
   {
