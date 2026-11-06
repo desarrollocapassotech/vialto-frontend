@@ -152,9 +152,12 @@ export function fetchMovimientos(
   );
 }
 
-/** Saldo por moneda de todas las cuentas de un lado. Una cuenta sin movimientos no viene. */
+/**
+ * Saldo por moneda y próximo vencimiento sin imputar de todas las cuentas de un lado.
+ * Una cuenta sin movimientos no viene.
+ */
 export function fetchSaldosCuentas(getToken: GetToken, lado: TipoContraparte) {
-  return apiJson<{ contraparteId: string; saldos: SaldoPorMoneda[] }[]>(
+  return apiJson<{ contraparteId: string; saldos: SaldoPorMoneda[]; proximoVencimiento: string | null }[]>(
     `/api/cuenta-corriente/saldos?lado=${lado}`,
     getToken,
   );
