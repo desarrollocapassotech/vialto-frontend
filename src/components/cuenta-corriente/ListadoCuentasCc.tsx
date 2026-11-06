@@ -24,7 +24,8 @@ type Fila = Cuenta & DatosCuenta;
 
 const TITULO_VENCIMIENTO = 'Próximo vencimiento sin imputar';
 
-const saldoEn = (f: Fila, moneda: string) => f.saldos.find((s) => s.moneda === moneda)?.saldo ?? null;
+/** Sin saldo en esa moneda = 0: se muestra y se ordena como cualquier otro saldo. */
+const saldoEn = (f: Fila, moneda: string) => f.saldos.find((s) => s.moneda === moneda)?.saldo ?? 0;
 
 type Props = {
   tipoContraparte: TipoContraparte;
@@ -147,8 +148,8 @@ export function ListadoCuentasCc({ tipoContraparte, cuentas, cargandoCuentas, on
             cell: (f: Fila) => {
               const saldo = saldoEn(f, moneda);
               return (
-                <span className={`tabular-nums ${saldo == null ? 'text-vialto-steel' : saldo < 0 ? 'text-emerald-700' : ''}`}>
-                  {saldo == null ? '—' : fmtSaldoCc(saldo)}
+                <span className={`tabular-nums ${saldo === 0 ? 'text-vialto-steel' : saldo < 0 ? 'text-emerald-700' : ''}`}>
+                  {fmtSaldoCc(saldo)}
                 </span>
               );
             },
