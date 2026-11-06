@@ -640,9 +640,7 @@ export function LiquidacionViewModal({
                 value={CBTE_TIPO[source.cbteTipo] ?? `Tipo ${source.cbteTipo}`}
                 sub={
                   source.cbteNro != null
-                    ? `N° ${nroComprobante(source.ptoVenta, source.cbteNro)}${
-                        source.fechaEmision ? ` · Emitido ${fmtDate(source.fechaEmision)}` : ""
-                      }`
+                    ? `N° ${nroComprobante(source.ptoVenta, source.cbteNro)}`
                     : undefined
                 }
               />
@@ -658,6 +656,9 @@ export function LiquidacionViewModal({
                   }
                 />
               )
+            )}
+            {hasArca && source.fechaEmision && (
+              <Dato label="Fecha de emisión" value={fmtDate(source.fechaEmision)} />
             )}
             <Dato
               label="Período"

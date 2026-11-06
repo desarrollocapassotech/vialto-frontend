@@ -35,6 +35,7 @@ import {
   fetchMovimientos,
   fetchSaldoCliente,
   fetchSaldoProveedor,
+  fmtSaldoCc as fmtSaldo,
   cuentaEnHistorialCc,
   esDebeCc,
   estadoImputacionComprobanteCc,
@@ -100,13 +101,6 @@ type MovimientoConSaldo = MovimientoCc & {
   /** Cobro/pago imputado: el número de cada factura/liquidación que cancela (tooltip y filtro). */
   comprobantesImputados: string[];
 };
-
-/** Saldo con signo pesos adelante: "$ 1.234,00" / "-$ 1.234,00". */
-function fmtSaldo(valor: number): string {
-  return valor < 0
-    ? `-$ ${formatCurrencyArFromNumber(-valor)}`
-    : `$ ${formatCurrencyArFromNumber(valor)}`;
-}
 
 /**
  * Ícono sutil junto al número de una venta/compra imputada (tooltip con el detalle):
