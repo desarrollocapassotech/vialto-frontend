@@ -48,11 +48,16 @@ export function ProductoSearchableSelect({
 
   const ordenadas = useMemo(() => ordenarAlfabetico(opciones, filaLabel), [opciones]);
 
+  // Busca también por descripción y código, así se encuentra un producto por lo que es.
   const filtradas = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return ordenadas;
-    return ordenadas.filter((o) => o.nombre.toLowerCase().includes(q));
+    return ordenadas.filter((o) =>
+      [o.nombre, o.descripcion, o.codigo].some((t) => t?.toLowerCase().includes(q)),
+    );
   }, [ordenadas, search]);
+
+  const seleccionada = opciones.find((x) => x.id === value);
 
   const actualizarRect = useCallback(() => {
     const el = btnRef.current;
@@ -150,7 +155,7 @@ export function ProductoSearchableSelect({
             onKeyDown={(e) => e.stopPropagation()}
           />
         </div>
-        <ul className="max-h-52 overflow-y-auto py-0.5">
+        <ul className="max-h-64 overflow-y-auto py-0.5">
           <li role="none">
             <button
               type="button"
@@ -173,10 +178,21 @@ export function ProductoSearchableSelect({
                   type="button"
                   role="option"
                   aria-selected={value === o.id}
-                  className={`flex w-full px-2 py-1.5 text-left text-sm hover:bg-vialto-mist/80 ${value === o.id ? 'bg-vialto-mist/60 font-medium' : ''}`}
+                  title={o.descripcion ?? undefined}
+                  className={`flex w-full flex-col px-2 py-1.5 text-left text-sm hover:bg-vialto-mist/80 ${value === o.id ? 'bg-vialto-mist/60' : ''}`}
                   onClick={() => elegir(o.id)}
                 >
-                  {filaLabel(o)}
+                  <span className="flex w-full items-baseline justify-between gap-2">
+                    <span className={`min-w-0 truncate ${value === o.id ? 'font-medium' : ''}`}>
+                      {filaLabel(o)}
+                    </span>
+                    {o.codigo && (
+                      <span className="shrink-0 text-[11px] text-vialto-steel">{o.codigo}</span>
+                    )}
+                  </span>
+                  {o.descripcion && (
+                    <span className="line-clamp-2 text-xs text-vialto-steel">{o.descripcion}</span>
+                  )}
                 </button>
               </li>
             ))
@@ -210,6 +226,7 @@ export function ProductoSearchableSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
+        title={seleccionada?.descripcion ?? undefined}
         className={`flex h-9 w-full min-w-0 items-center justify-between gap-2 border border-black/15 bg-white px-2 text-left text-sm disabled:opacity-50 ${triggerClassName}`}
         onClick={() => { if (disabled) return; setOpen((v) => !v); }}
       >

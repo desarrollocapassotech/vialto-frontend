@@ -87,7 +87,7 @@ import {
   idPropio2Label,
 } from "@/lib/viajesFlota";
 import { roundMoney2 } from "@/lib/facturaTotales";
-import { type OpcionProducto } from "@/lib/productosViaje";
+import { opcionDesdeProducto, type OpcionProducto } from "@/lib/productosViaje";
 import { ViajeCreateResumenClientes } from "@/components/viajes/steps/ViajeCreateResumenClientes";
 import { ViajeCreateStep1ClientesYCarga } from "@/components/viajes/steps/ViajeCreateStep1ClientesYCarga";
 import { ViajeCreateStep2Operacion } from "@/components/viajes/steps/ViajeCreateStep2Operacion";
@@ -1022,11 +1022,9 @@ export function ViajeCreatePage() {
     if (v) setTransportistaEfectivoId("");
   }
 
-  const opcionesProducto = productosCatalogo.map<OpcionProducto>((p) => ({
-    id: p.id,
-    nombre: p.nombre,
-    activo: p.activo,
-  }));
+  const opcionesProducto = productosCatalogo.map<OpcionProducto>((p) =>
+    opcionDesdeProducto(p),
+  );
 
   const mostrarGananciaBrutaManual = isVisible("alta_viaje", "gananciaBrutaManual");
   const mostrarPagosTransportista =

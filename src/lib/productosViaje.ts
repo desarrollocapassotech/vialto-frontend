@@ -10,7 +10,26 @@ export type OpcionProducto = {
   id: string;
   nombre: string;
   activo: boolean;
+  /** Código del sistema (P-001…), para identificarlo en el selector. */
+  codigo?: string | null;
+  /** Descripción del producto, se muestra debajo del nombre en el selector. */
+  descripcion?: string | null;
 };
+
+/** Opción del selector de productos a partir del producto del catálogo. */
+export function opcionDesdeProducto(
+  p: Pick<Producto, 'id' | 'nombre' | 'activo'> &
+    Partial<Pick<Producto, 'codigo' | 'descripcion'>>,
+  nombre: string = p.nombre,
+): OpcionProducto {
+  return {
+    id: p.id,
+    nombre,
+    activo: p.activo,
+    codigo: p.codigo ?? null,
+    descripcion: p.descripcion?.trim() || null,
+  };
+}
 
 type ProductoNombrado = { producto?: { nombre?: string | null } | null };
 
@@ -52,11 +71,7 @@ export function mergeOpcionesProducto(
 ): OpcionProducto[] {
   const m = new Map<string, OpcionProducto>();
   for (const p of activos) {
-    m.set(p.id, {
-      id: p.id,
-      nombre: p.nombre,
-      activo: p.activo,
-    });
+    m.set(p.id, opcionDesdeProducto(p));
   }
   const desdeViaje = viaje?.productosViaje?.length
     ? [...viaje.productosViaje].sort((a, b) => a.orden - b.orden)
@@ -64,11 +79,13 @@ export function mergeOpcionesProducto(
   for (const row of desdeViaje) {
     const cur = row.producto;
     if (cur?.id && !m.has(cur.id)) {
-      m.set(cur.id, {
-        id: cur.id,
-        nombre: cur.activo ? cur.nombre : `${cur.nombre} (inactivo)`,
-        activo: cur.activo,
-      });
+      m.set(
+        cur.id,
+        opcionDesdeProducto(
+          cur,
+          cur.activo ? cur.nombre : `${cur.nombre} (inactivo)`,
+        ),
+      );
     }
   }
   return [...m.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));

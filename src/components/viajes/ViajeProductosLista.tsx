@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react';
 import { ProductoSearchableSelect } from '@/components/viajes/ProductoSearchableSelect';
 import { ProductoModal } from '@/components/stock/ProductoModal';
-import type { OpcionProducto, ViajeProductoItem } from '@/lib/productosViaje';
+import {
+  opcionDesdeProducto,
+  type OpcionProducto,
+  type ViajeProductoItem,
+} from '@/lib/productosViaje';
 import type { Producto } from '@/types/api';
 import { labelEnFrase } from '@/lib/productoLabel';
 import { useProductoLabels } from '@/hooks/useProductoLabels';
@@ -116,7 +120,7 @@ export function ViajeProductosLista({
           onSaved={(p) => {
             setLocalOpciones((prev) => [
               ...prev,
-              { id: p.id, nombre: p.nombre, activo: p.activo },
+              opcionDesdeProducto(p),
             ]);
             onProductoCreado?.(p);
             if (nuevoParaIndex !== null) {
