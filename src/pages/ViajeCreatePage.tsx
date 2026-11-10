@@ -79,6 +79,8 @@ import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { ProductoLabelsProvider } from "@/hooks/useProductoLabels";
+import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { resolverPaisFijoViaje } from "@/lib/paisFijoViaje";
 import { DireccionesSugeridasProvider } from "@/hooks/useDireccionesSugeridas";
 import {
   labelIdentificacionPersonalizadaViajes,
@@ -237,6 +239,7 @@ export function ViajeCreatePage() {
   // Solo se usa en modo superadmin (`tenantId` presente): `useMaestroData()` resuelve el
   // tenant logueado, no el elegido — ver `tenantConfig` más abajo.
   const [tenantConfigPlatform, setTenantConfigPlatform] = useState<Tenant | null>(null);
+  const [tenantConfigPlatformListo, setTenantConfigPlatformListo] = useState(false);
   useEffect(() => {
     if (!tenantId || !isLoaded || !isSignedIn) return;
     let cancelled = false;
@@ -249,6 +252,8 @@ export function ViajeCreatePage() {
         if (!cancelled) setTenantConfigPlatform(data);
       } catch {
         if (!cancelled) setTenantConfigPlatform(null);
+      } finally {
+        if (!cancelled) setTenantConfigPlatformListo(true);
       }
     })();
     return () => {
@@ -257,15 +262,15 @@ export function ViajeCreatePage() {
   }, [getToken, isLoaded, isSignedIn, tenantId]);
 
   const tenantConfig = tenantId ? tenantConfigPlatform : maestro.tenant;
-  /** País fijo si el tenant tiene `paisOrigenDestinoOculto` — hay que resolverlo contra
-   * el catálogo de países ya cargado; si el país fijado fue borrado, no aplica (fallback
-   * seguro: se sigue mostrando el selector). */
-  const paisFijo = useMemo(() => {
-    if (!tenantConfig?.paisOrigenDestinoOculto || !tenantConfig.paisOrigenDestinoFijoId) {
-      return null;
-    }
-    return paisesConSesion.find((p) => p.id === tenantConfig.paisOrigenDestinoFijoId) ?? null;
-  }, [tenantConfig, paisesConSesion]);
+  // El formulario espera la config de la empresa: sin ella no se sabe si el país va
+  // fijo, y el selector aparecería un momento para después desaparecer.
+  const { loading: tenantPropioLoading } = useCurrentTenant();
+  const tenantConfigListo = tenantId ? tenantConfigPlatformListo : !tenantPropioLoading;
+  /** País fijo si el tenant tiene `paisOrigenDestinoOculto` (ver `resolverPaisFijoViaje`). */
+  const paisFijo = useMemo(
+    () => resolverPaisFijoViaje(tenantConfig, paisesConSesion),
+    [tenantConfig, paisesConSesion],
+  );
   /** `Tenant.recomendacionCiudadesHabilitada` (default true): false = ciudades en texto libre. */
   const sugerenciasCiudad = tenantConfig?.recomendacionCiudadesHabilitada !== false;
 
@@ -326,7 +331,8 @@ export function ViajeCreatePage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [localLoadingRefs, setLocalLoadingRefs] = useState(true);
-  const loadingRefs = tenantId ? localLoadingRefs : maestro.loading;
+  const loadingRefs =
+    (tenantId ? localLoadingRefs : maestro.loading) || !tenantConfigListo;
   const [error, setError] = useState<string | null>(null);
   const submitBusyRef = useRef(false);
 

@@ -1,4 +1,5 @@
 import { DireccionesSugeridasProvider } from "@/hooks/useDireccionesSugeridas";
+import { resolverPaisFijoViaje } from "@/lib/paisFijoViaje";
 import {
   useEffect,
   useMemo,
@@ -213,6 +214,8 @@ export type ViajeEditModalProps = {
     | "labelIdentificacionPersonalizadaViajes"
     | "paisOrigenDestinoOculto"
     | "paisOrigenDestinoFijoId"
+    | "paisOrigenDestinoFijoCodigo"
+    | "paisOrigenDestinoFijoNombre"
     | "idSistemaHabilitado"
     | "idPropio1Habilitado"
     | "idPropio2Habilitado"
@@ -374,10 +377,10 @@ export function ViajeEditModal({
   /** País fijo si el tenant tiene `paisOrigenDestinoOculto` — ver `Tenant.paisOrigenDestinoOculto`
    * en el backend. Si el país fijado fue borrado del catálogo, no aplica (fallback seguro: se
    * sigue mostrando el selector de país). */
-  const paisFijo = useMemo(() => {
-    if (!tenant?.paisOrigenDestinoOculto || !tenant.paisOrigenDestinoFijoId) return null;
-    return todosPaises.find((p) => p.id === tenant.paisOrigenDestinoFijoId) ?? null;
-  }, [tenant, todosPaises]);
+  const paisFijo = useMemo(
+    () => resolverPaisFijoViaje(tenant, todosPaises),
+    [tenant, todosPaises],
+  );
   /** `Tenant.recomendacionCiudadesHabilitada` (default true): false = ciudades en texto libre. */
   const sugerenciasCiudad = tenant?.recomendacionCiudadesHabilitada !== false;
 
