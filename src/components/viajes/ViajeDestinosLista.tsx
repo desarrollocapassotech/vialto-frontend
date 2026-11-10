@@ -60,6 +60,9 @@ export function ViajeDestinosLista({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Sin recuadro por destino y mismo espacio label→campo que Origen, para que
+          queden alineados lado a lado en el alta de viaje. */}
+      <div className="flex flex-col gap-1">
       <span className={sectionLabelClass}>{rows.length > 1 ? 'Destinos' : 'Destino'}</span>
       <div className="flex flex-col gap-3">
         {rows.map((row, i) => {
@@ -68,9 +71,9 @@ export function ViajeDestinosLista({
           return (
             <div
               key={`${groupId}-dest-${i}`}
-              className="grid grid-cols-1 gap-2 rounded border border-black/10 bg-white/60 p-3 sm:grid-cols-[auto_1fr_auto] sm:items-end"
+              className="flex flex-col gap-2 sm:flex-row sm:items-end"
             >
-              <div className="flex min-w-0 flex-col gap-1 sm:col-span-2">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
                 {esPrimero && sugerenciaPrimerDestino && !row.etiqueta.trim() && (
                   <button
                     type="button"
@@ -123,20 +126,23 @@ export function ViajeDestinosLista({
                   );
                 })()}
               </div>
-              <div className="flex items-end justify-end">
-                <button
-                  type="button"
-                  disabled={esPrimero}
-                  onClick={() => removeRow(i)}
-                  className="text-xs uppercase tracking-wider px-2 py-1 border border-black/15 text-vialto-steel hover:bg-red-50 disabled:opacity-40"
-                  title={esPrimero ? 'El primer destino es obligatorio' : 'Quitar destino'}
-                >
-                  Quitar
-                </button>
-              </div>
+              {/* El primer destino es obligatorio: sin "Quitar" (antes quedaba deshabilitado). */}
+              {!esPrimero && (
+                <div className="flex items-end justify-end">
+                  <button
+                    type="button"
+                    onClick={() => removeRow(i)}
+                    className="h-9 text-xs uppercase tracking-wider px-2 border border-black/15 text-vialto-steel hover:bg-red-50"
+                    title="Quitar destino"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
+      </div>
       </div>
       <button
         type="button"
