@@ -1,3 +1,5 @@
+import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
+import { transportistaEnFrase } from "@/lib/transportistaLabel";
 import {
   AdjuntarComprobanteClip,
   ComprobanteAdjuntoClip,
@@ -409,6 +411,9 @@ export function LiquidacionesTenantPage() {
   const { paisFijo } = useTenantPaisFijo(
     isSuperAdmin && activeTenantId ? activeTenantId : undefined,
   );
+  // Nombre que la empresa le da al transportista (superadmin, ej. "Fletero").
+  const tl = useTransportistaLabels(isSuperAdmin && activeTenantId ? activeTenantId : undefined);
+  const tFrase = transportistaEnFrase(tl.singular);
   const exportColumns = useMemo(
     () => liquidacionesExportColumns(paisFijo),
     [paisFijo],
@@ -1327,7 +1332,7 @@ export function LiquidacionesTenantPage() {
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 orden={ordenColumna("transportista")}
-                title="Transportista"
+                title={tl.singular}
                 filterActive={!!transportistaFilter}
                 filterSignature={transportistaFilter}
                 onClear={() => aplicarFiltroTransportista("")}
@@ -1339,7 +1344,7 @@ export function LiquidacionesTenantPage() {
                   onChange={(id) => aplicarFiltroTransportista(id)}
                   emptyListChoiceLabel="Todos"
                   placeholderCerrado="Todos"
-                  aria-label="Filtrar listado por transportista"
+                  aria-label={`Filtrar listado por ${tFrase}`}
                   inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
                     transportistaFilter
                       ? "text-vialto-fire"
@@ -1486,7 +1491,7 @@ export function LiquidacionesTenantPage() {
           },
           {
             id: "transportista",
-            header: "Transportista",
+            header: tl.singular,
             primary: true,
             cell: (liq) => (
               <p
