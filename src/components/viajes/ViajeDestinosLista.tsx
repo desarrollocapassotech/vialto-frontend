@@ -1,4 +1,5 @@
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
+import { FaltaCampo } from '@/components/shared/FaltaCampo';
 import { PaisSearchSelect } from '@/components/forms/PaisSearchSelect';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { Pais } from '@/types/api';
@@ -29,6 +30,10 @@ type Props = {
   sugerenciaPrimerDestino?: { pais: PaisCodigo; etiqueta: string } | null;
   /** `Tenant.recomendacionCiudadesHabilitada`: false = ciudad en texto libre. */
   sugerenciasCiudad?: boolean;
+  /** Falta el destino: borde rojo + aviso sutil en el primer destino si está vacío. */
+  errorPrimerDestino?: boolean;
+  /** Muestra el asterisco de obligatorio en el label. */
+  requerido?: boolean;
 };
 
 export function ViajeDestinosLista({
@@ -43,6 +48,8 @@ export function ViajeDestinosLista({
   paisFijo = null,
   sugerenciaPrimerDestino = null,
   sugerenciasCiudad = true,
+  errorPrimerDestino = false,
+  requerido = false,
 }: Props) {
   function setRow(i: number, patch: Partial<ViajeDestinoRowDraft>) {
     onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -63,7 +70,10 @@ export function ViajeDestinosLista({
       {/* Sin recuadro por destino y mismo espacio label→campo que Origen, para que
           queden alineados lado a lado en el alta de viaje. */}
       <div className="flex flex-col gap-1">
-      <span className={sectionLabelClass}>{rows.length > 1 ? 'Destinos' : 'Destino'}</span>
+      <span className={sectionLabelClass}>
+        {rows.length > 1 ? 'Destinos' : 'Destino'}{' '}
+        {requerido && <span className="text-red-500">*</span>}
+      </span>
       <div className="flex flex-col gap-3">
         {rows.map((row, i) => {
           const esPrimero = i === 0;
@@ -110,6 +120,7 @@ export function ViajeDestinosLista({
                             : paises.find((p) => (p.codigo || p.id) === row.pais)?.nombre
                         }
                         value={row.etiqueta}
+                        error={esPrimero && errorPrimerDestino && !row.etiqueta.trim()}
                         onChange={(next) => setRow(i, { etiqueta: next })}
                         inputClassName={`${inputClassName} w-full`}
                         disableBrowserAutocomplete={disableBrowserAutocomplete}
@@ -118,7 +129,10 @@ export function ViajeDestinosLista({
                     </div>
                   );
                   return esPrimero ? (
-                    camposDestino
+                    <>
+                      {camposDestino}
+                      <FaltaCampo show={errorPrimerDestino && !row.etiqueta.trim()} />
+                    </>
                   ) : (
                     <div className="flex min-w-0 flex-col gap-1 sm:grid sm:grid-cols-[auto_1fr] sm:items-end sm:gap-2">
                       <span className={LABEL}>{labelDestino}</span>

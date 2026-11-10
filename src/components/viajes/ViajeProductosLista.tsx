@@ -9,6 +9,8 @@ import {
 import type { Producto } from '@/types/api';
 import { labelEnFrase } from '@/lib/productoLabel';
 import { useProductoLabels } from '@/hooks/useProductoLabels';
+import { conBordeError } from '@/lib/bordeError';
+import { FaltaCampo } from '@/components/shared/FaltaCampo';
 
 export type ViajeProductosListaProps = {
   groupId: string;
@@ -20,6 +22,8 @@ export type ViajeProductosListaProps = {
   disabled?: boolean;
   getToken?: () => Promise<string | null>;
   onProductoCreado?: (p: Producto) => void;
+  /** Falta la carga: borde rojo en las filas sin elegir o, si no hay ninguna, en "+ Agregar". */
+  error?: boolean;
 };
 
 export function ViajeProductosLista({
@@ -31,6 +35,7 @@ export function ViajeProductosLista({
   disabled,
   getToken,
   onProductoCreado,
+  error = false,
 }: ViajeProductosListaProps) {
   const labels = useProductoLabels();
   const [showNuevo, setShowNuevo] = useState(false);
@@ -64,7 +69,7 @@ export function ViajeProductosLista({
               value={item.productoId}
               onChange={(id) => patchRow(i, { productoId: id })}
               opciones={todasLasOpciones}
-              triggerClassName={triggerClassName}
+              triggerClassName={conBordeError(triggerClassName, error && !item.productoId.trim())}
               disabled={disabled}
               onNuevoProducto={getToken ? () => { setNuevoParaIndex(i); setShowNuevo(true); } : undefined}
             />
@@ -107,10 +112,14 @@ export function ViajeProductosLista({
         type="button"
         disabled={disabled || value.some((item) => !item.productoId.trim())}
         onClick={addRow}
-        className="h-9 w-fit px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50"
+        className={conBordeError(
+          "h-9 w-fit px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50",
+          error && value.length === 0,
+        )}
       >
         + Agregar {labelEnFrase(labels.singular)}
       </button>
+      <FaltaCampo show={error && !value.some((item) => item.productoId.trim())} />
       {showNuevo && getToken && (
         <ProductoModal
           labels={labels}

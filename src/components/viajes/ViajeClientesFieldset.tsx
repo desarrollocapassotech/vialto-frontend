@@ -8,7 +8,13 @@ import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { maskCurrencyForMoneda, parseCurrencyForMoneda, preserveAmountOnMonedaChange } from '@/lib/currencyMask';
 import { textoRutaViaje } from '@/lib/viajesDestinos';
-import { ultimoDestinoCargado, type ViajeClienteDraft } from '@/lib/viajesClientes';
+import {
+  ultimoDestinoCargado,
+  type CampoClienteFaltante,
+  type ViajeClienteDraft,
+} from '@/lib/viajesClientes';
+import { conBordeError } from '@/lib/bordeError';
+import { FaltaCampo } from '@/components/shared/FaltaCampo';
 import { facturacionPermiteVincular } from '@/lib/viajesIndicadores';
 import type { OpcionProducto } from '@/lib/productosViaje';
 import type { Cliente, Pais, Producto } from '@/types/api';
@@ -163,6 +169,8 @@ interface Props {
   labelCantidad?: string;
   /** Número de la primera tarjeta (default 1). En edición el principal es el 1 y estos siguen desde 2. */
   numeroInicial?: number;
+  /** Campos que faltan por tarjeta: borde rojo + "Falta completar" debajo (ver `faltantesPorFila`). */
+  camposFaltantes?: Record<number, CampoClienteFaltante[]>;
 }
 
 /**
@@ -194,6 +202,7 @@ export function ViajeClientesFieldset({
   sugerenciasCiudad = true,
   labelCantidad = 'Cantidad',
   numeroInicial = 1,
+  camposFaltantes,
 }: Props) {
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
   const [openIndexes, setOpenIndexes] = useState<Set<number>>(
@@ -243,6 +252,11 @@ export function ViajeClientesFieldset({
           i > 0 && primero?.origen.trim() ? { pais: primero.paisOrigen, etiqueta: primero.origen } : null;
         const summary = textoRutaViaje(row.origen, row.destinosRows.map((r) => r.etiqueta).filter(Boolean));
         const summaryMonto = formatClienteMontoSummary(row, desgloseActivo);
+        const faltan = camposFaltantes?.[i] ?? [];
+        const falta = (campo: CampoClienteFaltante) => faltan.includes(campo);
+        // Cliente principal (alta: la 1ª tarjeta): origen, destino y cobro obligatorios,
+        // igual que en el backend. En los adicionales solo el cliente.
+        const principal = i < minRows;
         return (
           <ClienteCard
             key={i}
@@ -262,21 +276,24 @@ export function ViajeClientesFieldset({
             <div className="grid grid-cols-1 items-start gap-3 @3xl:grid-cols-2 @3xl:gap-x-5">
               <div className="flex min-w-0 flex-col gap-1 @3xl:order-1">
                 <span className={fieldLabelClass}>
-                  Cliente {i < minRows && <span className="text-red-500">*</span>}
+                  Cliente <span className="text-red-500">*</span>
                 </span>
                 <ClienteSearchSelect
                   clientes={clientes}
                   value={row.clienteId}
                   onChange={(id) => update(i, { clienteId: id })}
-                  inputClassName={inputClass}
+                  inputClassName={conBordeError(inputClass, falta('cliente'))}
                   disabled={bloqueado}
                   aria-label={`${labelPrefix} ${i + 1}`}
                   onNuevo={onNuevoCliente ? () => onNuevoCliente(i) : undefined}
                 />
+                <FaltaCampo show={falta('cliente')} />
               </div>
               <div className="flex min-w-0 flex-col gap-1 @3xl:order-3">
                 <div className="flex items-center gap-2">
-                  <span className={fieldLabelClass}>Origen</span>
+                  <span className={fieldLabelClass}>
+                    Origen {principal && <span className="text-red-500">*</span>}
+                  </span>
                   {sugerenciaOrigen && !row.origen.trim() && (
                     <button
                       type="button"
@@ -314,11 +331,13 @@ export function ViajeClientesFieldset({
                       value={row.origen}
                       onChange={(next) => update(i, { origen: next })}
                       inputClassName={inputClass}
+                      error={falta('origen')}
                       disableBrowserAutocomplete
                       sugerencias={sugerenciasCiudad}
                     />
                   </div>
                 </div>
+                <FaltaCampo show={falta('origen')} />
               </div>
               <div className="flex min-w-0 flex-col gap-1 @3xl:order-4">
                 <ViajeDestinosLista
@@ -333,6 +352,8 @@ export function ViajeClientesFieldset({
                   paisFijo={paisFijo}
                   sugerenciaPrimerDestino={sugerenciaDestino}
                   sugerenciasCiudad={sugerenciasCiudad}
+                  errorPrimerDestino={falta('destino')}
+                  requerido={principal}
                 />
               </div>
               {mostrarProductos && (
@@ -348,13 +369,16 @@ export function ViajeClientesFieldset({
                     disabled={bloqueado}
                     getToken={getToken}
                     onProductoCreado={onProductoCreado}
+                    error={falta('carga')}
                   />
                 </div>
               )}
               {desgloseActivo ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-[6rem_minmax(0,3fr)_minmax(0,2fr)] @3xl:order-5 @3xl:col-span-2">
                   <div className="flex flex-col gap-1">
-                    <span className={fieldLabelClass}>{labelCantidad}</span>
+                    <span className={fieldLabelClass}>
+                      {labelCantidad} {principal && <span className="text-red-500">*</span>}
+                    </span>
                     <input
                       type="text"
                       inputMode="decimal"
@@ -362,12 +386,15 @@ export function ViajeClientesFieldset({
                       onChange={(e) => update(i, { cantidadStr: e.target.value })}
                       disabled={bloqueado}
                       placeholder="0"
-                      className={`${inputClass} text-right tabular-nums`}
+                      className={`${conBordeError(inputClass, falta('cantidad'))} text-right tabular-nums`}
                       aria-label={`${labelCantidad} del cliente ${i + 1}`}
                     />
+                    <FaltaCampo show={falta('cantidad')} />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <span className={fieldLabelClass}>Tarifa</span>
+                    <span className={fieldLabelClass}>
+                      Tarifa {principal && <span className="text-red-500">*</span>}
+                    </span>
                     <div className="flex min-w-0 gap-2">
                       <input
                         type="text"
@@ -378,7 +405,7 @@ export function ViajeClientesFieldset({
                         }
                         disabled={bloqueado}
                         placeholder="0.00"
-                        className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
+                        className={`${conBordeError(inputClass, falta('tarifa'))} min-w-0 flex-1 text-right tabular-nums`}
                         aria-label={`Tarifa del cliente ${i + 1}`}
                       />
                       <MonedaSelect
@@ -388,6 +415,7 @@ export function ViajeClientesFieldset({
                         aria-label={`Moneda del cliente ${i + 1}`}
                       />
                     </div>
+                    <FaltaCampo show={falta('tarifa')} />
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className={`${fieldLabelClass} text-right`}>Total</span>
@@ -407,7 +435,9 @@ export function ViajeClientesFieldset({
                 </div>
               ) : (
                 <div className="flex min-w-0 flex-col gap-1 @3xl:order-5">
-                  <span className={fieldLabelClass}>Monto</span>
+                  <span className={fieldLabelClass}>
+                    Monto {principal && <span className="text-red-500">*</span>}
+                  </span>
                   <div className="flex min-w-0 gap-2">
                     <input
                       type="text"
@@ -418,7 +448,7 @@ export function ViajeClientesFieldset({
                       }
                       disabled={bloqueado}
                       placeholder="0.00"
-                      className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
+                      className={`${conBordeError(inputClass, falta('monto'))} min-w-0 flex-1 text-right tabular-nums`}
                       aria-label={`Monto del cliente ${i + 1}`}
                     />
                     <MonedaSelect
@@ -433,6 +463,7 @@ export function ViajeClientesFieldset({
                       aria-label={`Moneda del cliente ${i + 1}`}
                     />
                   </div>
+                  <FaltaCampo show={falta('monto')} />
                 </div>
               )}
             </div>

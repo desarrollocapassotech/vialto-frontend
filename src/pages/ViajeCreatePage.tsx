@@ -24,6 +24,8 @@ import {
   emptyClienteRow,
   clientesPayloadParaApi,
   validarClientesRows,
+  clientesRowsIncompletos,
+  faltantesPorFila,
   conPaisFijo,
   type ViajeClienteDraft,
 } from "@/lib/viajesClientes";
@@ -539,12 +541,46 @@ export function ViajeCreatePage() {
   // Alta: todas las tarjetas de cliente completas (ver `validarClientesRows`, modo `completo`).
   const opcionesValidacionClientes = {
     completo: true,
-    exigirCarga: isVisible("alta_viaje", "productoItems"),
     desglose: desgloseActivo,
-    labelCantidad: labelCantidadViajes(tenantConfig),
   };
+  // Después de un intento fallido (Continuar / Agregar cliente / Crear), los campos
+  // que faltan se marcan en rojo. Se calcula en vivo: al completar un campo deja de
+  // estar marcado sin esperar al próximo click.
+  const [marcarFaltantes, setMarcarFaltantes] = useState(false);
+  const camposFaltantesClientes = marcarFaltantes
+    ? faltantesPorFila(clientesRows, opcionesValidacionClientes)
+    : {};
+  const hayFaltantesClientes = Object.keys(camposFaltantesClientes).length > 0;
+  useEffect(() => {
+    // Ya no falta nada: se va también el aviso del pie.
+    if (marcarFaltantes && !hayFaltantesClientes) {
+      setMarcarFaltantes(false);
+      setError(null);
+    }
+  }, [marcarFaltantes, hayFaltantesClientes, setError]);
+
+  /** "+ Agregar cliente": solo si las tarjetas que ya están se completaron. */
+  function puedeAgregarCliente(): boolean {
+    const incompletos = clientesRowsIncompletos(clientesRows, opcionesValidacionClientes);
+    if (!incompletos) {
+      setError(null);
+      return true;
+    }
+    setMarcarFaltantes(true);
+    setError("Completá los campos marcados en rojo antes de agregar otro cliente.");
+    return false;
+  }
+
+  /** Campos faltantes en las tarjetas: los marca en rojo + aviso corto. true = faltan. */
+  function marcarSiFaltanDatosClientes(): boolean {
+    if (!clientesRowsIncompletos(clientesRows, opcionesValidacionClientes)) return false;
+    setMarcarFaltantes(true);
+    setError("Completá los campos marcados en rojo.");
+    return true;
+  }
 
   async function handleContinuar1() {
+    if (marcarSiFaltanDatosClientes()) return;
     const clientesValidacion = await validarClientesRows(
       clientesRows,
       sugerenciasCiudad,
@@ -708,6 +744,10 @@ export function ViajeCreatePage() {
     }
     setFieldErrors({});
 
+    if (marcarSiFaltanDatosClientes()) {
+      setStep(1);
+      return;
+    }
     const clientesValidacion = await validarClientesRows(
       clientesRows,
       sugerenciasCiudad,
@@ -1084,6 +1124,8 @@ export function ViajeCreatePage() {
             {step === 1 && (
               <ViajeCreateStep1ClientesYCarga
                 labelCantidad={labelCantidadViajes(tenantEfectivo)}
+                puedeAgregarCliente={puedeAgregarCliente}
+                camposFaltantes={camposFaltantesClientes}
                 clientesRows={clientesRows}
                 onClientesRowsChange={(rows) => {
                   setClientesRows(rows);

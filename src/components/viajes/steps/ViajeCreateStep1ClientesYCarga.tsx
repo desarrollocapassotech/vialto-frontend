@@ -1,7 +1,11 @@
 import { Button } from "@/components/ui/Button";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { ViajeClientesFieldset } from "@/components/viajes/ViajeClientesFieldset";
-import { emptyClienteRow, type ViajeClienteDraft } from "@/lib/viajesClientes";
+import {
+  emptyClienteRow,
+  type CampoClienteFaltante,
+  type ViajeClienteDraft,
+} from "@/lib/viajesClientes";
 import type { OpcionProducto } from "@/lib/productosViaje";
 import type { Cliente, Pais, Producto } from "@/types/api";
 
@@ -28,6 +32,10 @@ interface Props {
   sugerenciasCiudad?: boolean;
   /** "Toneladas" o "Cantidad" según `Tenant.unidadCantidadViajes`. */
   labelCantidad?: string;
+  /** Antes de agregar un cliente: false = hay tarjetas incompletas (el host muestra el aviso). */
+  puedeAgregarCliente?: () => boolean;
+  /** Campos que faltan por tarjeta: se marcan en rojo (ver `faltantesPorFila`). */
+  camposFaltantes?: Record<number, CampoClienteFaltante[]>;
 
   error: string | null;
   onContinuar: () => void;
@@ -51,6 +59,8 @@ export function ViajeCreateStep1ClientesYCarga({
   paisFijo = null,
   sugerenciasCiudad = true,
   labelCantidad,
+  puedeAgregarCliente,
+  camposFaltantes,
   error,
   onContinuar,
 }: Props) {
@@ -78,11 +88,16 @@ export function ViajeCreateStep1ClientesYCarga({
           paisFijo={paisFijo}
           sugerenciasCiudad={sugerenciasCiudad}
           labelCantidad={labelCantidad}
+          camposFaltantes={camposFaltantes}
           ocultarTextoError
         />
         <button
           type="button"
-          onClick={() => onClientesRowsChange([...clientesRows, emptyClienteRow()])}
+          onClick={() => {
+            // No se suma otra tarjeta mientras haya alguna incompleta: el host avisa qué falta.
+            if (puedeAgregarCliente && !puedeAgregarCliente()) return;
+            onClientesRowsChange([...clientesRows, emptyClienteRow()]);
+          }}
           className="mt-2 w-full rounded-md border-2 border-dashed border-black/20 py-3 text-sm font-medium uppercase tracking-wider text-vialto-steel hover:border-vialto-fire hover:bg-vialto-fire/5 hover:text-vialto-fire"
         >
           + Agregar cliente
