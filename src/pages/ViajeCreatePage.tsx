@@ -79,6 +79,7 @@ import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { ProductoLabelsProvider } from "@/hooks/useProductoLabels";
+import { DireccionesSugeridasProvider } from "@/hooks/useDireccionesSugeridas";
 import {
   labelIdentificacionPersonalizadaViajes,
   idSistemaHabilitado,
@@ -1034,6 +1035,8 @@ export function ViajeCreatePage() {
   // ─── RENDERIZADO ──────────────────────────────────────────────────────────
   return (
     <ProductoLabelsProvider tenant={tenantEfectivo}>
+      {/* Direcciones de entrega como sugerencias en Origen/Destino (ver CiudadCombobox). */}
+      <DireccionesSugeridasProvider tenantId={tenantId || undefined}>
       <CrudPageLayout
         title="Crear viaje"
         contentClassName="w-full min-w-0"
@@ -1362,6 +1365,7 @@ export function ViajeCreatePage() {
           }}
         />
       )}
+      </DireccionesSugeridasProvider>
     </ProductoLabelsProvider>
   );
 }

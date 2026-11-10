@@ -277,6 +277,7 @@ export function ViajeClientesFieldset({
                   )}
                   <div className="min-w-[200px] flex-1">
                     <CiudadCombobox
+                      campo="origen"
                       pais={paisFijo ? (paisFijo.codigo || paisFijo.id) : row.paisOrigen}
                       paisNombre={
                         paisFijo

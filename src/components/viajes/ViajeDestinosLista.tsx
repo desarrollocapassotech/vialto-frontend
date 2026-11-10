@@ -102,6 +102,7 @@ export function ViajeDestinosLista({
                         />
                       )}
                       <CiudadCombobox
+                        campo="destino"
                         pais={paisFijo ? (paisFijo.codigo || paisFijo.id) : row.pais}
                         paisNombre={
                           paisFijo

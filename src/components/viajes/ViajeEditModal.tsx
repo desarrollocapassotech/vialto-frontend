@@ -1,3 +1,4 @@
+import { DireccionesSugeridasProvider } from "@/hooks/useDireccionesSugeridas";
 import {
   useEffect,
   useMemo,
@@ -601,7 +602,8 @@ export function ViajeEditModal({
   );
 
   return (
-    <>
+    // Direcciones de entrega como sugerencias en Origen/Destino (ver CiudadCombobox).
+    <DireccionesSugeridasProvider tenantId={tenantId || undefined}>
       <div
         className="fixed inset-0 z-[45] flex items-stretch justify-center sm:items-center sm:p-4 md:p-6"
         role="presentation"
@@ -786,6 +788,7 @@ export function ViajeEditModal({
                           />
                         )}
                         <CiudadCombobox
+                          campo="origen"
                           pais={paisFijo ? (paisFijo.codigo || paisFijo.id) : draft.paisOrigen}
                           value={draft.origen}
                           onChange={(next) =>
@@ -1919,6 +1922,6 @@ export function ViajeEditModal({
             }}
           />
         )}
-    </>
+    </DireccionesSugeridasProvider>
   );
 }
