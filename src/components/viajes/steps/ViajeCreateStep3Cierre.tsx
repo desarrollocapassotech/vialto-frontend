@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { FaltaCampo } from "@/components/shared/FaltaCampo";
@@ -7,6 +8,7 @@ import { ViajeFechaHoraFields } from "@/components/viajes/ViajeFechaHoraFields";
 import {
   OtrosGastosFieldset,
   emptyOtroGasto,
+  otrosGastosIncompletos,
   type OtroGastoDraft,
   type OtroGastoAutor,
 } from "@/components/viajes/OtrosGastosFieldset";
@@ -65,6 +67,8 @@ interface Props {
 
   /** ID propio 1 obligatorio y vacío (después de un intento fallido). */
   faltaIdPropio1?: boolean;
+  /** Hay gastos con obligatorios vacíos (después de un intento fallido de crear). */
+  faltaGastos?: boolean;
 
   error: string | null;
   loading: boolean;
@@ -108,10 +112,17 @@ export function ViajeCreateStep3Cierre({
   gastoAutor,
   tenantId,
   faltaIdPropio1 = false,
+  faltaGastos = false,
   error,
   loading,
   onVolver,
 }: Props) {
+  // "+ Agregar gasto" con uno a medias: marca los incompletos hasta que se completen.
+  const [marcarGastos, setMarcarGastos] = useState(false);
+  const gastosIncompletos = otrosGastosIncompletos(otrosGastos);
+  useEffect(() => {
+    if (marcarGastos && !gastosIncompletos) setMarcarGastos(false);
+  }, [marcarGastos, gastosIncompletos]);
   return (
     <div className="flex flex-col gap-4">
       {/* Dos columnas solo si se muestran los dos campos; uno solo ocupa todo el ancho. */}
@@ -230,10 +241,18 @@ export function ViajeCreateStep3Cierre({
             tenantId={tenantId}
             stacked
             mostrarCargadoPor={false}
+            marcarIncompletos={faltaGastos || marcarGastos}
           />
           <button
             type="button"
-            onClick={() => onOtrosGastosChange([...otrosGastos, emptyOtroGasto(gastoAutor)])}
+            onClick={() => {
+              // No se suma otro gasto mientras haya uno con obligatorios vacíos.
+              if (otrosGastosIncompletos(otrosGastos)) {
+                setMarcarGastos(true);
+                return;
+              }
+              onOtrosGastosChange([...otrosGastos, emptyOtroGasto(gastoAutor)]);
+            }}
             className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
           >
             + Agregar gasto

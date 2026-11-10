@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { conBordeError } from '@/lib/bordeError';
+import { FaltaCampo } from '@/components/shared/FaltaCampo';
 import {
   formatNumberForMoneda,
   parseCurrencyForMoneda,
@@ -118,6 +120,23 @@ export function otroGastoDraftToApi(
   return out;
 }
 
+/**
+ * Obligatorios de un gasto (mismo criterio que el backend, `OtroGastoDto`):
+ * descripción y monto >= 0. La fecha es opcional.
+ */
+export function faltantesOtroGasto(d: OtroGastoDraft): { descripcion: boolean; monto: boolean } {
+  const monto = parseCurrencyForMoneda(d.montoStr, d.moneda);
+  return { descripcion: !d.descripcion.trim(), monto: monto == null || monto < 0 };
+}
+
+/** true = algún gasto tiene obligatorios vacíos (no se agrega otro ni se crea el viaje). */
+export function otrosGastosIncompletos(rows: OtroGastoDraft[]): boolean {
+  return rows.some((r) => {
+    const f = faltantesOtroGasto(r);
+    return f.descripcion || f.monto;
+  });
+}
+
 export function emptyOtroGasto(autor?: OtroGastoAutor): OtroGastoDraft {
   return {
     descripcion: '',
@@ -137,9 +156,11 @@ const smallInputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm
 const gastoRowGridClassCompact =
   'grid grid-cols-1 gap-4 mb-6 border-b border-black/10 pb-4 last:mb-4 last:border-0 last:pb-0 lg:mb-2 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_minmax(7rem,11rem)_auto] lg:items-end lg:gap-2 lg:border-0 lg:pb-0';
 
-function gastoFieldLabel(label: string, rowIndex: number) {
+function gastoFieldLabel(label: string, rowIndex: number, requerido = false) {
   return (
-    <span className={`${fieldLabelClass} ${rowIndex > 0 ? 'lg:hidden' : ''}`}>{label}</span>
+    <span className={`${fieldLabelClass} ${rowIndex > 0 ? 'lg:hidden' : ''}`}>
+      {label} {requerido && <span className="text-red-500">*</span>}
+    </span>
   );
 }
 
@@ -161,6 +182,8 @@ interface Props {
   stacked?: boolean;
   /** Si se muestra la columna "Cargado por". Default true; el dato se sigue guardando igual aunque no se muestre. */
   mostrarCargadoPor?: boolean;
+  /** Marca los gastos con obligatorios vacíos: borde rojo + "Falta completar" (ver `faltantesOtroGasto`). */
+  marcarIncompletos?: boolean;
 }
 
 export function OtrosGastosFieldset({
@@ -170,6 +193,7 @@ export function OtrosGastosFieldset({
   tenantId,
   stacked = false,
   mostrarCargadoPor = true,
+  marcarIncompletos = false,
 }: Props) {
   const userLabelMap = useOrgUserLabels(tenantId);
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
@@ -192,8 +216,11 @@ export function OtrosGastosFieldset({
         <span className={fieldLabelClass}>Otros gastos</span>
       </div>
 
-      {rows.map((row, i) =>
-        stacked ? (
+      {rows.map((row, i) => {
+        const f = marcarIncompletos
+          ? faltantesOtroGasto(row)
+          : { descripcion: false, monto: false };
+        return stacked ? (
           <ClienteCard
             key={i}
             title={row.descripcion.trim() || `Gasto ${i + 1}`}
@@ -203,28 +230,34 @@ export function OtrosGastosFieldset({
           >
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-1">
-                <span className={fieldLabelClass}>Descripción</span>
+                <span className={fieldLabelClass}>
+                  Descripción <span className="text-red-500">*</span>
+                </span>
                 <input
                   type="text"
                   value={row.descripcion}
                   onChange={(e) => update(i, { descripcion: e.target.value })}
                   placeholder="Ej. Peaje, estadía…"
-                  className={inputClass}
+                  className={conBordeError(inputClass, f.descripcion)}
                   aria-label={`Descripción gasto ${i + 1}`}
                 />
+                <FaltaCampo show={f.descripcion} />
               </div>
               <div className="grid grid-cols-[minmax(5rem,1fr)_5rem_minmax(7rem,1fr)] gap-2">
                 <div className="flex flex-col gap-1">
-                  <span className={fieldLabelClass}>Monto</span>
+                  <span className={fieldLabelClass}>
+                    Monto <span className="text-red-500">*</span>
+                  </span>
                   <input
                     type="text"
                     inputMode="decimal"
                     value={row.montoStr}
                     onChange={(e) => update(i, { montoStr: maskCurrencyForMoneda(e.target.value, row.moneda) })}
                     placeholder="0.00"
-                    className={`${smallInputClass} text-right tabular-nums`}
+                    className={`${conBordeError(smallInputClass, f.monto)} text-right tabular-nums`}
                     aria-label={`Monto gasto ${i + 1}`}
                   />
+                  <FaltaCampo show={f.monto} />
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className={fieldLabelClass}>Moneda</span>
@@ -272,29 +305,31 @@ export function OtrosGastosFieldset({
           <div key={i} className={gastoRowGridClassCompact}>
             {/* Descripción */}
             <div className="flex min-w-0 flex-col gap-1">
-              {gastoFieldLabel('Descripción', i)}
+              {gastoFieldLabel('Descripción', i, true)}
               <input
                 type="text"
                 value={row.descripcion}
                 onChange={(e) => update(i, { descripcion: e.target.value })}
                 placeholder="Ej. Peaje, estadía…"
-                className={inputClass}
+                className={conBordeError(inputClass, f.descripcion)}
                 aria-label={`Descripción gasto ${i + 1}`}
               />
+              <FaltaCampo show={f.descripcion} />
             </div>
 
             {/* Monto */}
             <div className="flex flex-col gap-1 lg:w-36">
-              {gastoFieldLabel('Monto', i)}
+              {gastoFieldLabel('Monto', i, true)}
               <input
                 type="text"
                 inputMode="decimal"
                 value={row.montoStr}
                 onChange={(e) => update(i, { montoStr: maskCurrencyForMoneda(e.target.value, row.moneda) })}
                 placeholder="0.00"
-                className={`${smallInputClass} text-right tabular-nums lg:w-36`}
+                className={`${conBordeError(smallInputClass, f.monto)} text-right tabular-nums lg:w-36`}
                 aria-label={`Monto gasto ${i + 1}`}
               />
+              <FaltaCampo show={f.monto} />
             </div>
 
             {/* Moneda */}
@@ -359,8 +394,8 @@ export function OtrosGastosFieldset({
               </button>
             </div>
           </div>
-        ),
-      )}
+        );
+      })}
       <ConfirmDialog
         open={removeIndex !== null}
         title="Eliminar gasto"

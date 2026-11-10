@@ -14,6 +14,7 @@ import { draftRequiereGananciaBrutaManual } from "@/lib/viajesGananciaBruta";
 import {
   otroGastoAutorFromClerk,
   otroGastoDraftToApi,
+  otrosGastosIncompletos,
   type OtroGastoDraft,
 } from "@/components/viajes/OtrosGastosFieldset";
 import {
@@ -1111,6 +1112,7 @@ export function ViajeCreatePage() {
       idPropio1Habilitado(maestro.tenant) &&
       !idSistemaHabilitado(maestro.tenant) &&
       !numeroIdentificacionPersonalizado.trim(),
+    gastos: isVisible("alta_viaje", "otrosGastos") && otrosGastosIncompletos(otrosGastos),
   };
   function hayFaltantesOperacion() {
     return Object.values(faltantesOp).some(Boolean);
@@ -1155,6 +1157,9 @@ export function ViajeCreatePage() {
         ) : (
           <form
             autoComplete="off"
+            // Sin validación nativa del navegador (globo "Completá este campo"): los
+            // obligatorios se marcan con el estándar del sistema (rojo + "Falta completar").
+            noValidate
             className="mt-4 max-w-5xl mx-auto space-y-6"
             onSubmit={(e) => {
               e.preventDefault();
@@ -1338,6 +1343,7 @@ export function ViajeCreatePage() {
                 }}
                 fechaCargaError={fechaCargaError ?? (marcaCierre("fechaCarga") ? FALTA : null)}
                 faltaIdPropio1={marcaCierre("idPropio1")}
+                faltaGastos={marcaCierre("gastos")}
                 fechaDescargaError={fechaDescargaError}
                 mostrarKmLitros={
                   isVisible("alta_viaje", "kmRecorridos") ||

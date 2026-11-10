@@ -464,6 +464,7 @@ Al tocar Continuar / Guardar / Agregar con obligatorios vacíos:
 5. **Solo los obligatorios**, y con la misma regla que el backend (DTO / service). Ese es el criterio: no inventar obligatorios en el front. Llevan el asterisco rojo en el label. Ejemplo (viaje): cliente siempre; origen, destino y cobro solo en el cliente principal; carga opcional.
 6. **Bloquear acciones que sumarían más cosas a medias.** Ej. "+ Agregar cliente" no agrega otra tarjeta si las que están tienen obligatorios vacíos: marca y avisa igual que Continuar.
 7. **Al enviar el formulario completo** (último paso), volver a chequear todos los pasos y saltar al primero que tenga faltantes (`setStep(n)`).
+8. **Sin validación nativa del navegador**: el `<form>` lleva `noValidate`. Si algún input tiene `required`, el navegador frena el envío con su globo "Completá este campo" antes de que corra esta validación, y se ve distinto al resto.
 
 Validaciones que no son "campo vacío" (formato, duplicados, reglas de negocio, error de API) siguen yendo por el aviso del pie con su propio mensaje; si se refieren a un campo, también lo marcan con `conBordeError` + `FaltaCampo texto=…`.
 
