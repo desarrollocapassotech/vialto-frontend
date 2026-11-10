@@ -157,9 +157,6 @@ export function VehiculosTenantPage() {
           <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
             Vehículos
           </h1>
-          <p className="mt-2 text-vialto-steel">
-            Toda tu flota.
-          </p>
         </div>
         {activeFilterCount > 0 && (
           <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />

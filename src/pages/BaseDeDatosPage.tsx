@@ -110,8 +110,12 @@ export function BaseDeDatosPage() {
     userIsOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
 
   const productoLabelsTenant = useProductoLabels();
+  // Con Stock la pestaña es el catálogo de Stock: siempre "Productos". El label
+  // propio de la empresa (ej. "Cargas") solo aplica si no tiene Stock.
   const visibleTabs = ALL_TABS.map((tab) =>
-    tab.id === "productos" ? { ...tab, label: productoLabelsTenant.plural } : tab,
+    tab.id === "productos" && !canAccessStock(modules)
+      ? { ...tab, label: productoLabelsTenant.plural }
+      : tab,
   ).filter((tab) => {
     switch (tab.id) {
       case "clientes":
