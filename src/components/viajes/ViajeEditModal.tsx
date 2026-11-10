@@ -744,6 +744,7 @@ export function ViajeEditModal({
               <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
                 <span className={labelClass}>Clientes del viaje</span>
                 <ClienteCard
+                  numero={1}
                   title={
                     todosClientes.find((c) => c.id === draft.clienteId)
                       ?.nombre || "Cliente principal"
@@ -990,6 +991,7 @@ export function ViajeEditModal({
                   </div>
                 </ClienteCard>
                 <ViajeClientesFieldset
+                  numeroInicial={2}
                   ocultarTextoError
                   rows={draft.clientesRows}
                   onChange={(rows) => {

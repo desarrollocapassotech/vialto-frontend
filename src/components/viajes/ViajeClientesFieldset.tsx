@@ -46,9 +46,12 @@ export function ClienteCard({
   defaultOpen = true,
   open: openProp,
   onToggle: onToggleProp,
+  numero,
   children,
 }: {
   title: string;
+  /** Número de la tarjeta (1, 2…): se muestra en un círculo para distinguir un cliente de otro. */
+  numero?: number;
   summary?: string;
   /** Dato corto (ej. monto) alineado a la derecha del resumen colapsado, separado del texto de ruta. */
   summaryRight?: string;
@@ -66,8 +69,23 @@ export function ClienteCard({
   const open = controlado ? openProp : internalOpen;
   const toggle = controlado ? onToggleProp! : () => setInternalOpen((o) => !o);
   return (
-    <div className="mb-3 border border-black/10 last:mb-0">
-      <div className="flex items-center gap-2 bg-vialto-mist/40 px-3 py-2">
+    // Con `numero` (clientes del viaje): borde de acento a la izquierda, encabezado
+    // marcado y más separación, para que cada cliente se lea como un bloque propio.
+    // Sin número (ej. Otros gastos) queda el estilo liviano de siempre.
+    <div
+      className={
+        numero != null
+          ? "mb-5 overflow-hidden rounded-md border border-black/15 border-l-4 border-l-vialto-fire bg-white shadow-sm last:mb-0"
+          : "mb-3 border border-black/10 last:mb-0"
+      }
+    >
+      <div
+        className={
+          numero != null
+            ? "flex items-center gap-2 border-b border-black/10 bg-vialto-mist px-3 py-2.5"
+            : "flex items-center gap-2 bg-vialto-mist/40 px-3 py-2"
+        }
+      >
         <button
           type="button"
           onClick={toggle}
@@ -80,7 +98,12 @@ export function ClienteCard({
           >
             ▸
           </span>
-          <span className="shrink-0 text-sm font-medium text-vialto-charcoal">{title}</span>
+          {numero != null && (
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-vialto-fire text-xs font-semibold text-white">
+              {numero}
+            </span>
+          )}
+          <span className="shrink-0 text-sm font-semibold text-vialto-charcoal">{title}</span>
           {!open && summary && (
             <span className="min-w-0 flex-1 truncate text-xs text-vialto-steel">{summary}</span>
           )}
@@ -138,6 +161,8 @@ interface Props {
   sugerenciasCiudad?: boolean;
   /** Label de la cantidad con desglose: "Toneladas" o "Cantidad" (`labelCantidadViajes`). */
   labelCantidad?: string;
+  /** Número de la primera tarjeta (default 1). En edición el principal es el 1 y estos siguen desde 2. */
+  numeroInicial?: number;
 }
 
 /**
@@ -168,6 +193,7 @@ export function ViajeClientesFieldset({
   paisFijo = null,
   sugerenciasCiudad = true,
   labelCantidad = 'Cantidad',
+  numeroInicial = 1,
 }: Props) {
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
   const [openIndexes, setOpenIndexes] = useState<Set<number>>(
@@ -220,6 +246,7 @@ export function ViajeClientesFieldset({
         return (
           <ClienteCard
             key={i}
+            numero={numeroInicial + i}
             title={nombre || `${labelPrefix} ${i + 1}`}
             summary={summary}
             summaryRight={summaryMonto}
@@ -363,7 +390,7 @@ export function ViajeClientesFieldset({
                     </div>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <span className={fieldLabelClass}>Total</span>
+                    <span className={`${fieldLabelClass} text-right`}>Total</span>
                     {/* Calculado: se muestra como número, no como input deshabilitado. */}
                     <div className="flex h-9 items-center text-right text-base font-semibold tabular-nums text-vialto-charcoal">
                       <span className="w-full truncate">

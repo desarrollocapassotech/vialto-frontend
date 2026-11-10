@@ -81,7 +81,7 @@ export function ViajeCreateStep1ClientesYCarga({
         <button
           type="button"
           onClick={() => onClientesRowsChange([...clientesRows, emptyClienteRow()])}
-          className="mt-1 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist self-start"
+          className="mt-2 w-full rounded-md border-2 border-dashed border-black/20 py-3 text-sm font-medium uppercase tracking-wider text-vialto-steel hover:border-vialto-fire hover:bg-vialto-fire/5 hover:text-vialto-fire"
         >
           + Agregar cliente
         </button>
