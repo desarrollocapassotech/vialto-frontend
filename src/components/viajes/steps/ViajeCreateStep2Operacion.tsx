@@ -1,4 +1,6 @@
 import { Button } from "@/components/ui/Button";
+import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
+import { labelTransporteViaje, transportistaEnFrase } from "@/lib/transportistaLabel";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { FaltaCampo } from "@/components/shared/FaltaCampo";
 import { conBordeError } from "@/lib/bordeError";
@@ -204,12 +206,18 @@ export function ViajeCreateStep2Operacion({
   onVolver,
   onContinuar,
 }: Props) {
+  // Nombre que la empresa le da al transportista (superadmin); sin configurar,
+  // "Transporte / Porteador" / "Transportista" como siempre.
+  const tl = useTransportistaLabels(tenantId || undefined);
+  const lblTransporte = labelTransporteViaje(tl);
+  const transpFrase = transportistaEnFrase(tl.singular);
   return (
     <div className="flex flex-col gap-4">
       <ViajeOperacionTipoFieldset
         modo={modoOperacion}
         onModoChange={onModoChange}
         externoVisible={externoVisible}
+        labelExterno={lblTransporte}
         propioVisible={propioVisible}
         className="min-w-0 space-y-3 border-0 p-0 [&:disabled]:opacity-60"
         externoContent={
@@ -217,17 +225,17 @@ export function ViajeCreateStep2Operacion({
             <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2 lg:gap-x-5">
             <div className="flex min-w-0 flex-col gap-1">
               <span className={fieldLabelClass}>
-                Transporte / Porteador <span className="text-red-500">*</span>
+                {lblTransporte} <span className="text-red-500">*</span>
               </span>
               <TransportistaSearchSelect
                 transportistas={transportistas}
                 value={transportistaId}
                 onChange={onTransportistaIdChange}
                 inputClassName={conBordeError(inputClass, !!fieldErrorTransportistaId)}
-                placeholderCerrado="Elegí un transporte / porteador…"
-                placeholderBuscar="Buscar transporte / porteador…"
-                emptyListChoiceLabel="Elegí un transporte / porteador…"
-                aria-label="Transporte / Porteador"
+                placeholderCerrado={tl.propio ? `Elegí ${transpFrase}…` : "Elegí un transporte / porteador…"}
+                placeholderBuscar={tl.propio ? `Buscar ${transpFrase}…` : "Buscar transporte / porteador…"}
+                emptyListChoiceLabel={tl.propio ? `Elegí ${transpFrase}…` : "Elegí un transporte / porteador…"}
+                aria-label={lblTransporte}
                 onNuevo={onNuevoTransportista}
               />
               <FaltaCampo show={!!fieldErrorTransportistaId} texto={fieldErrorTransportistaId} />
@@ -249,7 +257,7 @@ export function ViajeCreateStep2Operacion({
             {transportistaId && (
               <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
                 <span className={fieldLabelClass}>
-                  ¿El transportista seleccionado realiza el flete?
+                  ¿El {transpFrase} seleccionado realiza el flete?
                 </span>
                 <div className="flex gap-5">
                   <label className="flex cursor-pointer items-center gap-2 text-sm">
@@ -276,14 +284,14 @@ export function ViajeCreateStep2Operacion({
                 {!realizaFlete && (
                   <div className="flex min-w-0 flex-col gap-1 mt-1">
                     <span className={fieldLabelClass}>
-                      Transportista que realiza el flete <span className="text-red-500">*</span>
+                      {tl.singular} que realiza el flete <span className="text-red-500">*</span>
                     </span>
                     <TransportistaSearchSelect
                       transportistas={transportistas.filter((t) => t.id !== transportistaId)}
                       value={transportistaEfectivoId}
                       onChange={onTransportistaEfectivoIdChange}
                       inputClassName={conBordeError(inputClass, !!transportistaEfectivoError)}
-                      aria-label="Transportista que realiza el flete"
+                      aria-label={`${tl.singular} que realiza el flete`}
                       onNuevo={onNuevoTransportista}
                     />
                     <FaltaCampo
@@ -353,7 +361,7 @@ export function ViajeCreateStep2Operacion({
                 {ivaTransportistaVisible ? (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>Pago bruto a transporte</span>
+                      <span className={fieldLabelClass}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
                       <div className={readonlyMoneyClass}>
                         <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
                       </div>
@@ -373,7 +381,7 @@ export function ViajeCreateStep2Operacion({
                   </div>
                 ) : (
                   <div className="flex min-w-0 flex-col gap-1 sm:max-w-xs">
-                    <span className={fieldLabelClass}>Pago bruto a transporte</span>
+                    <span className={fieldLabelClass}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
                     <div className={readonlyMoneyClass}>
                       <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
                     </div>
@@ -384,7 +392,7 @@ export function ViajeCreateStep2Operacion({
               <>
                 <div className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-2" : ""}`}>
                   <div className="flex min-w-0 flex-col gap-1">
-                    <span className={fieldLabelClass}>Precio transporte</span>
+                    <span className={fieldLabelClass}>{tl.propio ? `Precio ${transpFrase}` : "Precio transporte"}</span>
                     <div className="flex min-w-0 gap-2">
                       <input
                         type="text"
@@ -424,7 +432,7 @@ export function ViajeCreateStep2Operacion({
                 {ivaTransportistaVisible && (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>Pago bruto a transporte</span>
+                      <span className={fieldLabelClass}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
                       <div className={readonlyMoneyClass}>
                         <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
                       </div>
@@ -536,7 +544,7 @@ export function ViajeCreateStep2Operacion({
             }
             className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
           >
-            + Agregar pago al transportista
+            + Agregar pago al {transpFrase}
           </button>
         </div>
       )}

@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from "react";
+import { transportistaEnFrase, transportistaLabels } from "@/lib/transportistaLabel";
 import { useAuth } from "@clerk/clerk-react";
 import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
 import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
@@ -207,6 +208,9 @@ export function ViajeViewModal({
   const { tenant: currentTenant } = useCurrentTenant();
   // Empresa del viaje (la elegida en superadmin, o la propia): unidad de la cantidad.
   const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId || undefined);
+  // Nombre que la empresa le da al transportista (superadmin).
+  const tl = transportistaLabels(tenantEfectivo);
+  const transpFrase = transportistaEnFrase(tl.singular);
   const { getToken } = useAuth();
   const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
   /** Comprobante adjunto: foto en el visor, documento en pestaña nueva. */
@@ -368,7 +372,7 @@ export function ViajeViewModal({
       : [{ key: "clienteId", label: "Cliente", value: clienteNombre }]),
     {
       key: "transportistaId",
-      label: "Transportista",
+      label: tl.singular,
       value: viaje.transportistaId ? transportistaNombre : "Flota propia",
     },
     {
@@ -605,14 +609,14 @@ export function ViajeViewModal({
     celdasPrecioTransp.cantidad = { value: viaje.cantidadTransportista.toLocaleString("es-AR") };
   }
   if (verPrecioTransp && viaje.precioUnitarioTransportista != null) {
-    columnasPrecioTransp.push({ key: "tarifa", label: "Tarifa transportista", numero: true });
+    columnasPrecioTransp.push({ key: "tarifa", label: `Tarifa ${transpFrase}`, numero: true });
     celdasPrecioTransp.tarifa = { value: fmtMonto(viaje.precioUnitarioTransportista, monedaTransp) };
   }
   if (verPrecioTransp && viaje.precioTransportistaExterno != null) {
     columnasPrecioTransp.push({
       key: "precio",
       // Sin desglose el precio es la tarifa del viaje; con desglose, el total.
-      label: viaje.precioUnitarioTransportista != null ? "Total" : "Tarifa transportista",
+      label: viaje.precioUnitarioTransportista != null ? "Total" : `Tarifa ${transpFrase}`,
       numero: true,
     });
     celdasPrecioTransp.precio = {
@@ -776,7 +780,7 @@ export function ViajeViewModal({
     filasLiquidacion.length > 0 && (
       <SeccionDetalleViaje
         key="liquidacion"
-        titulo={tieneLiquidaciones ? "Liquidación a transportista" : "Pago al transportista"}
+        titulo={tieneLiquidaciones ? `Liquidación a ${transpFrase}` : `Pago al ${transpFrase}`}
         accion={
           tieneLiquidaciones ? (
             !bloqueado && ver("liquidacionEstado") ? (

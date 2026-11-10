@@ -444,6 +444,10 @@ export interface Tenant {
   productoLabel?: string | null;
   /** Plural de productoLabel (ej. "Granos"); lo genera la IA al guardar el singular. */
   productoLabelPlural?: string | null;
+  /** Cómo llama la empresa al transportista externo (ej. "Fletero"); null = "Transportista". Ver `lib/transportistaLabel.ts`. */
+  transportistaLabel?: string | null;
+  /** Plural de transportistaLabel; lo genera la IA al guardar el singular. */
+  transportistaLabelPlural?: string | null;
   createdAt: string;
 }
 

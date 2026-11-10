@@ -1,4 +1,6 @@
 import { DireccionesSugeridasProvider } from "@/hooks/useDireccionesSugeridas";
+import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
+import { labelTransporteViaje, transportistaEnFrase } from "@/lib/transportistaLabel";
 import { resolverPaisFijoViaje } from "@/lib/paisFijoViaje";
 import {
   useEffect,
@@ -315,6 +317,10 @@ export function ViajeEditModal({
     [fechaCargaError, fechaDescargaError, destinosError, transportistaEfectivoError, clientesRowErrors],
   );
   const { isVisible } = useFieldConfig("viajes");
+  // Nombre que la empresa le da al transportista (superadmin).
+  const tl = useTransportistaLabels(tenantId || undefined);
+  const lblTransporte = labelTransporteViaje(tl);
+  const transpFrase = transportistaEnFrase(tl.singular);
   const { flotaPropiaVisible, transportistaExternoVisible } =
     useTipoFlotaVisible(tenantId || undefined);
   const desgloseActivo = isVisible("edicion_viaje", "desgloseMontos");
@@ -1049,18 +1055,19 @@ export function ViajeEditModal({
                 modo={draft.operacionModo}
                 onModoChange={onModoChange}
                 externoVisible={transportistaExternoVisible}
+                labelExterno={lblTransporte}
                 propioVisible={flotaPropiaVisible}
                 groupName={`viaje-edit-${draft.numero || "e"}`}
                 externoContent={
                   <div className="grid gap-3">
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={labelClass}>Transporte / Porteador</span>
+                      <span className={labelClass}>{lblTransporte}</span>
                       <TransportistaSearchSelect
                         transportistas={todosTransportistas}
                         value={draft.transportistaId}
-                        placeholderCerrado="Elegí un transporte / porteador…"
-                        placeholderBuscar="Buscar transporte / porteador…"
-                        emptyListChoiceLabel="Elegí un transporte / porteador…"
+                        placeholderCerrado={tl.propio ? `Elegí ${transpFrase}…` : "Elegí un transporte / porteador…"}
+                        placeholderBuscar={tl.propio ? `Buscar ${transpFrase}…` : "Buscar transporte / porteador…"}
+                        emptyListChoiceLabel={tl.propio ? `Elegí ${transpFrase}…` : "Elegí un transporte / porteador…"}
                         onChange={(id) =>
                           setDraft((p) =>
                             p
@@ -1077,7 +1084,7 @@ export function ViajeEditModal({
                         }
                         inputClassName={inputClass}
                         disabled={datosTransporteBloqueados || saving}
-                        aria-label="Transporte / Porteador"
+                        aria-label={lblTransporte}
                         onNuevo={
                           getToken && !datosTransporteBloqueados
                             ? () => setQuickCreate("transportista")
@@ -1088,7 +1095,7 @@ export function ViajeEditModal({
                     {draft.transportistaId && (
                       <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
                         <span className={labelClass}>
-                          ¿El transportista seleccionado realiza el flete?
+                          ¿El {transpFrase} seleccionado realiza el flete?
                         </span>
                         <div className="flex gap-5">
                           <label
@@ -1137,7 +1144,7 @@ export function ViajeEditModal({
                         {!draft.realizaFlete && (
                           <div className="flex min-w-0 flex-col gap-1 mt-1">
                             <span className={labelClass}>
-                              Transportista que realiza el flete{" "}
+                              {tl.singular} que realiza el flete{" "}
                               <span className="text-red-500">*</span>
                             </span>
                             <TransportistaSearchSelect
@@ -1157,7 +1164,7 @@ export function ViajeEditModal({
                                   ? " border-red-400"
                                   : ""
                               }`}
-                              aria-label="Transportista que realiza el flete"
+                              aria-label={`${tl.singular} que realiza el flete`}
                               onNuevo={
                                 getToken && !datosTransporteBloqueados
                                   ? () => setQuickCreate("transportista")
@@ -1712,7 +1719,7 @@ export function ViajeEditModal({
                       }
                       className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
                     >
-                      + Agregar pago al transportista
+                      + Agregar pago al {transpFrase}
                     </button>
                   </div>
                 ))}

@@ -20,6 +20,8 @@ type Props = {
    * viaje cargado antes del cambio de configuración se pueda corregir.
    */
   externoVisible?: boolean;
+  /** Texto de la opción externa (nombre del transportista de la empresa). Default "Transporte / Porteador". */
+  labelExterno?: string;
   propioVisible?: boolean;
 };
 
@@ -31,6 +33,7 @@ export function ViajeOperacionTipoFieldset({
   groupName = "viaje-operacion-tipo",
   className,
   externoVisible = true,
+  labelExterno = "Transporte / Porteador",
   propioVisible = true,
 }: Props) {
   const mostrarExterno = externoVisible || modo === "externo";
@@ -59,7 +62,7 @@ export function ViajeOperacionTipoFieldset({
               checked={modo === "externo"}
               onChange={() => onModoChange("externo")}
             />
-            <span>Transporte / Porteador</span>
+            <span>{labelExterno}</span>
           </label>
         )}
         {mostrarPropio && (

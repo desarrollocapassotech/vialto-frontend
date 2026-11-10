@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import {
@@ -110,12 +111,16 @@ export function BaseDeDatosPage() {
     userIsOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
 
   const productoLabelsTenant = useProductoLabels();
+  // Nombre que la empresa le da al transportista (superadmin): pestaña "Fleteros", etc.
+  const transportistaLabelsTenant = useTransportistaLabels();
   // Con Stock la pestaña es el catálogo de Stock: siempre "Productos". El label
   // propio de la empresa (ej. "Cargas") solo aplica si no tiene Stock.
   const visibleTabs = ALL_TABS.map((tab) =>
     tab.id === "productos" && !canAccessStock(modules)
       ? { ...tab, label: productoLabelsTenant.plural }
-      : tab,
+      : tab.id === "transportistas"
+        ? { ...tab, label: transportistaLabelsTenant.plural }
+        : tab,
   ).filter((tab) => {
     switch (tab.id) {
       case "clientes":
