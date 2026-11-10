@@ -40,7 +40,12 @@ import {
 import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
 import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
-import { numeroVisibleViaje, viajeUsaNumeroInterno } from "@/lib/viajesFlota";
+import {
+  labelCantidadViajes,
+  numeroVisibleViaje,
+  viajeUsaNumeroInterno,
+} from "@/lib/viajesFlota";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { Dato, DatosCabecera } from "@/components/shared/DetalleComprobante";
 import {
@@ -153,6 +158,8 @@ export function ViajeViewModal({
   const { isVisible } = useFieldConfig("viajes");
   const productoLabelsTenant = useProductoLabels();
   const { tenant: currentTenant } = useCurrentTenant();
+  // Empresa del viaje (la elegida en superadmin, o la propia): unidad de la cantidad.
+  const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId || undefined);
   const { getToken } = useAuth();
   const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
   /** Comprobante adjunto: foto en el visor, documento en pestaña nueva. */
@@ -298,7 +305,7 @@ export function ViajeViewModal({
       : null;
   const montoClienteSub =
     viaje.cantidadFactura != null && viaje.precioUnitarioFactura != null
-      ? `${viaje.cantidadFactura.toLocaleString("es-AR")} × ${fmtMonto(viaje.precioUnitarioFactura, viaje.monedaMonto)}`
+      ? `${viaje.cantidadFactura.toLocaleString("es-AR")} ${labelCantidadViajes(tenantEfectivo).toLowerCase()} × ${fmtMonto(viaje.precioUnitarioFactura, viaje.monedaMonto)}`
       : undefined;
 
   /** Datos generales del viaje en el bloque compacto (montos y estados van en sus secciones). */
@@ -353,7 +360,7 @@ export function ViajeViewModal({
       : [
           {
             key: "monto",
-            label: "Monto cliente",
+            label: "Tarifa cliente",
             value: montoClienteTxt,
             sub: montoClienteSub,
           },
@@ -421,73 +428,143 @@ export function ViajeViewModal({
     )
       .map(([moneda, total]) => fmtMonto(total, moneda))
       .join(" + ") || "—";
-  const filasFacturacion = !tieneFacturacion
+  // Tabla de una fila: Estado | Toneladas/Unidades | Tarifa cliente | Total, y Factura /
+  // Facturado cuando ya hay comprobante. Solo las columnas con dato.
+  const columnasFacturacion: {
+    key: string;
+    label: string;
+    value: ReactNode;
+    sub?: ReactNode;
+    subClassName?: string;
+    numero?: boolean;
+  }[] = !tieneFacturacion
     ? []
     : [
-        ver("facturacionEstado") && (
-          <FilaDetalleViaje
-            key="estado"
-            label="Estado"
-            value={
-              <BadgeEstadoViaje className={facturacionEstadoBadgeClass[estadoFact]}>
-                {facturacionEstadoLabel[estadoFact]}
-              </BadgeEstadoViaje>
-            }
-            // Error de AFIP / anulada: el texto largo explica qué pasó.
-            sub={
-              !esMultiCliente &&
-              (estadoFact === "error_afip" || estadoFact === "anulado")
-                ? tooltipFacturacionEstado(viaje)
-                : undefined
-            }
-            subClassName={
-              estadoFact === "error_afip" ? "text-red-700" : "text-vialto-steel"
-            }
-          />
-        ),
-        ver("monto") && montoClienteTxt && (
-          <FilaDetalleViaje
-            key="monto"
-            label="Monto cliente"
-            value={montoClienteTxt}
-            sub={montoClienteSub}
-          />
-        ),
-        ver("facturacionEstado") && !esMultiCliente && nroFactura && (
-          <FilaDetalleViaje
-            key="factura"
-            label="Factura"
-            value={conAdjunto(abrirComprobanteFactura(factura), `N° ${nroFactura}`)}
-            sub={
-              <>
-                {[
-                  factura?.fechaEmision ? `Emitida ${fmtDate(factura.fechaEmision)}` : null,
-                  factura?.cae ? `CAE ${factura.cae}` : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ") || null}
-                {abrirComprobanteFactura(factura) && (
-                  <span className="block">
-                    <VerComprobanteAdjunto onClick={abrirComprobanteFactura(factura)!} />
-                  </span>
-                )}
-              </>
-            }
-          />
-        ),
-        ver("facturacionEstado") &&
-          !esMultiCliente &&
-          viaje.montoFacturadoReal != null && (
-            <FilaDetalleViaje
-              key="facturadoReal"
-              label="Facturado"
-              value={fmtMonto(
-                viaje.montoFacturadoReal,
-                viaje.monedaMontoFacturadoReal,
-              )}
-            />
-          ),
-      ].filter(Boolean);
+        ...(ver("facturacionEstado")
+          ? [
+              {
+                key: "estado",
+                label: "Estado",
+                value: (
+                  <BadgeEstadoViaje className={facturacionEstadoBadgeClass[estadoFact]}>
+                    {facturacionEstadoLabel[estadoFact]}
+                  </BadgeEstadoViaje>
+                ),
+                // Error de AFIP / anulada: el texto largo explica qué pasó.
+                sub:
+                  !esMultiCliente &&
+                  (estadoFact === "error_afip" || estadoFact === "anulado")
+                    ? tooltipFacturacionEstado(viaje)
+                    : undefined,
+                subClassName:
+                  estadoFact === "error_afip" ? "text-red-700" : "text-vialto-steel",
+              },
+            ]
+          : []),
+        ...(ver("monto") && !esMultiCliente && viaje.cantidadFactura != null
+          ? [
+              {
+                key: "cantidad",
+                label: labelCantidadViajes(tenantEfectivo),
+                value: viaje.cantidadFactura.toLocaleString("es-AR"),
+                numero: true,
+              },
+            ]
+          : []),
+        ...(ver("monto") && !esMultiCliente && viaje.precioUnitarioFactura != null
+          ? [
+              {
+                key: "tarifa",
+                label: "Tarifa cliente",
+                value: fmtMonto(viaje.precioUnitarioFactura, viaje.monedaMonto),
+                numero: true,
+              },
+            ]
+          : []),
+        ...(ver("monto") && montoClienteTxt
+          ? [
+              {
+                key: "monto",
+                // Sin desglose el monto es la tarifa del viaje; con desglose, el total.
+                label: viaje.precioUnitarioFactura != null ? "Total" : "Tarifa cliente",
+                value: <span className="font-semibold">{montoClienteTxt}</span>,
+                numero: true,
+              },
+            ]
+          : []),
+        ...(ver("facturacionEstado") && !esMultiCliente && nroFactura
+          ? [
+              {
+                key: "factura",
+                label: "Factura",
+                value: conAdjunto(abrirComprobanteFactura(factura), `N° ${nroFactura}`),
+                sub: (
+                  <>
+                    {[
+                      factura?.fechaEmision ? `Emitida ${fmtDate(factura.fechaEmision)}` : null,
+                      factura?.cae ? `CAE ${factura.cae}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || null}
+                    {abrirComprobanteFactura(factura) && (
+                      <span className="block">
+                        <VerComprobanteAdjunto onClick={abrirComprobanteFactura(factura)!} />
+                      </span>
+                    )}
+                  </>
+                ),
+              },
+            ]
+          : []),
+        ...(ver("facturacionEstado") && !esMultiCliente && viaje.montoFacturadoReal != null
+          ? [
+              {
+                key: "facturadoReal",
+                label: "Facturado",
+                value: fmtMonto(viaje.montoFacturadoReal, viaje.monedaMontoFacturadoReal),
+                numero: true,
+              },
+            ]
+          : []),
+      ];
+  const filasFacturacion =
+    columnasFacturacion.length === 0
+      ? []
+      : [
+          <div key="tabla" className="-mx-1 overflow-x-auto">
+            <table className="w-full min-w-max text-sm">
+              <thead>
+                <tr className="border-b border-black/10">
+                  {columnasFacturacion.map((c) => (
+                    <th
+                      key={c.key}
+                      className={`px-1 pb-1.5 text-[10px] font-normal uppercase tracking-[0.15em] text-vialto-steel ${c.numero ? "text-right" : "text-left"}`}
+                    >
+                      {c.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {columnasFacturacion.map((c) => (
+                    <td
+                      key={c.key}
+                      className={`px-1 pt-2 align-top text-vialto-charcoal ${c.numero ? "text-right tabular-nums" : "text-left"}`}
+                    >
+                      {c.value}
+                      {c.sub && (
+                        <span className={`mt-0.5 block text-xs ${c.subClassName ?? "text-vialto-steel"}`}>
+                          {c.sub}
+                        </span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>,
+        ];
 
   // ── Liquidación / pago al transportista ──────────────────────────────────
   const conTransportista = !!viaje.transportistaId;
