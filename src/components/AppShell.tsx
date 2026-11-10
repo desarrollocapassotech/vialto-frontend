@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { createPortal } from "react-dom";
+import { EntornoBadge } from "@/components/shared/EntornoBadge";
 import {
   useAuth,
   useClerk,
@@ -436,7 +437,9 @@ export function AppShell() {
     );
     const hasClerkImage = Boolean(user?.hasImage && user?.imageUrl);
     if (hasClerkImage) return user?.imageUrl ?? null;
-    return googleAccount?.imageUrl ?? user?.imageUrl ?? null;
+    // Sin foto propia, `user.imageUrl` es el avatar genérico de Clerk (silueta): no se
+    // usa; se muestra la de Google si hay, y si no, las iniciales.
+    return googleAccount?.imageUrl || null;
   }, [user]);
 
   const accountName =
@@ -444,7 +447,20 @@ export function AppShell() {
     user?.primaryEmailAddress?.emailAddress ||
     "Cuenta";
 
-  const accountInitial = accountName.trim().charAt(0).toUpperCase() || "U";
+  // Iniciales para el avatar sin foto: nombre + apellido ("Elias QA Riedel" → "ER");
+  // con una sola palabra (o el email), su primera letra.
+  const accountInitial = (() => {
+    const nombre = user?.firstName?.trim();
+    const apellido = user?.lastName?.trim();
+    if (nombre && apellido) {
+      return `${nombre.charAt(0)}${apellido.split(/\s+/).pop()!.charAt(0)}`.toUpperCase();
+    }
+    const palabras = accountName.trim().split(/\s+/).filter(Boolean);
+    if (palabras.length >= 2 && !accountName.includes("@")) {
+      return `${palabras[0].charAt(0)}${palabras[palabras.length - 1].charAt(0)}`.toUpperCase();
+    }
+    return accountName.trim().charAt(0).toUpperCase() || "U";
+  })();
 
   const isTestKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.startsWith(
     "pk_test_",
@@ -454,18 +470,6 @@ export function AppShell() {
     !apiUrl || apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1");
   const neonBranch = import.meta.env.VITE_NEON_BRANCH as string | undefined;
   const clerkEnv = isTestKey ? "Clerk Dev" : "Clerk Prod";
-
-  const envBadge = isTestKey
-    ? isLocal
-      ? {
-          label: "Backend: LOCAL",
-          cls: "text-sky-900 bg-sky-400 border-sky-500",
-        }
-      : {
-          label: "Backend: QA",
-          cls: "text-amber-900 bg-amber-400 border-amber-500",
-        }
-    : null;
 
   function renderSidebar(showCloseButton: boolean, collapsed: boolean) {
     return (
@@ -671,22 +675,14 @@ export function AppShell() {
         <div className="flex-1" />
 
         <div className="flex shrink-0 items-center gap-2">
-          {envBadge && (
-            <div className="hidden sm:flex items-center gap-1.5">
-              {neonBranch && (
-                <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm text-emerald-900 bg-emerald-400 border-emerald-500">
-                  Neon: {neonBranch}
-                </span>
-              )}
-              <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm text-violet-900 bg-violet-400 border-violet-500">
-                {clerkEnv}
-              </span>
-              <span
-                className={`font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm ${envBadge.cls}`}
-              >
-                {envBadge.label}
-              </span>
-            </div>
+          {/* Entorno de pruebas: un solo badge amarillo; el detalle se abre con click. */}
+          {isTestKey && (
+            <EntornoBadge
+              backend={isLocal ? "Local" : "QA"}
+              apiUrl={apiUrl || (isLocal ? "http://localhost:8080" : undefined)}
+              clerkEnv={clerkEnv}
+              neonBranch={neonBranch}
+            />
           )}
 
           {/* usuario */}
