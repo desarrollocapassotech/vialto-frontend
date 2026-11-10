@@ -1034,22 +1034,26 @@ export function ViajeCreatePage() {
   // ─── RENDERIZADO ──────────────────────────────────────────────────────────
   return (
     <ProductoLabelsProvider tenant={tenantEfectivo}>
-      <CrudPageLayout title="Crear viaje" contentClassName="w-full min-w-0">
+      <CrudPageLayout
+        title="Crear viaje"
+        contentClassName="w-full min-w-0"
+        headerCenter={
+          loadingRefs ? undefined : (
+            <Stepper steps={VIAJE_CREATE_STEPS} currentStep={step} />
+          )
+        }
+      >
         {loadingRefs ? (
           <p className="mt-6 text-vialto-steel">Cargando referencias…</p>
         ) : (
           <form
             autoComplete="off"
-            className="mt-6 max-w-2xl mx-auto space-y-6"
+            className="mt-4 max-w-5xl mx-auto space-y-6"
             onSubmit={(e) => {
               e.preventDefault();
               onSubmit();
             }}
           >
-            <div className="flex justify-center">
-              <Stepper steps={VIAJE_CREATE_STEPS} currentStep={step} />
-            </div>
-
             {step > 1 && (
               <div className="mb-6">
                 <ViajeCreateResumenClientes clientesRows={clientesRows} clientes={clientes} />

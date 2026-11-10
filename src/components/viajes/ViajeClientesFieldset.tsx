@@ -228,8 +228,12 @@ export function ViajeClientesFieldset({
             open={openIndexes.has(i)}
             onToggle={() => toggleOpen(i)}
           >
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
+            {/* Dos columnas cuando la tarjeta es ancha (alta de viaje): Cliente | Carga,
+                Origen | Destino y la cantidad/tarifa a todo el ancho (con `order`, así en
+                contenedores angostos —modal de edición— sigue el orden de siempre). */}
+            <div className="@container">
+            <div className="grid grid-cols-1 items-start gap-3 @3xl:grid-cols-2 @3xl:gap-x-5">
+              <div className="flex min-w-0 flex-col gap-1 @3xl:order-1">
                 <span className={fieldLabelClass}>
                   Cliente {i < minRows && <span className="text-red-500">*</span>}
                 </span>
@@ -243,7 +247,7 @@ export function ViajeClientesFieldset({
                   onNuevo={onNuevoCliente ? () => onNuevoCliente(i) : undefined}
                 />
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="flex min-w-0 flex-col gap-1 @3xl:order-3">
                 <div className="flex items-center gap-2">
                   <span className={fieldLabelClass}>Origen</span>
                   {sugerenciaOrigen && !row.origen.trim() && (
@@ -288,7 +292,7 @@ export function ViajeClientesFieldset({
                   </div>
                 </div>
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="flex min-w-0 flex-col gap-1 @3xl:order-4">
                 <ViajeDestinosLista
                   groupId={`viaje-cliente-${i}`}
                   rows={row.destinosRows}
@@ -304,7 +308,7 @@ export function ViajeClientesFieldset({
                 />
               </div>
               {mostrarProductos && (
-                <div className="flex flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1 @3xl:order-2">
                   <span className={fieldLabelClass}>Carga</span>
                   <ViajeProductosLista
                     groupId={`viaje-cliente-${i}`}
@@ -320,7 +324,7 @@ export function ViajeClientesFieldset({
                 </div>
               )}
               {desgloseActivo ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[6rem_minmax(0,3fr)_minmax(0,2fr)]">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[6rem_minmax(0,3fr)_minmax(0,2fr)] @3xl:order-5 @3xl:col-span-2">
                   <div className="flex flex-col gap-1">
                     <span className={fieldLabelClass}>{labelCantidad}</span>
                     <input
@@ -359,9 +363,10 @@ export function ViajeClientesFieldset({
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className={fieldLabelClass}>Total</span>
-                    <div className="flex h-9 items-center border border-black/15 bg-vialto-mist/40 px-3 text-right text-sm tabular-nums text-vialto-steel">
+                    {/* Calculado: se muestra como número, no como input deshabilitado. */}
+                    <div className="flex h-9 items-center text-right text-base font-semibold tabular-nums text-vialto-charcoal">
                       <span className="w-full truncate">
-                        {(
+                        $ {(
                           (Number(row.cantidadStr.replace(",", ".")) || 0) *
                           (parseCurrencyForMoneda(row.precioUnitarioStr, row.moneda) || 0)
                         ).toLocaleString("es-AR", {
@@ -373,7 +378,7 @@ export function ViajeClientesFieldset({
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1 @3xl:order-5">
                   <span className={fieldLabelClass}>Monto</span>
                   <div className="flex min-w-0 gap-2">
                     <input
@@ -402,6 +407,7 @@ export function ViajeClientesFieldset({
                   </div>
                 </div>
               )}
+            </div>
             </div>
             {rowErrors?.[i] && !ocultarTextoError && (
               <p className="mt-2 text-xs font-medium text-red-600">{rowErrors[i]}</p>

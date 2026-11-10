@@ -204,6 +204,7 @@ export function ViajeCreateStep2Operacion({
         className="min-w-0 space-y-3 border-0 p-0 [&:disabled]:opacity-60"
         externoContent={
           <div className="grid gap-3">
+            <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2 lg:gap-x-5">
             <div className="flex min-w-0 flex-col gap-1">
               <span className={fieldLabelClass}>
                 Transporte / Porteador <span className="text-red-500">*</span>
@@ -220,6 +221,20 @@ export function ViajeCreateStep2Operacion({
                 onNuevo={onNuevoTransportista}
               />
               <CrudFieldError message={fieldErrorTransportistaId} />
+            </div>
+            {mostrarChoferExterno && (
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className={fieldLabelClass}>Chofer</span>
+                <ChoferSearchSelect
+                  choferes={choferesExterno}
+                  value={choferExternoId}
+                  onChange={onChoferExternoIdChange}
+                  inputClassName={inputClass}
+                  aria-label="Chofer transporte / porteador"
+                  onNuevo={onNuevoChoferExterno}
+                />
+              </div>
+            )}
             </div>
             {transportistaId && (
               <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
@@ -420,19 +435,6 @@ export function ViajeCreateStep2Operacion({
               </>
             )}
             <div className="grid gap-3">
-              {mostrarChoferExterno && (
-                <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                  <span className={fieldLabelClass}>Chofer</span>
-                  <ChoferSearchSelect
-                    choferes={choferesExterno}
-                    value={choferExternoId}
-                    onChange={onChoferExternoIdChange}
-                    inputClassName={inputClass}
-                    aria-label="Chofer transporte / porteador"
-                    onNuevo={onNuevoChoferExterno}
-                  />
-                </div>
-              )}
               {mostrarVehiculosExternos && (
                 <ViajeVehiculosLista
                   groupId="viaje-create-ext"
@@ -454,7 +456,7 @@ export function ViajeCreateStep2Operacion({
         propioContent={
           <div className="grid gap-3">
             {mostrarChoferPropio && (
-              <div className="flex min-w-0 flex-col gap-1 max-w-md">
+              <div className="flex min-w-0 flex-col gap-1 lg:max-w-[calc(50%-0.625rem)]">
                 <span className={fieldLabelClass}>Chofer (flota propia)</span>
                 <ChoferSearchSelect
                   choferes={choferesPropios}

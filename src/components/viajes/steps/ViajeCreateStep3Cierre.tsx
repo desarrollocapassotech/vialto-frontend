@@ -107,8 +107,10 @@ export function ViajeCreateStep3Cierre({
 }: Props) {
   return (
     <div className="flex flex-col gap-4">
+      {(mostrarIdPropio1 || mostrarIdPropio2) && (
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-x-5">
       {mostrarIdPropio1 && (
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1">
           <span className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel/70">
             {labelIdentificacion}{" "}
             {idPropio1Requerido && <span className="text-red-500">*</span>}
@@ -124,7 +126,7 @@ export function ViajeCreateStep3Cierre({
       )}
 
       {mostrarIdPropio2 && (
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1">
           <span className={fieldLabelClass}>{labelIdPropio2}</span>
           <input
             type="text"
@@ -134,6 +136,8 @@ export function ViajeCreateStep3Cierre({
             className={inputClass}
           />
         </div>
+      )}
+      </div>
       )}
 
       <ViajeFechaHoraFields
@@ -177,8 +181,10 @@ export function ViajeCreateStep3Cierre({
         </div>
       )}
 
+      {(mostrarDetalleCarga || mostrarObservaciones) && (
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-x-5">
       {mostrarDetalleCarga && (
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1">
           <span className={fieldLabelClass}>Detalle adicional</span>
           <textarea
             value={detalleCarga}
@@ -190,7 +196,7 @@ export function ViajeCreateStep3Cierre({
       )}
 
       {mostrarObservaciones && (
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1">
           <span className={fieldLabelClass}>Observaciones</span>
           <textarea
             value={observaciones}
@@ -199,6 +205,8 @@ export function ViajeCreateStep3Cierre({
             className={textareaLongClass}
           />
         </div>
+      )}
+      </div>
       )}
 
       {mostrarOtrosGastos && (
