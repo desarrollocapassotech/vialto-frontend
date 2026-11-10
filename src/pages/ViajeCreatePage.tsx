@@ -551,13 +551,12 @@ export function ViajeCreatePage() {
     ? faltantesPorFila(clientesRows, opcionesValidacionClientes)
     : {};
   const hayFaltantesClientes = Object.keys(camposFaltantesClientes).length > 0;
-  useEffect(() => {
-    // Ya no falta nada: se va también el aviso del pie.
-    if (marcarFaltantes && !hayFaltantesClientes) {
-      setMarcarFaltantes(false);
-      setError(null);
-    }
-  }, [marcarFaltantes, hayFaltantesClientes, setError]);
+
+  /** Marca en rojo los obligatorios que faltan (en vivo) + aviso corto en el pie. */
+  function avisarFaltantes(msg = "Completá los campos marcados en rojo.") {
+    setMarcarFaltantes(true);
+    setError(msg);
+  }
 
   /** "+ Agregar cliente": solo si las tarjetas que ya están se completaron. */
   function puedeAgregarCliente(): boolean {
@@ -566,16 +565,14 @@ export function ViajeCreatePage() {
       setError(null);
       return true;
     }
-    setMarcarFaltantes(true);
-    setError("Completá los campos marcados en rojo antes de agregar otro cliente.");
+    avisarFaltantes("Completá los campos marcados en rojo antes de agregar otro cliente.");
     return false;
   }
 
   /** Campos faltantes en las tarjetas: los marca en rojo + aviso corto. true = faltan. */
   function marcarSiFaltanDatosClientes(): boolean {
     if (!clientesRowsIncompletos(clientesRows, opcionesValidacionClientes)) return false;
-    setMarcarFaltantes(true);
-    setError("Completá los campos marcados en rojo.");
+    avisarFaltantes();
     return true;
   }
 
@@ -598,8 +595,8 @@ export function ViajeCreatePage() {
 
   async function handleContinuar2() {
     const externo = modoOperacion === "externo";
-    if (externo && !transportistaId.trim()) {
-      setError("Seleccioná un transporte / porteador.");
+    if (hayFaltantesOperacion()) {
+      avisarFaltantes();
       return;
     }
     setFieldErrors({});
@@ -726,26 +723,20 @@ export function ViajeCreatePage() {
     const choferExternoSeleccionado = choferExternoIdRef.current.trim();
     const principal = clientesRows[0];
 
-    // 1. Validaciones básicas del formulario
-    let clienteRowErr = "";
-    if (!principal?.clienteId.trim()) clienteRowErr = "Seleccioná un cliente.";
-    else if (!principal?.origen.trim()) clienteRowErr = "Completá el origen.";
-    else if (!principal?.destinosRows[0]?.etiqueta.trim())
-      clienteRowErr = "Ingresá el destino 1.";
-    if (clienteRowErr) {
-      setError(clienteRowErr);
+    // 1. Obligatorios de los 3 pasos: se marcan en rojo y se vuelve al paso que falta.
+    setFieldErrors({});
+    if (marcarSiFaltanDatosClientes()) {
       setStep(1);
       return;
     }
-    if (externo && !transportistaId.trim()) {
-      setError("Seleccioná un transporte / porteador.");
+    if (hayFaltantesOperacion()) {
+      avisarFaltantes();
       setStep(2);
       return;
     }
-    setFieldErrors({});
-
-    if (marcarSiFaltanDatosClientes()) {
-      setStep(1);
+    if (hayFaltantesCierre()) {
+      avisarFaltantes();
+      setStep(3);
       return;
     }
     const clientesValidacion = await validarClientesRows(
@@ -1089,6 +1080,62 @@ export function ViajeCreatePage() {
   const mostrarPagosTransportista =
     modoOperacion === "externo" && isVisible("alta_viaje", "pagosTransportista");
 
+  // ─── OBLIGATORIOS QUE FALTAN (pasos 2 y 3) ────────────────────────────────
+  // Se calculan siempre a partir de lo cargado; solo se muestran en rojo después de
+  // un intento fallido (`marcarFaltantes`), y dejan de estarlo al completarse.
+  const opExterno = modoOperacion === "externo";
+  const faltantesOp = {
+    transportista: opExterno && !transportistaId.trim(),
+    cantidadTransportista:
+      opExterno && desgloseActivo && !(Number(cantidadTransportista.replace(",", ".")) > 0),
+    precioUnitarioTransportista:
+      opExterno &&
+      desgloseActivo &&
+      !((parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) ?? 0) > 0),
+    precioTransportista:
+      opExterno &&
+      !desgloseActivo &&
+      !((parseCurrencyForMoneda(precioTransportistaExterno, monedaPrecioTransportista) ?? 0) > 0),
+    chofer: !opExterno && isVisible("alta_viaje", "choferId") && !choferId.trim(),
+    vehiculos:
+      !opExterno &&
+      isVisible("alta_viaje", "vehiculosRows") &&
+      vehiculoIdsDesdeRows(vehiculosRows).length === 0,
+    gananciaManual:
+      draftRequiereGananciaBrutaManual(buildGananciaDraft()) &&
+      parseCurrencyForMoneda(gananciaBrutaManual, monedaGananciaBrutaManual) == null,
+  };
+  const faltantesCierre = {
+    fechaCarga: !fechaCarga.trim(),
+    idPropio1:
+      idPropio1Habilitado(maestro.tenant) &&
+      !idSistemaHabilitado(maestro.tenant) &&
+      !numeroIdentificacionPersonalizado.trim(),
+  };
+  function hayFaltantesOperacion() {
+    return Object.values(faltantesOp).some(Boolean);
+  }
+  function hayFaltantesCierre() {
+    return Object.values(faltantesCierre).some(Boolean);
+  }
+  const marcaOp = (k: keyof typeof faltantesOp) => marcarFaltantes && faltantesOp[k];
+  const marcaCierre = (k: keyof typeof faltantesCierre) => marcarFaltantes && faltantesCierre[k];
+  const FALTA = "Falta completar";
+
+  // Ya no falta nada en el paso que se ve: se va el rojo y también el aviso del pie.
+  const hayAlgunFaltante =
+    step === 1
+      ? hayFaltantesClientes
+      : step === 2
+        ? hayFaltantesOperacion()
+        : hayFaltantesCierre();
+  useEffect(() => {
+    if (marcarFaltantes && !hayAlgunFaltante) {
+      setMarcarFaltantes(false);
+      setError(null);
+    }
+  }, [marcarFaltantes, hayAlgunFaltante, setError]);
+
   // ─── RENDERIZADO ──────────────────────────────────────────────────────────
   return (
     <ProductoLabelsProvider tenant={tenantEfectivo}>
@@ -1175,18 +1222,18 @@ export function ViajeCreatePage() {
                   if (id) setError(null);
                 }}
                 transportistas={transportistas}
-                fieldErrorTransportistaId={fieldErrors.transportistaId}
+                fieldErrorTransportistaId={fieldErrors.transportistaId ?? (marcaOp("transportista") ? FALTA : undefined)}
                 onNuevoTransportista={() => setQuickCreate("transportista")}
                 desgloseActivo={desgloseActivo}
                 ivaTransportistaVisible={ivaTransportistaVisible}
                 cantidadTransportista={cantidadTransportista}
                 onCantidadTransportistaChange={setCantidadTransportista}
-                fieldErrorCantidadTransportista={fieldErrors.cantidadTransportista}
+                fieldErrorCantidadTransportista={fieldErrors.cantidadTransportista ?? (marcaOp("cantidadTransportista") ? FALTA : undefined)}
                 precioUnitarioTransportista={precioUnitarioTransportista}
                 onPrecioUnitarioTransportistaChange={(v) =>
                   setPrecioUnitarioTransportista(maskCurrencyForMoneda(v, monedaPrecioTransportista))
                 }
-                fieldErrorPrecioUnitarioTransportista={fieldErrors.precioUnitarioTransportista}
+                fieldErrorPrecioUnitarioTransportista={fieldErrors.precioUnitarioTransportista ?? (marcaOp("precioUnitarioTransportista") ? FALTA : undefined)}
                 monedaPrecioTransportista={monedaPrecioTransportista}
                 onMonedaPrecioTransportistaChange={handleMonedaPrecioTransportistaChange}
                 precioTransportistaIvaIncluidoPct={precioTransportistaIvaIncluidoPct}
@@ -1198,7 +1245,7 @@ export function ViajeCreatePage() {
                 onPrecioTransportistaExternoChange={(v) =>
                   setPrecioTransportistaExterno(maskCurrencyForMoneda(v, monedaPrecioTransportista))
                 }
-                fieldErrorPrecioTransportistaExterno={fieldErrors.precioTransportistaExterno}
+                fieldErrorPrecioTransportistaExterno={fieldErrors.precioTransportistaExterno ?? (marcaOp("precioTransportista") ? FALTA : undefined)}
                 realizaFlete={realizaFlete}
                 onRealizaFleteChange={handleRealizaFleteChange}
                 transportistaEfectivoId={transportistaEfectivoId}
@@ -1253,6 +1300,9 @@ export function ViajeCreatePage() {
                   setPagosTransportista(rows);
                   setError(null);
                 }}
+                faltaChofer={marcaOp("chofer")}
+                faltaVehiculos={marcaOp("vehiculos")}
+                faltaGananciaManual={marcaOp("gananciaManual")}
                 error={error}
                 onVolver={() => setStep(1)}
                 onContinuar={() => void handleContinuar2()}
@@ -1286,7 +1336,8 @@ export function ViajeCreatePage() {
                   }
                   if (p.horaDescarga !== undefined) setHoraDescarga(p.horaDescarga);
                 }}
-                fechaCargaError={fechaCargaError}
+                fechaCargaError={fechaCargaError ?? (marcaCierre("fechaCarga") ? FALTA : null)}
+                faltaIdPropio1={marcaCierre("idPropio1")}
                 fechaDescargaError={fechaDescargaError}
                 mostrarKmLitros={
                   isVisible("alta_viaje", "kmRecorridos") ||

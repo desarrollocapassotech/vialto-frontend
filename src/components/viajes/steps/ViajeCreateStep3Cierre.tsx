@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/Button";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { FaltaCampo } from "@/components/shared/FaltaCampo";
+import { conBordeError } from "@/lib/bordeError";
 import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
 import { ViajeFechaHoraFields } from "@/components/viajes/ViajeFechaHoraFields";
 import {
@@ -61,6 +63,9 @@ interface Props {
   gastoAutor?: OtroGastoAutor;
   tenantId?: string;
 
+  /** ID propio 1 obligatorio y vacío (después de un intento fallido). */
+  faltaIdPropio1?: boolean;
+
   error: string | null;
   loading: boolean;
 
@@ -102,14 +107,18 @@ export function ViajeCreateStep3Cierre({
   onOtrosGastosChange,
   gastoAutor,
   tenantId,
+  faltaIdPropio1 = false,
   error,
   loading,
   onVolver,
 }: Props) {
   return (
     <div className="flex flex-col gap-4">
+      {/* Dos columnas solo si se muestran los dos campos; uno solo ocupa todo el ancho. */}
       {(mostrarIdPropio1 || mostrarIdPropio2) && (
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-x-5">
+      <div
+        className={`grid grid-cols-1 items-start gap-4 ${mostrarIdPropio1 && mostrarIdPropio2 ? "lg:grid-cols-2 lg:gap-x-5" : ""}`}
+      >
       {mostrarIdPropio1 && (
         <div className="flex min-w-0 flex-col gap-1">
           <span className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel/70">
@@ -121,8 +130,9 @@ export function ViajeCreateStep3Cierre({
             value={numeroIdentificacionPersonalizado}
             onChange={(e) => onNumeroIdentificacionChange(e.target.value)}
             placeholder="Ej: CTG-01452301"
-            className={inputClass}
+            className={conBordeError(inputClass, faltaIdPropio1)}
           />
+          <FaltaCampo show={faltaIdPropio1} />
         </div>
       )}
 
@@ -183,7 +193,9 @@ export function ViajeCreateStep3Cierre({
       )}
 
       {(mostrarDetalleCarga || mostrarObservaciones) && (
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-x-5">
+      <div
+        className={`grid grid-cols-1 items-start gap-4 ${mostrarDetalleCarga && mostrarObservaciones ? "lg:grid-cols-2 lg:gap-x-5" : ""}`}
+      >
       {mostrarDetalleCarga && (
         <div className="flex min-w-0 flex-col gap-1">
           <span className={fieldLabelClass}>Detalle adicional</span>

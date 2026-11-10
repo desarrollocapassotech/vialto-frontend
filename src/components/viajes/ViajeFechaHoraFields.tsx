@@ -1,3 +1,6 @@
+import { conBordeError } from "@/lib/bordeError";
+import { FaltaCampo } from "@/components/shared/FaltaCampo";
+
 type Patch = Partial<{
   fechaCarga: string;
   horaCarga: string;
@@ -55,7 +58,7 @@ function campoFechaHora({
   ocultarTextoError?: boolean;
 }) {
   const subLabel = `${labelClassName} block min-h-[1.25rem] leading-tight`;
-  const inputCls = `${inputClassName}${errorFecha ? ' border-red-400' : ''}`;
+  const inputCls = conBordeError(inputClassName, !!errorFecha);
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-x-4 sm:items-start">
       <div className="flex min-w-0 flex-col gap-1">
@@ -70,9 +73,7 @@ function campoFechaHora({
           aria-label={ariaFecha}
           required={required}
         />
-        {errorFecha && !ocultarTextoError && (
-          <span className="text-xs text-red-600">{errorFecha}</span>
-        )}
+        <FaltaCampo show={!!errorFecha && !ocultarTextoError} texto={errorFecha ?? undefined} />
       </div>
       <div className="flex min-w-0 flex-col gap-1">
         <span className={subLabel}>{labelHora}</span>

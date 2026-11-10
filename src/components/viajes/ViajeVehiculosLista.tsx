@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { VehiculoPatenteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { VehiculoModal } from '@/components/viajes/VehiculoModal';
 import type { Vehiculo } from '@/types/api';
+import { conBordeError } from '@/lib/bordeError';
+import { FaltaCampo } from '@/components/shared/FaltaCampo';
 
 /** `tipo` se deriva del vehículo elegido; no lo elige el usuario. */
 export type ViajeVehiculoRowDraft = { tipo: string; vehiculoId: string };
@@ -33,6 +35,8 @@ type Props = {
   alMenosUno?: boolean;
   /** Etiqueta de la sección; por defecto según `alMenosUno`. */
   labelVehiculos?: string;
+  /** Falta al menos un vehículo: borde rojo + "Falta completar" en la primera fila vacía. */
+  error?: boolean;
 };
 
 export function ViajeVehiculosLista({
@@ -47,7 +51,9 @@ export function ViajeVehiculosLista({
   quickCreateStacked,
   alMenosUno = true,
   labelVehiculos,
+  error = false,
 }: Props) {
+  const primeraVacia = rows.findIndex((r) => !r.vehiculoId);
   const titulo =
     labelVehiculos ??
     (alMenosUno ? 'Vehículos del viaje (al menos uno)' : 'Vehículos del viaje');
@@ -65,7 +71,19 @@ export function ViajeVehiculosLista({
     onChange(next);
   }
 
+  // "+ Agregar vehículo" con filas sin patente: no agrega otra y marca las vacías
+  // (borde rojo + "Falta completar") hasta que se completen.
+  const [marcarVacias, setMarcarVacias] = useState(false);
+  const hayVacias = rows.some((r) => !r.vehiculoId);
+  useEffect(() => {
+    if (marcarVacias && !hayVacias) setMarcarVacias(false);
+  }, [marcarVacias, hayVacias]);
+
   function addRow() {
+    if (hayVacias) {
+      setMarcarVacias(true);
+      return;
+    }
     onChange([...rows, { tipo: 'tractor', vehiculoId: '' }]);
   }
 
@@ -78,7 +96,9 @@ export function ViajeVehiculosLista({
     <>
     <div className="flex flex-col gap-3 md:col-span-2 lg:col-span-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
-        <span className={LABEL}>{titulo}</span>
+        <span className={LABEL}>
+          {titulo} {alMenosUno && <span className="text-red-500">*</span>}
+        </span>
         <button
           type="button"
           onClick={addRow}
@@ -87,7 +107,7 @@ export function ViajeVehiculosLista({
           + Agregar vehículo
         </button>
       </div>
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
         {rows.map((row, i) => {
           // El tipo no se elige acá: es el del vehículo elegido (Vehiculo.tipo).
           const idsUsados = new Set(
@@ -97,13 +117,17 @@ export function ViajeVehiculosLista({
             (v) => !idsUsados.has(v.id) || v.id === row.vehiculoId,
           );
           const sinOpciones = opciones.length === 0;
+          // Sin recuadro ni label por fila (el título de la sección ya lo dice). Si es
+          // el único vehículo obligatorio no hay "Quitar" (antes quedaba deshabilitado).
+          const puedeQuitar = !(alMenosUno && rows.length <= 1);
+          const marcada =
+            (error && i === primeraVacia) || (marcarVacias && !row.vehiculoId);
           return (
             <div
               key={`${groupId}-vh-${i}`}
-              className="grid grid-cols-1 gap-2 rounded border border-black/10 bg-white/60 p-3 sm:grid-cols-[1fr_auto]"
+              className="flex flex-col gap-2 sm:flex-row sm:items-start"
             >
-              <div className="flex min-w-0 flex-col gap-1">
-                <span className={LABEL}>Vehículo</span>
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <VehiculoPatenteSearchSelect
                   vehiculos={opciones}
                   value={row.vehiculoId}
@@ -114,10 +138,11 @@ export function ViajeVehiculosLista({
                     })
                   }
                   sinOpciones={sinOpciones}
-                  inputClassName={INPUT}
+                  inputClassName={conBordeError(INPUT, marcada)}
                   aria-label={`Vehículo ${i + 1}`}
                   onNuevo={getToken ? () => { setNuevoParaRowIndex(i); setShowNuevoVehiculo(true); } : undefined}
                 />
+                <FaltaCampo show={marcada} />
                 {sinOpciones && !getToken ? (
                   <p className="text-xs text-amber-800/90">
                     No hay vehículos
@@ -134,21 +159,18 @@ export function ViajeVehiculosLista({
                   </p>
                 ) : null}
               </div>
-              <div className="flex items-end justify-end sm:pb-0">
-                <button
-                  type="button"
-                  disabled={alMenosUno && rows.length <= 1}
-                  onClick={() => removeRow(i)}
-                  className="text-xs uppercase tracking-wider px-2 py-1 border border-black/15 text-vialto-steel hover:bg-red-50 disabled:opacity-40"
-                  title={
-                    alMenosUno && rows.length <= 1
-                      ? 'Debe haber al menos un vehículo'
-                      : 'Quitar fila'
-                  }
-                >
-                  Quitar
-                </button>
-              </div>
+              {puedeQuitar && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => removeRow(i)}
+                    className="h-9 text-xs uppercase tracking-wider px-2 border border-black/15 text-vialto-steel hover:bg-red-50"
+                    title="Quitar vehículo"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
