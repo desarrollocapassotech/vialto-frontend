@@ -12,8 +12,9 @@ function tipoDeVehiculo(vehiculos: Vehiculo[], id: string, fallback: string): st
   return vehiculos.find((v) => v.id === id)?.tipo ?? fallback;
 }
 
+// Mismo estilo que los labels del resto del formulario de viaje (alinea con los campos de al lado).
 const LABEL =
-  'text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel';
+  'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 const INPUT = 'h-9 border border-black/15 bg-white px-2 text-sm';
 
 type Props = {
@@ -94,19 +95,12 @@ export function ViajeVehiculosLista({
 
   return (
     <>
-    <div className="flex flex-col gap-3 md:col-span-2 lg:col-span-3">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <span className={LABEL}>
-          {titulo} {alMenosUno && <span className="text-red-500">*</span>}
-        </span>
-        <button
-          type="button"
-          onClick={addRow}
-          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-        >
-          + Agregar vehículo
-        </button>
-      </div>
+    {/* Título arriba con el mismo espacio que cualquier label (así se alinea con los
+        campos de al lado) y "+ Agregar vehículo" debajo, como "+ Agregar destino". */}
+    <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+      <span className={LABEL}>
+        {titulo} {alMenosUno && <span className="text-red-500">*</span>}
+      </span>
       <div className="flex flex-col gap-2">
         {rows.map((row, i) => {
           // El tipo no se elige acá: es el del vehículo elegido (Vehiculo.tipo).
@@ -175,6 +169,13 @@ export function ViajeVehiculosLista({
           );
         })}
       </div>
+      <button
+        type="button"
+        onClick={addRow}
+        className="mt-1 self-start text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+      >
+        + Agregar vehículo
+      </button>
     </div>
     {showNuevoVehiculo && getToken && (
       <VehiculoModal

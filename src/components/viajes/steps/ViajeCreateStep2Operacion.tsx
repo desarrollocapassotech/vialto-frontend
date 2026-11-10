@@ -33,10 +33,11 @@ const fieldLabelClass =
   "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
 const inputClass = "h-9 w-full border border-black/15 bg-white px-2 text-sm";
 const readonlyMoneyClass =
-  "flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0";
+  // Importe calculado: se muestra como número (igual que el Total del alta), no como input.
+  "flex h-9 items-center text-right text-base font-semibold tabular-nums text-vialto-charcoal min-w-0";
 
 function fmtReadonlyMoney(n: number) {
-  return n.toLocaleString("es-AR", {
+  return "$ " + n.toLocaleString("es-AR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -361,19 +362,19 @@ export function ViajeCreateStep2Operacion({
                 {ivaTransportistaVisible ? (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
+                      <span className={`${fieldLabelClass} text-right`}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
                       <div className={readonlyMoneyClass}>
                         <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>Pago neto</span>
+                      <span className={`${fieldLabelClass} text-right`}>Pago neto</span>
                       <div className={readonlyMoneyClass}>
                         <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoNeto)}</span>
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>Monto IVA</span>
+                      <span className={`${fieldLabelClass} text-right`}>Monto IVA</span>
                       <div className={readonlyMoneyClass}>
                         <span className="w-full truncate">{fmtReadonlyMoney(desgloseMontoIva)}</span>
                       </div>
@@ -381,7 +382,7 @@ export function ViajeCreateStep2Operacion({
                   </div>
                 ) : (
                   <div className="flex min-w-0 flex-col gap-1 sm:max-w-xs">
-                    <span className={fieldLabelClass}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
+                    <span className={`${fieldLabelClass} text-right`}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
                     <div className={readonlyMoneyClass}>
                       <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
                     </div>
@@ -432,19 +433,19 @@ export function ViajeCreateStep2Operacion({
                 {ivaTransportistaVisible && (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
+                      <span className={`${fieldLabelClass} text-right`}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
                       <div className={readonlyMoneyClass}>
                         <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>Pago neto</span>
+                      <span className={`${fieldLabelClass} text-right`}>Pago neto</span>
                       <div className={readonlyMoneyClass}>
                         <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoNeto)}</span>
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>Monto IVA</span>
+                      <span className={`${fieldLabelClass} text-right`}>Monto IVA</span>
                       <div className={readonlyMoneyClass}>
                         <span className="w-full truncate">{fmtReadonlyMoney(desgloseMontoIva)}</span>
                       </div>

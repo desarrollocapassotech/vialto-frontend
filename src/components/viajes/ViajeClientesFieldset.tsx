@@ -171,6 +171,8 @@ interface Props {
   numeroInicial?: number;
   /** Campos que faltan por tarjeta: borde rojo + "Falta completar" debajo (ver `faltantesPorFila`). */
   camposFaltantes?: Record<number, CampoClienteFaltante[]>;
+  /** true = las tarjetas arrancan colapsadas (edición). Un cliente que se agrega se abre igual. */
+  inicialColapsados?: boolean;
 }
 
 /**
@@ -203,10 +205,11 @@ export function ViajeClientesFieldset({
   labelCantidad = 'Cantidad',
   numeroInicial = 1,
   camposFaltantes,
+  inicialColapsados = false,
 }: Props) {
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
   const [openIndexes, setOpenIndexes] = useState<Set<number>>(
-    () => new Set(rows.map((_, idx) => idx)),
+    () => (inicialColapsados ? new Set() : new Set(rows.map((_, idx) => idx))),
   );
   const prevRowsLengthRef = useRef(rows.length);
 
@@ -219,6 +222,13 @@ export function ViajeClientesFieldset({
     }
     prevRowsLengthRef.current = rows.length;
   }, [rows.length]);
+
+  // Tarjetas con campos marcados en rojo: se abren para que se vea qué falta.
+  const clavesFaltantes = Object.keys(camposFaltantes ?? {}).join(",");
+  useEffect(() => {
+    if (!clavesFaltantes) return;
+    setOpenIndexes((prev) => new Set([...prev, ...clavesFaltantes.split(",").map(Number)]));
+  }, [clavesFaltantes]);
 
   function toggleOpen(i: number) {
     setOpenIndexes((prev) => {
