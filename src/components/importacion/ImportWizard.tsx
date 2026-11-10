@@ -1425,6 +1425,9 @@ function EtapaModulo({
 
   const advertenciasCampoUnicoDuplicado =
     p?.advertenciasCampoUnicoDuplicado ?? [];
+  const conflictosFilas = new Set(
+    advertenciasCampoUnicoDuplicado.map((c) => c.fila),
+  );
   // Ninguna fila tiene algo para guardar: todas sin cambios, viajes bloqueados (ya
   // facturados/liquidados) o actualizaciones que el usuario eligió ignorar. El paso
   // se reduce a un solo botón ("Finalizar" / "Continuar"), sin avisos que pidan
@@ -1445,7 +1448,10 @@ function EtapaModulo({
         )
       : (p.filasDetalle?.length ?? 0) > 0 &&
         p.filasDetalle!.every(
-          (f) => !f.esNuevo && (f.sinCambios || actualizacionesIgnoradas.has(f.fila)),
+          (f) =>
+            !f.esNuevo &&
+            !f.repetidaEnArchivo &&
+            (f.sinCambios || actualizacionesIgnoradas.has(f.fila)),
         ));
   const hayBloqueados =
     hasViajes && p!.viajes!.some((v) => !v.nuevo && !!v.bloqueadoPor && (v.cambios?.length ?? 0) > 0);
@@ -1464,20 +1470,40 @@ function EtapaModulo({
       )
     )
   ).join(" o ");
-  // Tarjetas "Filas nuevas" / "Filas a actualizar": a actualizar cuenta solo
-  // las filas que cambian algo (las "Sin cambios" no se escriben).
+  // Tarjetas "Filas nuevas" / "Filas a actualizar": descuentan filas repetidas
+  // en el archivo, filas con conflicto de campo único ignoradas/sin decidir y
+  // actualizaciones marcadas como "Ignorar fila".
   const filasNuevasCount = hasViajes
     ? p!.viajes!.filter((v) => v.nuevo).length
     : p?.filasDetalle
-      ? p.filasDetalle.filter((f) => f.esNuevo).length
+      ? p.filasDetalle.filter(
+          (f) =>
+            f.esNuevo &&
+            !f.repetidaEnArchivo &&
+            !conflictosFilas.has(f.fila),
+        ).length
       : (p?.entidadesNuevas ?? p?.exitosas ?? 0);
   const filasActualizarCount = hasViajes
     ? p!.viajes!.filter(
-        // Los bloqueados (ya facturados/liquidados) no se actualizan: no cuentan.
-        (v) => !v.nuevo && !v.bloqueadoPor && (v.cambios?.length ?? 0) > 0,
+        // Los bloqueados (ya facturados/liquidados) y los ignorados no se actualizan: no cuentan.
+        (v) =>
+          !v.nuevo &&
+          !v.bloqueadoPor &&
+          (v.cambios?.length ?? 0) > 0 &&
+          !actualizacionesIgnoradas.has(v.fila),
       ).length
     : p?.filasDetalle
-      ? p.filasDetalle.filter((f) => !f.esNuevo && !f.sinCambios).length
+      ? p.filasDetalle.filter((f) => {
+          if (f.repetidaEnArchivo) return false;
+          if (conflictosFilas.has(f.fila)) {
+            return decisionesCampoUnico[f.fila] === "actualizar";
+          }
+          return (
+            !f.esNuevo &&
+            !f.sinCambios &&
+            !actualizacionesIgnoradas.has(f.fila)
+          );
+        }).length
       : (p?.entidadesActualizadas ?? 0);
   const cantStatBoxes = 3 + (hasFacturas ? 1 : 0);
 
@@ -2327,15 +2353,16 @@ function FilasDetalleTabla({
           {filas.map((f) => {
             const conflicto = conflictoDe(f.fila);
             const decision = decisionDe(f.fila);
+            const repetida = f.repetidaEnArchivo;
             const valores = new Map(f.campos.map((c) => [c.campo, c.valor]));
             // Actualiza un registro existente: fila en amarillo + franja con qué cambia.
-            const actualiza = !conflicto && !f.esNuevo && !f.sinCambios;
+            const actualiza = !conflicto && !repetida && !f.esNuevo && !f.sinCambios;
             const cambios = actualiza ? (f.cambios ?? []) : [];
             return (
               <Fragment key={f.fila}>
                 <tr
                   className={`border-t border-black/5 first:border-t-0 ${
-                    conflicto || actualiza ? "bg-amber-50/60" : ""
+                    conflicto || repetida || actualiza ? "bg-amber-50/60" : ""
                   }`}
                 >
                   <td className={`${td} text-vialto-steel tabular-nums`}>{f.fila}</td>
@@ -2355,6 +2382,10 @@ function FilasDetalleTabla({
                     {conflicto ? (
                       <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-900 uppercase tracking-wider">
                         {conflicto.campoLabel} duplicado
+                      </span>
+                    ) : repetida ? (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-900 uppercase tracking-wider">
+                        {repetida.campoLabel} repetido
                       </span>
                     ) : f.esNuevo ? (
                       <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 uppercase tracking-wider">
@@ -2408,6 +2439,22 @@ function FilasDetalleTabla({
                             Actualizar fila
                           </button>
                         </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                {repetida && (
+                  <tr className="bg-amber-50/60">
+                    <td colSpan={columnas.length + 2} className="px-3 pb-2.5">
+                      <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-amber-900">
+                        <span className="text-right">
+                          Mismo {repetida.campoLabel} que la fila{" "}
+                          <strong>{repetida.filaOriginal}</strong>
+                          {repetida.nombreOriginal
+                            ? ` (${repetida.nombreOriginal})`
+                            : ""}
+                          {" "}— no se va a crear.
+                        </span>
                       </div>
                     </td>
                   </tr>
