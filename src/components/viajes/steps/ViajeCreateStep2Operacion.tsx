@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/Button";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import {
   ChoferSearchSelect,
@@ -523,13 +524,9 @@ export function ViajeCreateStep2Operacion({
         </div>
       )}
 
-      {error && (
-        <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-          {error}
-        </p>
-      )}
-
-      <div className="pt-2 flex justify-end gap-3">
+      {/* Mismo aviso que el pie de los modales: rojo, a la izquierda de los botones, zumba. */}
+      <div className="pt-2 flex flex-wrap items-center justify-end gap-3">
+        <ErrorPieModal error={error} />
         <Button type="button" variant="secondary" onClick={onVolver}>
           Volver
         </Button>

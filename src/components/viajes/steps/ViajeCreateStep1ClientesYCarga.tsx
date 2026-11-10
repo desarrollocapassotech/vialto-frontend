@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/Button";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { ViajeClientesFieldset } from "@/components/viajes/ViajeClientesFieldset";
 import { emptyClienteRow, type ViajeClienteDraft } from "@/lib/viajesClientes";
 import type { OpcionProducto } from "@/lib/productosViaje";
@@ -77,6 +78,7 @@ export function ViajeCreateStep1ClientesYCarga({
           paisFijo={paisFijo}
           sugerenciasCiudad={sugerenciasCiudad}
           labelCantidad={labelCantidad}
+          ocultarTextoError
         />
         <button
           type="button"
@@ -87,13 +89,9 @@ export function ViajeCreateStep1ClientesYCarga({
         </button>
       </div>
 
-      {error && (
-        <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-          {error}
-        </p>
-      )}
-
-      <div className="pt-2 flex justify-end">
+      {/* Mismo aviso que el pie de los modales: rojo, a la izquierda del botón, zumba. */}
+      <div className="pt-2 flex flex-wrap items-center justify-end gap-3">
+        <ErrorPieModal error={error} />
         <Button type="button" onClick={onContinuar}>
           Continuar
         </Button>

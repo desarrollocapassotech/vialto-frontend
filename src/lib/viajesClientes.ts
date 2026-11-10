@@ -160,12 +160,68 @@ export function clientesPayloadParaApi(rows: ViajeClienteDraft[]): ViajeClienteA
  * `validarCiudades = false` (`Tenant.recomendacionCiudadesHabilitada` apagado): origen y
  * destinos en texto libre, sin contrastar con el catálogo.
  */
+export type OpcionesValidacionClientes = {
+  /**
+   * Alta de viaje: toda tarjeta tiene que estar completa (cliente, carga si
+   * `exigirCarga`, origen, destino y cobro > 0). Una tarjeta vacía no se saltea: hay
+   * que completarla o quitarla. El error lista qué falta en cada una.
+   */
+  completo?: boolean;
+  /** Con `completo`: exige al menos una carga (campo Carga visible). */
+  exigirCarga?: boolean;
+  /** Con `completo`: true = toneladas × tarifa; false = monto. */
+  desglose?: boolean;
+  /** Con `completo`: label de la cantidad para el mensaje ("toneladas" / "cantidad"). */
+  labelCantidad?: string;
+};
+
+/** Lo que le falta a una tarjeta en modo `completo` (vacío = está completa). */
+function faltantesClienteRow(row: ViajeClienteDraft, o: OpcionesValidacionClientes): string[] {
+  const falta: string[] = [];
+  if (!row.clienteId.trim()) falta.push('cliente');
+  if (o.exigirCarga && !row.productoItems.some((p) => p.productoId.trim())) falta.push('carga');
+  if (!row.origen.trim()) falta.push('origen');
+  if (!row.destinosRows.some((d) => d.etiqueta.trim())) falta.push('destino');
+  if (o.desglose) {
+    const cantidad = Number(row.cantidadStr.replace(',', '.'));
+    if (!row.cantidadStr.trim() || !Number.isFinite(cantidad) || cantidad <= 0) {
+      falta.push((o.labelCantidad ?? 'cantidad').toLowerCase());
+    }
+    const tarifa = parseCurrencyForMoneda(row.precioUnitarioStr, row.moneda);
+    if (tarifa == null || tarifa <= 0) falta.push('tarifa');
+  } else {
+    const monto = parseCurrencyForMoneda(row.montoStr, row.moneda);
+    if (monto == null || monto <= 0) falta.push('monto');
+  }
+  return falta;
+}
+
 export async function validarClientesRows(
   rows: ViajeClienteDraft[],
   validarCiudades = true,
+  opciones: OpcionesValidacionClientes = {},
 ): Promise<{ ok: true } | { ok: false; message: string; rowErrors: Record<number, string> }> {
   const rowErrors: Record<number, string> = {};
   const seen = new Set<string>();
+  if (opciones.completo) {
+    for (let i = 0; i < rows.length; i++) {
+      const falta = faltantesClienteRow(rows[i], opciones);
+      if (falta.length > 0) rowErrors[i] = `Falta completar: ${falta.join(', ')}.`;
+    }
+    if (Object.keys(rowErrors).length > 0) {
+      // Un solo mensaje con lo que falta en cada tarjeta (el alta no muestra el
+      // error dentro de la tarjeta, solo este aviso en el pie).
+      const detalle = rows
+        .map((row, i) => ({ i, falta: faltantesClienteRow(row, opciones) }))
+        .filter((x) => x.falta.length > 0)
+        .map((x) => `cliente ${x.i + 1}: ${x.falta.join(', ')}`);
+      return {
+        ok: false,
+        message: `Falta completar — ${detalle.join(' · ')}.`,
+        rowErrors,
+      };
+    }
+  }
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const clienteId = row.clienteId.trim();

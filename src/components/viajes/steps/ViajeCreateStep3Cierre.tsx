@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/Button";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
 import { ViajeFechaHoraFields } from "@/components/viajes/ViajeFechaHoraFields";
 import {
@@ -228,13 +229,9 @@ export function ViajeCreateStep3Cierre({
         </div>
       )}
 
-      {error && (
-        <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-          {error}
-        </p>
-      )}
-
-      <div className="pt-2 flex justify-end items-center gap-3">
+      {/* Mismo aviso que el pie de los modales: rojo, a la izquierda de los botones, zumba. */}
+      <div className="pt-2 flex flex-wrap justify-end items-center gap-3">
+        <ErrorPieModal error={error} />
         <Button type="button" variant="secondary" className="h-12" onClick={onVolver}>
           Volver
         </Button>

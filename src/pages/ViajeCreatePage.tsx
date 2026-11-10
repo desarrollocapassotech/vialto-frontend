@@ -1,5 +1,5 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/lib/toast";
 import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
@@ -333,7 +333,13 @@ export function ViajeCreatePage() {
   const [localLoadingRefs, setLocalLoadingRefs] = useState(true);
   const loadingRefs =
     (tenantId ? localLoadingRefs : maestro.loading) || !tenantConfigListo;
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorEstado] = useState<string | null>(null);
+  // Se vacía y se vuelve a poner en el próximo frame para que el aviso del pie
+  // (`ErrorPieModal`) zumbe en cada intento, aunque el mensaje sea el mismo.
+  const setError = useCallback((msg: string | null) => {
+    setErrorEstado(null);
+    if (msg) requestAnimationFrame(() => setErrorEstado(msg));
+  }, []);
   const submitBusyRef = useRef(false);
 
   const choferIdRef = useRef("");
@@ -530,19 +536,20 @@ export function ViajeCreatePage() {
   }
 
   // ─── NAVEGACIÓN ENTRE PASOS ───────────────────────────────────────────────
-  async function handleContinuar1() {
-    const principal = clientesRows[0];
-    let clienteRowErr = "";
-    if (!principal?.clienteId.trim()) clienteRowErr = "Seleccioná un cliente.";
-    else if (!principal?.origen.trim()) clienteRowErr = "Completá el origen.";
-    else if (!principal?.destinosRows[0]?.etiqueta.trim())
-      clienteRowErr = "Ingresá el destino 1.";
-    if (clienteRowErr) {
-      setError(clienteRowErr);
-      return;
-    }
+  // Alta: todas las tarjetas de cliente completas (ver `validarClientesRows`, modo `completo`).
+  const opcionesValidacionClientes = {
+    completo: true,
+    exigirCarga: isVisible("alta_viaje", "productoItems"),
+    desglose: desgloseActivo,
+    labelCantidad: labelCantidadViajes(tenantConfig),
+  };
 
-    const clientesValidacion = await validarClientesRows(clientesRows, sugerenciasCiudad);
+  async function handleContinuar1() {
+    const clientesValidacion = await validarClientesRows(
+      clientesRows,
+      sugerenciasCiudad,
+      opcionesValidacionClientes,
+    );
     if (!clientesValidacion.ok) {
       setClientesRowErrors(clientesValidacion.rowErrors);
       setError(clientesValidacion.message);
@@ -701,7 +708,11 @@ export function ViajeCreatePage() {
     }
     setFieldErrors({});
 
-    const clientesValidacion = await validarClientesRows(clientesRows, sugerenciasCiudad);
+    const clientesValidacion = await validarClientesRows(
+      clientesRows,
+      sugerenciasCiudad,
+      opcionesValidacionClientes,
+    );
     if (!clientesValidacion.ok) {
       setClientesRowErrors(clientesValidacion.rowErrors);
       setError(clientesValidacion.message);
