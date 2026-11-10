@@ -862,7 +862,7 @@ export function ViajeEditModal({
                           />
                         </div>
                         <div className="flex flex-col gap-1">
-                          <span className={labelClass}>Precio unitario</span>
+                          <span className={labelClass}>Tarifa</span>
                           <div className="flex min-w-0 gap-2">
                             <input
                               type="text"

@@ -85,6 +85,7 @@ import {
   idPropio1Habilitado,
   idPropio2Habilitado,
   idPropio2Label,
+  labelCantidadViajes,
 } from "@/lib/viajesFlota";
 import { roundMoney2 } from "@/lib/facturaTotales";
 import { opcionDesdeProducto, type OpcionProducto } from "@/lib/productosViaje";
@@ -1058,6 +1059,7 @@ export function ViajeCreatePage() {
             <div className="bg-white rounded-lg border border-black/10 p-6">
             {step === 1 && (
               <ViajeCreateStep1ClientesYCarga
+                labelCantidad={labelCantidadViajes(tenantEfectivo)}
                 clientesRows={clientesRows}
                 onClientesRowsChange={(rows) => {
                   setClientesRows(rows);

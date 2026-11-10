@@ -25,6 +25,8 @@ interface Props {
   paisFijo?: Pais | null;
   /** `Tenant.recomendacionCiudadesHabilitada`: false = origen/destinos en texto libre. */
   sugerenciasCiudad?: boolean;
+  /** "Toneladas" o "Cantidad" según `Tenant.unidadCantidadViajes`. */
+  labelCantidad?: string;
 
   error: string | null;
   onContinuar: () => void;
@@ -47,6 +49,7 @@ export function ViajeCreateStep1ClientesYCarga({
   onProductoCreado,
   paisFijo = null,
   sugerenciasCiudad = true,
+  labelCantidad,
   error,
   onContinuar,
 }: Props) {
@@ -73,6 +76,7 @@ export function ViajeCreateStep1ClientesYCarga({
           labelPrefix="Cliente"
           paisFijo={paisFijo}
           sugerenciasCiudad={sugerenciasCiudad}
+          labelCantidad={labelCantidad}
         />
         <button
           type="button"

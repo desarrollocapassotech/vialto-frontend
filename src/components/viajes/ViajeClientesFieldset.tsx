@@ -136,6 +136,8 @@ interface Props {
   mostrarProductos?: boolean;
   /** `Tenant.recomendacionCiudadesHabilitada`: false = origen/destinos en texto libre. */
   sugerenciasCiudad?: boolean;
+  /** Label de la cantidad con desglose: "Toneladas" o "Cantidad" (`labelCantidadViajes`). */
+  labelCantidad?: string;
 }
 
 /**
@@ -165,6 +167,7 @@ export function ViajeClientesFieldset({
   mostrarProductos = true,
   paisFijo = null,
   sugerenciasCiudad = true,
+  labelCantidad = 'Cantidad',
 }: Props) {
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
   const [openIndexes, setOpenIndexes] = useState<Set<number>>(
@@ -319,7 +322,7 @@ export function ViajeClientesFieldset({
               {desgloseActivo ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-[6rem_minmax(0,3fr)_minmax(0,2fr)]">
                   <div className="flex flex-col gap-1">
-                    <span className={fieldLabelClass}>Cantidad</span>
+                    <span className={fieldLabelClass}>{labelCantidad}</span>
                     <input
                       type="text"
                       inputMode="decimal"
@@ -328,11 +331,11 @@ export function ViajeClientesFieldset({
                       disabled={bloqueado}
                       placeholder="0"
                       className={`${inputClass} text-right tabular-nums`}
-                      aria-label={`Cantidad del cliente ${i + 1}`}
+                      aria-label={`${labelCantidad} del cliente ${i + 1}`}
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <span className={fieldLabelClass}>Precio unitario</span>
+                    <span className={fieldLabelClass}>Tarifa</span>
                     <div className="flex min-w-0 gap-2">
                       <input
                         type="text"
@@ -344,7 +347,7 @@ export function ViajeClientesFieldset({
                         disabled={bloqueado}
                         placeholder="0.00"
                         className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
-                        aria-label={`Precio unitario del cliente ${i + 1}`}
+                        aria-label={`Tarifa del cliente ${i + 1}`}
                       />
                       <MonedaSelect
                         value={row.moneda}
