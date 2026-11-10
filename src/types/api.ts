@@ -413,6 +413,11 @@ export interface Tenant {
   validacionCuitArcaHabilitada?: boolean;
   /** Con qué flota trabaja la empresa. Default 'mixta'; solo lo cambia superadmin (ver `useTipoFlotaVisible`). */
   tipoFlota?: TipoFlota;
+  /**
+   * Solo con tipoFlota 'mixta': opción marcada por defecto al crear Viaje/Chofer/Vehículo.
+   * null = la de siempre (Viajes: externa; Choferes/Vehículos: propia). Ver `useTipoFlotaVisible`.
+   */
+  tipoFlotaDefault?: "propia" | "externa" | null;
   /** false = sin dashboard; el inicio es el primer módulo contratado (`lib/tenantHome.ts`). Default true; solo lo cambia superadmin. */
   dashboardHabilitado?: boolean;
   /** Default true. false = origen/destino de Viajes en texto libre, sin buscador de ciudades ni validación en el import. */

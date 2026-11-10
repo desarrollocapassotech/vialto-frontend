@@ -234,6 +234,10 @@ export function CamposEmpresaPage() {
   const [savingValidacionCuitArca, setSavingValidacionCuitArca] = useState(false);
   const [empresaTipoFlota, setEmpresaTipoFlota] = useState<TipoFlota>("mixta");
   const [savingTipoFlota, setSavingTipoFlota] = useState(false);
+  const [empresaTipoFlotaDefault, setEmpresaTipoFlotaDefault] = useState<
+    "propia" | "externa" | null
+  >(null);
+  const [savingTipoFlotaDefault, setSavingTipoFlotaDefault] = useState(false);
   const [empresaDashboardHabilitado, setEmpresaDashboardHabilitado] = useState(true);
   const [savingDashboardHabilitado, setSavingDashboardHabilitado] = useState(false);
   const [empresaRecomendacionCiudades, setEmpresaRecomendacionCiudades] = useState(true);
@@ -342,6 +346,7 @@ export function CamposEmpresaPage() {
           setEmpresaPaisFijoId(tenant.paisOrigenDestinoFijoId ?? "");
           setEmpresaValidacionCuitArca(tenant.validacionCuitArcaHabilitada ?? false);
           setEmpresaTipoFlota(tenant.tipoFlota ?? "mixta");
+          setEmpresaTipoFlotaDefault(tenant.tipoFlotaDefault ?? null);
           setEmpresaDashboardHabilitado(tenant.dashboardHabilitado ?? true);
           setEmpresaRecomendacionCiudades(tenant.recomendacionCiudadesHabilitada ?? true);
           setEmpresaMarcarCobrada(tenant.marcarCobradaHabilitada ?? false);
@@ -838,6 +843,28 @@ export function CamposEmpresaPage() {
       showToast(msg, "error");
     } finally {
       setSavingTipoFlota(false);
+    }
+  }
+
+  async function guardarTipoFlotaDefault(valor: "propia" | "externa" | null) {
+    if (!filtroEmpresa || valor === empresaTipoFlotaDefault) return;
+    const anterior = empresaTipoFlotaDefault;
+    setEmpresaTipoFlotaDefault(valor);
+    setSavingTipoFlotaDefault(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ tipoFlotaDefault: valor }),
+      });
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      setEmpresaTipoFlotaDefault(anterior);
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingTipoFlotaDefault(false);
     }
   }
 
@@ -1704,6 +1731,39 @@ export function CamposEmpresaPage() {
                             </select>
                           </td>
                         </tr>
+                        {empresaTipoFlota === "mixta" && (
+                          <tr className="border-t border-black/10">
+                            <td className="px-4 py-2.5">
+                              Flota por defecto al crear
+                              <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                                Qué opción viene marcada al crear un Viaje, un
+                                Chofer o un Vehículo. Se puede cambiar en cada
+                                alta. "Según el formulario" = Viajes arranca en
+                                transportista externo y Choferes/Vehículos en
+                                flota propia.
+                              </p>
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              <select
+                                value={empresaTipoFlotaDefault ?? ""}
+                                disabled={savingTipoFlotaDefault}
+                                onChange={(e) =>
+                                  void guardarTipoFlotaDefault(
+                                    (e.target.value || null) as
+                                      | "propia"
+                                      | "externa"
+                                      | null,
+                                  )
+                                }
+                                className="h-9 w-full max-w-xs border border-black/15 bg-white px-2 text-sm text-left disabled:opacity-50"
+                              >
+                                <option value="">Según el formulario</option>
+                                <option value="propia">Flota propia</option>
+                                <option value="externa">Transportista externo</option>
+                              </select>
+                            </td>
+                          </tr>
+                        )}
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
                             Opciones de proveedor para contrato (Liquidación PDF)

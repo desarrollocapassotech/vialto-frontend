@@ -114,8 +114,12 @@ export function ViajeCreatePage() {
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
   const { isVisible } = useFieldConfig("viajes");
-  const { flotaPropiaVisible, transportistaExternoVisible } =
-    useTipoFlotaVisible(tenantId || undefined);
+  const {
+    flotaPropiaVisible,
+    transportistaExternoVisible,
+    defaultCreacion: defaultFlotaCreacion,
+    tenantCargado: tenantFlotaCargado,
+  } = useTipoFlotaVisible(tenantId || undefined);
   // Tenant efectivo (propio u override de superadmin), para el label de "Producto".
   const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId || undefined);
   const desgloseActivo = isVisible("alta_viaje", "desgloseMontos");
@@ -491,6 +495,18 @@ export function ViajeCreatePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transportistaExternoVisible, modoOperacion]);
+
+  // Flota mixta con default de creación configurado (Tenant.tipoFlotaDefault):
+  // se aplica una sola vez, cuando carga el tenant, para no pisar lo que elija el usuario.
+  const defaultFlotaAplicado = useRef(false);
+  useEffect(() => {
+    if (defaultFlotaAplicado.current || !tenantFlotaCargado) return;
+    defaultFlotaAplicado.current = true;
+    if (defaultFlotaCreacion === "propia" && modoOperacion !== "propio") {
+      applyModoOperacion("propio");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantFlotaCargado, defaultFlotaCreacion]);
 
   function buildGananciaDraft(): GananciaBrutaManualDraftSlice {
     return {
