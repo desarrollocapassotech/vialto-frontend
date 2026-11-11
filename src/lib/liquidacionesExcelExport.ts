@@ -1,6 +1,9 @@
 import * as XLSX from "xlsx";
 import type { ExcelExportColOption } from "@/components/stock/ExcelExportModal";
 import type { LiquidacionConTransportista } from "@/components/liquidaciones/LiquidacionViewModal";
+import { liquidacionConArca } from "@/lib/arcaCbteTipo";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
+import { fechaEmisionLiquidacion } from "@/lib/liquidacionFechaEmision";
 
 const ESTADO_LABEL: Record<string, string> = {
   borrador: "BORRADOR",
@@ -22,6 +25,7 @@ export function liquidacionesExportColumns(
 export const LIQUIDACIONES_EXPORT_COLUMNS: ExcelExportColOption[] = [
   { id: "transportista", label: "Transportista", required: true },
   { id: "idFiscal", label: "ID Fiscal (CUIT/RUT)" },
+  { id: "fechaEmision", label: "Fecha de Emisión" },
   { id: "periodoDesde", label: "Período Desde" },
   { id: "periodoHasta", label: "Período Hasta" },
   { id: "bruto", label: "Monto Bruto" },
@@ -53,6 +57,8 @@ export async function generarLiquidacionesExcel(
   columnas: ExcelExportColOption[],
   liquidaciones: LiquidacionConTransportista[],
   filename: string = "liquidaciones_export",
+  /** La empresa emite liquidaciones en ARCA (define de dónde sale la fecha de emisión). */
+  hasArca = false,
 ) {
   const data = liquidaciones.map((liq) => {
     const row: Record<string, string | number> = {};
@@ -65,6 +71,11 @@ export async function generarLiquidacionesExcel(
         case "idFiscal":
           row[col.label] = liq.transportista?.idFiscal || "";
           break;
+        case "fechaEmision": {
+          const f = fechaEmisionLiquidacion(liq, liquidacionConArca(hasArca, liq));
+          row[col.label] = f ? fmtDateUtc(f) : "";
+          break;
+        }
         case "periodoDesde":
           row[col.label] = fmtDate(liq.periodoDesde);
           break;
