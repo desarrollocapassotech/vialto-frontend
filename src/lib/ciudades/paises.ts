@@ -173,10 +173,10 @@ export function validarIdFiscal(
 
   switch (pais) {
     case "AR": {
-      // Solo dígitos y guiones: XX-XXXXXXXX-X o XXXXXXXXXXX
-      if (!/^[\d-]+$/.test(valor))
-        return "El CUIT/CUIL solo puede contener dígitos y guiones.";
-      const d = valor.replace(/-/g, "");
+      // Solo dígitos, puntos y guiones: XX-XXXXXXXX-X, XX.XXXXXXXX.X o XXXXXXXXXXX
+      if (!/^[\d.-]+$/.test(valor))
+        return "El CUIT/CUIL solo puede contener dígitos, puntos y guiones.";
+      const d = valor.replace(/[.-]/g, "");
       if (d.length !== 11)
         return `El CUIT/CUIL debe tener 11 dígitos (se ingresaron ${d.length}).`;
       if (!cuitDigitoVerificadorValido(d))
@@ -193,10 +193,10 @@ export function validarIdFiscal(
       break;
     }
     case "PY": {
-      // Solo dígitos y guiones: XXXXXXXX-X
-      if (!/^[\d-]+$/.test(valor))
-        return "El RUC solo puede contener dígitos y guiones.";
-      const d = valor.replace(/-/g, "");
+      // Solo dígitos, puntos y guiones: XXXXXXXX-X
+      if (!/^[\d.-]+$/.test(valor))
+        return "El RUC solo puede contener dígitos, puntos y guiones.";
+      const d = valor.replace(/[.-]/g, "");
       if (d.length < 5 || d.length > 10)
         return `El RUC debe tener entre 5 y 10 dígitos (se ingresaron ${d.length}).`;
       break;
