@@ -160,12 +160,115 @@ export function clientesPayloadParaApi(rows: ViajeClienteDraft[]): ViajeClienteA
  * `validarCiudades = false` (`Tenant.recomendacionCiudadesHabilitada` apagado): origen y
  * destinos en texto libre, sin contrastar con el catálogo.
  */
+export type OpcionesValidacionClientes = {
+  /**
+   * Alta de viaje: toda tarjeta tiene que estar completa (cliente, carga si
+   * `exigirCarga`, origen, destino y cobro > 0). Una tarjeta vacía no se saltea: hay
+   * que completarla o quitarla. El error lista qué falta en cada una.
+   */
+  completo?: boolean;
+  /** Con `completo`: true = cantidad × tarifa; false = monto. */
+  desglose?: boolean;
+  /** Con `completo`: cuántas tarjetas del principio son el cliente principal (default 1). */
+  principales?: number;
+};
+
+/** Campo obligatorio de una tarjeta de cliente que puede faltar (se marca en rojo). */
+export type CampoClienteFaltante =
+  | 'cliente'
+  | 'carga'
+  | 'origen'
+  | 'destino'
+  | 'cantidad'
+  | 'tarifa'
+  | 'monto';
+
+/**
+ * Campos obligatorios que le faltan a una tarjeta en modo `completo` (vacío = completa).
+ * Misma regla que el backend (`CreateViajeDto` / `ViajeClienteItemDto`):
+ * - Cliente: siempre.
+ * - Principal: origen, primer destino y cobro (monto > 0, o cantidad y tarifa).
+ * - Adicionales: origen, destino y cobro opcionales; pero cantidad y tarifa van juntas
+ *   (si se carga una, falta la otra).
+ * La carga nunca es obligatoria.
+ */
+export function esClientePrincipal(i: number, o: OpcionesValidacionClientes): boolean {
+  return i < (o.principales ?? 1);
+}
+
+export function faltantesClienteRow(
+  row: ViajeClienteDraft,
+  o: OpcionesValidacionClientes,
+  principal = true,
+): CampoClienteFaltante[] {
+  const falta: CampoClienteFaltante[] = [];
+  if (!row.clienteId.trim()) falta.push('cliente');
+  const cantidadOk = (() => {
+    const n = Number(row.cantidadStr.replace(',', '.'));
+    return row.cantidadStr.trim() !== '' && Number.isFinite(n) && n >= 0;
+  })();
+  const tarifa = parseCurrencyForMoneda(row.precioUnitarioStr, row.moneda);
+  const tarifaOk = row.precioUnitarioStr.trim() !== '' && tarifa != null && tarifa >= 0;
+  if (principal) {
+    if (!row.origen.trim()) falta.push('origen');
+    if (!row.destinosRows.some((d) => d.etiqueta.trim())) falta.push('destino');
+    if (o.desglose) {
+      if (!cantidadOk) falta.push('cantidad');
+      if (!tarifaOk) falta.push('tarifa');
+    } else {
+      const monto = parseCurrencyForMoneda(row.montoStr, row.moneda);
+      if (monto == null || monto <= 0) falta.push('monto');
+    }
+  } else if (o.desglose && (row.cantidadStr.trim() || row.precioUnitarioStr.trim())) {
+    if (!cantidadOk) falta.push('cantidad');
+    if (!tarifaOk) falta.push('tarifa');
+  }
+  return falta;
+}
+
+/** Campos faltantes por tarjeta (índice → campos); solo incluye las incompletas. */
+export function faltantesPorFila(
+  rows: ViajeClienteDraft[],
+  opciones: OpcionesValidacionClientes,
+): Record<number, CampoClienteFaltante[]> {
+  const out: Record<number, CampoClienteFaltante[]> = {};
+  rows.forEach((row, i) => {
+    const falta = faltantesClienteRow(row, opciones, esClientePrincipal(i, opciones));
+    if (falta.length > 0) out[i] = falta;
+  });
+  return out;
+}
+
+/**
+ * Modo `completo`, sin las validaciones async (ciudades): null si todas las tarjetas
+ * están completas; si no, el aviso corto del pie (los campos se marcan en rojo).
+ * Lo usa también "+ Agregar cliente" para no sumar una tarjeta nueva con otras a medias.
+ */
+export function clientesRowsIncompletos(
+  rows: ViajeClienteDraft[],
+  opciones: OpcionesValidacionClientes,
+): { message: string; rowErrors: Record<number, string> } | null {
+  const faltantes = faltantesPorFila(rows, opciones);
+  const indices = Object.keys(faltantes);
+  if (indices.length === 0) return null;
+  const rowErrors: Record<number, string> = {};
+  for (const k of indices) rowErrors[Number(k)] = 'Faltan datos.';
+  return { message: 'Completá los campos marcados en rojo.', rowErrors };
+}
+
 export async function validarClientesRows(
   rows: ViajeClienteDraft[],
   validarCiudades = true,
+  opciones: OpcionesValidacionClientes = {},
 ): Promise<{ ok: true } | { ok: false; message: string; rowErrors: Record<number, string> }> {
   const rowErrors: Record<number, string> = {};
   const seen = new Set<string>();
+  if (opciones.completo) {
+    // Un solo mensaje con lo que falta en cada tarjeta (el alta no muestra el error
+    // dentro de la tarjeta, solo el aviso del pie).
+    const incompletos = clientesRowsIncompletos(rows, opciones);
+    if (incompletos) return { ok: false, ...incompletos };
+  }
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const clienteId = row.clienteId.trim();
@@ -201,6 +304,11 @@ export async function validarClientesRows(
       rowErrors[i] = destinosVal.message;
       continue;
     }
+
+    // Alta: en los clientes adicionales el cobro es opcional (igual que en el backend).
+    const sinCobro =
+      !row.cantidadStr.trim() && !row.precioUnitarioStr.trim() && !row.montoStr.trim();
+    if (opciones.completo && !esClientePrincipal(i, opciones) && sinCobro) continue;
 
     if (row.cantidadStr.trim() || row.precioUnitarioStr.trim()) {
       const cantidad = Number(row.cantidadStr.replace(',', '.'));

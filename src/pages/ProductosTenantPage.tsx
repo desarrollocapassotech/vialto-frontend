@@ -18,6 +18,8 @@ import { puedeGestionarComoAdminEmpresa } from "@/lib/roleLabels";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 import { useProductoLabels } from "@/hooks/useProductoLabels";
 import { PRODUCTO_LABELS_DEFAULT, labelEnFrase } from "@/lib/productoLabel";
+import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { canAccessStock } from "@/lib/tenantModules";
 
 type Paginated = { items: Producto[]; meta: PaginatedMeta };
 
@@ -34,7 +36,13 @@ export function ProductosTenantPage() {
     orgRole,
     user?.publicMetadata,
   );
-  const labels = useProductoLabels();
+  // Con Stock este catálogo es el de Stock, que siempre dice "Producto"; el label
+  // propio de la empresa (ej. "Carga") es solo para fuera de Stock.
+  const { tenant } = useCurrentTenant();
+  const labelsEmpresa = useProductoLabels();
+  const labels = canAccessStock(tenant?.modules ?? [])
+    ? PRODUCTO_LABELS_DEFAULT
+    : labelsEmpresa;
   const labelPropio = labels.singular !== PRODUCTO_LABELS_DEFAULT.singular;
   const singularFrase = labelEnFrase(labels.singular);
   const pluralFrase = labelEnFrase(labels.plural);
@@ -217,9 +225,6 @@ export function ProductosTenantPage() {
           <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
             {labels.plural}
           </h1>
-          <p className="mt-2 text-vialto-steel max-w-2xl">
-            {labelPropio ? `Catálogo de ${pluralFrase}.` : "Los productos que manipulás."}
-          </p>
         </div>
         {activeFilterCount > 0 && (
           <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />

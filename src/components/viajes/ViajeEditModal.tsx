@@ -1,3 +1,7 @@
+import { DireccionesSugeridasProvider } from "@/hooks/useDireccionesSugeridas";
+import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
+import { labelTransporteViaje, transportistaEnFrase } from "@/lib/transportistaLabel";
+import { resolverPaisFijoViaje } from "@/lib/paisFijoViaje";
 import {
   useEffect,
   useMemo,
@@ -57,14 +61,12 @@ import {
   tooltipEtapaViaje,
 } from "@/lib/viajesIndicadores";
 import {
-  viajePendienteComprobanteCliente,
   viajePendienteComprobanteTransportista,
   viajeRequiereComprobanteDual,
 } from "@/lib/viajesComprobantes";
 import {
   numeroFacturaVisibleViaje,
   numeroVisibleViaje,
-  viajeUsaNumeroInterno,
   labelIdentificacionPersonalizadaViajes,
   idSistemaHabilitado,
   idPropio1Habilitado,
@@ -102,7 +104,15 @@ import {
   ViajeClientesFieldset,
   ClienteCard,
 } from "@/components/viajes/ViajeClientesFieldset";
-import { emptyClienteRow, conPaisFijo, type ViajeClienteDraft } from "@/lib/viajesClientes";
+import {
+  emptyClienteRow,
+  conPaisFijo,
+  faltantesClienteRow,
+  faltantesPorFila,
+  type ViajeClienteDraft,
+} from "@/lib/viajesClientes";
+import { conBordeError } from "@/lib/bordeError";
+import { FaltaCampo } from "@/components/shared/FaltaCampo";
 
 /** A qué campo aplicar el país recién creado desde "+ Nuevo país". */
 type PaisQuickCreateTarget =
@@ -212,6 +222,8 @@ export type ViajeEditModalProps = {
     | "labelIdentificacionPersonalizadaViajes"
     | "paisOrigenDestinoOculto"
     | "paisOrigenDestinoFijoId"
+    | "paisOrigenDestinoFijoCodigo"
+    | "paisOrigenDestinoFijoNombre"
     | "idSistemaHabilitado"
     | "idPropio1Habilitado"
     | "idPropio2Habilitado"
@@ -265,8 +277,6 @@ export function ViajeEditModal({
   onDraftFechasPatch,
   onClose,
   onSave,
-  onFacturar,
-  facturarBloqueoMotivo = null,
   onLiquidar,
   liquidarBloqueoMotivo = null,
   onContinuarFactura,
@@ -311,9 +321,70 @@ export function ViajeEditModal({
     [fechaCargaError, fechaDescargaError, destinosError, transportistaEfectivoError, clientesRowErrors],
   );
   const { isVisible } = useFieldConfig("viajes");
+  // Nombre que la empresa le da al transportista (superadmin).
+  const tl = useTransportistaLabels(tenantId || undefined);
+  const lblTransporte = labelTransporteViaje(tl);
+  const transpFrase = transportistaEnFrase(tl.singular);
   const { flotaPropiaVisible, transportistaExternoVisible } =
     useTipoFlotaVisible(tenantId || undefined);
   const desgloseActivo = isVisible("edicion_viaje", "desgloseMontos");
+
+  // ── Obligatorios que faltan (mismo estándar que el alta de viaje) ──────
+  // Se calculan siempre desde el draft; se marcan en rojo recién después de un
+  // intento fallido (Guardar / + Agregar cliente) y se apagan al completarse.
+  const [marcarFaltantes, setMarcarFaltantes] = useState(false);
+  const [avisoFaltantes, setAvisoFaltantesEstado] = useState<string | null>(null);
+  /** Aviso del pie que zumba en cada intento (vacía y vuelve a poner el mensaje). */
+  function avisarFaltantes(msg = "Completá los campos marcados en rojo.") {
+    setMarcarFaltantes(true);
+    setAvisoFaltantesEstado(null);
+    requestAnimationFrame(() => setAvisoFaltantesEstado(msg));
+  }
+  const opcionesFaltantes = { completo: true, desglose: desgloseActivo, principales: 0 };
+  // Cliente principal: mismas reglas que la 1ª tarjeta del alta (cliente, origen,
+  // destino y cobro), sobre los campos del draft del viaje.
+  const faltaPrincipal = draft
+    ? faltantesClienteRow(
+        {
+          clienteId: draft.clienteId,
+          origen: draft.origen,
+          destinosRows: draft.destinosRows,
+          cantidadStr: draft.cantidadFactura,
+          precioUnitarioStr: draft.precioUnitarioFactura,
+          montoStr: draft.monto,
+          moneda: draft.monedaMonto,
+          productoItems: draft.productoItems,
+        } as unknown as ViajeClienteDraft,
+        opcionesFaltantes,
+        true,
+      )
+    : [];
+  // Clientes adicionales: solo el cliente es obligatorio (cantidad y tarifa, juntas).
+  const faltaAdicionales = draft ? faltantesPorFila(draft.clientesRows, opcionesFaltantes) : {};
+  const flotaPropia = draft?.operacionModo === "propio";
+  const faltaChoferPropio =
+    !!draft && flotaPropia && isVisible("edicion_viaje", "choferId") && !draft.choferId.trim();
+  const faltaVehiculosPropios =
+    !!draft &&
+    flotaPropia &&
+    isVisible("edicion_viaje", "vehiculosRows") &&
+    !draft.vehiculosRows.some((r) => r.vehiculoId);
+  const hayFaltantesClientes =
+    faltaPrincipal.length > 0 || Object.keys(faltaAdicionales).length > 0;
+  const hayFaltantes = hayFaltantesClientes || faltaChoferPropio || faltaVehiculosPropios;
+  const marcaP = (c: string) => marcarFaltantes && faltaPrincipal.includes(c as never);
+  const [abiertoPrincipal, setAbiertoPrincipal] = useState(false);
+  useEffect(() => {
+    // Ya no falta nada: se van el rojo y el aviso.
+    if (marcarFaltantes && !hayFaltantes) {
+      setMarcarFaltantes(false);
+      setAvisoFaltantesEstado(null);
+    }
+  }, [marcarFaltantes, hayFaltantes]);
+  useEffect(() => {
+    // Las tarjetas arrancan colapsadas: la del principal se abre si tiene faltantes.
+    if (marcarFaltantes && faltaPrincipal.length > 0) setAbiertoPrincipal(true);
+  }, [marcarFaltantes, faltaPrincipal.length]);
   const ivaTransportistaVisible = isVisible(
     "edicion_viaje",
     "precioTransportistaIvaIncluidoPct",
@@ -373,10 +444,10 @@ export function ViajeEditModal({
   /** País fijo si el tenant tiene `paisOrigenDestinoOculto` — ver `Tenant.paisOrigenDestinoOculto`
    * en el backend. Si el país fijado fue borrado del catálogo, no aplica (fallback seguro: se
    * sigue mostrando el selector de país). */
-  const paisFijo = useMemo(() => {
-    if (!tenant?.paisOrigenDestinoOculto || !tenant.paisOrigenDestinoFijoId) return null;
-    return todosPaises.find((p) => p.id === tenant.paisOrigenDestinoFijoId) ?? null;
-  }, [tenant, todosPaises]);
+  const paisFijo = useMemo(
+    () => resolverPaisFijoViaje(tenant, todosPaises),
+    [tenant, todosPaises],
+  );
   /** `Tenant.recomendacionCiudadesHabilitada` (default true): false = ciudades en texto libre. */
   const sugerenciasCiudad = tenant?.recomendacionCiudadesHabilitada !== false;
 
@@ -473,9 +544,10 @@ export function ViajeEditModal({
   const montoIvaTransportista = pagoNetoTransportista - pagoBrutoTransportista;
 
   const readonlyMoneyClass =
-    "flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0";
+  // Importe calculado: se muestra como número (igual que el Total del alta), no como input.
+  "flex h-9 items-center text-right text-base font-semibold tabular-nums text-vialto-charcoal min-w-0";
   function fmtReadonlyMoney(n: number) {
-    return n.toLocaleString("es-AR", {
+    return "$ " + n.toLocaleString("es-AR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
@@ -557,12 +629,6 @@ export function ViajeEditModal({
         : snapshotViaje.transportistaId,
   };
   const comprobantesHabilitados = draft.estado !== "cancelado";
-  const muestraBotonFacturar =
-    typeof onFacturar === "function" &&
-    comprobantesHabilitados &&
-    viajePendienteComprobanteCliente(viajeComprobantes);
-  const facturarDeshabilitado =
-    saving || !draft.clienteId.trim() || Boolean(facturarBloqueoMotivo);
   const muestraBotonLiquidar =
     typeof onLiquidar === "function" &&
     comprobantesHabilitados &&
@@ -601,7 +667,8 @@ export function ViajeEditModal({
   );
 
   return (
-    <>
+    // Direcciones de entrega como sugerencias en Origen/Destino (ver CiudadCombobox).
+    <DireccionesSugeridasProvider tenantId={tenantId || undefined}>
       <div
         className="fixed inset-0 z-[45] flex items-stretch justify-center sm:items-center sm:p-4 md:p-6"
         role="presentation"
@@ -611,7 +678,7 @@ export function ViajeEditModal({
           role="dialog"
           aria-modal="true"
           aria-labelledby="viaje-edit-modal-title"
-          className="relative flex h-full max-h-[100dvh] w-full max-w-[min(72rem,calc(100vw-1rem))] flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-lg sm:border sm:border-black/15"
+          className="relative flex h-full max-h-[100dvh] w-full max-w-[min(88rem,calc(100vw-1rem))] flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-lg sm:border sm:border-black/15"
           onClick={(e) => e.stopPropagation()}
         >
           <header className="flex shrink-0 items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-6">
@@ -622,12 +689,6 @@ export function ViajeEditModal({
               >
                 Editar viaje {numeroVisibleViaje(draft)}
               </h2>
-              <p className="mt-1 text-xs text-vialto-steel">
-                {viajeUsaNumeroInterno(draft)
-                  ? "Número interno generado automáticamente por el sistema. "
-                  : ""}
-                Modificá los datos del viaje. Los cambios se aplican al guardar.
-              </p>
             </div>
             <button
               type="button"
@@ -656,9 +717,20 @@ export function ViajeEditModal({
               </div>
             )}
 
+            {/* ID propio (y el 2, si la empresa lo usa) y Etapa en la misma fila. */}
+            <div
+              className={`mb-4 grid gap-4 ${
+                [idPropio1Habilitado(tenant), idPropio2Habilitado(tenant)].filter(Boolean).length === 2
+                  ? "md:grid-cols-3"
+                  : idPropio1Habilitado(tenant) || idPropio2Habilitado(tenant)
+                    ? "md:grid-cols-2"
+                    : ""
+              }`}
+            >
             {idPropio1Habilitado(tenant) && (
-              <div className="mb-4 flex flex-col gap-1.5 rounded border-2 border-vialto-fire/60 bg-vialto-mist/50 p-3">
-                <span className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-[0.08em] text-vialto-charcoal">
+              // Un campo más del formulario (sin recuadro destacado ni texto de ayuda).
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className={labelClass}>
                   {labelIdentificacionPersonalizadaViajes(tenant)}{" "}
                   {!idSistemaHabilitado(tenant) && (
                     <span className="text-red-500">*</span>
@@ -678,18 +750,13 @@ export function ViajeEditModal({
                     )
                   }
                   placeholder="Ej: número de CTG"
-                  className="h-11 w-full border border-black/15 bg-white px-3 text-base font-medium text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/40"
+                  className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                 />
-                <p className="text-xs text-vialto-steel">
-                  {idSistemaHabilitado(tenant)
-                    ? "Si lo cargás, este número se usa para identificar el viaje en toda la app en vez del número interno del sistema."
-                    : "Tu empresa tiene deshabilitado el ID Sistema — este campo es obligatorio para poder identificar el viaje."}
-                </p>
               </div>
             )}
 
             {idPropio2Habilitado(tenant) && (
-              <div className="flex flex-col gap-1.5">
+              <div className="flex min-w-0 flex-col gap-1">
                 <span className={labelClass}>{idPropio2Label(tenant)}</span>
                 <input
                   type="text"
@@ -710,8 +777,7 @@ export function ViajeEditModal({
               </div>
             )}
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+              <div className="flex min-w-0 flex-col gap-1">
                 <span className={labelClass}>Etapa</span>
                 <select
                   value={draft.estado}
@@ -735,10 +801,13 @@ export function ViajeEditModal({
                   </span>
                 )}
               </div>
+            </div>
 
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
                 <span className={labelClass}>Clientes del viaje</span>
                 <ClienteCard
+                  numero={1}
                   title={
                     todosClientes.find((c) => c.id === draft.clienteId)
                       ?.nombre || "Cliente principal"
@@ -747,18 +816,22 @@ export function ViajeEditModal({
                     draft.origen,
                     draft.destinosRows.map((r) => r.etiqueta).filter(Boolean),
                   )}
-                  defaultOpen
+                  // En la edición los clientes arrancan colapsados (se abre sola si le falta algo).
+                  open={abiertoPrincipal}
+                  onToggle={() => setAbiertoPrincipal((v) => !v)}
                 >
                   <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1">
-                      <span className={labelClass}>Cliente</span>
+                      <span className={labelClass}>
+                        Cliente <span className="text-red-500">*</span>
+                      </span>
                       <ClienteSearchSelect
                         clientes={todosClientes}
                         value={draft.clienteId}
                         onChange={(id) =>
                           setDraft((p) => (p ? { ...p, clienteId: id } : p))
                         }
-                        inputClassName={inputClass}
+                        inputClassName={conBordeError(inputClass, marcaP("cliente"))}
                         aria-label="Cliente"
                         disabled={datosClienteBloqueados || saving}
                         onNuevo={
@@ -767,9 +840,12 @@ export function ViajeEditModal({
                             : undefined
                         }
                       />
+                      <FaltaCampo show={marcaP("cliente")} />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <span className={labelClass}>Origen</span>
+                      <span className={labelClass}>
+                        Origen <span className="text-red-500">*</span>
+                      </span>
                       <div className={`grid gap-2 sm:items-end ${paisFijo ? '' : 'sm:grid-cols-[auto_1fr]'}`}>
                         {!paisFijo && (
                           <PaisUbicacionSelect
@@ -786,6 +862,7 @@ export function ViajeEditModal({
                           />
                         )}
                         <CiudadCombobox
+                          campo="origen"
                           pais={paisFijo ? (paisFijo.codigo || paisFijo.id) : draft.paisOrigen}
                           value={draft.origen}
                           onChange={(next) =>
@@ -794,9 +871,11 @@ export function ViajeEditModal({
                             )
                           }
                           inputClassName={`${inputClass} w-full`}
+                          error={marcaP("origen")}
                           sugerencias={sugerenciasCiudad}
                         />
                       </div>
+                      <FaltaCampo show={marcaP("origen")} />
                     </div>
                     <div className="flex flex-col gap-1">
                       <ViajeDestinosLista
@@ -818,6 +897,8 @@ export function ViajeEditModal({
                         }}
                         paisFijo={paisFijo}
                         sugerenciasCiudad={sugerenciasCiudad}
+                        requerido
+                        errorPrimerDestino={marcaP("destino")}
                       />
                     </div>
                     {isVisible("edicion_viaje", "productoItems") && (
@@ -843,7 +924,9 @@ export function ViajeEditModal({
                     {desgloseActivo ? (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div className="flex flex-col gap-1">
-                          <span className={labelClass}>Cantidad</span>
+                          <span className={labelClass}>
+                            Cantidad <span className="text-red-500">*</span>
+                          </span>
                           <input
                             type="text"
                             inputMode="decimal"
@@ -858,11 +941,14 @@ export function ViajeEditModal({
                               )
                             }
                             placeholder="0.00"
-                            className={`${inputClass} text-right tabular-nums`}
+                            className={`${conBordeError(inputClass, marcaP("cantidad"))} text-right tabular-nums`}
                           />
+                          <FaltaCampo show={marcaP("cantidad")} />
                         </div>
                         <div className="flex flex-col gap-1">
-                          <span className={labelClass}>Precio unitario</span>
+                          <span className={labelClass}>
+                            Tarifa <span className="text-red-500">*</span>
+                          </span>
                           <div className="flex min-w-0 gap-2">
                             <input
                               type="text"
@@ -885,7 +971,7 @@ export function ViajeEditModal({
                                 )
                               }
                               placeholder="0.00"
-                              className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
+                              className={`${conBordeError(inputClass, marcaP("tarifa"))} min-w-0 flex-1 text-right tabular-nums`}
                             />
                             <MonedaSelect
                               value={draft.monedaMonto}
@@ -909,13 +995,14 @@ export function ViajeEditModal({
                               aria-label="Moneda precio unitario"
                             />
                           </div>
+                          <FaltaCampo show={marcaP("tarifa")} />
                         </div>
                         <div className="flex flex-col gap-1">
                           <span className={labelClass}>Total</span>
                           <div
                             className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
                           >
-                            <span className="w-full truncate text-sm">
+                            <span className="w-full truncate">
                               {(
                                 (Number(
                                   draft.cantidadFactura.replace(",", "."),
@@ -934,7 +1021,9 @@ export function ViajeEditModal({
                       </div>
                     ) : (
                       <div className="flex flex-col gap-1">
-                        <span className={labelClass}>Monto a facturar</span>
+                        <span className={labelClass}>
+                          Monto a facturar <span className="text-red-500">*</span>
+                        </span>
                         <div className="flex min-w-0 gap-2">
                           <input
                             type="text"
@@ -956,7 +1045,7 @@ export function ViajeEditModal({
                               )
                             }
                             placeholder="0.00"
-                            className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
+                            className={`${conBordeError(inputClass, marcaP("monto"))} min-w-0 flex-1 text-right tabular-nums`}
                           />
                           <MonedaSelect
                             value={draft.monedaMonto}
@@ -979,11 +1068,15 @@ export function ViajeEditModal({
                             aria-label="Moneda monto a facturar"
                           />
                         </div>
+                        <FaltaCampo show={marcaP("monto")} />
                       </div>
                     )}
                   </div>
                 </ClienteCard>
                 <ViajeClientesFieldset
+                  numeroInicial={2}
+                  inicialColapsados
+                  camposFaltantes={marcarFaltantes ? faltaAdicionales : undefined}
                   ocultarTextoError
                   rows={draft.clientesRows}
                   onChange={(rows) => {
@@ -1018,7 +1111,14 @@ export function ViajeEditModal({
                 />
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    // Igual que el alta: no se suma otro cliente con obligatorios vacíos.
+                    if (hayFaltantesClientes) {
+                      avisarFaltantes(
+                        "Completá los campos marcados en rojo antes de agregar otro cliente.",
+                      );
+                      return;
+                    }
                     setDraft((p) =>
                       p
                         ? {
@@ -1029,8 +1129,8 @@ export function ViajeEditModal({
                             ],
                           }
                         : p,
-                    )
-                  }
+                    );
+                  }}
                   className="mt-1 self-start text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
                 >
                   + Agregar cliente
@@ -1041,18 +1141,21 @@ export function ViajeEditModal({
                 modo={draft.operacionModo}
                 onModoChange={onModoChange}
                 externoVisible={transportistaExternoVisible}
+                labelExterno={lblTransporte}
                 propioVisible={flotaPropiaVisible}
                 groupName={`viaje-edit-${draft.numero || "e"}`}
                 externoContent={
                   <div className="grid gap-3">
+                    {/* Fletero, chofer y vehículos en la misma fila. */}
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:items-start">
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={labelClass}>Transporte / Porteador</span>
+                      <span className={labelClass}>{lblTransporte}</span>
                       <TransportistaSearchSelect
                         transportistas={todosTransportistas}
                         value={draft.transportistaId}
-                        placeholderCerrado="Elegí un transporte / porteador…"
-                        placeholderBuscar="Buscar transporte / porteador…"
-                        emptyListChoiceLabel="Elegí un transporte / porteador…"
+                        placeholderCerrado={tl.propio ? `Elegí ${transpFrase}…` : "Elegí un transporte / porteador…"}
+                        placeholderBuscar={tl.propio ? `Buscar ${transpFrase}…` : "Buscar transporte / porteador…"}
+                        emptyListChoiceLabel={tl.propio ? `Elegí ${transpFrase}…` : "Elegí un transporte / porteador…"}
                         onChange={(id) =>
                           setDraft((p) =>
                             p
@@ -1069,7 +1172,7 @@ export function ViajeEditModal({
                         }
                         inputClassName={inputClass}
                         disabled={datosTransporteBloqueados || saving}
-                        aria-label="Transporte / Porteador"
+                        aria-label={lblTransporte}
                         onNuevo={
                           getToken && !datosTransporteBloqueados
                             ? () => setQuickCreate("transportista")
@@ -1077,10 +1180,53 @@ export function ViajeEditModal({
                         }
                       />
                     </div>
+                    {isVisible("edicion_viaje", "choferExternoId") && (
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <span className={labelClass}>Chofer</span>
+                        <ChoferSearchSelect
+                          choferes={choferesExterno}
+                          value={draft.choferExternoId}
+                          onChange={(id) =>
+                            setDraft((p) =>
+                              p ? { ...p, choferExternoId: id } : p,
+                            )
+                          }
+                          inputClassName={inputClass}
+                          aria-label="Chofer transporte / porteador"
+                          onNuevo={
+                            getToken
+                              ? () => setQuickCreate("chofer-ext")
+                              : undefined
+                          }
+                        />
+                      </div>
+                    )}
+                    {isVisible("edicion_viaje", "vehiculosRows") && (
+                      // Envuelto: la lista trae `md:col-span-*` para otros layouts.
+                      <div className="min-w-0">
+                        <ViajeVehiculosLista
+                          groupId={`viaje-modal-ext-${draft.numero || "e"}`}
+                          crearVehiculoHref={crearVehiculoHref}
+                          rows={draft.vehiculosRows}
+                          onChange={(rows) =>
+                            setDraft((p) =>
+                              p ? { ...p, vehiculosRows: rows } : p,
+                            )
+                          }
+                          vehiculos={todosVehiculos}
+                          alMenosUno={false}
+                          getToken={getToken}
+                          tenantId={tenantId}
+                          onVehiculoCreado={onVehiculoCreado}
+                          quickCreateStacked
+                        />
+                      </div>
+                    )}
+                    </div>
                     {draft.transportistaId && (
                       <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
                         <span className={labelClass}>
-                          ¿El transportista seleccionado realiza el flete?
+                          ¿El {transpFrase} seleccionado realiza el flete?
                         </span>
                         <div className="flex gap-5">
                           <label
@@ -1129,7 +1275,7 @@ export function ViajeEditModal({
                         {!draft.realizaFlete && (
                           <div className="flex min-w-0 flex-col gap-1 mt-1">
                             <span className={labelClass}>
-                              Transportista que realiza el flete{" "}
+                              {tl.singular} que realiza el flete{" "}
                               <span className="text-red-500">*</span>
                             </span>
                             <TransportistaSearchSelect
@@ -1149,7 +1295,7 @@ export function ViajeEditModal({
                                   ? " border-red-400"
                                   : ""
                               }`}
-                              aria-label="Transportista que realiza el flete"
+                              aria-label={`${tl.singular} que realiza el flete`}
                               onNuevo={
                                 getToken && !datosTransporteBloqueados
                                   ? () => setQuickCreate("transportista")
@@ -1162,8 +1308,9 @@ export function ViajeEditModal({
                     )}
                     {desgloseActivo ? (
                       <>
+                        {/* Cantidad | Precio + moneda | (% IVA) | Pago bruto en una fila. */}
                         <div
-                          className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-[0.6fr_1.4fr_1fr]" : "sm:grid-cols-[0.6fr_1.4fr]"}`}
+                          className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-[0.6fr_1.4fr_0.7fr_1fr]" : "sm:grid-cols-[0.6fr_1.4fr_1fr]"}`}
                         >
                           <div className="flex min-w-0 flex-col gap-1">
                             <span className={labelClass}>Cantidad</span>
@@ -1265,41 +1412,32 @@ export function ViajeEditModal({
                               </p>
                             </div>
                           )}
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={`${labelClass} text-right`}>Pago bruto</span>
+                            <div className={readonlyMoneyClass}>
+                              <span className="w-full truncate">
+                                {fmtReadonlyMoney(pagoBrutoTransportista)}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        {ivaTransportistaVisible ? (
+                        {ivaTransportistaVisible && (
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <div className="flex min-w-0 flex-col gap-1">
-                              <span className={labelClass}>Pago bruto</span>
+                              <span className={`${labelClass} text-right`}>Pago neto</span>
                               <div className={readonlyMoneyClass}>
-                                <span className="w-full truncate text-sm">
-                                  {fmtReadonlyMoney(pagoBrutoTransportista)}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex min-w-0 flex-col gap-1">
-                              <span className={labelClass}>Pago neto</span>
-                              <div className={readonlyMoneyClass}>
-                                <span className="w-full truncate text-sm">
+                                <span className="w-full truncate">
                                   {fmtReadonlyMoney(pagoNetoTransportista)}
                                 </span>
                               </div>
                             </div>
                             <div className="flex min-w-0 flex-col gap-1">
-                              <span className={labelClass}>Monto IVA</span>
+                              <span className={`${labelClass} text-right`}>Monto IVA</span>
                               <div className={readonlyMoneyClass}>
-                                <span className="w-full truncate text-sm">
+                                <span className="w-full truncate">
                                   {fmtReadonlyMoney(montoIvaTransportista)}
                                 </span>
                               </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex min-w-0 flex-col gap-1 sm:max-w-xs">
-                            <span className={labelClass}>Pago bruto</span>
-                            <div className={readonlyMoneyClass}>
-                              <span className="w-full truncate text-sm">
-                                {fmtReadonlyMoney(pagoBrutoTransportista)}
-                              </span>
                             </div>
                           </div>
                         )}
@@ -1393,25 +1531,25 @@ export function ViajeEditModal({
                         {ivaTransportistaVisible && (
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <div className="flex min-w-0 flex-col gap-1">
-                              <span className={labelClass}>Pago bruto</span>
+                              <span className={`${labelClass} text-right`}>Pago bruto</span>
                               <div className={readonlyMoneyClass}>
-                                <span className="w-full truncate text-sm">
+                                <span className="w-full truncate">
                                   {fmtReadonlyMoney(pagoBrutoTransportista)}
                                 </span>
                               </div>
                             </div>
                             <div className="flex min-w-0 flex-col gap-1">
-                              <span className={labelClass}>Pago neto</span>
+                              <span className={`${labelClass} text-right`}>Pago neto</span>
                               <div className={readonlyMoneyClass}>
-                                <span className="w-full truncate text-sm">
+                                <span className="w-full truncate">
                                   {fmtReadonlyMoney(pagoNetoTransportista)}
                                 </span>
                               </div>
                             </div>
                             <div className="flex min-w-0 flex-col gap-1">
-                              <span className={labelClass}>Monto IVA</span>
+                              <span className={`${labelClass} text-right`}>Monto IVA</span>
                               <div className={readonlyMoneyClass}>
-                                <span className="w-full truncate text-sm">
+                                <span className="w-full truncate">
                                   {fmtReadonlyMoney(montoIvaTransportista)}
                                 </span>
                               </div>
@@ -1420,101 +1558,63 @@ export function ViajeEditModal({
                         )}
                       </>
                     )}
-                    <div className="grid gap-3">
-                      {isVisible("edicion_viaje", "choferExternoId") && (
-                        <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                          <span className={labelClass}>Chofer</span>
+                  </div>
+                }
+                // Con flota propia, chofer y vehículos van en la misma fila que las opciones.
+                alLadoPropio={
+                  isVisible("edicion_viaje", "choferId") ||
+                  isVisible("edicion_viaje", "vehiculosRows") ? (
+                    <div className="grid gap-3 sm:grid-cols-2 sm:items-start">
+                      {isVisible("edicion_viaje", "choferId") && (
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={labelClass}>
+                            Chofer <span className="text-red-500">*</span>
+                          </span>
                           <ChoferSearchSelect
-                            choferes={choferesExterno}
-                            value={draft.choferExternoId}
+                            choferes={todosChoferesPropios}
+                            value={draft.choferId}
                             onChange={(id) =>
-                              setDraft((p) =>
-                                p ? { ...p, choferExternoId: id } : p,
-                              )
+                              setDraft((p) => (p ? { ...p, choferId: id } : p))
                             }
-                            inputClassName={inputClass}
-                            aria-label="Chofer transporte / porteador"
+                            inputClassName={conBordeError(inputClass, marcarFaltantes && faltaChoferPropio)}
+                            aria-label="Chofer flota propia"
                             onNuevo={
-                              getToken
-                                ? () => setQuickCreate("chofer-ext")
-                                : undefined
+                              getToken ? () => setQuickCreate("chofer-prop") : undefined
                             }
                           />
+                          <FaltaCampo show={marcarFaltantes && faltaChoferPropio} />
+                          {ayudaFlota.chofer && (
+                            <p className="text-xs text-amber-800/90">{ayudaFlota.chofer}</p>
+                          )}
                         </div>
                       )}
                       {isVisible("edicion_viaje", "vehiculosRows") && (
-                        <ViajeVehiculosLista
-                          groupId={`viaje-modal-ext-${draft.numero || "e"}`}
-                          crearVehiculoHref={crearVehiculoHref}
-                          rows={draft.vehiculosRows}
-                          onChange={(rows) =>
-                            setDraft((p) =>
-                              p ? { ...p, vehiculosRows: rows } : p,
-                            )
-                          }
-                          vehiculos={todosVehiculos}
-                          alMenosUno={false}
-                          getToken={getToken}
-                          tenantId={tenantId}
-                          onVehiculoCreado={onVehiculoCreado}
-                          quickCreateStacked
-                        />
+                        // Envuelto: la lista trae `md:col-span-*` para otros layouts.
+                        <div className="min-w-0">
+                          <ViajeVehiculosLista
+                            groupId={`viaje-modal-${draft.numero || "e"}`}
+                            crearVehiculoHref={crearVehiculoHref}
+                            rows={draft.vehiculosRows}
+                            onChange={(rows) =>
+                              setDraft((p) => (p ? { ...p, vehiculosRows: rows } : p))
+                            }
+                            vehiculos={vehiculosPropios}
+                            getToken={getToken}
+                            tenantId={tenantId}
+                            onVehiculoCreado={onVehiculoCreado}
+                            quickCreateStacked
+                            error={marcarFaltantes && faltaVehiculosPropios}
+                          />
+                          {ayudaFlota.vehiculo && (
+                            <p className="text-xs text-amber-800/90">{ayudaFlota.vehiculo}</p>
+                          )}
+                        </div>
                       )}
                     </div>
-                  </div>
+                  ) : undefined
                 }
                 propioContent={
                   <div className="grid gap-3">
-                    {isVisible("edicion_viaje", "choferId") && (
-                      <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                        <span className={labelClass}>
-                          Chofer (flota propia)
-                        </span>
-                        <ChoferSearchSelect
-                          choferes={todosChoferesPropios}
-                          value={draft.choferId}
-                          onChange={(id) =>
-                            setDraft((p) => (p ? { ...p, choferId: id } : p))
-                          }
-                          inputClassName={inputClass}
-                          aria-label="Chofer flota propia"
-                          onNuevo={
-                            getToken
-                              ? () => setQuickCreate("chofer-prop")
-                              : undefined
-                          }
-                        />
-                        {ayudaFlota.chofer && (
-                          <p className="text-xs text-amber-800/90">
-                            {ayudaFlota.chofer}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    {isVisible("edicion_viaje", "vehiculosRows") && (
-                      <>
-                        <ViajeVehiculosLista
-                          groupId={`viaje-modal-${draft.numero || "e"}`}
-                          crearVehiculoHref={crearVehiculoHref}
-                          rows={draft.vehiculosRows}
-                          onChange={(rows) =>
-                            setDraft((p) =>
-                              p ? { ...p, vehiculosRows: rows } : p,
-                            )
-                          }
-                          vehiculos={vehiculosPropios}
-                          getToken={getToken}
-                          tenantId={tenantId}
-                          onVehiculoCreado={onVehiculoCreado}
-                          quickCreateStacked
-                        />
-                        {ayudaFlota.vehiculo && (
-                          <p className="text-xs text-amber-800/90">
-                            {ayudaFlota.vehiculo}
-                          </p>
-                        )}
-                      </>
-                    )}
                     {viajeEditHint && (
                       <p className="text-xs text-amber-800/90">
                         {viajeEditHint}
@@ -1704,7 +1804,7 @@ export function ViajeEditModal({
                       }
                       className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
                     >
-                      + Agregar pago al transportista
+                      + Agregar pago al {transpFrase}
                     </button>
                   </div>
                 ))}
@@ -1712,25 +1812,10 @@ export function ViajeEditModal({
           </div>
 
           <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
-            <ErrorPieModal error={error} fieldErrors={erroresPie} />
+            <ErrorPieModal error={avisoFaltantes ?? error} fieldErrors={erroresPie} />
             <div className="flex flex-wrap items-center gap-2">
-              {muestraBotonFacturar ? (
-                <button
-                  type="button"
-                  onClick={onFacturar}
-                  disabled={facturarDeshabilitado}
-                  title={
-                    facturarBloqueoMotivo
-                      ? facturarBloqueoMotivo
-                      : !draft.clienteId.trim()
-                        ? "Elegí un cliente para poder facturar este viaje"
-                        : undefined
-                  }
-                  className="inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Facturar
-                </button>
-              ) : null}
+              {/* Sin "Facturar" en la edición (a pedido): se factura desde el menú de
+                  acciones de la grilla o desde el detalle del viaje. */}
               {muestraBotonLiquidar ? (
                 <button
                   type="button"
@@ -1786,7 +1871,14 @@ export function ViajeEditModal({
               </button>
               <button
                 type="button"
-                onClick={onSave}
+                onClick={() => {
+                  // Igual que el alta: obligatorios vacíos en rojo + aviso, sin guardar.
+                  if (hayFaltantes) {
+                    avisarFaltantes();
+                    return;
+                  }
+                  onSave();
+                }}
                 disabled={saving || !!pagosSaldoError}
                 title={pagosSaldoError ?? undefined}
                 className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
@@ -1919,6 +2011,6 @@ export function ViajeEditModal({
             }}
           />
         )}
-    </>
+    </DireccionesSugeridasProvider>
   );
 }

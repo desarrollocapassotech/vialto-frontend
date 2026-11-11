@@ -373,6 +373,8 @@ Ejemplo real (histórico, la situación concreta ya no aplica pero el patrón si
 
 **Regla global para todos los formularios actuales y futuros.**
 
+> **Estándar para formularios nuevos (nov 2026):** campos obligatorios vacíos con borde rojo + "Falta completar" sutil debajo + un solo aviso rojo que zumba en el pie. Ver "Campos obligatorios que faltan" más abajo. Lo que sigue (`CrudFieldError` / `CrudFormErrorAlert`) es el patrón viejo de páginas CRUD: al tocar una de esas pantallas, pasarla al estándar nuevo.
+
 Cuando el usuario intenta enviar un formulario con campos inválidos:
 
 - El borde del input afectado se marca en rojo (`border-red-400`).
@@ -437,6 +439,36 @@ setFieldErrors({});
   <button …>Guardar</button>
 </div>
 ```
+
+### Campos obligatorios que faltan: borde rojo + "Falta completar" + aviso que zumba (nov 2026)
+
+**Regla global para todo formulario nuevo o que se toque** (páginas, asistentes por pasos y modales). Implementación de referencia: el alta de viaje (`ViajeCreatePage` + `components/viajes/steps/*`).
+
+Al tocar Continuar / Guardar / Agregar con obligatorios vacíos:
+
+1. **El campo** queda con borde rojo y debajo un texto chico y suave: **"Falta completar"**.
+   - Borde: `conBordeError(clase, falta)` (`lib/bordeError.ts`). Saca el `border-black/NN` de la clase base y suma `border-red-400`; nunca concatenar `border-red-400` a mano (con dos colores de borde gana el que esté último en el CSS).
+   - Texto: `<FaltaCampo show={falta} />` (`components/shared/FaltaCampo.tsx`). Acepta `texto` para otro error del mismo campo (ej. "La fecha de descarga no puede ser anterior…"). No usar `CrudFieldError` (es más fuerte de lo que pide este estándar).
+2. **Un solo aviso abajo**, a la izquierda de los botones: `<ErrorPieModal error={error} />` en un contenedor `flex flex-wrap items-center justify-end gap-3`. Mensaje corto: **"Completá los campos marcados en rojo."**. No listar lo que falta (ya está marcado en cada campo) ni repetir el error dentro de una tarjeta o sección.
+3. **Que zumbe en cada intento**, aunque el mensaje sea el mismo: el setter vacía y vuelve a poner el error en el próximo frame.
+
+   ```ts
+   const [error, setErrorEstado] = useState<string | null>(null);
+   const setError = useCallback((msg: string | null) => {
+     setErrorEstado(null);
+     if (msg) requestAnimationFrame(() => setErrorEstado(msg));
+   }, []);
+   ```
+
+4. **En vivo**: los faltantes se calculan siempre desde el estado, y se muestran solo después del primer intento fallido (un flag `marcarFaltantes`). Al completar un campo deja de estar rojo sin esperar otro click. Cuando ya no falta nada en lo que se está viendo, se apagan el flag y el aviso del pie (un `useEffect`). En un asistente por pasos, mirar solo el paso actual.
+5. **Solo los obligatorios**, y con la misma regla que el backend (DTO / service). Ese es el criterio: no inventar obligatorios en el front. Llevan el asterisco rojo en el label. Ejemplo (viaje): cliente siempre; origen, destino y cobro solo en el cliente principal; carga opcional.
+6. **Bloquear acciones que sumarían más cosas a medias.** Ej. "+ Agregar cliente" no agrega otra tarjeta si las que están tienen obligatorios vacíos: marca y avisa igual que Continuar.
+7. **Al enviar el formulario completo** (último paso), volver a chequear todos los pasos y saltar al primero que tenga faltantes (`setStep(n)`).
+8. **Sin validación nativa del navegador**: el `<form>` lleva `noValidate`. Si algún input tiene `required`, el navegador frena el envío con su globo "Completá este campo" antes de que corra esta validación, y se ve distinto al resto.
+
+Validaciones que no son "campo vacío" (formato, duplicados, reglas de negocio, error de API) siguen yendo por el aviso del pie con su propio mensaje; si se refieren a un campo, también lo marcan con `conBordeError` + `FaltaCampo texto=…`.
+
+Para listas (destinos, cargas, vehículos), el componente recibe `error` / `errorPrimerDestino` y marca la primera fila vacía (o el botón "+ Agregar" si no hay ninguna). Ver `ViajeDestinosLista`, `ViajeProductosLista` y `ViajeVehiculosLista`.
 
 ### Click afuera nunca cierra un modal (oct 2026)
 
@@ -603,8 +635,8 @@ Historia: sep 2026 — vencimiento de póliza un día antes (`VehiculoViewModal`
 
 **La cuenta corriente depende solo de facturas y liquidaciones** (reglas completas en `vialto-backend/CLAUDE.md`, sección `cuenta-corriente`). Lo que importa de este lado (`components/cuenta-corriente/`):
 
-- **Viajes no generan movimientos.** No agregar nada en Viajes que cree o muestre movimientos de cuenta corriente.
-- **La pantalla arranca con un listado (`ListadoCuentasCc`)**: cada cliente o proveedor con su saldo por moneda (`GET cuenta-corriente/saldos`), sin sumar monedas. Se filtra por nombre con el embudo de la columna, y click en la fila abre la cuenta. Pestaña y cuenta van en la URL (`?tipo=proveedor&id=...`, el mismo link del tablero del dashboard) y el nombre de la cuenta va en el breadcrumb (`useBreadcrumbOverride`), que es el camino de vuelta: no agregar un botón "Volver".
+- **Viajes no generan movimientos**, salvo los **pagos al transportista** (nov 2026): cada pago cargado en el viaje crea su PAGO en Cuenta corriente (lo hace el backend, ver `vialto-backend/CLAUDE.md`). El front solo tiene que devolver `ccPagoId`/`ccImputacionId`/`comprobante` de cada pago al guardar el viaje (`pagoTransportistaDraftFromApi`/`ToApi`); no agregar nada más en Viajes que cree movimientos.
+- **La pantalla arranca con un listado (`ListadoCuentasCc`)**: cada cliente o proveedor con su saldo por moneda (`GET cuenta-corriente/saldos`), sin sumar monedas, y su próximo vencimiento sin imputar (nov 2026: el más viejo de sus ventas/compras pendientes o parciales, en rojo si ya pasó). Por defecto ordena por ese vencimiento, del más viejo al más nuevo, con las cuentas sin vencimiento al final. Se filtra con el embudo de la columna (select con buscador, `SearchableSelect`), y click en la fila abre la cuenta. Pestaña y cuenta van en la URL (`?tipo=proveedor&id=...`, el mismo link del tablero del dashboard) y el nombre de la cuenta va en el breadcrumb (`useBreadcrumbOverride`), que es el camino de vuelta: no agregar un botón "Volver".
 - **"Nueva venta" / "Nueva compra" solo si la empresa no tiene el módulo que las genera**: se ocultan con `ventasNacenDeFacturas` (Facturación manual o ARCA) y `comprasNacenDeLiquidaciones` (Liquidaciones manual o ARCA) de `lib/tenantModules.ts`. En ese caso `MovimientoCcFormModal` recibe `permiteCargo={false}` y queda solo para cobros/pagos. El backend también lo rechaza. "Registrar cobro/pago" va siempre.
 - **"Tipo" en pantalla = `concepto` de la API (oct 2026)**: la columna, el filtro y el Excel dicen "Tipo", y el filtro del front se llama `tipoFiltro`, pero el campo de la API y la base sigue siendo `concepto`. En los movimientos manuales **no se tipea**: `MovimientoCcFormModal` no lo manda y el backend (`defaultConcepto`) pone siempre VENTA/COMPRA/COBRO/PAGO. Facturas y liquidaciones arman el suyo. No confundir con `MovimientoCuentaCorriente.tipo` (`cargo`/`pago`/`credito`), que define Debe/Haber y no se renombró.
 - **Debe / Haber**: `esDebeCc` (`lib/cuentaCorriente.ts`) — cargo en Debe; cobro/pago y crédito de anulación (`tipo: 'credito'`) en Haber. Una anulación nunca se muestra como negativo.
@@ -640,6 +672,7 @@ Historia: sep 2026 — vencimiento de póliza un día antes (`VehiculoViewModal`
 - **Ordenar Viajes con click en el título de la columna**: ver la sección global "Grillas: ordenar con click en el título de la columna". No confundir con el orden de columnas de arriba (qué columna va dónde).
 - **Columna opcional Productos en Viajes (oct 2026)**: `Tenant.viajesColumnaProductosHabilitada` (switch en "Configuración por empresa" → pestaña Viajes) + campo `productoItems` visible. Muestra `nombresProductosViaje(v)` (`lib/productosViaje.ts`, viaje + clientes adicionales, sin repetir).
 - **Label de "Producto" por empresa (oct 2026)**: `Tenant.productoLabel`/`productoLabelPlural` (superadmin, pestaña General; el plural lo genera la IA en el backend). Leer siempre con `useProductoLabels()` (`hooks/useProductoLabels.tsx`) — nunca escribir "Producto" fijo fuera de Stock. Las páginas que operan sobre un tenant elegido por superadmin montan `ProductoLabelsProvider` con el tenant efectivo (hoy `ViajesTenantPage`, `ViajeCreatePage`); sin provider se usa el tenant propio. **Stock queda afuera**: los componentes compartidos con Stock reciben el label por prop (`ProductoModal labels=…`) y con el default muestran los textos de siempre. "Líquido Producto" (ARCA) no se toca. Frases neutras en género ("Crear grano", "No hay mercaderías que…"), no "Nuevo {label}". Detalle backend en `vialto-backend/CLAUDE.md`, "Label de Producto por tenant".
+- **Label del transportista por empresa (nov 2026)**: `Tenant.transportistaLabel`/`transportistaLabelPlural` (ej. "Fletero"/"Fleteros"; superadmin, pestaña General; el plural lo genera la IA en el backend, mismo servicio que el de Producto). Leer con `useTransportistaLabels(tenantId)` (`hooks/useTransportistaLabels.ts`) o `transportistaLabels(tenant)` (`lib/transportistaLabel.ts`). En el alta/edición de viaje reemplaza también a "Transporte / Porteador" (`labelTransporteViaje`). Hoy se aplica solo en: pestaña de Base de datos, alta/edición de viaje, detalle del viaje y Liquidaciones (grilla, filtro, nueva/editar liquidación y sus avisos); el resto del sistema sigue diciendo "Transportista". Al tocar otra pantalla que muestre "Transportista", pasarla a este label.
 - **Columnas de ID: truncar por el principio** (se ven los últimos caracteres, "…01406"), con `TruncarInicio` (`components/ui/TruncarInicio.tsx`). Hoy: ID sistema, ID propio 1 y 2 de Viajes. Toda columna de ID nueva usa ese componente, no `truncate` a secas.
 - Indicadores de pantalla tipo "Emisión electrónica vía ARCA" / "Ambiente de pruebas" no van junto al título sino en la línea del breadcrumb, a la derecha: `BreadcrumbExtras` (`hooks/useBreadcrumbOverride.tsx`), ver `ArcaEmisionIndicadores`.
 
@@ -707,6 +740,7 @@ Pendientes conocidos (no hechos a propósito): Facturas/Liquidaciones no guardan
 - **Toda tabla nueva usa el formato de acciones de Viajes**: header "Acciones", 2–3 íconos + flecha con el resto (`AccionesFila`), "Ver …" primero, click en la fila = única acción o modal de acciones. Con `ListadoDatos`, `rowActions`; a mano, `CeldaAccionesFila` + `clickFilaAcciones` — ver "Columna de acciones de toda grilla: formato de Viajes".
 - **Toda grilla nueva ordena con click en el título de cada columna** (flechitas tenues, flecha naranja + ✕ en la activa, criterio de `lib/ordenListado.ts`) — ver "Grillas: ordenar con click en el título de la columna".
 - **Campos obligatorios con asterisco rojo; campos opcionales sin ningún indicador.**
+- **Obligatorios vacíos al enviar: borde rojo (`conBordeError`) + "Falta completar" (`FaltaCampo`) + un solo aviso que zumba en el pie (`ErrorPieModal`)**, con la misma regla de obligatorios que el backend — ver "Campos obligatorios que faltan".
 - **Si el modal carga datos**, usar `useConfirmarDescarte` (× / Cancelar / Escape piden confirmación, click afuera no cierra) — ver "Modales con formulario: confirmar antes de descartar".
 - **Si el módulo agrega una sección al dashboard del tenant**, sumarla a `moduloTabs` en `TenantOwnerDashboard.tsx` en vez de apilarla — ver "Panel del tenant: pestañas por módulo en el dashboard".
 - **Si la pantalla muestra estado de un comprobante o viaje (Facturas/Liquidaciones/Viajes)**, los ejes independientes (cobro, ambiente de prueba) van en badges aditivos, nunca reemplazando al badge de ciclo de vida — ver "Badges de estado: ejes aditivos, nunca se reemplazan".

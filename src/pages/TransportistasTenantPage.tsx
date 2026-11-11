@@ -115,9 +115,6 @@ export function TransportistasTenantPage() {
           <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
             Transportistas externos
           </h1>
-          <p className="mt-2 text-vialto-steel">
-            Gestión de los transportistas externos (fleteros).
-          </p>
         </div>
         {anyFiltroActivo && (
           <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />

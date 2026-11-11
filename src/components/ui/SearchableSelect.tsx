@@ -25,6 +25,13 @@ export type SearchableSelectProps = {
 
 const MENU_Z = 300;
 
+/** Sin acentos ni mayúsculas: "Martín" se encuentra escribiendo "martin". */
+const normalizarBusqueda = (texto: string) =>
+  texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+
 /**
  * Select con buscador (combobox) para filtros con muchas opciones —
  * conductor, vehículo, estación, etc. `value: ""` equivale a "sin filtro".
@@ -55,9 +62,9 @@ export function SearchableSelect({
   );
 
   const filtradas = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = normalizarBusqueda(search.trim());
     if (!q) return ordenadas;
-    return ordenadas.filter((o) => o.label.toLowerCase().includes(q));
+    return ordenadas.filter((o) => normalizarBusqueda(o.label).includes(q));
   }, [ordenadas, search]);
 
   const actualizarRect = useCallback(() => {

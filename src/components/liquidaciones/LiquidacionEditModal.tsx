@@ -1,3 +1,5 @@
+import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
+import { transportistaEnFrase } from "@/lib/transportistaLabel";
 import { useEffect, useMemo, useState } from "react";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
@@ -166,6 +168,9 @@ export function LiquidacionEditModal({
   /** Opciones configuradas de entidades/proveedores para el contrato PDF. */
   opcionesProveedor?: string[];
 }) {
+  // Nombre que la empresa le da al transportista (superadmin, ej. "Fletero").
+  const tl = useTransportistaLabels(tenantId || undefined);
+  const tFrase = transportistaEnFrase(tl.singular);
   const { showToast } = useToast();
   const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
   // Liquidación manual (monotributista): se edita como en una empresa sin ARCA.
@@ -584,7 +589,7 @@ export function LiquidacionEditModal({
       >
         <div className="rounded border border-black/10 bg-vialto-mist px-4 py-3">
           <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-            Transportista
+            {tl.singular}
           </p>
           <p className="mt-1 text-sm font-medium text-vialto-charcoal">
             {transportistaNombre}
@@ -725,7 +730,7 @@ export function LiquidacionEditModal({
                   }}
                   loading={viajesTransportistaLoading}
                   maxHeightClass="max-h-56"
-                  emptyMessage="No hay viajes disponibles para este transportista."
+                  emptyMessage={`No hay viajes disponibles para este ${tFrase}.`}
                 />
               </div>
             )}
@@ -809,7 +814,7 @@ export function LiquidacionEditModal({
 
         {liquidacionManual && (
           <div>
-            <p className={LABEL}>Factura del transportista</p>
+            <p className={LABEL}>Factura del {tFrase}</p>
             <ComprobanteManualFields
               value={cbteProveedor}
               onChange={(v) => {
@@ -841,9 +846,6 @@ export function LiquidacionEditModal({
               disabled={saving}
               className={INPUT}
             />
-            <p className="mt-1 text-xs text-vialto-steel">
-              Se muestra en la cuenta corriente del proveedor.
-            </p>
           </div>
         )}
 

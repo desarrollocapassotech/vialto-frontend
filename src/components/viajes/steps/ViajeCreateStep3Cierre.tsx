@@ -1,9 +1,14 @@
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { FaltaCampo } from "@/components/shared/FaltaCampo";
+import { conBordeError } from "@/lib/bordeError";
 import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
 import { ViajeFechaHoraFields } from "@/components/viajes/ViajeFechaHoraFields";
 import {
   OtrosGastosFieldset,
   emptyOtroGasto,
+  otrosGastosIncompletos,
   type OtroGastoDraft,
   type OtroGastoAutor,
 } from "@/components/viajes/OtrosGastosFieldset";
@@ -60,6 +65,11 @@ interface Props {
   gastoAutor?: OtroGastoAutor;
   tenantId?: string;
 
+  /** ID propio 1 obligatorio y vacío (después de un intento fallido). */
+  faltaIdPropio1?: boolean;
+  /** Hay gastos con obligatorios vacíos (después de un intento fallido de crear). */
+  faltaGastos?: boolean;
+
   error: string | null;
   loading: boolean;
 
@@ -101,14 +111,27 @@ export function ViajeCreateStep3Cierre({
   onOtrosGastosChange,
   gastoAutor,
   tenantId,
+  faltaIdPropio1 = false,
+  faltaGastos = false,
   error,
   loading,
   onVolver,
 }: Props) {
+  // "+ Agregar gasto" con uno a medias: marca los incompletos hasta que se completen.
+  const [marcarGastos, setMarcarGastos] = useState(false);
+  const gastosIncompletos = otrosGastosIncompletos(otrosGastos);
+  useEffect(() => {
+    if (marcarGastos && !gastosIncompletos) setMarcarGastos(false);
+  }, [marcarGastos, gastosIncompletos]);
   return (
     <div className="flex flex-col gap-4">
+      {/* Dos columnas solo si se muestran los dos campos; uno solo ocupa todo el ancho. */}
+      {(mostrarIdPropio1 || mostrarIdPropio2) && (
+      <div
+        className={`grid grid-cols-1 items-start gap-4 ${mostrarIdPropio1 && mostrarIdPropio2 ? "lg:grid-cols-2 lg:gap-x-5" : ""}`}
+      >
       {mostrarIdPropio1 && (
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1">
           <span className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel/70">
             {labelIdentificacion}{" "}
             {idPropio1Requerido && <span className="text-red-500">*</span>}
@@ -118,13 +141,14 @@ export function ViajeCreateStep3Cierre({
             value={numeroIdentificacionPersonalizado}
             onChange={(e) => onNumeroIdentificacionChange(e.target.value)}
             placeholder="Ej: CTG-01452301"
-            className={inputClass}
+            className={conBordeError(inputClass, faltaIdPropio1)}
           />
+          <FaltaCampo show={faltaIdPropio1} />
         </div>
       )}
 
       {mostrarIdPropio2 && (
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1">
           <span className={fieldLabelClass}>{labelIdPropio2}</span>
           <input
             type="text"
@@ -134,6 +158,8 @@ export function ViajeCreateStep3Cierre({
             className={inputClass}
           />
         </div>
+      )}
+      </div>
       )}
 
       <ViajeFechaHoraFields
@@ -177,8 +203,12 @@ export function ViajeCreateStep3Cierre({
         </div>
       )}
 
+      {(mostrarDetalleCarga || mostrarObservaciones) && (
+      <div
+        className={`grid grid-cols-1 items-start gap-4 ${mostrarDetalleCarga && mostrarObservaciones ? "lg:grid-cols-2 lg:gap-x-5" : ""}`}
+      >
       {mostrarDetalleCarga && (
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1">
           <span className={fieldLabelClass}>Detalle adicional</span>
           <textarea
             value={detalleCarga}
@@ -190,7 +220,7 @@ export function ViajeCreateStep3Cierre({
       )}
 
       {mostrarObservaciones && (
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1">
           <span className={fieldLabelClass}>Observaciones</span>
           <textarea
             value={observaciones}
@@ -199,6 +229,8 @@ export function ViajeCreateStep3Cierre({
             className={textareaLongClass}
           />
         </div>
+      )}
+      </div>
       )}
 
       {mostrarOtrosGastos && (
@@ -209,10 +241,18 @@ export function ViajeCreateStep3Cierre({
             tenantId={tenantId}
             stacked
             mostrarCargadoPor={false}
+            marcarIncompletos={faltaGastos || marcarGastos}
           />
           <button
             type="button"
-            onClick={() => onOtrosGastosChange([...otrosGastos, emptyOtroGasto(gastoAutor)])}
+            onClick={() => {
+              // No se suma otro gasto mientras haya uno con obligatorios vacíos.
+              if (otrosGastosIncompletos(otrosGastos)) {
+                setMarcarGastos(true);
+                return;
+              }
+              onOtrosGastosChange([...otrosGastos, emptyOtroGasto(gastoAutor)]);
+            }}
             className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
           >
             + Agregar gasto
@@ -220,13 +260,9 @@ export function ViajeCreateStep3Cierre({
         </div>
       )}
 
-      {error && (
-        <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-          {error}
-        </p>
-      )}
-
-      <div className="pt-2 flex justify-end items-center gap-3">
+      {/* Mismo aviso que el pie de los modales: rojo, a la izquierda de los botones, zumba. */}
+      <div className="pt-2 flex flex-wrap justify-end items-center gap-3">
+        <ErrorPieModal error={error} />
         <Button type="button" variant="secondary" className="h-12" onClick={onVolver}>
           Volver
         </Button>

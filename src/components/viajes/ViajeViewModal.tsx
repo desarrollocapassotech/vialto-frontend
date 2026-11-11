@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from "react";
+import { transportistaEnFrase, transportistaLabels } from "@/lib/transportistaLabel";
 import { useAuth } from "@clerk/clerk-react";
 import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
 import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
@@ -40,7 +41,12 @@ import {
 import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
 import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
-import { numeroVisibleViaje, viajeUsaNumeroInterno } from "@/lib/viajesFlota";
+import {
+  labelCantidadViajes,
+  numeroVisibleViaje,
+  viajeUsaNumeroInterno,
+} from "@/lib/viajesFlota";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { Dato, DatosCabecera } from "@/components/shared/DetalleComprobante";
 import {
@@ -61,13 +67,6 @@ import {
 } from "@/lib/tenantModules";
 import { calcularSaldoTransportista } from "@/lib/viajesTransportistaPagos";
 import { nroComprobante } from "@/lib/arcaCbteTipo";
-
-/** Clase de grilla de las secciones según cuántas se muestran (clases fijas para Tailwind). */
-const SECCIONES_GRID: Record<number, string> = {
-  1: "",
-  2: "sm:grid-cols-2",
-  3: "sm:grid-cols-3",
-};
 
 function fmtDate(iso: string | null | undefined) {
   return fmtDateUtc(iso);
@@ -95,6 +94,60 @@ function cargaClienteAdicional(c: ViajeCliente): string {
     .map((p) => `${p.producto.nombre}${p.cantidad ? ` × ${p.cantidad}` : ""}`)
     .join(", ");
   return productos || "—";
+}
+
+type ColumnaDetalle = { key: string; label: string; numero?: boolean };
+type CeldaDetalle = { value: ReactNode; sub?: ReactNode; subClassName?: string };
+
+/**
+ * Tabla compacta de las secciones del detalle (Facturación, Liquidación): encabezados
+ * chicos en mayúscula, números a la derecha, un subtexto opcional por celda.
+ */
+function tablaDetalle(
+  key: string,
+  columnas: ColumnaDetalle[],
+  filas: Record<string, CeldaDetalle | undefined>[],
+) {
+  return (
+    <div key={key} className="-mx-1 overflow-x-auto">
+      <table className="w-full min-w-max text-sm">
+        <thead>
+          <tr className="border-b border-black/10">
+            {columnas.map((c) => (
+              <th
+                key={c.key}
+                className={`px-1 pb-1.5 text-[10px] font-normal uppercase tracking-[0.15em] text-vialto-steel ${c.numero ? "text-right" : "text-left"}`}
+              >
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((fila, i) => (
+            <tr key={i} className={i > 0 ? "border-t border-black/5" : undefined}>
+              {columnas.map((c) => {
+                const celda = fila[c.key];
+                return (
+                  <td
+                    key={c.key}
+                    className={`px-1 py-2 align-top text-vialto-charcoal ${c.numero ? "text-right tabular-nums" : "text-left"}`}
+                  >
+                    {celda?.value}
+                    {celda?.sub && (
+                      <span className={`mt-0.5 block text-xs ${celda.subClassName ?? "text-vialto-steel"}`}>
+                        {celda.sub}
+                      </span>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export function ViajeViewModal({
@@ -153,6 +206,11 @@ export function ViajeViewModal({
   const { isVisible } = useFieldConfig("viajes");
   const productoLabelsTenant = useProductoLabels();
   const { tenant: currentTenant } = useCurrentTenant();
+  // Empresa del viaje (la elegida en superadmin, o la propia): unidad de la cantidad.
+  const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId || undefined);
+  // Nombre que la empresa le da al transportista (superadmin).
+  const tl = transportistaLabels(tenantEfectivo);
+  const transpFrase = transportistaEnFrase(tl.singular);
   const { getToken } = useAuth();
   const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
   /** Comprobante adjunto: foto en el visor, documento en pestaña nueva. */
@@ -298,7 +356,7 @@ export function ViajeViewModal({
       : null;
   const montoClienteSub =
     viaje.cantidadFactura != null && viaje.precioUnitarioFactura != null
-      ? `${viaje.cantidadFactura.toLocaleString("es-AR")} × ${fmtMonto(viaje.precioUnitarioFactura, viaje.monedaMonto)}`
+      ? `${viaje.cantidadFactura.toLocaleString("es-AR")} ${labelCantidadViajes(tenantEfectivo).toLowerCase()} × ${fmtMonto(viaje.precioUnitarioFactura, viaje.monedaMonto)}`
       : undefined;
 
   /** Datos generales del viaje en el bloque compacto (montos y estados van en sus secciones). */
@@ -314,7 +372,7 @@ export function ViajeViewModal({
       : [{ key: "clienteId", label: "Cliente", value: clienteNombre }]),
     {
       key: "transportistaId",
-      label: "Transportista",
+      label: tl.singular,
       value: viaje.transportistaId ? transportistaNombre : "Flota propia",
     },
     {
@@ -353,7 +411,7 @@ export function ViajeViewModal({
       : [
           {
             key: "monto",
-            label: "Monto cliente",
+            label: "Tarifa cliente",
             value: montoClienteTxt,
             sub: montoClienteSub,
           },
@@ -421,222 +479,273 @@ export function ViajeViewModal({
     )
       .map(([moneda, total]) => fmtMonto(total, moneda))
       .join(" + ") || "—";
-  const filasFacturacion = !tieneFacturacion
+  // Tabla de una fila: Estado | Toneladas/Unidades | Tarifa cliente | Total, y Factura /
+  // Facturado cuando ya hay comprobante. Solo las columnas con dato.
+  const columnasFacturacion: {
+    key: string;
+    label: string;
+    value: ReactNode;
+    sub?: ReactNode;
+    subClassName?: string;
+    numero?: boolean;
+  }[] = !tieneFacturacion
     ? []
     : [
-        ver("facturacionEstado") && (
-          <FilaDetalleViaje
-            key="estado"
-            label="Estado"
-            value={
-              <BadgeEstadoViaje className={facturacionEstadoBadgeClass[estadoFact]}>
-                {facturacionEstadoLabel[estadoFact]}
-              </BadgeEstadoViaje>
-            }
-            // Error de AFIP / anulada: el texto largo explica qué pasó.
-            sub={
-              !esMultiCliente &&
-              (estadoFact === "error_afip" || estadoFact === "anulado")
-                ? tooltipFacturacionEstado(viaje)
-                : undefined
-            }
-            subClassName={
-              estadoFact === "error_afip" ? "text-red-700" : "text-vialto-steel"
-            }
-          />
-        ),
-        ver("monto") && montoClienteTxt && (
-          <FilaDetalleViaje
-            key="monto"
-            label="Monto cliente"
-            value={montoClienteTxt}
-            sub={montoClienteSub}
-          />
-        ),
-        ver("facturacionEstado") && !esMultiCliente && nroFactura && (
-          <FilaDetalleViaje
-            key="factura"
-            label="Factura"
-            value={conAdjunto(abrirComprobanteFactura(factura), `N° ${nroFactura}`)}
-            sub={
-              <>
-                {[
-                  factura?.fechaEmision ? `Emitida ${fmtDate(factura.fechaEmision)}` : null,
-                  factura?.cae ? `CAE ${factura.cae}` : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ") || null}
-                {abrirComprobanteFactura(factura) && (
-                  <span className="block">
-                    <VerComprobanteAdjunto onClick={abrirComprobanteFactura(factura)!} />
-                  </span>
-                )}
-              </>
-            }
-          />
-        ),
-        ver("facturacionEstado") &&
-          !esMultiCliente &&
-          viaje.montoFacturadoReal != null && (
-            <FilaDetalleViaje
-              key="facturadoReal"
-              label="Facturado"
-              value={fmtMonto(
-                viaje.montoFacturadoReal,
-                viaje.monedaMontoFacturadoReal,
-              )}
-            />
+        ...(ver("facturacionEstado")
+          ? [
+              {
+                key: "estado",
+                label: "Estado",
+                value: (
+                  <BadgeEstadoViaje className={facturacionEstadoBadgeClass[estadoFact]}>
+                    {facturacionEstadoLabel[estadoFact]}
+                  </BadgeEstadoViaje>
+                ),
+                // Error de AFIP / anulada: el texto largo explica qué pasó.
+                sub:
+                  !esMultiCliente &&
+                  (estadoFact === "error_afip" || estadoFact === "anulado")
+                    ? tooltipFacturacionEstado(viaje)
+                    : undefined,
+                subClassName:
+                  estadoFact === "error_afip" ? "text-red-700" : "text-vialto-steel",
+              },
+            ]
+          : []),
+        ...(ver("monto") && !esMultiCliente && viaje.cantidadFactura != null
+          ? [
+              {
+                key: "cantidad",
+                label: labelCantidadViajes(tenantEfectivo),
+                value: viaje.cantidadFactura.toLocaleString("es-AR"),
+                numero: true,
+              },
+            ]
+          : []),
+        ...(ver("monto") && !esMultiCliente && viaje.precioUnitarioFactura != null
+          ? [
+              {
+                key: "tarifa",
+                label: "Tarifa cliente",
+                value: fmtMonto(viaje.precioUnitarioFactura, viaje.monedaMonto),
+                numero: true,
+              },
+            ]
+          : []),
+        ...(ver("monto") && montoClienteTxt
+          ? [
+              {
+                key: "monto",
+                // Sin desglose el monto es la tarifa del viaje; con desglose, el total.
+                label: viaje.precioUnitarioFactura != null ? "Total" : "Tarifa cliente",
+                value: <span className="font-semibold">{montoClienteTxt}</span>,
+                numero: true,
+              },
+            ]
+          : []),
+        ...(ver("facturacionEstado") && !esMultiCliente && nroFactura
+          ? [
+              {
+                key: "factura",
+                label: "Factura",
+                value: conAdjunto(abrirComprobanteFactura(factura), `N° ${nroFactura}`),
+                sub: (
+                  <>
+                    {[
+                      factura?.fechaEmision ? `Emitida ${fmtDate(factura.fechaEmision)}` : null,
+                      factura?.cae ? `CAE ${factura.cae}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || null}
+                    {abrirComprobanteFactura(factura) && (
+                      <span className="block">
+                        <VerComprobanteAdjunto onClick={abrirComprobanteFactura(factura)!} />
+                      </span>
+                    )}
+                  </>
+                ),
+              },
+            ]
+          : []),
+        ...(ver("facturacionEstado") && !esMultiCliente && viaje.montoFacturadoReal != null
+          ? [
+              {
+                key: "facturadoReal",
+                label: "Facturado",
+                value: fmtMonto(viaje.montoFacturadoReal, viaje.monedaMontoFacturadoReal),
+                numero: true,
+              },
+            ]
+          : []),
+      ];
+  const filasFacturacion =
+    columnasFacturacion.length === 0
+      ? []
+      : [
+          tablaDetalle(
+            "tabla-facturacion",
+            columnasFacturacion,
+            [Object.fromEntries(columnasFacturacion.map((c) => [c.key, c]))],
           ),
-      ].filter(Boolean);
+        ];
 
   // ── Liquidación / pago al transportista ──────────────────────────────────
   const conTransportista = !!viaje.transportistaId;
-  const precioTransportistaFila = ver("precioTransportistaExterno") &&
-    viaje.precioTransportistaExterno != null && (
-      <FilaDetalleViaje
-        key="precio"
-        label="Precio transportista"
-        value={fmtMonto(
-          viaje.precioTransportistaExterno,
-          viaje.monedaPrecioTransportistaExterno,
-        )}
-        sub={
-          [
-            viaje.cantidadTransportista != null &&
-            viaje.precioUnitarioTransportista != null
-              ? `${viaje.cantidadTransportista.toLocaleString("es-AR")} × ${fmtMonto(viaje.precioUnitarioTransportista, viaje.monedaPrecioTransportistaExterno)}`
-              : null,
-            ver("precioTransportistaIvaIncluidoPct") &&
-            viaje.precioTransportistaIvaIncluidoPct
-              ? `+${viaje.precioTransportistaIvaIncluidoPct}% IVA en efectivo`
-              : null,
-          ]
-            .filter(Boolean)
-            .join(" · ") || undefined
-        }
-      />
-    );
+  const monedaTransp = viaje.monedaPrecioTransportistaExterno;
+  const ivaEfectivoTxt =
+    ver("precioTransportistaIvaIncluidoPct") && viaje.precioTransportistaIvaIncluidoPct
+      ? `+${viaje.precioTransportistaIvaIncluidoPct}% IVA en efectivo`
+      : undefined;
+  const verPrecioTransp = ver("precioTransportistaExterno");
+  /** Celdas del precio al transportista: Toneladas/Unidades | Tarifa transportista | Total. */
+  const celdasPrecioTransp: Record<string, CeldaDetalle> = {};
+  const columnasPrecioTransp: ColumnaDetalle[] = [];
+  if (verPrecioTransp && viaje.cantidadTransportista != null) {
+    columnasPrecioTransp.push({
+      key: "cantidad",
+      label: labelCantidadViajes(tenantEfectivo),
+      numero: true,
+    });
+    celdasPrecioTransp.cantidad = { value: viaje.cantidadTransportista.toLocaleString("es-AR") };
+  }
+  if (verPrecioTransp && viaje.precioUnitarioTransportista != null) {
+    columnasPrecioTransp.push({ key: "tarifa", label: `Tarifa ${transpFrase}`, numero: true });
+    celdasPrecioTransp.tarifa = { value: fmtMonto(viaje.precioUnitarioTransportista, monedaTransp) };
+  }
+  if (verPrecioTransp && viaje.precioTransportistaExterno != null) {
+    columnasPrecioTransp.push({
+      key: "precio",
+      // Sin desglose el precio es la tarifa del viaje; con desglose, el total.
+      label: viaje.precioUnitarioTransportista != null ? "Total" : `Tarifa ${transpFrase}`,
+      numero: true,
+    });
+    celdasPrecioTransp.precio = {
+      value: (
+        <span className="font-semibold">
+          {fmtMonto(viaje.precioTransportistaExterno, monedaTransp)}
+        </span>
+      ),
+      sub: ivaEfectivoTxt,
+    };
+  }
+
   const estadoLiq = viaje.liquidacionEstado as LiquidacionEstado | null;
   const saldoTransportista =
     !tieneLiquidaciones && ver("pagosTransportista")
       ? calcularSaldoTransportista(viaje)
       : null;
-  const filasLiquidacion = !conTransportista
-    ? []
-    : tieneLiquidaciones
-      ? [
-          // Estado primero, alineado con el de Etapa y Facturación.
-          ver("liquidacionEstado") && estadoLiq && (
-            <FilaDetalleViaje
-              key="estado"
-              label="Estado"
-              value={
-                <BadgeEstadoViaje className={liquidacionEstadoBadgeClass[estadoLiq]}>
-                  {liquidacionEstadoLabel[estadoLiq] ?? estadoLiq}
-                </BadgeEstadoViaje>
-              }
-              sub={
-                estadoLiq === "error_afip" || estadoLiq === "anulado"
-                  ? tooltipLiquidacionEstado(viaje)
-                  : undefined
-              }
-              subClassName={
-                estadoLiq === "error_afip" ? "text-red-700" : "text-vialto-steel"
-              }
-            />
-          ),
-          precioTransportistaFila,
-          // Igual que Facturación: una fila con el comprobante ("Liquidación") y otra con
-          // el importe ("Liquidado").
-          // Ya liquidado: las liquidaciones anuladas (reemplazadas) no se listan.
-          ...(ver("liquidacionEstado") ? viaje.liquidacionesViaje ?? [] : [])
-            .filter(
-              (lv) =>
-                estadoLiq !== "liquidado" ||
-                (lv.liquidacion.estado !== "anulado" && !lv.liquidacion.anuladoAt),
-            )
-            .flatMap(
-            (lv) => {
-              const l = lv.liquidacion;
-              const subComprobante =
-                [
-                  // Misma fecha que el PDF del CVLP (alta de la liquidación).
-                  l.createdAt
-                    ? `${l.cbteNro != null ? "Emitida" : "Cargada"} ${fmtDate(l.createdAt)}`
-                    : null,
-                  l.cae ? `CAE ${l.cae}` : null,
-                  l.anuladoAt ? "Anulada" : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ") || null;
-              const abrirComprobante = abrirComprobanteLiquidacion(l);
-              // Sin ARCA el comprobante es el adjunto: el PDF que arma Vialto va aparte.
-              const verPdfLiq =
-                !tieneLiqArca && l.cbteNro == null
-                  ? () => void verPdfLiquidacion(l.id, () => getToken(), tenantId || undefined)
-                  : undefined;
-              return [
-                <FilaDetalleViaje
-                  key={`${lv.liquidacionId}-cbte`}
-                  label="Liquidación"
-                  value={conAdjunto(
-                    abrirComprobante,
-                    l.cbteNro != null
-                      ? `N° ${nroComprobante(l.ptoVenta, l.cbteNro)}`
-                      : "Manual",
-                  )}
-                  sub={
-                    subComprobante || abrirComprobante || verPdfLiq ? (
-                      <>
-                        {subComprobante}
-                        {abrirComprobante && (
-                          <span className="block">
-                            <VerComprobanteAdjunto onClick={abrirComprobante} />
-                          </span>
-                        )}
-                        {verPdfLiq && (
-                          <span className="block">
-                            <VerPdfLiquidacionLink onClick={verPdfLiq} />
-                          </span>
-                        )}
-                      </>
-                    ) : undefined
-                  }
-                />,
-                <FilaDetalleViaje
-                  key={`${lv.liquidacionId}-monto`}
-                  label="Liquidado"
-                  value={fmtMonto(lv.monto ?? l.liquido)}
-                />,
-              ];
-            },
-          ),
-        ].filter(Boolean)
-      : [
-          precioTransportistaFila,
-          saldoTransportista && saldoTransportista.totalAcordado > 0 && (
-            <FilaDetalleViaje
-              key="pagado"
-              label="Pagado"
-              value={fmtMonto(saldoTransportista.totalPagado, saldoTransportista.moneda)}
-            />
-          ),
-          saldoTransportista && saldoTransportista.totalAcordado > 0 && (
-            <FilaDetalleViaje
-              key="saldo"
-              label="Saldo"
-              value={
-                saldoTransportista.pagado ? (
-                  <BadgeEstadoViaje className="border-emerald-500/80 bg-emerald-100 text-emerald-950">
-                    Pagado
-                  </BadgeEstadoViaje>
-                ) : (
-                  fmtMonto(saldoTransportista.saldo, saldoTransportista.moneda)
-                )
-              }
-            />
-          ),
-        ].filter(Boolean);
+
+  /** Liquidaciones a listar (ya liquidado: las anuladas, reemplazadas, no se listan). */
+  const liquidacionesListadas =
+    tieneLiquidaciones && ver("liquidacionEstado")
+      ? (viaje.liquidacionesViaje ?? []).filter(
+          (lv) =>
+            estadoLiq !== "liquidado" ||
+            (lv.liquidacion.estado !== "anulado" && !lv.liquidacion.anuladoAt),
+        )
+      : [];
+  const celdasLiquidacion: Record<string, CeldaDetalle>[] = liquidacionesListadas.map((lv) => {
+    const l = lv.liquidacion;
+    const subComprobante =
+      [
+        // Misma fecha que el PDF del CVLP (alta de la liquidación).
+        l.createdAt
+          ? `${l.cbteNro != null ? "Emitida" : "Cargada"} ${fmtDate(l.createdAt)}`
+          : null,
+        l.cae ? `CAE ${l.cae}` : null,
+        l.anuladoAt ? "Anulada" : null,
+      ]
+        .filter(Boolean)
+        .join(" · ") || null;
+    const abrirComprobante = abrirComprobanteLiquidacion(l);
+    // Sin ARCA el comprobante es el adjunto: el PDF que arma Vialto va aparte.
+    const verPdfLiq =
+      !tieneLiqArca && l.cbteNro == null
+        ? () => void verPdfLiquidacion(l.id, () => getToken(), tenantId || undefined)
+        : undefined;
+    return {
+      liquidacion: {
+        value: conAdjunto(
+          abrirComprobante,
+          l.cbteNro != null ? `N° ${nroComprobante(l.ptoVenta, l.cbteNro)}` : "Manual",
+        ),
+        sub:
+          subComprobante || abrirComprobante || verPdfLiq ? (
+            <>
+              {subComprobante}
+              {abrirComprobante && (
+                <span className="block">
+                  <VerComprobanteAdjunto onClick={abrirComprobante} />
+                </span>
+              )}
+              {verPdfLiq && (
+                <span className="block">
+                  <VerPdfLiquidacionLink onClick={verPdfLiq} />
+                </span>
+              )}
+            </>
+          ) : undefined,
+      },
+      liquidado: { value: fmtMonto(lv.monto ?? l.liquido) },
+    };
+  });
+
+  // Tabla como la de Facturación: Estado | Toneladas | Tarifa transportista | Total |
+  // Liquidación | Liquidado (una fila por liquidación). Sin módulo de liquidaciones:
+  // ... | Pagado | Saldo. Solo las columnas con dato.
+  let filasLiquidacion: ReactNode[] = [];
+  if (conTransportista) {
+    const columnas: ColumnaDetalle[] = [];
+    const primera: Record<string, CeldaDetalle> = {};
+    if (tieneLiquidaciones && ver("liquidacionEstado") && estadoLiq) {
+      columnas.push({ key: "estado", label: "Estado" });
+      primera.estado = {
+        value: (
+          <BadgeEstadoViaje className={liquidacionEstadoBadgeClass[estadoLiq]}>
+            {liquidacionEstadoLabel[estadoLiq] ?? estadoLiq}
+          </BadgeEstadoViaje>
+        ),
+        sub:
+          estadoLiq === "error_afip" || estadoLiq === "anulado"
+            ? tooltipLiquidacionEstado(viaje)
+            : undefined,
+        subClassName: estadoLiq === "error_afip" ? "text-red-700" : "text-vialto-steel",
+      };
+    }
+    columnas.push(...columnasPrecioTransp);
+    Object.assign(primera, celdasPrecioTransp);
+    let filas: Record<string, CeldaDetalle>[] = [primera];
+    if (tieneLiquidaciones) {
+      if (celdasLiquidacion.length > 0) {
+        columnas.push(
+          { key: "liquidacion", label: "Liquidación" },
+          { key: "liquidado", label: "Liquidado", numero: true },
+        );
+        // La 1ª liquidación va en la misma fila; las siguientes, en filas aparte.
+        filas = celdasLiquidacion.map((c, i) => (i === 0 ? { ...primera, ...c } : c));
+      }
+    } else if (saldoTransportista && saldoTransportista.totalAcordado > 0) {
+      columnas.push(
+        { key: "pagado", label: "Pagado", numero: true },
+        { key: "saldo", label: "Saldo", numero: true },
+      );
+      primera.pagado = {
+        value: fmtMonto(saldoTransportista.totalPagado, saldoTransportista.moneda),
+      };
+      primera.saldo = {
+        value: saldoTransportista.pagado ? (
+          <BadgeEstadoViaje className="border-emerald-500/80 bg-emerald-100 text-emerald-950">
+            Pagado
+          </BadgeEstadoViaje>
+        ) : (
+          fmtMonto(saldoTransportista.saldo, saldoTransportista.moneda)
+        ),
+      };
+    }
+    if (columnas.length > 0) {
+      filasLiquidacion = [tablaDetalle("tabla-liquidacion", columnas, filas)];
+    }
+  }
 
   // El estado va embebido en la cabecera (bloque aparte a la derecha), no como sección.
   const estadoCabecera =
@@ -653,7 +762,7 @@ export function ViajeViewModal({
     filasFacturacion.length > 0 && (
       <SeccionDetalleViaje
         key="facturacion"
-        titulo="Facturación"
+        titulo="Facturación a cliente"
         accion={
           !bloqueado && ver("facturacionEstado") ? (
             <ViajeFacturacionIndicador
@@ -671,7 +780,7 @@ export function ViajeViewModal({
     filasLiquidacion.length > 0 && (
       <SeccionDetalleViaje
         key="liquidacion"
-        titulo={tieneLiquidaciones ? "Liquidación" : "Pago al transportista"}
+        titulo={tieneLiquidaciones ? `Liquidación a ${transpFrase}` : `Pago al ${transpFrase}`}
         accion={
           tieneLiquidaciones ? (
             !bloqueado && ver("liquidacionEstado") ? (
@@ -856,9 +965,9 @@ export function ViajeViewModal({
             </div>
           )}
           {secciones.length > 0 && (
-            <div className={`grid items-start gap-4 ${SECCIONES_GRID[secciones.length] ?? ""}`}>
-              {secciones}
-            </div>
+            // Una debajo de la otra (Facturación, después Liquidación): cada tabla usa
+            // todo el ancho.
+            <div className="flex flex-col gap-4">{secciones}</div>
           )}
         </div>
 

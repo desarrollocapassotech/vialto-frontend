@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import {
@@ -83,6 +84,36 @@ const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "importar", label: "Importar datos", icon: Upload },
 ];
 
+/** Módulo al que pertenece cada sección, para agruparlas en el menú. */
+type GrupoTab = "general" | "viajes" | "stock" | "administracion";
+const GRUPOS: { id: GrupoTab; label: string }[] = [
+  { id: "general", label: "General" },
+  { id: "viajes", label: "Viajes" },
+  { id: "stock", label: "Stock" },
+  { id: "administracion", label: "Administración" },
+];
+function grupoDeTab(tab: Tab, conStock: boolean): GrupoTab {
+  switch (tab) {
+    case "clientes":
+      return "general";
+    case "transportistas":
+    case "choferes":
+    case "vehiculos":
+    case "paises":
+      return "viajes";
+    // Productos es el catálogo de Stock si la empresa lo tiene; si no, la carga de Viajes.
+    case "productos":
+      return conStock ? "stock" : "viajes";
+    case "destinatarios":
+    case "presentaciones":
+    case "depositos":
+    case "direcciones-entrega":
+      return "stock";
+    default:
+      return "administracion";
+  }
+}
+
 export function BaseDeDatosPage() {
   const { user, isLoaded } = useUser();
   const { orgRole } = useAuth();
@@ -110,8 +141,16 @@ export function BaseDeDatosPage() {
     userIsOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
 
   const productoLabelsTenant = useProductoLabels();
+  // Nombre que la empresa le da al transportista (superadmin): pestaña "Fleteros", etc.
+  const transportistaLabelsTenant = useTransportistaLabels();
+  // Con Stock la pestaña es el catálogo de Stock: siempre "Productos". El label
+  // propio de la empresa (ej. "Cargas") solo aplica si no tiene Stock.
   const visibleTabs = ALL_TABS.map((tab) =>
-    tab.id === "productos" ? { ...tab, label: productoLabelsTenant.plural } : tab,
+    tab.id === "productos" && !canAccessStock(modules)
+      ? { ...tab, label: productoLabelsTenant.plural }
+      : tab.id === "transportistas"
+        ? { ...tab, label: transportistaLabelsTenant.plural }
+        : tab,
   ).filter((tab) => {
     switch (tab.id) {
       case "clientes":
@@ -197,10 +236,20 @@ export function BaseDeDatosPage() {
     return <Navigate to="/importar" replace />;
   }
 
-  const sectionOptions: SelectorOpcion[] = visibleTabs.map((tab) => ({
-    id: tab.id,
-    label: tab.label,
-  }));
+  // Mobile: mismo orden que el menú (por módulo) y el módulo a la derecha de cada opción.
+  const sectionOptions: SelectorOpcion[] = GRUPOS.flatMap((grupo) =>
+    visibleTabs
+      .filter((tab) => grupoDeTab(tab.id, hasStock) === grupo.id)
+      .map((tab) => ({
+        id: tab.id,
+        label: tab.label,
+        trailing: (
+          <span className="text-[10px] uppercase tracking-[0.15em] text-vialto-steel/70">
+            {grupo.label}
+          </span>
+        ),
+      })),
+  );
 
   function setTab(tab: Tab) {
     if (tab === "importar") {
@@ -213,26 +262,22 @@ export function BaseDeDatosPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="border-b border-black/15">
+    // Secciones en un menú vertical a la izquierda (desktop); en mobile, el selector.
+    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
         {tabsLoading ? (
           <>
-            <div className="pb-3 lg:hidden" aria-hidden>
+            <div className="lg:hidden" aria-hidden>
               <div className="h-11 w-full animate-pulse rounded-lg bg-black/[0.06]" />
             </div>
-            <div className="-mb-px hidden gap-1 pb-px lg:flex" aria-hidden>
-              {[100, 130, 90, 100, 95].map((w, i) => (
-                <div
-                  key={i}
-                  className="h-10 rounded-t-sm bg-black/[0.06] animate-pulse"
-                  style={{ width: `${w}px` }}
-                />
+            <div className="hidden w-60 shrink-0 flex-col gap-1 lg:flex" aria-hidden>
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-10 animate-pulse rounded-sm bg-black/[0.06]" />
               ))}
             </div>
           </>
         ) : (
           <>
-            <div className="pb-3 lg:hidden">
+            <div className="lg:hidden">
               <button
                 type="button"
                 onClick={() => setSectionSheetOpen(true)}
@@ -272,34 +317,47 @@ export function BaseDeDatosPage() {
             </div>
 
             <nav
-              className="-mb-px hidden gap-1 overflow-x-auto lg:flex"
+              className="hidden w-60 shrink-0 flex-col gap-0.5 border-r border-black/10 pr-3 lg:sticky lg:top-4 lg:flex"
               aria-label="Secciones de base de datos"
             >
-              {visibleTabs.map((tab) => (
+              {GRUPOS.map((grupo) => {
+                const tabsGrupo = visibleTabs.filter(
+                  (t) => grupoDeTab(t.id, hasStock) === grupo.id,
+                );
+                if (tabsGrupo.length === 0) return null;
+                return (
+                  <div key={grupo.id} className="mb-3 flex flex-col gap-0.5 last:mb-0">
+                    <p className="px-3 pb-1 pt-1 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-vialto-steel/70">
+                      {grupo.label}
+                    </p>
+              {tabsGrupo.map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setTab(tab.id)}
+                  aria-current={activeTab === tab.id ? "page" : undefined}
                   className={[
-                    "flex shrink-0 whitespace-nowrap items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
+                    "flex w-full items-center gap-2.5 rounded-sm border-l-2 px-3 py-2.5 text-left font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] transition-colors",
                     activeTab === tab.id
-                      ? "border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal"
-                      : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
+                      ? "border-l-vialto-fire bg-vialto-mist text-vialto-charcoal"
+                      : "border-l-transparent text-vialto-steel hover:bg-black/[0.04] hover:text-vialto-charcoal",
                   ].join(" ")}
                 >
                   <tab.icon
-                    className="h-3.5 w-3.5 shrink-0"
+                    className="h-4 w-4 shrink-0"
                     strokeWidth={1.75}
                   />
-                  {tab.label}
+                  <span className="min-w-0 leading-snug">{tab.label}</span>
                 </button>
               ))}
+                  </div>
+                );
+              })}
             </nav>
           </>
         )}
-      </div>
 
-      <div>
+      <div className="min-w-0 flex-1">
         {activeTab === "clientes" && <ClientesPage />}
         {activeTab === "transportistas" && <TransportistasPage />}
         {activeTab === "choferes" && <ChoferesPage />}

@@ -8,6 +8,11 @@ export interface PagoTransportista {
   metodo?: string;
   createdBy?: string;
   createdAt?: string;
+  comprobante?: string;
+  /** PAGO de Cuenta corriente creado desde este pago del viaje. */
+  ccPagoId?: string;
+  /** Imputación de Cuenta corriente de la que sale este pago (cargado en CC). */
+  ccImputacionId?: string;
 }
 
 /** Documento adjunto de un viaje (máx. 3 y 10 MB entre todos, lo controla el backend). */
@@ -413,6 +418,11 @@ export interface Tenant {
   validacionCuitArcaHabilitada?: boolean;
   /** Con qué flota trabaja la empresa. Default 'mixta'; solo lo cambia superadmin (ver `useTipoFlotaVisible`). */
   tipoFlota?: TipoFlota;
+  /**
+   * Solo con tipoFlota 'mixta': opción marcada por defecto al crear Viaje/Chofer/Vehículo.
+   * null = la de siempre (Viajes: externa; Choferes/Vehículos: propia). Ver `useTipoFlotaVisible`.
+   */
+  tipoFlotaDefault?: "propia" | "externa" | null;
   /** false = sin dashboard; el inicio es el primer módulo contratado (`lib/tenantHome.ts`). Default true; solo lo cambia superadmin. */
   dashboardHabilitado?: boolean;
   /** Default true. false = origen/destino de Viajes en texto libre, sin buscador de ciudades ni validación en el import. */
@@ -439,6 +449,10 @@ export interface Tenant {
   productoLabel?: string | null;
   /** Plural de productoLabel (ej. "Granos"); lo genera la IA al guardar el singular. */
   productoLabelPlural?: string | null;
+  /** Cómo llama la empresa al transportista externo (ej. "Fletero"); null = "Transportista". Ver `lib/transportistaLabel.ts`. */
+  transportistaLabel?: string | null;
+  /** Plural de transportistaLabel; lo genera la IA al guardar el singular. */
+  transportistaLabelPlural?: string | null;
   createdAt: string;
 }
 

@@ -1,5 +1,9 @@
 import { Button } from "@/components/ui/Button";
-import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
+import { labelTransporteViaje, transportistaEnFrase } from "@/lib/transportistaLabel";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { FaltaCampo } from "@/components/shared/FaltaCampo";
+import { conBordeError } from "@/lib/bordeError";
 import {
   ChoferSearchSelect,
   TransportistaSearchSelect,
@@ -29,10 +33,11 @@ const fieldLabelClass =
   "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
 const inputClass = "h-9 w-full border border-black/15 bg-white px-2 text-sm";
 const readonlyMoneyClass =
-  "flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0";
+  // Importe calculado: se muestra como número (igual que el Total del alta), no como input.
+  "flex h-9 items-center text-right text-base font-semibold tabular-nums text-vialto-charcoal min-w-0";
 
 function fmtReadonlyMoney(n: number) {
-  return n.toLocaleString("es-AR", {
+  return "$ " + n.toLocaleString("es-AR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -123,6 +128,11 @@ interface Props {
   pagosTransportista: PagoTransportistaDraft[];
   onPagosTransportistaChange: (rows: PagoTransportistaDraft[]) => void;
 
+  /** Obligatorios que faltan (después de un intento fallido): borde rojo + "Falta completar". */
+  faltaChofer?: boolean;
+  faltaVehiculos?: boolean;
+  faltaGananciaManual?: boolean;
+
   error: string | null;
   onVolver: () => void;
   onContinuar: () => void;
@@ -190,41 +200,65 @@ export function ViajeCreateStep2Operacion({
   mostrarPagosTransportista,
   pagosTransportista,
   onPagosTransportistaChange,
+  faltaChofer = false,
+  faltaVehiculos = false,
+  faltaGananciaManual = false,
   error,
   onVolver,
   onContinuar,
 }: Props) {
+  // Nombre que la empresa le da al transportista (superadmin); sin configurar,
+  // "Transporte / Porteador" / "Transportista" como siempre.
+  const tl = useTransportistaLabels(tenantId || undefined);
+  const lblTransporte = labelTransporteViaje(tl);
+  const transpFrase = transportistaEnFrase(tl.singular);
   return (
     <div className="flex flex-col gap-4">
       <ViajeOperacionTipoFieldset
         modo={modoOperacion}
         onModoChange={onModoChange}
         externoVisible={externoVisible}
+        labelExterno={lblTransporte}
         propioVisible={propioVisible}
         className="min-w-0 space-y-3 border-0 p-0 [&:disabled]:opacity-60"
         externoContent={
           <div className="grid gap-3">
+            <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2 lg:gap-x-5">
             <div className="flex min-w-0 flex-col gap-1">
               <span className={fieldLabelClass}>
-                Transporte / Porteador <span className="text-red-500">*</span>
+                {lblTransporte} <span className="text-red-500">*</span>
               </span>
               <TransportistaSearchSelect
                 transportistas={transportistas}
                 value={transportistaId}
                 onChange={onTransportistaIdChange}
-                inputClassName={inputClass}
-                placeholderCerrado="Elegí un transporte / porteador…"
-                placeholderBuscar="Buscar transporte / porteador…"
-                emptyListChoiceLabel="Elegí un transporte / porteador…"
-                aria-label="Transporte / Porteador"
+                inputClassName={conBordeError(inputClass, !!fieldErrorTransportistaId)}
+                placeholderCerrado={tl.propio ? `Elegí ${transpFrase}…` : "Elegí un transporte / porteador…"}
+                placeholderBuscar={tl.propio ? `Buscar ${transpFrase}…` : "Buscar transporte / porteador…"}
+                emptyListChoiceLabel={tl.propio ? `Elegí ${transpFrase}…` : "Elegí un transporte / porteador…"}
+                aria-label={lblTransporte}
                 onNuevo={onNuevoTransportista}
               />
-              <CrudFieldError message={fieldErrorTransportistaId} />
+              <FaltaCampo show={!!fieldErrorTransportistaId} texto={fieldErrorTransportistaId} />
+            </div>
+            {mostrarChoferExterno && (
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className={fieldLabelClass}>Chofer</span>
+                <ChoferSearchSelect
+                  choferes={choferesExterno}
+                  value={choferExternoId}
+                  onChange={onChoferExternoIdChange}
+                  inputClassName={inputClass}
+                  aria-label="Chofer transporte / porteador"
+                  onNuevo={onNuevoChoferExterno}
+                />
+              </div>
+            )}
             </div>
             {transportistaId && (
               <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
                 <span className={fieldLabelClass}>
-                  ¿El transportista seleccionado realiza el flete?
+                  ¿El {transpFrase} seleccionado realiza el flete?
                 </span>
                 <div className="flex gap-5">
                   <label className="flex cursor-pointer items-center gap-2 text-sm">
@@ -251,19 +285,20 @@ export function ViajeCreateStep2Operacion({
                 {!realizaFlete && (
                   <div className="flex min-w-0 flex-col gap-1 mt-1">
                     <span className={fieldLabelClass}>
-                      Transportista que realiza el flete <span className="text-red-500">*</span>
+                      {tl.singular} que realiza el flete <span className="text-red-500">*</span>
                     </span>
                     <TransportistaSearchSelect
                       transportistas={transportistas.filter((t) => t.id !== transportistaId)}
                       value={transportistaEfectivoId}
                       onChange={onTransportistaEfectivoIdChange}
-                      inputClassName={`${inputClass}${transportistaEfectivoError ? " border-red-400" : ""}`}
-                      aria-label="Transportista que realiza el flete"
+                      inputClassName={conBordeError(inputClass, !!transportistaEfectivoError)}
+                      aria-label={`${tl.singular} que realiza el flete`}
                       onNuevo={onNuevoTransportista}
                     />
-                    {transportistaEfectivoError && (
-                      <span className="text-xs text-red-600">{transportistaEfectivoError}</span>
-                    )}
+                    <FaltaCampo
+                      show={!!transportistaEfectivoError}
+                      texto={transportistaEfectivoError ?? undefined}
+                    />
                   </div>
                 )}
               </div>
@@ -282,9 +317,9 @@ export function ViajeCreateStep2Operacion({
                       value={cantidadTransportista}
                       onChange={(e) => onCantidadTransportistaChange(e.target.value)}
                       placeholder="0.00"
-                      className={`${inputClass} text-right tabular-nums ${fieldErrorCantidadTransportista ? "border-red-400" : ""}`}
+                      className={`${conBordeError(inputClass, !!fieldErrorCantidadTransportista)} text-right tabular-nums`}
                     />
-                    <CrudFieldError message={fieldErrorCantidadTransportista} />
+                    <FaltaCampo show={!!fieldErrorCantidadTransportista} texto={fieldErrorCantidadTransportista} />
                   </div>
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className={fieldLabelClass}>Precio unitario</span>
@@ -296,7 +331,7 @@ export function ViajeCreateStep2Operacion({
                         value={precioUnitarioTransportista}
                         onChange={(e) => onPrecioUnitarioTransportistaChange(e.target.value)}
                         placeholder="0.00"
-                        className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrorPrecioUnitarioTransportista ? "border-red-400" : ""}`}
+                        className={`min-w-0 flex-1 ${conBordeError(inputClass, !!fieldErrorPrecioUnitarioTransportista)} text-right tabular-nums`}
                       />
                       <MonedaSelect
                         value={monedaPrecioTransportista}
@@ -304,7 +339,7 @@ export function ViajeCreateStep2Operacion({
                         aria-label="Moneda precio unitario transportista"
                       />
                     </div>
-                    <CrudFieldError message={fieldErrorPrecioUnitarioTransportista} />
+                    <FaltaCampo show={!!fieldErrorPrecioUnitarioTransportista} texto={fieldErrorPrecioUnitarioTransportista} />
                   </div>
                   {ivaTransportistaVisible && (
                     <div className="flex min-w-0 flex-col gap-1">
@@ -327,19 +362,19 @@ export function ViajeCreateStep2Operacion({
                 {ivaTransportistaVisible ? (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>Pago bruto a transporte</span>
+                      <span className={`${fieldLabelClass} text-right`}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
                       <div className={readonlyMoneyClass}>
                         <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>Pago neto</span>
+                      <span className={`${fieldLabelClass} text-right`}>Pago neto</span>
                       <div className={readonlyMoneyClass}>
                         <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoNeto)}</span>
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>Monto IVA</span>
+                      <span className={`${fieldLabelClass} text-right`}>Monto IVA</span>
                       <div className={readonlyMoneyClass}>
                         <span className="w-full truncate">{fmtReadonlyMoney(desgloseMontoIva)}</span>
                       </div>
@@ -347,7 +382,7 @@ export function ViajeCreateStep2Operacion({
                   </div>
                 ) : (
                   <div className="flex min-w-0 flex-col gap-1 sm:max-w-xs">
-                    <span className={fieldLabelClass}>Pago bruto a transporte</span>
+                    <span className={`${fieldLabelClass} text-right`}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
                     <div className={readonlyMoneyClass}>
                       <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
                     </div>
@@ -358,7 +393,7 @@ export function ViajeCreateStep2Operacion({
               <>
                 <div className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-2" : ""}`}>
                   <div className="flex min-w-0 flex-col gap-1">
-                    <span className={fieldLabelClass}>Precio transporte</span>
+                    <span className={fieldLabelClass}>{tl.propio ? `Precio ${transpFrase}` : "Precio transporte"}</span>
                     <div className="flex min-w-0 gap-2">
                       <input
                         type="text"
@@ -367,7 +402,7 @@ export function ViajeCreateStep2Operacion({
                         value={precioTransportistaExterno}
                         onChange={(e) => onPrecioTransportistaExternoChange(e.target.value)}
                         placeholder="0.00"
-                        className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrorPrecioTransportistaExterno ? "border-red-400" : ""}`}
+                        className={`min-w-0 flex-1 ${conBordeError(inputClass, !!fieldErrorPrecioTransportistaExterno)} text-right tabular-nums`}
                       />
                       <MonedaSelect
                         value={monedaPrecioTransportista}
@@ -375,7 +410,7 @@ export function ViajeCreateStep2Operacion({
                         aria-label="Moneda precio transporte / porteador"
                       />
                     </div>
-                    <CrudFieldError message={fieldErrorPrecioTransportistaExterno} />
+                    <FaltaCampo show={!!fieldErrorPrecioTransportistaExterno} texto={fieldErrorPrecioTransportistaExterno} />
                   </div>
                   {ivaTransportistaVisible && (
                     <div className="flex min-w-0 flex-col gap-1">
@@ -398,19 +433,19 @@ export function ViajeCreateStep2Operacion({
                 {ivaTransportistaVisible && (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>Pago bruto a transporte</span>
+                      <span className={`${fieldLabelClass} text-right`}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
                       <div className={readonlyMoneyClass}>
                         <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>Pago neto</span>
+                      <span className={`${fieldLabelClass} text-right`}>Pago neto</span>
                       <div className={readonlyMoneyClass}>
                         <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoNeto)}</span>
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>Monto IVA</span>
+                      <span className={`${fieldLabelClass} text-right`}>Monto IVA</span>
                       <div className={readonlyMoneyClass}>
                         <span className="w-full truncate">{fmtReadonlyMoney(desgloseMontoIva)}</span>
                       </div>
@@ -420,19 +455,6 @@ export function ViajeCreateStep2Operacion({
               </>
             )}
             <div className="grid gap-3">
-              {mostrarChoferExterno && (
-                <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                  <span className={fieldLabelClass}>Chofer</span>
-                  <ChoferSearchSelect
-                    choferes={choferesExterno}
-                    value={choferExternoId}
-                    onChange={onChoferExternoIdChange}
-                    inputClassName={inputClass}
-                    aria-label="Chofer transporte / porteador"
-                    onNuevo={onNuevoChoferExterno}
-                  />
-                </div>
-              )}
               {mostrarVehiculosExternos && (
                 <ViajeVehiculosLista
                   groupId="viaje-create-ext"
@@ -454,16 +476,19 @@ export function ViajeCreateStep2Operacion({
         propioContent={
           <div className="grid gap-3">
             {mostrarChoferPropio && (
-              <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                <span className={fieldLabelClass}>Chofer (flota propia)</span>
+              <div className="flex min-w-0 flex-col gap-1 lg:max-w-[calc(50%-0.625rem)]">
+                <span className={fieldLabelClass}>
+                  Chofer (flota propia) <span className="text-red-500">*</span>
+                </span>
                 <ChoferSearchSelect
                   choferes={choferesPropios}
                   value={choferId}
                   onChange={onChoferIdChange}
-                  inputClassName={inputClass}
+                  inputClassName={conBordeError(inputClass, faltaChofer)}
                   aria-label="Chofer flota propia"
                   onNuevo={onNuevoChoferPropio}
                 />
+                <FaltaCampo show={faltaChofer} />
                 {ayudaFlotaChofer && <p className="text-xs text-vialto-steel">{ayudaFlotaChofer}</p>}
               </div>
             )}
@@ -481,6 +506,7 @@ export function ViajeCreateStep2Operacion({
                   getToken={getToken}
                   tenantId={tenantId || undefined}
                   onVehiculoCreado={onVehiculoCreado}
+                  error={faltaVehiculos}
                 />
                 {ayudaFlotaVehiculo && <p className="text-xs text-vialto-steel">{ayudaFlotaVehiculo}</p>}
               </>
@@ -490,12 +516,15 @@ export function ViajeCreateStep2Operacion({
       />
 
       {mostrarGananciaBrutaManual && (
-        <ViajeGananciaBrutaManualFieldset
-          draft={gananciaDraft}
-          onPatch={onGananciaBrutaManualPatch}
-          labelClassName={fieldLabelClass}
-          inputClassName={inputClass}
-        />
+        <div className="flex flex-col gap-1">
+          <ViajeGananciaBrutaManualFieldset
+            draft={gananciaDraft}
+            onPatch={onGananciaBrutaManualPatch}
+            labelClassName={fieldLabelClass}
+            inputClassName={conBordeError(inputClass, faltaGananciaManual)}
+          />
+          <FaltaCampo show={faltaGananciaManual} />
+        </div>
       )}
 
       {mostrarPagosTransportista && (
@@ -516,18 +545,14 @@ export function ViajeCreateStep2Operacion({
             }
             className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
           >
-            + Agregar pago al transportista
+            + Agregar pago al {transpFrase}
           </button>
         </div>
       )}
 
-      {error && (
-        <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-          {error}
-        </p>
-      )}
-
-      <div className="pt-2 flex justify-end gap-3">
+      {/* Mismo aviso que el pie de los modales: rojo, a la izquierda de los botones, zumba. */}
+      <div className="pt-2 flex flex-wrap items-center justify-end gap-3">
+        <ErrorPieModal error={error} />
         <Button type="button" variant="secondary" onClick={onVolver}>
           Volver
         </Button>

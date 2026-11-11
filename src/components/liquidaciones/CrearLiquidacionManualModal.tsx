@@ -1,3 +1,5 @@
+import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
+import { transportistaEnFrase } from "@/lib/transportistaLabel";
 import {
   errorFechaEmisionArca,
   hoyArgentinaIso,
@@ -273,6 +275,10 @@ export function CrearLiquidacionManualModal({
   // se comunicaron: solo en borrador se pueden agregar/quitar (mismo criterio que la edición).
   const puedeCambiarViajes = !existente || existente.estado === "borrador";
   const plataforma = rutasPlataforma && Boolean(tenantId);
+  // Nombre que la empresa le da al transportista (superadmin, ej. "Fletero").
+  const tl = useTransportistaLabels(tenantId || undefined);
+  const tFrase = transportistaEnFrase(tl.singular);
+  const tFrasePlural = transportistaEnFrase(tl.plural);
   const arcaBase = plataforma ? "/api/platform/integracion-arca" : "/api/integracion-arca";
   const qsTenant = plataforma ? `?tenantId=${encodeURIComponent(tenantId!)}` : "";
 
@@ -628,7 +634,7 @@ export function CrearLiquidacionManualModal({
             setSelectedViajeIds(new Set(elegidos.map((v) => v.id)));
             if (elegidos.length < preseleccion.length) {
               showToast(
-                `${preseleccion.length - elegidos.length} de los viajes elegidos ya no están disponibles para liquidar a este transportista.`,
+                `${preseleccion.length - elegidos.length} de los viajes elegidos ya no están disponibles para liquidar a este ${tFrase}.`,
                 "error",
               );
             }
@@ -766,7 +772,7 @@ export function CrearLiquidacionManualModal({
   const mensajeFaltantes = faltantesEmision.every((f) => f.startsWith("Cliente:"))
     ? "Faltan datos del cliente para poder liquidar."
     : faltantesEmision.every((f) => f.startsWith("Transportista:"))
-      ? "Faltan datos del transportista para poder liquidar."
+      ? `Faltan datos del ${tFrase} para poder liquidar.`
       : "Faltan datos para poder liquidar.";
   const zumbidoAviso = useZumbidoAviso();
   const [modalDatos, setModalDatos] = useState<
@@ -1060,7 +1066,7 @@ export function CrearLiquidacionManualModal({
         : viajeTieneLiquidacionTransportista(viajeInicial);
       if (yaLiquidadoAEste) {
         setError(
-          `La acción no es válida. Ya existe una liquidación previa para este transportista en el viaje #${numeroVisibleViaje(viajeInicial)}.`,
+          `La acción no es válida. Ya existe una liquidación previa para este ${tFrase} en el viaje #${numeroVisibleViaje(viajeInicial)}.`,
         );
         return;
       }
@@ -1104,13 +1110,13 @@ export function CrearLiquidacionManualModal({
     }
     if (action === "emitir" && cvlpClaseBAlerta) {
       setError(
-        "No se puede emitir: la condición frente al IVA del transportista no corresponde a CVLP 060.",
+        `No se puede emitir: la condición frente al IVA del ${tFrase} no corresponde a CVLP 060.`,
       );
       return;
     }
     if (action === "emitir" && missingEmitFields.length > 0) {
       setError(
-        "No se puede emitir. Faltan datos obligatorios del transportista o cliente.",
+        `No se puede emitir. Faltan datos obligatorios del ${tFrase} o cliente.`,
       );
       return;
     }
@@ -1395,7 +1401,7 @@ export function CrearLiquidacionManualModal({
           // Emitiendo contra ARCA: se bloquea todo el modal, no solo el botón.
           <BloqueoModal mensaje="Emitiendo la liquidación en ARCA… No cierres esta ventana." />
         ) : step !== "autorizada" && transportistasLoading ? (
-          <BloqueoModal mensaje="Cargando transportistas…" />
+          <BloqueoModal mensaje={`Cargando ${tFrasePlural}…`} />
         ) : null}
         {step === "autorizada" ? (
           <>
@@ -1440,7 +1446,7 @@ export function CrearLiquidacionManualModal({
                     Resumen
                   </p>
                   <div className="flex justify-between text-xs">
-                    <span className="text-vialto-steel">Transportista</span>
+                    <span className="text-vialto-steel">{tl.singular}</span>
                     <span className="tabular-nums text-vialto-charcoal">
                       {transportistaNombre}
                     </span>
@@ -1550,7 +1556,7 @@ export function CrearLiquidacionManualModal({
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
                     <div>
                       <label className={labelClass}>
-                        Transportista <span className="text-red-500">*</span>
+                        {tl.singular} <span className="text-red-500">*</span>
                       </label>
                       {existente || (viajeInicial && !elegirTransportistaEnViaje) ? (
                         <div className="rounded border border-black/10 bg-vialto-mist px-3 py-2 text-sm text-vialto-charcoal">
@@ -1564,7 +1570,7 @@ export function CrearLiquidacionManualModal({
                           className={selectClass}
                         >
                           <option value="">
-                            — Seleccioná un transportista —
+                            — Seleccioná un {tFrase} —
                           </option>
                           {ordenarAlfabetico(
                             viajeInicial
@@ -1889,7 +1895,7 @@ export function CrearLiquidacionManualModal({
                         }}
                         loading={viajesLoading}
                         maxHeightClass="" /* sin alto máximo: la tabla muestra todos sus viajes, el scroll es el del formulario */
-                        emptyMessage="No hay viajes registrados para este transportista."
+                        emptyMessage={`No hay viajes registrados para este ${tFrase}.`}
                       />
                     </div>
                   )}
@@ -1905,15 +1911,15 @@ export function CrearLiquidacionManualModal({
 
                   {liquidacionManual && (
                     <p className="border border-black/10 bg-vialto-mist px-3 py-2 text-xs text-vialto-charcoal">
-                      El transportista es monotributista: no se le emite Líquido Producto en
+                      El {tFrase} es monotributista: no se le emite Líquido Producto en
                       ARCA. La liquidación queda registrada como liquidada; adjuntá la factura
-                      que te emitió el transportista.
+                      que te emitió el {tFrase}.
                     </p>
                   )}
 
                   {liquidacionManual && (
                     <div>
-                      <p className={labelClass}>Factura del transportista</p>
+                      <p className={labelClass}>Factura del {tFrase}</p>
                       <ComprobanteManualFields
                         value={cbteProveedor}
                         onChange={(v) => {
@@ -1945,10 +1951,6 @@ export function CrearLiquidacionManualModal({
                         className={inputClass}
                         disabled={submitting}
                       />
-                      <p className="mt-1 text-xs text-vialto-steel">
-                        Se muestra en la cuenta corriente del proveedor. Si todavía no la tenés, la
-                        podés cargar después.
-                      </p>
                     </div>
                   )}
 
@@ -2074,7 +2076,7 @@ export function CrearLiquidacionManualModal({
                       </p>
                       {selectedViajes.length === 0 ? (
                         <p className="pt-1 text-xs leading-relaxed text-vialto-steel">
-                          Seleccioná transportista y al menos un viaje para ver el
+                          Seleccioná {tFrase} y al menos un viaje para ver el
                           desglose de montos.
                         </p>
                       ) : (

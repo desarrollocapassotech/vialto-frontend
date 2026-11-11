@@ -1,6 +1,11 @@
 import { Button } from "@/components/ui/Button";
+import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { ViajeClientesFieldset } from "@/components/viajes/ViajeClientesFieldset";
-import { emptyClienteRow, type ViajeClienteDraft } from "@/lib/viajesClientes";
+import {
+  emptyClienteRow,
+  type CampoClienteFaltante,
+  type ViajeClienteDraft,
+} from "@/lib/viajesClientes";
 import type { OpcionProducto } from "@/lib/productosViaje";
 import type { Cliente, Pais, Producto } from "@/types/api";
 
@@ -25,6 +30,12 @@ interface Props {
   paisFijo?: Pais | null;
   /** `Tenant.recomendacionCiudadesHabilitada`: false = origen/destinos en texto libre. */
   sugerenciasCiudad?: boolean;
+  /** "Toneladas" o "Cantidad" según `Tenant.unidadCantidadViajes`. */
+  labelCantidad?: string;
+  /** Antes de agregar un cliente: false = hay tarjetas incompletas (el host muestra el aviso). */
+  puedeAgregarCliente?: () => boolean;
+  /** Campos que faltan por tarjeta: se marcan en rojo (ver `faltantesPorFila`). */
+  camposFaltantes?: Record<number, CampoClienteFaltante[]>;
 
   error: string | null;
   onContinuar: () => void;
@@ -47,6 +58,9 @@ export function ViajeCreateStep1ClientesYCarga({
   onProductoCreado,
   paisFijo = null,
   sugerenciasCiudad = true,
+  labelCantidad,
+  puedeAgregarCliente,
+  camposFaltantes,
   error,
   onContinuar,
 }: Props) {
@@ -73,23 +87,26 @@ export function ViajeCreateStep1ClientesYCarga({
           labelPrefix="Cliente"
           paisFijo={paisFijo}
           sugerenciasCiudad={sugerenciasCiudad}
+          labelCantidad={labelCantidad}
+          camposFaltantes={camposFaltantes}
+          ocultarTextoError
         />
         <button
           type="button"
-          onClick={() => onClientesRowsChange([...clientesRows, emptyClienteRow()])}
-          className="mt-1 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist self-start"
+          onClick={() => {
+            // No se suma otra tarjeta mientras haya alguna incompleta: el host avisa qué falta.
+            if (puedeAgregarCliente && !puedeAgregarCliente()) return;
+            onClientesRowsChange([...clientesRows, emptyClienteRow()]);
+          }}
+          className="mt-2 w-full rounded-md border-2 border-dashed border-black/20 py-3 text-sm font-medium uppercase tracking-wider text-vialto-steel hover:border-vialto-fire hover:bg-vialto-fire/5 hover:text-vialto-fire"
         >
           + Agregar cliente
         </button>
       </div>
 
-      {error && (
-        <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-          {error}
-        </p>
-      )}
-
-      <div className="pt-2 flex justify-end">
+      {/* Mismo aviso que el pie de los modales: rojo, a la izquierda del botón, zumba. */}
+      <div className="pt-2 flex flex-wrap items-center justify-end gap-3">
+        <ErrorPieModal error={error} />
         <Button type="button" onClick={onContinuar}>
           Continuar
         </Button>

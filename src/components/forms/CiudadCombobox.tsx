@@ -1,7 +1,15 @@
 import type { CSSProperties } from 'react';
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { buscarCiudades, normalizarEtiquetaCiudad, type PaisCodigo } from '@/lib/ciudades';
+import { useDireccionesSugeridas } from '@/hooks/useDireccionesSugeridas';
+
+/** Sin acentos ni mayúsculas, para filtrar direcciones por lo que se escribe. */
+function claveBusqueda(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+}
+
+const MAX_DIRECCIONES = 8;
 
 type Props = {
   /** País cuyo buscador se usa (Argentina, Uruguay, …). */
@@ -28,6 +36,12 @@ type Props = {
    * apagado). Default true: hay que elegir una ciudad de la lista.
    */
   sugerencias?: boolean;
+  /**
+   * Qué se carga ("origen", "destino"), para el placeholder en modo texto libre:
+   * "Escribí o elegí el origen" (o "Escribí el origen" si no hay direcciones de
+   * entrega para elegir). Sin esto, el placeholder de siempre.
+   */
+  campo?: string;
 };
 
 const MIN_CHARS = 2;
@@ -51,16 +65,35 @@ export function CiudadCombobox({
   disableBrowserAutocomplete = false,
   error = false,
   sugerencias = true,
+  campo,
 }: Props) {
+  const direcciones = useDireccionesSugeridas();
+  const datalistId = useId();
   if (!sugerencias) {
+    const placeholderLibre =
+      placeholder ??
+      (campo
+        ? direcciones.length > 0
+          ? `Escribí o elegí el ${campo}`
+          : `Escribí el ${campo}`
+        : 'Ciudad o localidad');
+    // Texto libre: las direcciones de entrega (si hay) se sugieren con la lista nativa.
     return (
       <div className={className}>
+        {direcciones.length > 0 && (
+          <datalist id={datalistId}>
+            {direcciones.map((d) => (
+              <option key={d} value={d} />
+            ))}
+          </datalist>
+        )}
         <input
           id={idProp}
           type="text"
           autoComplete="off"
+          list={direcciones.length > 0 ? datalistId : undefined}
           disabled={disabled}
-          placeholder={placeholder ?? 'Ciudad o localidad'}
+          placeholder={placeholderLibre}
           aria-label={ariaLabel}
           aria-invalid={error || undefined}
           className={
@@ -92,6 +125,7 @@ export function CiudadCombobox({
       aria-label={ariaLabel}
       disableBrowserAutocomplete={disableBrowserAutocomplete}
       error={error}
+      direcciones={direcciones}
     />
   );
 }
@@ -109,7 +143,8 @@ function CiudadComboboxBuscador({
   'aria-label': ariaLabel,
   disableBrowserAutocomplete = false,
   error = false,
-}: Omit<Props, 'sugerencias'>) {
+  direcciones = [],
+}: Omit<Props, 'sugerencias'> & { direcciones?: string[] }) {
   const defaultPlaceholder = paisNombre
     ? `Buscá ciudad o localidad en ${paisNombre}…`
     : 'Buscá ciudad o localidad…';
@@ -132,9 +167,25 @@ function CiudadComboboxBuscador({
   const listRef = useRef<HTMLUListElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Direcciones de entrega de la empresa que coinciden con lo escrito (todas si el
+  // campo está vacío). Van primero en la lista, antes de las ciudades.
+  const direccionesMatch = useMemo(() => {
+    if (direcciones.length === 0) return [];
+    const q = claveBusqueda(inputValue);
+    const lista = q ? direcciones.filter((d) => claveBusqueda(d).includes(q)) : direcciones;
+    return lista.slice(0, MAX_DIRECCIONES).map((d) => ({ id: `dir:${d}`, label: d }));
+  }, [direcciones, inputValue]);
+  const opciones = useMemo(() => [...direccionesMatch, ...items], [direccionesMatch, items]);
+  const hayQueMostrar =
+    direccionesMatch.length > 0 || inputValue.trim().length >= MIN_CHARS || loading;
+
   useEffect(() => {
     setInputValue(value);
   }, [value]);
+
+  useEffect(() => {
+    setHighlight(0);
+  }, [direccionesMatch.length]);
 
   useEffect(() => {
     if (!open || inputValue.trim().length < MIN_CHARS) {
@@ -181,12 +232,12 @@ function CiudadComboboxBuscador({
   }
 
   useLayoutEffect(() => {
-    if (!open || !(inputValue.trim().length >= MIN_CHARS || loading)) {
+    if (!open || !hayQueMostrar) {
       setMenuStyle(null);
       return;
     }
     updateMenuPosition();
-  }, [open, items, loading, inputValue]);
+  }, [open, items, loading, inputValue, hayQueMostrar]);
 
   useEffect(() => {
     if (!open) return;
@@ -219,7 +270,24 @@ function CiudadComboboxBuscador({
     setOpen(false);
   }
 
-  const showList = open && (inputValue.trim().length >= MIN_CHARS || loading);
+  const showList = open && hayQueMostrar;
+  const tituloSeccionClass =
+    'px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-vialto-steel';
+  const renderOpcion = (it: { id: string; label: string }, i: number) => (
+    <li key={it.id} role="option" aria-selected={i === highlight}>
+      <button
+        type="button"
+        className={`w-full px-3 py-2 text-left hover:bg-vialto-mist ${
+          i === highlight ? 'bg-vialto-mist' : ''
+        }`}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => pick(it.label)}
+      >
+        {it.label}
+      </button>
+    </li>
+  );
+  const buscaCiudades = inputValue.trim().length >= MIN_CHARS;
   const listEl =
     showList && menuStyle ? (
       <ul
@@ -229,26 +297,29 @@ function CiudadComboboxBuscador({
         style={menuStyle}
         className="max-h-60 overflow-auto border border-black/15 bg-white py-1 text-sm shadow-md"
       >
+        {direccionesMatch.length > 0 && (
+          <>
+            <li role="presentation" className={tituloSeccionClass}>
+              Direcciones de entrega
+            </li>
+            {direccionesMatch.map((it, i) => renderOpcion(it, i))}
+            {buscaCiudades && (
+              <li role="presentation" className={`${tituloSeccionClass} border-t border-black/10`}>
+                Ciudades
+              </li>
+            )}
+          </>
+        )}
         {loading && items.length === 0 && (
           <li className="px-3 py-2 text-vialto-steel">Buscando…</li>
         )}
-        {!loading && items.length === 0 && inputValue.trim().length >= MIN_CHARS && (
+        {!loading && opciones.length === 0 && buscaCiudades && (
           <li className="px-3 py-2 text-vialto-steel">Sin resultados. Elegí una opción de la lista.</li>
         )}
-        {items.map((it, i) => (
-          <li key={it.id} role="option" aria-selected={i === highlight}>
-            <button
-              type="button"
-              className={`w-full px-3 py-2 text-left hover:bg-vialto-mist ${
-                i === highlight ? 'bg-vialto-mist' : ''
-              }`}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => pick(it.label)}
-            >
-              {it.label}
-            </button>
-          </li>
-        ))}
+        {!loading && items.length === 0 && direccionesMatch.length > 0 && buscaCiudades && (
+          <li className="px-3 py-2 text-xs text-vialto-steel">Sin ciudades que coincidan.</li>
+        )}
+        {items.map((it, i) => renderOpcion(it, direccionesMatch.length + i))}
       </ul>
     ) : null;
 
@@ -304,20 +375,21 @@ function CiudadComboboxBuscador({
             if (e.key === 'Escape') setOpen(false);
             return;
           }
-          if (items.length === 0) {
+          if (opciones.length === 0) {
             if (e.key === 'Escape') setOpen(false);
             if (e.key === 'Enter') e.preventDefault();
             return;
           }
           if (e.key === 'ArrowDown') {
             e.preventDefault();
-            setHighlight((h) => (h + 1) % items.length);
+            setHighlight((h) => (h + 1) % opciones.length);
           } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            setHighlight((h) => (h - 1 + items.length) % items.length);
+            setHighlight((h) => (h - 1 + opciones.length) % opciones.length);
           } else if (e.key === 'Enter') {
             e.preventDefault();
-            pick(items[highlight].label);
+            const elegida = opciones[highlight] ?? opciones[0];
+            if (elegida) pick(elegida.label);
           } else if (e.key === 'Escape') {
             setOpen(false);
           }

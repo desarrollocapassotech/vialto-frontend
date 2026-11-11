@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 // ---> IMPORTAMOS EL HOOK (Ajustá la ruta según tu estructura)
@@ -78,8 +78,12 @@ export function VehiculoCreatePage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const { isVisible } = useFieldConfig("vehiculos");
-  const { flotaPropiaVisible, transportistaExternoVisible } =
-    useTipoFlotaVisible(tenantId || undefined);
+  const {
+    flotaPropiaVisible,
+    transportistaExternoVisible,
+    defaultCreacion: defaultFlotaCreacion,
+    tenantCargado: tenantFlotaCargado,
+  } = useTipoFlotaVisible(tenantId || undefined);
 
   function patch(p: Partial<VehiculoFormState>) {
     setForm((prev) => ({ ...prev, ...p }));
@@ -99,6 +103,16 @@ export function VehiculoCreatePage() {
       applyAsignacionModo("externo");
     }
   }, [flotaPropiaVisible, transportistaExternoVisible, asignacionModo]);
+
+  // Flota mixta con default de creación configurado (Tenant.tipoFlotaDefault):
+  // se aplica una sola vez, cuando carga el tenant, para no pisar lo que elija el usuario.
+  const defaultFlotaAplicado = useRef(false);
+  useEffect(() => {
+    if (defaultFlotaAplicado.current || !tenantFlotaCargado) return;
+    defaultFlotaAplicado.current = true;
+    if (defaultFlotaCreacion === "externa") applyAsignacionModo("externo");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantFlotaCargado, defaultFlotaCreacion]);
 
   async function onSubmit() {
     const errs: Record<string, string> = {};

@@ -20,6 +20,7 @@ import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHead
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { PRODUCTO_LABELS_DEFAULT, labelEnFrase, productoLabels } from "@/lib/productoLabel";
+import { canAccessStock } from "@/lib/tenantModules";
 
 type Paginated = { items: Producto[]; meta: PaginatedMeta };
 
@@ -48,9 +49,13 @@ export function ProductosSuperadminPage() {
     "todos" | "activos" | "inactivos"
   >("todos");
   const [modal, setModal] = useState<ModalState>({ mode: "closed" });
-  // Label de "Producto" de la empresa elegida (ej. "Grano").
+  // Label de "Producto" de la empresa elegida (ej. "Grano"). Con Stock este catálogo
+  // es el de Stock, que siempre dice "Producto" (el label propio es para fuera de Stock).
   const { tenant: empresaTenant } = useTenantPaisFijo(filtroEmpresa || undefined);
-  const labels = productoLabels(filtroEmpresa ? empresaTenant : null);
+  const labels =
+    filtroEmpresa && empresaTenant && !canAccessStock(empresaTenant.modules ?? [])
+      ? productoLabels(empresaTenant)
+      : PRODUCTO_LABELS_DEFAULT;
   const labelPropio = labels.singular !== PRODUCTO_LABELS_DEFAULT.singular;
   const singularFrase = labelEnFrase(labels.singular);
   const pluralFrase = labelEnFrase(labels.plural);

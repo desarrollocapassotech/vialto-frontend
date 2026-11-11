@@ -1,5 +1,5 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/lib/toast";
 import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
@@ -14,6 +14,7 @@ import { draftRequiereGananciaBrutaManual } from "@/lib/viajesGananciaBruta";
 import {
   otroGastoAutorFromClerk,
   otroGastoDraftToApi,
+  otrosGastosIncompletos,
   type OtroGastoDraft,
 } from "@/components/viajes/OtrosGastosFieldset";
 import {
@@ -24,6 +25,8 @@ import {
   emptyClienteRow,
   clientesPayloadParaApi,
   validarClientesRows,
+  clientesRowsIncompletos,
+  faltantesPorFila,
   conPaisFijo,
   type ViajeClienteDraft,
 } from "@/lib/viajesClientes";
@@ -79,15 +82,19 @@ import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { ProductoLabelsProvider } from "@/hooks/useProductoLabels";
+import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { resolverPaisFijoViaje } from "@/lib/paisFijoViaje";
+import { DireccionesSugeridasProvider } from "@/hooks/useDireccionesSugeridas";
 import {
   labelIdentificacionPersonalizadaViajes,
   idSistemaHabilitado,
   idPropio1Habilitado,
   idPropio2Habilitado,
   idPropio2Label,
+  labelCantidadViajes,
 } from "@/lib/viajesFlota";
 import { roundMoney2 } from "@/lib/facturaTotales";
-import { type OpcionProducto } from "@/lib/productosViaje";
+import { opcionDesdeProducto, type OpcionProducto } from "@/lib/productosViaje";
 import { ViajeCreateResumenClientes } from "@/components/viajes/steps/ViajeCreateResumenClientes";
 import { ViajeCreateStep1ClientesYCarga } from "@/components/viajes/steps/ViajeCreateStep1ClientesYCarga";
 import { ViajeCreateStep2Operacion } from "@/components/viajes/steps/ViajeCreateStep2Operacion";
@@ -114,8 +121,12 @@ export function ViajeCreatePage() {
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
   const { isVisible } = useFieldConfig("viajes");
-  const { flotaPropiaVisible, transportistaExternoVisible } =
-    useTipoFlotaVisible(tenantId || undefined);
+  const {
+    flotaPropiaVisible,
+    transportistaExternoVisible,
+    defaultCreacion: defaultFlotaCreacion,
+    tenantCargado: tenantFlotaCargado,
+  } = useTipoFlotaVisible(tenantId || undefined);
   // Tenant efectivo (propio u override de superadmin), para el label de "Producto".
   const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId || undefined);
   const desgloseActivo = isVisible("alta_viaje", "desgloseMontos");
@@ -231,6 +242,7 @@ export function ViajeCreatePage() {
   // Solo se usa en modo superadmin (`tenantId` presente): `useMaestroData()` resuelve el
   // tenant logueado, no el elegido — ver `tenantConfig` más abajo.
   const [tenantConfigPlatform, setTenantConfigPlatform] = useState<Tenant | null>(null);
+  const [tenantConfigPlatformListo, setTenantConfigPlatformListo] = useState(false);
   useEffect(() => {
     if (!tenantId || !isLoaded || !isSignedIn) return;
     let cancelled = false;
@@ -243,6 +255,8 @@ export function ViajeCreatePage() {
         if (!cancelled) setTenantConfigPlatform(data);
       } catch {
         if (!cancelled) setTenantConfigPlatform(null);
+      } finally {
+        if (!cancelled) setTenantConfigPlatformListo(true);
       }
     })();
     return () => {
@@ -251,15 +265,15 @@ export function ViajeCreatePage() {
   }, [getToken, isLoaded, isSignedIn, tenantId]);
 
   const tenantConfig = tenantId ? tenantConfigPlatform : maestro.tenant;
-  /** País fijo si el tenant tiene `paisOrigenDestinoOculto` — hay que resolverlo contra
-   * el catálogo de países ya cargado; si el país fijado fue borrado, no aplica (fallback
-   * seguro: se sigue mostrando el selector). */
-  const paisFijo = useMemo(() => {
-    if (!tenantConfig?.paisOrigenDestinoOculto || !tenantConfig.paisOrigenDestinoFijoId) {
-      return null;
-    }
-    return paisesConSesion.find((p) => p.id === tenantConfig.paisOrigenDestinoFijoId) ?? null;
-  }, [tenantConfig, paisesConSesion]);
+  // El formulario espera la config de la empresa: sin ella no se sabe si el país va
+  // fijo, y el selector aparecería un momento para después desaparecer.
+  const { loading: tenantPropioLoading } = useCurrentTenant();
+  const tenantConfigListo = tenantId ? tenantConfigPlatformListo : !tenantPropioLoading;
+  /** País fijo si el tenant tiene `paisOrigenDestinoOculto` (ver `resolverPaisFijoViaje`). */
+  const paisFijo = useMemo(
+    () => resolverPaisFijoViaje(tenantConfig, paisesConSesion),
+    [tenantConfig, paisesConSesion],
+  );
   /** `Tenant.recomendacionCiudadesHabilitada` (default true): false = ciudades en texto libre. */
   const sugerenciasCiudad = tenantConfig?.recomendacionCiudadesHabilitada !== false;
 
@@ -320,8 +334,15 @@ export function ViajeCreatePage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [localLoadingRefs, setLocalLoadingRefs] = useState(true);
-  const loadingRefs = tenantId ? localLoadingRefs : maestro.loading;
-  const [error, setError] = useState<string | null>(null);
+  const loadingRefs =
+    (tenantId ? localLoadingRefs : maestro.loading) || !tenantConfigListo;
+  const [error, setErrorEstado] = useState<string | null>(null);
+  // Se vacía y se vuelve a poner en el próximo frame para que el aviso del pie
+  // (`ErrorPieModal`) zumbe en cada intento, aunque el mensaje sea el mismo.
+  const setError = useCallback((msg: string | null) => {
+    setErrorEstado(null);
+    if (msg) requestAnimationFrame(() => setErrorEstado(msg));
+  }, []);
   const submitBusyRef = useRef(false);
 
   const choferIdRef = useRef("");
@@ -492,6 +513,18 @@ export function ViajeCreatePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transportistaExternoVisible, modoOperacion]);
 
+  // Flota mixta con default de creación configurado (Tenant.tipoFlotaDefault):
+  // se aplica una sola vez, cuando carga el tenant, para no pisar lo que elija el usuario.
+  const defaultFlotaAplicado = useRef(false);
+  useEffect(() => {
+    if (defaultFlotaAplicado.current || !tenantFlotaCargado) return;
+    defaultFlotaAplicado.current = true;
+    if (defaultFlotaCreacion === "propia" && modoOperacion !== "propio") {
+      applyModoOperacion("propio");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantFlotaCargado, defaultFlotaCreacion]);
+
   function buildGananciaDraft(): GananciaBrutaManualDraftSlice {
     return {
       operacionModo: modoOperacion,
@@ -506,19 +539,51 @@ export function ViajeCreatePage() {
   }
 
   // ─── NAVEGACIÓN ENTRE PASOS ───────────────────────────────────────────────
-  async function handleContinuar1() {
-    const principal = clientesRows[0];
-    let clienteRowErr = "";
-    if (!principal?.clienteId.trim()) clienteRowErr = "Seleccioná un cliente.";
-    else if (!principal?.origen.trim()) clienteRowErr = "Completá el origen.";
-    else if (!principal?.destinosRows[0]?.etiqueta.trim())
-      clienteRowErr = "Ingresá el destino 1.";
-    if (clienteRowErr) {
-      setError(clienteRowErr);
-      return;
-    }
+  // Alta: todas las tarjetas de cliente completas (ver `validarClientesRows`, modo `completo`).
+  const opcionesValidacionClientes = {
+    completo: true,
+    desglose: desgloseActivo,
+  };
+  // Después de un intento fallido (Continuar / Agregar cliente / Crear), los campos
+  // que faltan se marcan en rojo. Se calcula en vivo: al completar un campo deja de
+  // estar marcado sin esperar al próximo click.
+  const [marcarFaltantes, setMarcarFaltantes] = useState(false);
+  const camposFaltantesClientes = marcarFaltantes
+    ? faltantesPorFila(clientesRows, opcionesValidacionClientes)
+    : {};
+  const hayFaltantesClientes = Object.keys(camposFaltantesClientes).length > 0;
 
-    const clientesValidacion = await validarClientesRows(clientesRows, sugerenciasCiudad);
+  /** Marca en rojo los obligatorios que faltan (en vivo) + aviso corto en el pie. */
+  function avisarFaltantes(msg = "Completá los campos marcados en rojo.") {
+    setMarcarFaltantes(true);
+    setError(msg);
+  }
+
+  /** "+ Agregar cliente": solo si las tarjetas que ya están se completaron. */
+  function puedeAgregarCliente(): boolean {
+    const incompletos = clientesRowsIncompletos(clientesRows, opcionesValidacionClientes);
+    if (!incompletos) {
+      setError(null);
+      return true;
+    }
+    avisarFaltantes("Completá los campos marcados en rojo antes de agregar otro cliente.");
+    return false;
+  }
+
+  /** Campos faltantes en las tarjetas: los marca en rojo + aviso corto. true = faltan. */
+  function marcarSiFaltanDatosClientes(): boolean {
+    if (!clientesRowsIncompletos(clientesRows, opcionesValidacionClientes)) return false;
+    avisarFaltantes();
+    return true;
+  }
+
+  async function handleContinuar1() {
+    if (marcarSiFaltanDatosClientes()) return;
+    const clientesValidacion = await validarClientesRows(
+      clientesRows,
+      sugerenciasCiudad,
+      opcionesValidacionClientes,
+    );
     if (!clientesValidacion.ok) {
       setClientesRowErrors(clientesValidacion.rowErrors);
       setError(clientesValidacion.message);
@@ -531,8 +596,8 @@ export function ViajeCreatePage() {
 
   async function handleContinuar2() {
     const externo = modoOperacion === "externo";
-    if (externo && !transportistaId.trim()) {
-      setError("Seleccioná un transporte / porteador.");
+    if (hayFaltantesOperacion()) {
+      avisarFaltantes();
       return;
     }
     setFieldErrors({});
@@ -659,25 +724,27 @@ export function ViajeCreatePage() {
     const choferExternoSeleccionado = choferExternoIdRef.current.trim();
     const principal = clientesRows[0];
 
-    // 1. Validaciones básicas del formulario
-    let clienteRowErr = "";
-    if (!principal?.clienteId.trim()) clienteRowErr = "Seleccioná un cliente.";
-    else if (!principal?.origen.trim()) clienteRowErr = "Completá el origen.";
-    else if (!principal?.destinosRows[0]?.etiqueta.trim())
-      clienteRowErr = "Ingresá el destino 1.";
-    if (clienteRowErr) {
-      setError(clienteRowErr);
+    // 1. Obligatorios de los 3 pasos: se marcan en rojo y se vuelve al paso que falta.
+    setFieldErrors({});
+    if (marcarSiFaltanDatosClientes()) {
       setStep(1);
       return;
     }
-    if (externo && !transportistaId.trim()) {
-      setError("Seleccioná un transporte / porteador.");
+    if (hayFaltantesOperacion()) {
+      avisarFaltantes();
       setStep(2);
       return;
     }
-    setFieldErrors({});
-
-    const clientesValidacion = await validarClientesRows(clientesRows, sugerenciasCiudad);
+    if (hayFaltantesCierre()) {
+      avisarFaltantes();
+      setStep(3);
+      return;
+    }
+    const clientesValidacion = await validarClientesRows(
+      clientesRows,
+      sugerenciasCiudad,
+      opcionesValidacionClientes,
+    );
     if (!clientesValidacion.ok) {
       setClientesRowErrors(clientesValidacion.rowErrors);
       setError(clientesValidacion.message);
@@ -1006,35 +1073,99 @@ export function ViajeCreatePage() {
     if (v) setTransportistaEfectivoId("");
   }
 
-  const opcionesProducto = productosCatalogo.map<OpcionProducto>((p) => ({
-    id: p.id,
-    nombre: p.nombre,
-    activo: p.activo,
-  }));
+  const opcionesProducto = productosCatalogo.map<OpcionProducto>((p) =>
+    opcionDesdeProducto(p),
+  );
 
   const mostrarGananciaBrutaManual = isVisible("alta_viaje", "gananciaBrutaManual");
   const mostrarPagosTransportista =
     modoOperacion === "externo" && isVisible("alta_viaje", "pagosTransportista");
 
+  // ─── OBLIGATORIOS QUE FALTAN (pasos 2 y 3) ────────────────────────────────
+  // Se calculan siempre a partir de lo cargado; solo se muestran en rojo después de
+  // un intento fallido (`marcarFaltantes`), y dejan de estarlo al completarse.
+  const opExterno = modoOperacion === "externo";
+  const faltantesOp = {
+    transportista: opExterno && !transportistaId.trim(),
+    cantidadTransportista:
+      opExterno && desgloseActivo && !(Number(cantidadTransportista.replace(",", ".")) > 0),
+    precioUnitarioTransportista:
+      opExterno &&
+      desgloseActivo &&
+      !((parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) ?? 0) > 0),
+    precioTransportista:
+      opExterno &&
+      !desgloseActivo &&
+      !((parseCurrencyForMoneda(precioTransportistaExterno, monedaPrecioTransportista) ?? 0) > 0),
+    chofer: !opExterno && isVisible("alta_viaje", "choferId") && !choferId.trim(),
+    vehiculos:
+      !opExterno &&
+      isVisible("alta_viaje", "vehiculosRows") &&
+      vehiculoIdsDesdeRows(vehiculosRows).length === 0,
+    gananciaManual:
+      draftRequiereGananciaBrutaManual(buildGananciaDraft()) &&
+      parseCurrencyForMoneda(gananciaBrutaManual, monedaGananciaBrutaManual) == null,
+  };
+  const faltantesCierre = {
+    fechaCarga: !fechaCarga.trim(),
+    idPropio1:
+      idPropio1Habilitado(maestro.tenant) &&
+      !idSistemaHabilitado(maestro.tenant) &&
+      !numeroIdentificacionPersonalizado.trim(),
+    gastos: isVisible("alta_viaje", "otrosGastos") && otrosGastosIncompletos(otrosGastos),
+  };
+  function hayFaltantesOperacion() {
+    return Object.values(faltantesOp).some(Boolean);
+  }
+  function hayFaltantesCierre() {
+    return Object.values(faltantesCierre).some(Boolean);
+  }
+  const marcaOp = (k: keyof typeof faltantesOp) => marcarFaltantes && faltantesOp[k];
+  const marcaCierre = (k: keyof typeof faltantesCierre) => marcarFaltantes && faltantesCierre[k];
+  const FALTA = "Falta completar";
+
+  // Ya no falta nada en el paso que se ve: se va el rojo y también el aviso del pie.
+  const hayAlgunFaltante =
+    step === 1
+      ? hayFaltantesClientes
+      : step === 2
+        ? hayFaltantesOperacion()
+        : hayFaltantesCierre();
+  useEffect(() => {
+    if (marcarFaltantes && !hayAlgunFaltante) {
+      setMarcarFaltantes(false);
+      setError(null);
+    }
+  }, [marcarFaltantes, hayAlgunFaltante, setError]);
+
   // ─── RENDERIZADO ──────────────────────────────────────────────────────────
   return (
     <ProductoLabelsProvider tenant={tenantEfectivo}>
-      <CrudPageLayout title="Crear viaje" contentClassName="w-full min-w-0">
+      {/* Direcciones de entrega como sugerencias en Origen/Destino (ver CiudadCombobox). */}
+      <DireccionesSugeridasProvider tenantId={tenantId || undefined}>
+      <CrudPageLayout
+        title="Crear viaje"
+        contentClassName="w-full min-w-0"
+        headerCenter={
+          loadingRefs ? undefined : (
+            <Stepper steps={VIAJE_CREATE_STEPS} currentStep={step} />
+          )
+        }
+      >
         {loadingRefs ? (
           <p className="mt-6 text-vialto-steel">Cargando referencias…</p>
         ) : (
           <form
             autoComplete="off"
-            className="mt-6 max-w-2xl mx-auto space-y-6"
+            // Sin validación nativa del navegador (globo "Completá este campo"): los
+            // obligatorios se marcan con el estándar del sistema (rojo + "Falta completar").
+            noValidate
+            className="mt-4 max-w-5xl mx-auto space-y-6"
             onSubmit={(e) => {
               e.preventDefault();
               onSubmit();
             }}
           >
-            <div className="flex justify-center">
-              <Stepper steps={VIAJE_CREATE_STEPS} currentStep={step} />
-            </div>
-
             {step > 1 && (
               <div className="mb-6">
                 <ViajeCreateResumenClientes clientesRows={clientesRows} clientes={clientes} />
@@ -1044,6 +1175,9 @@ export function ViajeCreatePage() {
             <div className="bg-white rounded-lg border border-black/10 p-6">
             {step === 1 && (
               <ViajeCreateStep1ClientesYCarga
+                labelCantidad={labelCantidadViajes(tenantEfectivo)}
+                puedeAgregarCliente={puedeAgregarCliente}
+                camposFaltantes={camposFaltantesClientes}
                 clientesRows={clientesRows}
                 onClientesRowsChange={(rows) => {
                   setClientesRows(rows);
@@ -1093,18 +1227,18 @@ export function ViajeCreatePage() {
                   if (id) setError(null);
                 }}
                 transportistas={transportistas}
-                fieldErrorTransportistaId={fieldErrors.transportistaId}
+                fieldErrorTransportistaId={fieldErrors.transportistaId ?? (marcaOp("transportista") ? FALTA : undefined)}
                 onNuevoTransportista={() => setQuickCreate("transportista")}
                 desgloseActivo={desgloseActivo}
                 ivaTransportistaVisible={ivaTransportistaVisible}
                 cantidadTransportista={cantidadTransportista}
                 onCantidadTransportistaChange={setCantidadTransportista}
-                fieldErrorCantidadTransportista={fieldErrors.cantidadTransportista}
+                fieldErrorCantidadTransportista={fieldErrors.cantidadTransportista ?? (marcaOp("cantidadTransportista") ? FALTA : undefined)}
                 precioUnitarioTransportista={precioUnitarioTransportista}
                 onPrecioUnitarioTransportistaChange={(v) =>
                   setPrecioUnitarioTransportista(maskCurrencyForMoneda(v, monedaPrecioTransportista))
                 }
-                fieldErrorPrecioUnitarioTransportista={fieldErrors.precioUnitarioTransportista}
+                fieldErrorPrecioUnitarioTransportista={fieldErrors.precioUnitarioTransportista ?? (marcaOp("precioUnitarioTransportista") ? FALTA : undefined)}
                 monedaPrecioTransportista={monedaPrecioTransportista}
                 onMonedaPrecioTransportistaChange={handleMonedaPrecioTransportistaChange}
                 precioTransportistaIvaIncluidoPct={precioTransportistaIvaIncluidoPct}
@@ -1116,7 +1250,7 @@ export function ViajeCreatePage() {
                 onPrecioTransportistaExternoChange={(v) =>
                   setPrecioTransportistaExterno(maskCurrencyForMoneda(v, monedaPrecioTransportista))
                 }
-                fieldErrorPrecioTransportistaExterno={fieldErrors.precioTransportistaExterno}
+                fieldErrorPrecioTransportistaExterno={fieldErrors.precioTransportistaExterno ?? (marcaOp("precioTransportista") ? FALTA : undefined)}
                 realizaFlete={realizaFlete}
                 onRealizaFleteChange={handleRealizaFleteChange}
                 transportistaEfectivoId={transportistaEfectivoId}
@@ -1171,6 +1305,9 @@ export function ViajeCreatePage() {
                   setPagosTransportista(rows);
                   setError(null);
                 }}
+                faltaChofer={marcaOp("chofer")}
+                faltaVehiculos={marcaOp("vehiculos")}
+                faltaGananciaManual={marcaOp("gananciaManual")}
                 error={error}
                 onVolver={() => setStep(1)}
                 onContinuar={() => void handleContinuar2()}
@@ -1204,7 +1341,9 @@ export function ViajeCreatePage() {
                   }
                   if (p.horaDescarga !== undefined) setHoraDescarga(p.horaDescarga);
                 }}
-                fechaCargaError={fechaCargaError}
+                fechaCargaError={fechaCargaError ?? (marcaCierre("fechaCarga") ? FALTA : null)}
+                faltaIdPropio1={marcaCierre("idPropio1")}
+                faltaGastos={marcaCierre("gastos")}
                 fechaDescargaError={fechaDescargaError}
                 mostrarKmLitros={
                   isVisible("alta_viaje", "kmRecorridos") ||
@@ -1342,6 +1481,7 @@ export function ViajeCreatePage() {
           }}
         />
       )}
+      </DireccionesSugeridasProvider>
     </ProductoLabelsProvider>
   );
 }

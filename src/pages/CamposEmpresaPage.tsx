@@ -234,6 +234,10 @@ export function CamposEmpresaPage() {
   const [savingValidacionCuitArca, setSavingValidacionCuitArca] = useState(false);
   const [empresaTipoFlota, setEmpresaTipoFlota] = useState<TipoFlota>("mixta");
   const [savingTipoFlota, setSavingTipoFlota] = useState(false);
+  const [empresaTipoFlotaDefault, setEmpresaTipoFlotaDefault] = useState<
+    "propia" | "externa" | null
+  >(null);
+  const [savingTipoFlotaDefault, setSavingTipoFlotaDefault] = useState(false);
   const [empresaDashboardHabilitado, setEmpresaDashboardHabilitado] = useState(true);
   const [savingDashboardHabilitado, setSavingDashboardHabilitado] = useState(false);
   const [empresaRecomendacionCiudades, setEmpresaRecomendacionCiudades] = useState(true);
@@ -255,6 +259,12 @@ export function CamposEmpresaPage() {
   const [empresaProductoPlural, setEmpresaProductoPlural] = useState("");
   const [empresaProductoPluralGuardado, setEmpresaProductoPluralGuardado] = useState("");
   const [savingProductoLabel, setSavingProductoLabel] = useState(false);
+  // Nombre del transportista externo (ej. "Fletero"); mismo mecanismo que el de Producto.
+  const [empresaTranspLabel, setEmpresaTranspLabel] = useState("");
+  const [empresaTranspLabelGuardado, setEmpresaTranspLabelGuardado] = useState("");
+  const [empresaTranspPlural, setEmpresaTranspPlural] = useState("");
+  const [empresaTranspPluralGuardado, setEmpresaTranspPluralGuardado] = useState("");
+  const [savingTranspLabel, setSavingTranspLabel] = useState(false);
   // Choferes/Vehículos/Productos no son flags del Tenant: son campos de Viajes
   // (tenant-field-config), ver SWITCHES_ENTIDAD_VIAJES. campo → visible.
   const [empresaSwitchEntidad, setEmpresaSwitchEntidad] = useState<
@@ -342,6 +352,7 @@ export function CamposEmpresaPage() {
           setEmpresaPaisFijoId(tenant.paisOrigenDestinoFijoId ?? "");
           setEmpresaValidacionCuitArca(tenant.validacionCuitArcaHabilitada ?? false);
           setEmpresaTipoFlota(tenant.tipoFlota ?? "mixta");
+          setEmpresaTipoFlotaDefault(tenant.tipoFlotaDefault ?? null);
           setEmpresaDashboardHabilitado(tenant.dashboardHabilitado ?? true);
           setEmpresaRecomendacionCiudades(tenant.recomendacionCiudadesHabilitada ?? true);
           setEmpresaMarcarCobrada(tenant.marcarCobradaHabilitada ?? false);
@@ -353,6 +364,10 @@ export function CamposEmpresaPage() {
           setEmpresaProductoLabelGuardado(tenant.productoLabel ?? "");
           setEmpresaProductoPlural(tenant.productoLabelPlural ?? "");
           setEmpresaProductoPluralGuardado(tenant.productoLabelPlural ?? "");
+          setEmpresaTranspLabel(tenant.transportistaLabel ?? "");
+          setEmpresaTranspLabelGuardado(tenant.transportistaLabel ?? "");
+          setEmpresaTranspPlural(tenant.transportistaLabelPlural ?? "");
+          setEmpresaTranspPluralGuardado(tenant.transportistaLabelPlural ?? "");
           setEmpresaTenant(tenant);
         }
       } catch (e) {
@@ -633,6 +648,51 @@ export function CamposEmpresaPage() {
     setEmpresaProductoPluralGuardado(plural);
   }
 
+  /** Nombre del transportista: igual que `guardarProductoLabel` (plural con IA en el backend). */
+  async function guardarTransportistaLabel(campo: "singular" | "plural") {
+    if (!filtroEmpresa) return;
+    const body =
+      campo === "singular"
+        ? empresaTranspLabel.trim() === empresaTranspLabelGuardado
+          ? null
+          : { transportistaLabel: empresaTranspLabel.trim() || null }
+        : empresaTranspPlural.trim() === empresaTranspPluralGuardado
+          ? null
+          : { transportistaLabelPlural: empresaTranspPlural.trim() || null };
+    if (!body) return;
+    setSavingTranspLabel(true);
+    setEmpresaConfigError(null);
+    try {
+      const actualizado = await apiJson<Tenant>(
+        `/api/tenants/${encodeURIComponent(filtroEmpresa)}`,
+        () => getToken(),
+        { method: "PATCH", body: JSON.stringify(body) },
+      );
+      const singular = actualizado.transportistaLabel ?? "";
+      const plural = actualizado.transportistaLabelPlural ?? "";
+      setEmpresaTranspLabel(singular);
+      setEmpresaTranspLabelGuardado(singular);
+      setEmpresaTranspPlural(plural);
+      setEmpresaTranspPluralGuardado(plural);
+      setEmpresaTenant((t) =>
+        t
+          ? {
+              ...t,
+              transportistaLabel: actualizado.transportistaLabel,
+              transportistaLabelPlural: actualizado.transportistaLabelPlural,
+            }
+          : t,
+      );
+      showToast("Label actualizado", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingTranspLabel(false);
+    }
+  }
+
   /** Guarda el singular (el backend genera el plural con IA) o una corrección del plural. */
   async function guardarProductoLabel(campo: "singular" | "plural") {
     if (!filtroEmpresa) return;
@@ -838,6 +898,28 @@ export function CamposEmpresaPage() {
       showToast(msg, "error");
     } finally {
       setSavingTipoFlota(false);
+    }
+  }
+
+  async function guardarTipoFlotaDefault(valor: "propia" | "externa" | null) {
+    if (!filtroEmpresa || valor === empresaTipoFlotaDefault) return;
+    const anterior = empresaTipoFlotaDefault;
+    setEmpresaTipoFlotaDefault(valor);
+    setSavingTipoFlotaDefault(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ tipoFlotaDefault: valor }),
+      });
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      setEmpresaTipoFlotaDefault(anterior);
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingTipoFlotaDefault(false);
     }
   }
 
@@ -1512,6 +1594,49 @@ export function CamposEmpresaPage() {
                         </tr>
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
+                            Nombre de "Transportista"
+                            <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                              Cómo llama la empresa al transportista externo (ej.
+                              "Fletero"). Se usa en Base de datos y en el alta,
+                              edición y detalle de Viajes (reemplaza también a
+                              "Transporte / Porteador"). El plural se completa solo;
+                              corregilo si hace falta. Vacío = "Transportista".
+                            </p>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <div className="ml-auto flex max-w-xs flex-col gap-2">
+                              <input
+                                value={empresaTranspLabel}
+                                onChange={(e) => setEmpresaTranspLabel(e.target.value)}
+                                onBlur={() => void guardarTransportistaLabel("singular")}
+                                disabled={savingTranspLabel}
+                                maxLength={40}
+                                placeholder="Transportista"
+                                aria-label="Nombre de Transportista en singular"
+                                className="h-9 w-full border border-black/15 bg-white px-3 text-sm text-left disabled:opacity-50"
+                              />
+                              {empresaTranspLabelGuardado && (
+                                <label className="flex items-center gap-2 text-xs text-vialto-steel">
+                                  Plural
+                                  <input
+                                    value={empresaTranspPlural}
+                                    onChange={(e) => setEmpresaTranspPlural(e.target.value)}
+                                    onBlur={() => void guardarTransportistaLabel("plural")}
+                                    disabled={savingTranspLabel}
+                                    maxLength={40}
+                                    placeholder="Transportistas"
+                                    className="h-9 min-w-0 flex-1 border border-black/15 bg-white px-3 text-sm text-left text-vialto-charcoal disabled:opacity-50"
+                                  />
+                                </label>
+                              )}
+                              {savingTranspLabel && (
+                                <span className="text-xs text-vialto-steel">Guardando…</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
                             Mostrar importación masiva de Excel para el admin
                           </td>
                           <td className="px-4 py-2.5 text-right">
@@ -1704,6 +1829,39 @@ export function CamposEmpresaPage() {
                             </select>
                           </td>
                         </tr>
+                        {empresaTipoFlota === "mixta" && (
+                          <tr className="border-t border-black/10">
+                            <td className="px-4 py-2.5">
+                              Flota por defecto al crear
+                              <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                                Qué opción viene marcada al crear un Viaje, un
+                                Chofer o un Vehículo. Se puede cambiar en cada
+                                alta. "Según el formulario" = Viajes arranca en
+                                transportista externo y Choferes/Vehículos en
+                                flota propia.
+                              </p>
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              <select
+                                value={empresaTipoFlotaDefault ?? ""}
+                                disabled={savingTipoFlotaDefault}
+                                onChange={(e) =>
+                                  void guardarTipoFlotaDefault(
+                                    (e.target.value || null) as
+                                      | "propia"
+                                      | "externa"
+                                      | null,
+                                  )
+                                }
+                                className="h-9 w-full max-w-xs border border-black/15 bg-white px-2 text-sm text-left disabled:opacity-50"
+                              >
+                                <option value="">Según el formulario</option>
+                                <option value="propia">Flota propia</option>
+                                <option value="externa">Transportista externo</option>
+                              </select>
+                            </td>
+                          </tr>
+                        )}
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
                             Opciones de proveedor para contrato (Liquidación PDF)

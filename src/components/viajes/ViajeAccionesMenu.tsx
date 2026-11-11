@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { BotonCopiar } from '@/components/ui/BotonCopiar';
 import {
   Banknote,
   Calculator,
@@ -247,7 +248,12 @@ export function ViajeAccionesMenu({
       options={options}
       destacadas={VIAJE_ACCIONES_DESTACADAS}
       maxIconos={1}
-      subtitle={`Viaje #${numeroVisibleViaje(viaje)}`}
+      subtitle={
+        <span className="inline-flex items-center gap-1">
+          Viaje {numeroVisibleViaje(viaje)}
+          <BotonCopiar texto={numeroVisibleViaje(viaje)} label="Copiar ID del viaje" />
+        </span>
+      }
       open={open}
       onOpenChange={setOpen}
     />

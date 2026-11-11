@@ -133,9 +133,6 @@ export function ChoferesTenantPage() {
           <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
             Choferes
           </h1>
-          <p className="mt-2 text-vialto-steel">
-            Quienes manejan tus unidades.
-          </p>
         </div>
         {anyFiltroActivo && (
           <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />

@@ -20,7 +20,11 @@ type Props = {
    * viaje cargado antes del cambio de configuración se pueda corregir.
    */
   externoVisible?: boolean;
+  /** Texto de la opción externa (nombre del transportista de la empresa). Default "Transporte / Porteador". */
+  labelExterno?: string;
   propioVisible?: boolean;
+  /** Con "Flota propia" elegida: contenido en la misma fila que las opciones (ej. el chofer). */
+  alLadoPropio?: ReactNode;
 };
 
 export function ViajeOperacionTipoFieldset({
@@ -31,13 +35,18 @@ export function ViajeOperacionTipoFieldset({
   groupName = "viaje-operacion-tipo",
   className,
   externoVisible = true,
+  labelExterno = "Transporte / Porteador",
   propioVisible = true,
+  alLadoPropio,
 }: Props) {
   const mostrarExterno = externoVisible || modo === "externo";
   const mostrarPropio = propioVisible || modo === "propio";
   // Con una sola opción no hay nada que elegir: sin título ni radio, solo el
   // contenido de ese tipo de flota.
   const mostrarSelector = mostrarExterno && mostrarPropio;
+  // Con un campo al lado (flota propia: chofer/vehículos), el título va arriba de las
+  // opciones, en la misma fila que los labels de esos campos.
+  const enFila = mostrarSelector && modo === "propio" && Boolean(alLadoPropio);
   return (
     <fieldset
       className={
@@ -46,9 +55,17 @@ export function ViajeOperacionTipoFieldset({
       }
     >
       {mostrarSelector && (
-        <legend className={`${legendClass} mb-2`}>Tipo de flota</legend>
+        <legend className={enFila ? "sr-only" : `${legendClass} mb-2`}>Tipo de flota</legend>
       )}
-      <div className={mostrarSelector ? "flex flex-wrap gap-4 sm:gap-6" : "hidden"}>
+      {/* Opciones + (opcional) un campo al lado, en la misma fila. */}
+      <div className="flex flex-wrap items-start gap-x-8 gap-y-3">
+      <div className={mostrarSelector ? "flex flex-col gap-1" : "hidden"}>
+      {enFila && (
+        <span className={legendClass} aria-hidden>
+          Tipo de flota
+        </span>
+      )}
+      <div className="flex h-9 flex-wrap items-center gap-4 sm:gap-6">
         {mostrarExterno && (
           <label className="flex cursor-pointer items-center gap-2 text-base text-vialto-charcoal">
             <input
@@ -59,7 +76,7 @@ export function ViajeOperacionTipoFieldset({
               checked={modo === "externo"}
               onChange={() => onModoChange("externo")}
             />
-            <span>Transporte / Porteador</span>
+            <span>{labelExterno}</span>
           </label>
         )}
         {mostrarPropio && (
@@ -75,6 +92,11 @@ export function ViajeOperacionTipoFieldset({
             <span>Flota propia</span>
           </label>
         )}
+      </div>
+      </div>
+      {modo === "propio" && alLadoPropio && (
+        <div className="min-w-0 flex-1">{alLadoPropio}</div>
+      )}
       </div>
       {modo === "externo" && !externoVisible && (
         <p className="text-xs text-amber-800/90">

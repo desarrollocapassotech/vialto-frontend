@@ -111,9 +111,6 @@ export function ClientesTenantPage() {
           <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
             Clientes
           </h1>
-          <p className="mt-2 text-vialto-steel">
-            Las empresas o personas a las que les prestás el servicio.
-          </p>
         </div>
         {anyFiltroActivo && (
           <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
