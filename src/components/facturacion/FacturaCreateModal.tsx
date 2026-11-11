@@ -58,6 +58,7 @@ import {
   validateFacturaLineasDraft,
   type FacturaLineaDraft,
 } from "@/components/facturacion/FacturaLineasEditor";
+import { FacturaObservacionesEditor } from "@/components/facturacion/FacturaObservacionesEditor";
 import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { Spinner } from "@/components/ui/Spinner";
@@ -1104,6 +1105,13 @@ export function FacturaCreateModal({
           incompleteIndices={tramosIncomplete}
         />
       )}
+      <FacturaObservacionesEditor
+        observaciones={draft.observaciones ?? []}
+        onChange={(observaciones) => patch({ observaciones })}
+        disabled={busy}
+        labelClassName={compactLabelClass}
+        inputClassName={compactInputClass}
+      />
       {/* Sin Neto/Total acá: ya los muestra el panel de la derecha (FacturaArcaPreviewPanel). */}
       {monedaInvalida && (
         <p className="shrink-0 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -1258,6 +1266,15 @@ export function FacturaCreateModal({
             />
           </div>
         )}
+        <div className="col-span-full">
+          <FacturaObservacionesEditor
+            observaciones={draft.observaciones ?? []}
+            onChange={(observaciones) => patch({ observaciones })}
+            disabled={busy}
+            labelClassName="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel"
+            inputClassName="h-9 w-full border border-black/20 bg-white px-3 text-sm"
+          />
+        </div>
       </div>
       <FacturaTotalesPreview draft={draft} viajes={derivedViajes} />
       {monedaInvalida && (

@@ -578,6 +578,8 @@ export interface Factura {
    */
   facturarPorTramo?: boolean;
   tramos?: FacturaTramo[];
+  /** Renglones de texto sin importe que van en el PDF debajo de los viajes. */
+  observaciones?: string[];
   comprobanteUrl: string | null;
   cbteTipo?: number | null;
   cbteNro?: number | null;

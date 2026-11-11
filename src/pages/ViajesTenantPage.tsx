@@ -415,6 +415,7 @@ export function ViajesTenantPage({
     viajeIds: [],
     facturarPorTramo: false,
     tramos: [],
+    observaciones: [],
     comprobanteUrl: null,
     comprobanteFile: null,
     letraComprobante: null,
@@ -968,6 +969,58 @@ export function ViajesTenantPage({
       cancelled = true;
     };
   }, [getToken, isLoaded, isSignedIn, platform, tid, resumenVersion]);
+
+  // Con el chip "Sin liquidar" activo, el filtro Transporte ofrece solo los transportistas
+  // que tienen viajes en ese filtro (como "Nueva liquidación"), no todo el maestro.
+  const filtroSinLiquidarActivo = liquidacionFiltro === "sin_liquidar";
+  const [transportistaIdsSinLiquidar, setTransportistaIdsSinLiquidar] =
+    useState<string[] | null>(null);
+  useEffect(() => {
+    if (!filtroSinLiquidarActivo) {
+      setTransportistaIdsSinLiquidar(null);
+      return;
+    }
+    if (!isLoaded || !isSignedIn) return;
+    if (platform && !tid) return;
+    let cancelled = false;
+    const url = platform
+      ? `/api/platform/viajes/transportistas-sin-liquidar?tenantId=${encodeURIComponent(tid)}`
+      : "/api/viajes/transportistas-sin-liquidar";
+    apiJson<string[]>(url, () => getToken())
+      .then((ids) => {
+        if (!cancelled) setTransportistaIdsSinLiquidar(ids);
+      })
+      .catch(() => {
+        // best-effort: si falla, el filtro muestra todos los transportistas
+        if (!cancelled) setTransportistaIdsSinLiquidar(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    filtroSinLiquidarActivo,
+    getToken,
+    isLoaded,
+    isSignedIn,
+    platform,
+    tid,
+    resumenVersion,
+  ]);
+  const transportistasFiltroColumna = useMemo(() => {
+    if (!filtroSinLiquidarActivo || !transportistaIdsSinLiquidar) {
+      return transportistas;
+    }
+    const ids = new Set(transportistaIdsSinLiquidar);
+    // El elegido se mantiene en la lista para que el select siga mostrando su nombre.
+    const elegido = transportistaIdFiltroActivo.trim();
+    if (elegido) ids.add(elegido);
+    return transportistas.filter((t) => ids.has(t.id));
+  }, [
+    filtroSinLiquidarActivo,
+    transportistaIdsSinLiquidar,
+    transportistas,
+    transportistaIdFiltroActivo,
+  ]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -1721,6 +1774,7 @@ export function ViajesTenantPage({
       viajeIds: ids,
       facturarPorTramo: false,
       tramos: [],
+      observaciones: [],
       comprobanteUrl: null,
       comprobanteFile: null,
       letraComprobante: null,
@@ -2130,6 +2184,7 @@ export function ViajesTenantPage({
       viajeIds: [v.id],
       facturarPorTramo: false,
       tramos: [],
+      observaciones: [],
       comprobanteUrl: null,
       comprobanteFile: null,
       letraComprobante: letra ?? null,
@@ -2552,7 +2607,7 @@ export function ViajesTenantPage({
       >
         <TransportistaSearchSelect
           id="viajes-col-filtro-transporte"
-          transportistas={transportistas}
+          transportistas={transportistasFiltroColumna}
           value={transportistaIdFiltroActivo}
           onChange={(id) => aplicarFiltroColumnaTransportista(id)}
           placeholderCerrado="Todos"
@@ -2981,7 +3036,7 @@ export function ViajesTenantPage({
         >
           <TransportistaSearchSelect
             id="viajes-filtro-transporte"
-            transportistas={transportistas}
+            transportistas={transportistasFiltroColumna}
             value={transportistaIdFiltroActivo}
             onChange={(id) => aplicarFiltroColumnaTransportista(id)}
             placeholderCerrado="Todos"

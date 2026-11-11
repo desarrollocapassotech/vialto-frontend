@@ -20,6 +20,10 @@ import {
 } from "@/components/facturacion/FacturaTramosEditor";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import {
+  FacturaObservacionesEditor,
+  observacionesFacturaPayload,
+} from "@/components/facturacion/FacturaObservacionesEditor";
+import {
   ViajesSeleccionTabla,
   type CantidadTarifaColumnas,
   type IvaSubtotalColumnas,
@@ -82,6 +86,8 @@ export type FacturaDraft = {
   ivaPct: string;
   facturarPorTramo: boolean;
   tramos: FacturaTramoDraft[];
+  /** Observaciones de la factura (texto sin importe, van en el PDF debajo de los viajes). */
+  observaciones: string[];
   /** Letra AFIP elegida al facturar desde un viaje (A o B). */
   letraComprobante?: "a" | "b" | null;
   /** URL ya guardada (edición) o vacía si se quitó. */
@@ -128,6 +134,7 @@ export function emptyFacturaDraft(): FacturaDraft {
     ivaPct: "21",
     facturarPorTramo: false,
     tramos: [],
+    observaciones: [],
     letraComprobante: null,
     comprobanteUrl: null,
     comprobanteFile: null,
@@ -171,6 +178,7 @@ export function facturaPayloadFromDraft(
     tramos: facturarPorTramo
       ? toFacturaTramosPayload(draft.tramos)
       : [],
+    observaciones: observacionesFacturaPayload(draft.observaciones ?? []),
   };
   if (comprobanteUrl !== undefined) {
     base.comprobanteUrl = comprobanteUrl ?? "";
@@ -220,6 +228,7 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
         : f.facturarPorTramo
           ? [emptyFacturaTramoDraft(ivaDefault)]
           : [],
+    observaciones: f.observaciones ?? [],
     comprobanteUrl: f.comprobanteUrl ?? null,
     comprobanteFile: null,
     manual: Boolean(f.manual),
@@ -940,6 +949,14 @@ export function FacturaEditModal({
                 />
               </div>
             )}
+
+            <div className="col-span-full">
+              <FacturaObservacionesEditor
+                observaciones={draft.observaciones ?? []}
+                onChange={(observaciones) => patch({ observaciones })}
+                disabled={saving}
+              />
+            </div>
           </div>
 
           <FacturaTotalesPreview draft={draft} viajes={derivedViajes} />
