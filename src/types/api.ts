@@ -8,6 +8,11 @@ export interface PagoTransportista {
   metodo?: string;
   createdBy?: string;
   createdAt?: string;
+  comprobante?: string;
+  /** PAGO de Cuenta corriente creado desde este pago del viaje. */
+  ccPagoId?: string;
+  /** Imputación de Cuenta corriente de la que sale este pago (cargado en CC). */
+  ccImputacionId?: string;
 }
 
 /** Documento adjunto de un viaje (máx. 3 y 10 MB entre todos, lo controla el backend). */

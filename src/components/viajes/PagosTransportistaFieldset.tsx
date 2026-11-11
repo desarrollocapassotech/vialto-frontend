@@ -30,6 +30,13 @@ export interface PagoTransportistaDraft {
   moneda: ViajeMonedaCodigo;
   fecha: string;
   observaciones: string;
+  /**
+   * Datos que no se editan acá pero hay que devolver al guardar: el vínculo con Cuenta
+   * corriente (si se pierde, el backend borra y vuelve a crear el PAGO) y el comprobante.
+   */
+  comprobante?: string;
+  ccPagoId?: string;
+  ccImputacionId?: string;
 }
 
 export function pagoTransportistaDraftFromApi(
@@ -41,6 +48,9 @@ export function pagoTransportistaDraftFromApi(
     moneda,
     fecha: fechaPagoToInputValue(p.fecha),
     observaciones: p.observaciones ?? "",
+    comprobante: p.comprobante,
+    ccPagoId: p.ccPagoId,
+    ccImputacionId: p.ccImputacionId,
   };
 }
 
@@ -60,6 +70,9 @@ export function pagoTransportistaDraftToApi(
     moneda: d.moneda,
     fecha,
     observaciones: d.observaciones.trim() || undefined,
+    ...(d.comprobante ? { comprobante: d.comprobante } : {}),
+    ...(d.ccPagoId ? { ccPagoId: d.ccPagoId } : {}),
+    ...(d.ccImputacionId ? { ccImputacionId: d.ccImputacionId } : {}),
   };
 }
 
