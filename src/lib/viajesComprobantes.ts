@@ -118,7 +118,44 @@ export function viajeTieneLiquidacionActivaParaTransportista(
  */
 const FACTURACION_SIN_COMPROBANTE = new Set(['sin_facturar', 'anulado']);
 
-export function viajePendienteComprobanteCliente(v: Pick<Viaje, 'facturacionEstado' | 'clientesViaje'>): boolean {
+export function viajeTieneMontoCliente(
+  v: Partial<
+    Pick<
+      Viaje,
+      | 'monto'
+      | 'cantidadFactura'
+      | 'precioUnitarioFactura'
+      | 'clientesViaje'
+    >
+  >,
+): boolean {
+  const tienePrincipal =
+    (typeof v.monto === 'number' && v.monto > 0) ||
+    (typeof v.cantidadFactura === 'number' &&
+      v.cantidadFactura > 0 &&
+      typeof v.precioUnitarioFactura === 'number' &&
+      v.precioUnitarioFactura > 0);
+  if (tienePrincipal) return true;
+  if (v.clientesViaje && v.clientesViaje.length > 0) {
+    return v.clientesViaje.some(
+      (c) =>
+        (typeof c.monto === 'number' && c.monto > 0) ||
+        (typeof (c as any).cantidad === 'number' &&
+          (c as any).cantidad > 0 &&
+          typeof (c as any).precioUnitario === 'number' &&
+          (c as any).precioUnitario > 0),
+    );
+  }
+  return false;
+}
+
+export function viajePendienteComprobanteCliente(
+  v: Pick<Viaje, 'facturacionEstado' | 'clientesViaje'> &
+    Partial<Pick<Viaje, 'monto' | 'cantidadFactura' | 'precioUnitarioFactura'>>,
+): boolean {
+  if (v.monto !== undefined || v.cantidadFactura !== undefined) {
+    if (!viajeTieneMontoCliente(v)) return false;
+  }
   if (FACTURACION_SIN_COMPROBANTE.has(v.facturacionEstado)) return true;
   if (v.clientesViaje) {
     for (const c of v.clientesViaje) {
@@ -156,9 +193,32 @@ export function viajePendienteComprobanteTransportista(
     | 'transportistaEfectivoId'
     | 'transportistaEfectivo'
     | 'liquidacionesViaje'
-  >,
+  > &
+    Partial<
+      Pick<
+        Viaje,
+        | 'precioTransportistaExterno'
+        | 'cantidadTransportista'
+        | 'precioUnitarioTransportista'
+      >
+    >,
 ): boolean {
   if (v.liquidacionEstado == null) return false;
+
+  if (
+    v.precioTransportistaExterno !== undefined ||
+    v.cantidadTransportista !== undefined
+  ) {
+    const tienePrecio =
+      (typeof v.precioTransportistaExterno === 'number' &&
+        v.precioTransportistaExterno > 0) ||
+      (typeof v.cantidadTransportista === 'number' &&
+        v.cantidadTransportista > 0 &&
+        typeof v.precioUnitarioTransportista === 'number' &&
+        v.precioUnitarioTransportista > 0);
+
+    if (!tienePrecio) return false;
+  }
 
   if (viajePermiteElegirTransportistaLiquidacion(v)) {
     const contratante = String(v.transportistaId ?? '').trim();

@@ -387,7 +387,7 @@ export function ViajeClientesFieldset({
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-[6rem_minmax(0,3fr)_minmax(0,2fr)] @3xl:order-5 @3xl:col-span-2">
                   <div className="flex flex-col gap-1">
                     <span className={fieldLabelClass}>
-                      {labelCantidad} {principal && <span className="text-red-500">*</span>}
+                      {labelCantidad}
                     </span>
                     <input
                       type="text"
@@ -403,7 +403,7 @@ export function ViajeClientesFieldset({
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className={fieldLabelClass}>
-                      Tarifa {principal && <span className="text-red-500">*</span>}
+                      Tarifa
                     </span>
                     <div className="flex min-w-0 gap-2">
                       <input
@@ -432,13 +432,19 @@ export function ViajeClientesFieldset({
                     {/* Calculado: se muestra como número, no como input deshabilitado. */}
                     <div className="flex h-9 items-center text-right text-base font-semibold tabular-nums text-vialto-charcoal">
                       <span className="w-full truncate">
-                        $ {(
-                          (Number(row.cantidadStr.replace(",", ".")) || 0) *
-                          (parseCurrencyForMoneda(row.precioUnitarioStr, row.moneda) || 0)
-                        ).toLocaleString("es-AR", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                        {row.cantidadStr.trim() && row.precioUnitarioStr.trim() ? (
+                          `$ ${(
+                            (Number(row.cantidadStr.replace(",", ".")) || 0) *
+                            (parseCurrencyForMoneda(row.precioUnitarioStr, row.moneda) || 0)
+                          ).toLocaleString("es-AR", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}`
+                        ) : (
+                          <span className="text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                            Pendiente
+                          </span>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -446,7 +452,7 @@ export function ViajeClientesFieldset({
               ) : (
                 <div className="flex min-w-0 flex-col gap-1 @3xl:order-5">
                   <span className={fieldLabelClass}>
-                    Monto {principal && <span className="text-red-500">*</span>}
+                    Monto
                   </span>
                   <div className="flex min-w-0 gap-2">
                     <input

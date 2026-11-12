@@ -377,12 +377,31 @@ function tramoFacturableParaCliente(
   v: Viaje,
   clienteId: string,
 ): { pertenece: boolean; facturable: boolean } {
-  const tramo: { facturacionEstado: string; facturaId?: string | null; factura?: { arcaEstado?: string | null } | null } | undefined =
-    v.clienteId === clienteId ? v : v.clientesViaje?.find((vc) => vc.clienteId === clienteId);
+  const tramo:
+    | {
+        facturacionEstado: string;
+        facturaId?: string | null;
+        factura?: { arcaEstado?: string | null } | null;
+        monto?: number | null;
+        cantidadFactura?: number | null;
+        precioUnitarioFactura?: number | null;
+      }
+    | undefined =
+    v.clienteId === clienteId
+      ? v
+      : v.clientesViaje?.find((vc) => vc.clienteId === clienteId);
   if (!tramo) return { pertenece: false, facturable: false };
   if (v.etapa === "cancelado") return { pertenece: true, facturable: false };
 
+  const tieneMonto =
+    (typeof tramo.monto === "number" && tramo.monto > 0) ||
+    (typeof tramo.cantidadFactura === "number" &&
+      tramo.cantidadFactura > 0 &&
+      typeof tramo.precioUnitarioFactura === "number" &&
+      tramo.precioUnitarioFactura > 0);
+
   const facturable =
+    tieneMonto &&
     tramoDisponibleParaFacturaNueva(tramo) &&
     facturacionPermiteVincular(tramo.facturacionEstado) &&
     tramo.facturacionEstado !== "cobrado";

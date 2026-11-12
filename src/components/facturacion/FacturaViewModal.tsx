@@ -661,6 +661,19 @@ export function FacturaViewModal({
         </DetalleMontosCard>
       </div>
 
+      {(factura.observaciones?.length ?? 0) > 0 && (
+        <div className="mt-4 border border-black/10 px-4 py-3">
+          <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+            Observaciones
+          </p>
+          <ul className="mt-1 space-y-0.5 text-sm text-vialto-charcoal">
+            {factura.observaciones!.map((obs, i) => (
+              <li key={i}>{obs}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {mostrarArcaError && arcaErrorTexto && (
         <div className="mt-4">
           {isAfipInfrastructureError(factura.arcaError) ||

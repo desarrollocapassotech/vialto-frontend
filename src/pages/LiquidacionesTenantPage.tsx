@@ -31,6 +31,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { LibroIvaExportModal } from "@/components/shared/LibroIvaExportModal";
+import { FiltroRangoFechas } from "@/components/shared/FiltroRangoFechas";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -93,6 +94,8 @@ import {
   nroComprobante,
 } from "@/lib/arcaCbteTipo";
 import { canAccessEmisionLiquidoProductoArca } from "@/lib/tenantModules";
+import { fechaDiaYmd, fmtDateUtc } from "@/lib/fmtDateUtc";
+import { fechaEmisionLiquidacion } from "@/lib/liquidacionFechaEmision";
 import {
   idSistemaHabilitado,
   idPropio1Habilitado,
@@ -172,6 +175,7 @@ function transportistaNombre(liq: LiquidacionConTransportista) {
 type LiquidacionSortField =
   | "comprobante"
   | "transportista"
+  | "emision"
   | "periodo"
   | "bruto"
   | "comision"
@@ -444,6 +448,7 @@ export function LiquidacionesTenantPage() {
     () => setPage(1),
     {
       comprobante: "numero",
+      emision: "fecha",
       periodo: "fecha",
       bruto: "numero",
       comision: "numero",
@@ -460,6 +465,9 @@ export function LiquidacionesTenantPage() {
   const [numeroFilter, setNumeroFilter] = useState("");
   const [periodoDesdeFilter, setPeriodoDesdeFilter] = useState("");
   const [periodoHastaFilter, setPeriodoHastaFilter] = useState("");
+  /** Fecha de emisión (YYYY-MM-DD), como el filtro Emisión de Facturas (pedido NyM). */
+  const [emisionDesdeFilter, setEmisionDesdeFilter] = useState("");
+  const [emisionHastaFilter, setEmisionHastaFilter] = useState("");
 
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [libroIvaOpen, setLibroIvaOpen] = useState(false);
@@ -487,6 +495,8 @@ export function LiquidacionesTenantPage() {
     setNumeroFilter("");
     setPeriodoDesdeFilter("");
     setPeriodoHastaFilter("");
+    setEmisionDesdeFilter("");
+    setEmisionHastaFilter("");
     setPage(1);
   }
 
@@ -494,6 +504,8 @@ export function LiquidacionesTenantPage() {
     (hasArca && estadoFilter !== "todos") ||
     !!numeroFilter.trim() ||
     !!transportistaFilter ||
+    !!emisionDesdeFilter ||
+    !!emisionHastaFilter ||
     !!periodoDesdeFilter ||
     !!periodoHastaFilter;
 
@@ -981,6 +993,10 @@ export function LiquidacionesTenantPage() {
       }
       case "transportista":
         return [transportistaNombre(liq)];
+      case "emision": {
+        const f = emisionDeLiquidacion(liq);
+        return [f ? Date.parse(f) : null];
+      }
       case "periodo":
         return [Date.parse(liq.periodoDesde), Date.parse(liq.periodoHasta)];
       case "bruto":
@@ -994,6 +1010,10 @@ export function LiquidacionesTenantPage() {
       case "estado":
         return [LIQUIDACION_ESTADO_ORDEN[estadoMostrado(liq)] ?? 9];
     }
+  }
+
+  function emisionDeLiquidacion(liq: LiquidacionConTransportista): string | null {
+    return fechaEmisionLiquidacion(liq, liquidacionConArca(hasArca, liq));
   }
 
   function numeroLiquidacion(liq: LiquidacionConTransportista): string {
@@ -1153,6 +1173,12 @@ export function LiquidacionesTenantPage() {
           r.periodoDesde.slice(0, 10) > periodoHastaFilter
         )
           return false;
+        if (emisionDesdeFilter || emisionHastaFilter) {
+          const dia = fechaDiaYmd(emisionDeLiquidacion(r));
+          if (!dia) return false;
+          if (emisionDesdeFilter && dia < emisionDesdeFilter) return false;
+          if (emisionHastaFilter && dia > emisionHastaFilter) return false;
+        }
         return true;
       })
     : null;
@@ -1192,6 +1218,7 @@ export function LiquidacionesTenantPage() {
         cols,
         sortedRows ?? filteredRows,
         "Liquidaciones_Exportadas",
+        hasArca,
       );
       showToast("Excel exportado exitosamente", "success");
     } catch {
@@ -1299,7 +1326,7 @@ export function LiquidacionesTenantPage() {
 
       <ListadoDatos
         className="mt-6"
-        tableColSpan={(hasArca ? 9 : 8) - (mostrarPeriodo ? 0 : 1)}
+        tableColSpan={(hasArca ? 10 : 9) - (mostrarPeriodo ? 0 : 1)}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
               <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -1353,6 +1380,29 @@ export function LiquidacionesTenantPage() {
                 />
               </ViajesListadoHeaderFiltro>
             </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                orden={ordenColumna("emision")}
+                title="Emisión"
+                filterActive={!!emisionDesdeFilter || !!emisionHastaFilter}
+                filterSignature={`${emisionDesdeFilter}|${emisionHastaFilter}`}
+                onClear={() => {
+                  setEmisionDesdeFilter("");
+                  setEmisionHastaFilter("");
+                  setPage(1);
+                }}
+              >
+                <FiltroRangoFechas
+                  desde={emisionDesdeFilter}
+                  hasta={emisionHastaFilter}
+                  onAplicar={(desde, hasta) => {
+                    setEmisionDesdeFilter(desde);
+                    setEmisionHastaFilter(hasta);
+                    setPage(1);
+                  }}
+                />
+              </ViajesListadoHeaderFiltro>
+            </th>
             {mostrarPeriodo && (
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
@@ -1368,30 +1418,14 @@ export function LiquidacionesTenantPage() {
                   setPage(1);
                 }}
               >
-                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
-                    Desde
-                    <input
-                      type="date"
-                      value={periodoDesdeFilter}
-                      onChange={(e) =>
-                        aplicarPeriodoDesdeFilter(e.target.value)
-                      }
-                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
-                    Hasta
-                    <input
-                      type="date"
-                      value={periodoHastaFilter}
-                      onChange={(e) =>
-                        aplicarPeriodoHastaFilter(e.target.value)
-                      }
-                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
-                    />
-                  </label>
-                </div>
+                <FiltroRangoFechas
+                  desde={periodoDesdeFilter}
+                  hasta={periodoHastaFilter}
+                  onAplicar={(desde, hasta) => {
+                    aplicarPeriodoDesdeFilter(desde);
+                    aplicarPeriodoHastaFilter(hasta);
+                  }}
+                />
               </ViajesListadoHeaderFiltro>
             </th>
             )}
@@ -1507,6 +1541,12 @@ export function LiquidacionesTenantPage() {
             ),
             tdClassName: listadoTablaTdClass,
           },
+          {
+            id: "emision",
+            header: "Emisión",
+            cell: (liq) => fmtDateUtc(emisionDeLiquidacion(liq)),
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel tabular-nums whitespace-nowrap`,
+          },
           ...(mostrarPeriodo
             ? [
                 {
@@ -1617,7 +1657,9 @@ export function LiquidacionesTenantPage() {
               : "Cargando datos de empresa..."
             : error
               ? "No se pudieron cargar las liquidaciones."
-              : "Todavía no hay liquidaciones..."
+              : anyFiltroActivo
+                ? "No hay liquidaciones que coincidan con los filtros aplicados."
+                : "Todavía no hay liquidaciones..."
         }
         loadingMessage="Cargando…"
         onRowClick={(liq) => setAccionesAbiertoLiqId(liq.id)}
@@ -1639,6 +1681,9 @@ export function LiquidacionesTenantPage() {
             fields={[
               ...(numeroLiquidacion(liq)
                 ? [{ label: "Comprobante", value: numeroLiquidacion(liq) }]
+                : []),
+              ...(emisionDeLiquidacion(liq)
+                ? [{ label: "Emisión", value: fmtDateUtc(emisionDeLiquidacion(liq)) }]
                 : []),
               ...(mostrarPeriodo
                 ? [

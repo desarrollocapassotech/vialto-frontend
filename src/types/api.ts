@@ -578,6 +578,8 @@ export interface Factura {
    */
   facturarPorTramo?: boolean;
   tramos?: FacturaTramo[];
+  /** Renglones de texto sin importe que van en el PDF debajo de los viajes. */
+  observaciones?: string[];
   comprobanteUrl: string | null;
   cbteTipo?: number | null;
   cbteNro?: number | null;
@@ -679,6 +681,13 @@ export interface ImportPreviewFilaCampo {
   valor: string;
 }
 
+export interface ImportFilaRepetidaArchivo {
+  campoLabel: string;
+  valor: string;
+  filaOriginal: number;
+  nombreOriginal: string;
+}
+
 /** Detalle fila por fila de un módulo "simple" (Clientes/Transportistas/Choferes/Vehículos): todas las columnas configuradas con su valor tal como viene del Excel, no solo el nombre. */
 export interface ImportPreviewFilaEntidad {
   fila: number;
@@ -688,6 +697,8 @@ export interface ImportPreviewFilaEntidad {
   sinCambios?: boolean;
   /** Solo si actualiza un registro existente: qué campos cambian (valor actual → valor del Excel). */
   cambios?: ImportPreviewFilaCambio[];
+  /** Presente si la fila repite el mismo documento único (CUIT/RUT/DNI) que una fila anterior del mismo archivo. */
+  repetidaEnArchivo?: ImportFilaRepetidaArchivo;
   campos: ImportPreviewFilaCampo[];
 }
 
