@@ -971,57 +971,103 @@ export function ViajesTenantPage({
     };
   }, [getToken, isLoaded, isSignedIn, platform, tid, resumenVersion]);
 
-  // Con el chip "Sin liquidar" activo, el filtro Transporte ofrece solo los transportistas
-  // que tienen viajes en ese filtro (como "Nueva liquidación"), no todo el maestro.
-  const filtroSinLiquidarActivo = liquidacionFiltro === "sin_liquidar";
-  const [transportistaIdsSinLiquidar, setTransportistaIdsSinLiquidar] =
-    useState<string[] | null>(null);
+  // Opciones acotadas dinámicamente según los filtros activos:
+  // cada filtro que se aplica acota las opciones de los demás,
+  // ofreciendo solo opciones que tienen al menos un viaje con la selección actual.
+  const [opcionesFiltros, setOpcionesFiltros] = useState<{
+    clienteIds: string[];
+    transportistaIds: string[];
+    choferIds: string[];
+  } | null>(null);
+
   useEffect(() => {
-    if (!filtroSinLiquidarActivo) {
-      setTransportistaIdsSinLiquidar(null);
-      return;
-    }
     if (!isLoaded || !isSignedIn) return;
     if (platform && !tid) return;
     let cancelled = false;
+
+    const f = filtrosAplicadosRef.current;
+    const p = new URLSearchParams();
+    if (f.numero?.trim()) {
+      const cleanNum = f.numero.replace(/#/g, "").trim();
+      p.set("numero", cleanNum);
+    }
+    if (f.ctg?.trim()) p.set("ctg", f.ctg.trim());
+    if (f.idPropio2?.trim()) p.set("idPropio2", f.idPropio2.trim());
+    if (f.clienteId?.trim()) p.set("clienteId", f.clienteId.trim());
+    if (f.transportistaId?.trim()) p.set("transportistaId", f.transportistaId.trim());
+    if (f.choferId?.trim()) p.set("choferId", f.choferId.trim());
+    if (f.estado?.trim()) p.set("etapa", f.estado.trim());
+    if (f.facturacionEstado?.trim()) p.set("facturacionEstado", f.facturacionEstado.trim());
+    if (f.liquidacionEstado?.trim()) p.set("liquidacionEstado", f.liquidacionEstado.trim());
+    if (f.pagoTransportista === "pagado") p.set("pagoTransportista", "pagado");
+    if ((f.tipoFecha === "carga" || f.tipoFecha === "descarga") && (f.fechaDesde?.trim() || f.fechaHasta?.trim())) {
+      p.set("tipoFecha", f.tipoFecha);
+      if (f.fechaDesde?.trim()) p.set("fechaDesde", f.fechaDesde.trim());
+      if (f.fechaHasta?.trim()) p.set("fechaHasta", f.fechaHasta.trim());
+    }
+    const utTrim = f.ubicacion?.trim();
+    if ((f.tipoUbicacion === "origen" || f.tipoUbicacion === "destino") && utTrim) {
+      p.set("tipoUbicacion", f.tipoUbicacion);
+      p.set("ubicacion", utTrim);
+    }
+    if (f.periodo === "desde_hoy" || f.periodo === "anteriores") {
+      p.set("periodo", f.periodo);
+    }
+
+    if (platform && tid) p.set("tenantId", tid);
+    const qs = p.toString();
     const url = platform
-      ? `/api/platform/viajes/transportistas-sin-liquidar?tenantId=${encodeURIComponent(tid)}`
-      : "/api/viajes/transportistas-sin-liquidar";
-    apiJson<string[]>(url, () => getToken())
-      .then((ids) => {
-        if (!cancelled) setTransportistaIdsSinLiquidar(ids);
+      ? `/api/platform/viajes/filtros-opciones${qs ? `?${qs}` : ""}`
+      : `/api/viajes/filtros-opciones${qs ? `?${qs}` : ""}`;
+
+    apiJson<{
+      clienteIds: string[];
+      transportistaIds: string[];
+      choferIds: string[];
+    }>(url, () => getTokenRef.current())
+      .then((data) => {
+        if (!cancelled) setOpcionesFiltros(data);
       })
       .catch(() => {
-        // best-effort: si falla, el filtro muestra todos los transportistas
-        if (!cancelled) setTransportistaIdsSinLiquidar(null);
+        // best-effort: si falla, los filtros muestran todas las entidades
+        if (!cancelled) setOpcionesFiltros(null);
       });
+
     return () => {
       cancelled = true;
     };
   }, [
-    filtroSinLiquidarActivo,
-    getToken,
     isLoaded,
     isSignedIn,
     platform,
     tid,
+    listadoQueryVersion,
     resumenVersion,
   ]);
+
+  const clientesFiltroColumna = useMemo(() => {
+    if (!opcionesFiltros?.clienteIds) return clientes;
+    const ids = new Set(opcionesFiltros.clienteIds);
+    const elegido = clienteIdFiltroActivo.trim();
+    if (elegido) ids.add(elegido);
+    return clientes.filter((c) => ids.has(c.id));
+  }, [opcionesFiltros, clientes, clienteIdFiltroActivo]);
+
   const transportistasFiltroColumna = useMemo(() => {
-    if (!filtroSinLiquidarActivo || !transportistaIdsSinLiquidar) {
-      return transportistas;
-    }
-    const ids = new Set(transportistaIdsSinLiquidar);
-    // El elegido se mantiene en la lista para que el select siga mostrando su nombre.
+    if (!opcionesFiltros?.transportistaIds) return transportistas;
+    const ids = new Set(opcionesFiltros.transportistaIds);
     const elegido = transportistaIdFiltroActivo.trim();
     if (elegido) ids.add(elegido);
     return transportistas.filter((t) => ids.has(t.id));
-  }, [
-    filtroSinLiquidarActivo,
-    transportistaIdsSinLiquidar,
-    transportistas,
-    transportistaIdFiltroActivo,
-  ]);
+  }, [opcionesFiltros, transportistas, transportistaIdFiltroActivo]);
+
+  const choferesFiltroColumna = useMemo(() => {
+    if (!opcionesFiltros?.choferIds) return choferes;
+    const ids = new Set(opcionesFiltros.choferIds);
+    const elegido = choferIdFiltroActivo.trim();
+    if (elegido) ids.add(elegido);
+    return choferes.filter((ch) => ids.has(ch.id));
+  }, [opcionesFiltros, choferes, choferIdFiltroActivo]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -2613,7 +2659,7 @@ export function ViajesTenantPage({
         >
           <ClienteSearchSelect
             id="viajes-col-filtro-cliente"
-            clientes={clientes}
+            clientes={clientesFiltroColumna}
             value={clienteIdFiltroActivo}
             onChange={(id) => aplicarFiltroColumnaCliente(id)}
             allowEmptyValue
@@ -2669,7 +2715,7 @@ export function ViajesTenantPage({
         >
           <ChoferSearchSelect
             id="viajes-col-filtro-chofer"
-            choferes={choferes}
+            choferes={choferesFiltroColumna}
             value={choferIdFiltroActivo}
             onChange={(id) => aplicarFiltroColumnaChofer(id)}
             allowEmptyValue
@@ -3048,7 +3094,7 @@ export function ViajesTenantPage({
       >
         <ClienteSearchSelect
           id="viajes-filtro-cliente"
-          clientes={clientes}
+          clientes={clientesFiltroColumna}
           value={clienteIdFiltroActivo}
           onChange={(id) => aplicarFiltroColumnaCliente(id)}
           allowEmptyValue
@@ -3092,7 +3138,7 @@ export function ViajesTenantPage({
         >
           <ChoferSearchSelect
             id="viajes-filtro-chofer"
-            choferes={choferes}
+            choferes={choferesFiltroColumna}
             value={choferIdFiltroActivo}
             onChange={(id) => aplicarFiltroColumnaChofer(id)}
             allowEmptyValue
