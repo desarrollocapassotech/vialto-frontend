@@ -82,6 +82,7 @@ import {
   TituloOrdenable,
   ViajesListadoHeaderFiltro,
 } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { FiltroRangoFechas } from "@/components/shared/FiltroRangoFechas";
 import { ordenarPorClaves, useOrdenColumna } from "@/lib/ordenListado";
 import { clavesOrdenFactura, type FacturaSortField } from "@/lib/facturasOrden";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
@@ -1378,67 +1379,31 @@ export function FacturacionTenantPage({
         label="Emisión"
         active={!!emisionDesdeFiltro || !!emisionHastaFiltro}
       >
-        <div className="flex flex-col gap-1.5">
-          <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-            Desde
-            <input
-              type="date"
-              value={emisionDesdeFiltro}
-              onChange={(e) => {
-                setListadoRefetching(true);
-                setPage(1);
-                setEmisionDesdeFiltro(e.target.value);
-              }}
-              className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-            />
-          </label>
-          <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-            Hasta
-            <input
-              type="date"
-              value={emisionHastaFiltro}
-              onChange={(e) => {
-                setListadoRefetching(true);
-                setPage(1);
-                setEmisionHastaFiltro(e.target.value);
-              }}
-              className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-            />
-          </label>
-        </div>
+        <FiltroRangoFechas
+          desde={emisionDesdeFiltro}
+          hasta={emisionHastaFiltro}
+          onAplicar={(desde, hasta) => {
+            setListadoRefetching(true);
+            setPage(1);
+            setEmisionDesdeFiltro(desde);
+            setEmisionHastaFiltro(hasta);
+          }}
+        />
       </ListadoFiltroCampo>
       <ListadoFiltroCampo
         label="Vencimiento"
         active={!!vencimientoDesdeFiltro || !!vencimientoHastaFiltro}
       >
-        <div className="flex flex-col gap-1.5">
-          <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-            Desde
-            <input
-              type="date"
-              value={vencimientoDesdeFiltro}
-              onChange={(e) => {
-                setListadoRefetching(true);
-                setPage(1);
-                setVencimientoDesdeFiltro(e.target.value);
-              }}
-              className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-            />
-          </label>
-          <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-            Hasta
-            <input
-              type="date"
-              value={vencimientoHastaFiltro}
-              onChange={(e) => {
-                setListadoRefetching(true);
-                setPage(1);
-                setVencimientoHastaFiltro(e.target.value);
-              }}
-              className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-            />
-          </label>
-        </div>
+        <FiltroRangoFechas
+          desde={vencimientoDesdeFiltro}
+          hasta={vencimientoHastaFiltro}
+          onAplicar={(desde, hasta) => {
+            setListadoRefetching(true);
+            setPage(1);
+            setVencimientoDesdeFiltro(desde);
+            setVencimientoHastaFiltro(hasta);
+          }}
+        />
       </ListadoFiltroCampo>
       <ListadoFiltroCampo label="Estado" active={!!estadoFiltro}>
         <select
@@ -1655,34 +1620,16 @@ export function FacturacionTenantPage({
                   setEmisionHastaFiltro("");
                 }}
               >
-                <div className="flex flex-col gap-1.5">
-                  <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-                    Desde
-                    <input
-                      type="date"
-                      value={emisionDesdeFiltro}
-                      onChange={(e) => {
-                        setListadoRefetching(true);
-                        setPage(1);
-                        setEmisionDesdeFiltro(e.target.value);
-                      }}
-                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-                    Hasta
-                    <input
-                      type="date"
-                      value={emisionHastaFiltro}
-                      onChange={(e) => {
-                        setListadoRefetching(true);
-                        setPage(1);
-                        setEmisionHastaFiltro(e.target.value);
-                      }}
-                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                    />
-                  </label>
-                </div>
+                <FiltroRangoFechas
+                  desde={emisionDesdeFiltro}
+                  hasta={emisionHastaFiltro}
+                  onAplicar={(desde, hasta) => {
+                    setListadoRefetching(true);
+                    setPage(1);
+                    setEmisionDesdeFiltro(desde);
+                    setEmisionHastaFiltro(hasta);
+                  }}
+                />
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -1700,34 +1647,16 @@ export function FacturacionTenantPage({
                   setVencimientoHastaFiltro("");
                 }}
               >
-                <div className="flex flex-col gap-1.5">
-                  <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-                    Desde
-                    <input
-                      type="date"
-                      value={vencimientoDesdeFiltro}
-                      onChange={(e) => {
-                        setListadoRefetching(true);
-                        setPage(1);
-                        setVencimientoDesdeFiltro(e.target.value);
-                      }}
-                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-                    Hasta
-                    <input
-                      type="date"
-                      value={vencimientoHastaFiltro}
-                      onChange={(e) => {
-                        setListadoRefetching(true);
-                        setPage(1);
-                        setVencimientoHastaFiltro(e.target.value);
-                      }}
-                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                    />
-                  </label>
-                </div>
+                <FiltroRangoFechas
+                  desde={vencimientoDesdeFiltro}
+                  hasta={vencimientoHastaFiltro}
+                  onAplicar={(desde, hasta) => {
+                    setListadoRefetching(true);
+                    setPage(1);
+                    setVencimientoDesdeFiltro(desde);
+                    setVencimientoHastaFiltro(hasta);
+                  }}
+                />
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>

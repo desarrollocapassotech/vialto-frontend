@@ -1,7 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { etiquetaDirOrden, type TipoOrden } from '@/lib/ordenListado';
+
+export const ViajesFiltroContext = createContext<{ cerrar: () => void } | null>(null);
+
+export function useViajesFiltro() {
+  return useContext(ViajesFiltroContext);
+}
 
 /** Ancho del panel flotante de filtro (px). */
 const PANEL_WIDTH_PX = 288;
@@ -285,18 +291,20 @@ export function ViajesListadoHeaderFiltro({
       </div>
       {abierto && pos
         ? createPortal(
-            <div
-              role="dialog"
-              aria-label={`Filtro: ${title}`}
-              className="fixed z-40 rounded border border-black/10 bg-white p-3 text-left font-[family-name:var(--font-body)] text-sm normal-case tracking-normal text-vialto-charcoal shadow-lg"
-              style={{ top: pos.top, left: pos.left, width: PANEL_WIDTH_PX }}
-              onMouseDownCapture={() => {
-                clickDentroRef.current = true;
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              {children}
-            </div>,
+            <ViajesFiltroContext.Provider value={{ cerrar: () => setAbierto(false) }}>
+              <div
+                role="dialog"
+                aria-label={`Filtro: ${title}`}
+                className="fixed z-40 rounded border border-black/10 bg-white p-3 text-left font-[family-name:var(--font-body)] text-sm normal-case tracking-normal text-vialto-charcoal shadow-lg"
+                style={{ top: pos.top, left: pos.left, width: PANEL_WIDTH_PX }}
+                onMouseDownCapture={() => {
+                  clickDentroRef.current = true;
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {children}
+              </div>
+            </ViajesFiltroContext.Provider>,
             document.body,
           )
         : null}

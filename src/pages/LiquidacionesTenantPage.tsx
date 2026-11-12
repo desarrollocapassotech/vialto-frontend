@@ -31,6 +31,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { LibroIvaExportModal } from "@/components/shared/LibroIvaExportModal";
+import { FiltroRangoFechas } from "@/components/shared/FiltroRangoFechas";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -1391,32 +1392,15 @@ export function LiquidacionesTenantPage() {
                   setPage(1);
                 }}
               >
-                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
-                    Desde
-                    <input
-                      type="date"
-                      value={emisionDesdeFilter}
-                      onChange={(e) => {
-                        setEmisionDesdeFilter(e.target.value);
-                        setPage(1);
-                      }}
-                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
-                    Hasta
-                    <input
-                      type="date"
-                      value={emisionHastaFilter}
-                      onChange={(e) => {
-                        setEmisionHastaFilter(e.target.value);
-                        setPage(1);
-                      }}
-                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
-                    />
-                  </label>
-                </div>
+                <FiltroRangoFechas
+                  desde={emisionDesdeFilter}
+                  hasta={emisionHastaFilter}
+                  onAplicar={(desde, hasta) => {
+                    setEmisionDesdeFilter(desde);
+                    setEmisionHastaFilter(hasta);
+                    setPage(1);
+                  }}
+                />
               </ViajesListadoHeaderFiltro>
             </th>
             {mostrarPeriodo && (
@@ -1434,30 +1418,14 @@ export function LiquidacionesTenantPage() {
                   setPage(1);
                 }}
               >
-                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
-                    Desde
-                    <input
-                      type="date"
-                      value={periodoDesdeFilter}
-                      onChange={(e) =>
-                        aplicarPeriodoDesdeFilter(e.target.value)
-                      }
-                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
-                    Hasta
-                    <input
-                      type="date"
-                      value={periodoHastaFilter}
-                      onChange={(e) =>
-                        aplicarPeriodoHastaFilter(e.target.value)
-                      }
-                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
-                    />
-                  </label>
-                </div>
+                <FiltroRangoFechas
+                  desde={periodoDesdeFilter}
+                  hasta={periodoHastaFilter}
+                  onAplicar={(desde, hasta) => {
+                    aplicarPeriodoDesdeFilter(desde);
+                    aplicarPeriodoHastaFilter(hasta);
+                  }}
+                />
               </ViajesListadoHeaderFiltro>
             </th>
             )}
@@ -1689,7 +1657,9 @@ export function LiquidacionesTenantPage() {
               : "Cargando datos de empresa..."
             : error
               ? "No se pudieron cargar las liquidaciones."
-              : "Todavía no hay liquidaciones..."
+              : anyFiltroActivo
+                ? "No hay liquidaciones que coincidan con los filtros aplicados."
+                : "Todavía no hay liquidaciones..."
         }
         loadingMessage="Cargando…"
         onRowClick={(liq) => setAccionesAbiertoLiqId(liq.id)}
