@@ -46,6 +46,7 @@ import {
   numeroVisibleViaje,
   viajeUsaNumeroInterno,
 } from "@/lib/viajesFlota";
+import { evaluarValorizacionViaje } from "@/lib/viajesValorizacion";
 import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { Dato, DatosCabecera } from "@/components/shared/DetalleComprobante";
@@ -419,6 +420,7 @@ export function ViajeViewModal({
   ].filter((c) => c.value != null && c.value !== "" && ver(c.key));
 
   // ── Estado ───────────────────────────────────────────────────────────────
+  const valorizacion = evaluarValorizacionViaje(viaje);
   const filasEstado = [
     // La etapa (pendiente / en curso / finalizado / cancelado) va siempre: es el dato
     // central de la sección, aunque la empresa oculte su badge en el encabezado.
@@ -427,11 +429,21 @@ export function ViajeViewModal({
         key="etapa"
         label="Etapa"
         value={
-          <BadgeEstadoViaje
-            className={etapaViajeBadgeClass[viaje.etapa] ?? etapaViajeBadgeClassDefault}
-          >
-            {etapaViajeLabel[viaje.etapa] ?? viaje.etapa}
-          </BadgeEstadoViaje>
+          <div className="inline-flex items-center gap-1.5">
+            <BadgeEstadoViaje
+              className={etapaViajeBadgeClass[viaje.etapa] ?? etapaViajeBadgeClassDefault}
+            >
+              {etapaViajeLabel[viaje.etapa] ?? viaje.etapa}
+            </BadgeEstadoViaje>
+            {!valorizacion.valorizado && viaje.etapa?.toLowerCase() !== "cancelado" && (
+              <span
+                className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900"
+                title={`Pendiente de carga de montos (no valorizado):\n${valorizacion.mensajePendiente}`}
+              >
+                No valorizado
+              </span>
+            )}
+          </div>
         }
       />
     ),
@@ -542,7 +554,19 @@ export function ViajeViewModal({
                 numero: true,
               },
             ]
-          : []),
+          : ver("monto") && !esMultiCliente && (viaje.monto == null || viaje.monto <= 0)
+            ? [
+                {
+                  key: "monto",
+                  label: "Tarifa cliente",
+                  value: (
+                    <span className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
+                      Pendiente de carga
+                    </span>
+                  ),
+                },
+              ]
+            : []),
         ...(ver("facturacionEstado") && !esMultiCliente && nroFactura
           ? [
               {
@@ -612,7 +636,7 @@ export function ViajeViewModal({
     columnasPrecioTransp.push({ key: "tarifa", label: `Tarifa ${transpFrase}`, numero: true });
     celdasPrecioTransp.tarifa = { value: fmtMonto(viaje.precioUnitarioTransportista, monedaTransp) };
   }
-  if (verPrecioTransp && viaje.precioTransportistaExterno != null) {
+  if (verPrecioTransp && viaje.precioTransportistaExterno != null && viaje.precioTransportistaExterno > 0) {
     columnasPrecioTransp.push({
       key: "precio",
       // Sin desglose el precio es la tarifa del viaje; con desglose, el total.
@@ -626,6 +650,23 @@ export function ViajeViewModal({
         </span>
       ),
       sub: ivaEfectivoTxt,
+    };
+  } else if (
+    verPrecioTransp &&
+    conTransportista &&
+    (viaje.precioTransportistaExterno == null || viaje.precioTransportistaExterno <= 0) &&
+    (viaje.precioUnitarioTransportista == null || viaje.precioUnitarioTransportista <= 0)
+  ) {
+    columnasPrecioTransp.push({
+      key: "precio",
+      label: `Tarifa ${transpFrase}`,
+    });
+    celdasPrecioTransp.precio = {
+      value: (
+        <span className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
+          Pendiente de carga
+        </span>
+      ),
     };
   }
 
@@ -1032,7 +1073,13 @@ export function ViajeViewModal({
                           Con IVA
                         </span>
                       )}
-                      {fmtMonto(c.monto, c.monedaMonto)}
+                      {c.monto != null ? (
+                        fmtMonto(c.monto, c.monedaMonto)
+                      ) : (
+                        <span className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900">
+                          Pendiente
+                        </span>
+                      )}
                     </span>
                   ),
                   thClassName: `${listadoTablaThClass} text-right`,

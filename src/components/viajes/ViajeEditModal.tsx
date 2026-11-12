@@ -525,23 +525,30 @@ export function ViajeEditModal({
 
   // Pago bruto al transportista: con desglose = cantidad × precio unitario; sin desglose =
   // el "Precio transporte" cargado. Con % IVA visible, se engrosa a pago neto / monto IVA.
-  const pagoBrutoTransportista = desgloseActivo
-    ? (Number(draft.cantidadTransportista.replace(",", ".")) || 0) *
-      (parseCurrencyForMoneda(
-        draft.precioUnitarioTransportista,
-        draft.monedaPrecioTransportistaExterno,
-      ) || 0)
-    : parseCurrencyForMoneda(
-        draft.precioTransportistaExterno,
-        draft.monedaPrecioTransportistaExterno,
-      ) || 0;
+  const pagoBrutoTransportista: number | null = desgloseActivo
+    ? (draft.cantidadTransportista.trim() && draft.precioUnitarioTransportista.trim()
+        ? (Number(draft.cantidadTransportista.replace(",", ".")) || 0) *
+          (parseCurrencyForMoneda(
+            draft.precioUnitarioTransportista,
+            draft.monedaPrecioTransportistaExterno,
+          ) || 0)
+        : null)
+    : (draft.precioTransportistaExterno.trim()
+        ? (parseCurrencyForMoneda(
+            draft.precioTransportistaExterno,
+            draft.monedaPrecioTransportistaExterno,
+          ) ?? null)
+        : null);
   const pctIvaTransportista =
     Number(draft.precioTransportistaIvaIncluidoPct.replace(",", ".")) || 0;
-  const pagoNetoTransportista = engrosarConIva(
-    pagoBrutoTransportista,
-    pctIvaTransportista,
-  );
-  const montoIvaTransportista = pagoNetoTransportista - pagoBrutoTransportista;
+  const pagoNetoTransportista =
+    pagoBrutoTransportista != null
+      ? engrosarConIva(pagoBrutoTransportista, pctIvaTransportista)
+      : null;
+  const montoIvaTransportista =
+    pagoNetoTransportista != null && pagoBrutoTransportista != null
+      ? pagoNetoTransportista - pagoBrutoTransportista
+      : null;
 
   const readonlyMoneyClass =
   // Importe calculado: se muestra como número (igual que el Total del alta), no como input.
@@ -585,7 +592,8 @@ export function ViajeEditModal({
       const next = { ...p };
       if (
         snapshotViaje.cantidadFactura == null &&
-        next.cantidadFactura === ""
+        next.cantidadFactura === "" &&
+        next.monto.trim() !== ""
       ) {
         next.cantidadFactura = "1";
         next.precioUnitarioFactura = next.monto;
@@ -593,7 +601,8 @@ export function ViajeEditModal({
       }
       if (
         snapshotViaje.cantidadTransportista == null &&
-        next.cantidadTransportista === ""
+        next.cantidadTransportista === "" &&
+        next.precioTransportistaExterno.trim() !== ""
       ) {
         next.cantidadTransportista = "1";
         next.precioUnitarioTransportista = next.precioTransportistaExterno;
@@ -643,13 +652,23 @@ export function ViajeEditModal({
 
   const pagosSaldoContext = useMemo(() => {
     if (!muestraPagosTransportista) return null;
+    const precioBase = desgloseActivo
+      ? (pagoNetoTransportista != null
+          ? String(pagoNetoTransportista)
+          : (pagoBrutoTransportista != null ? String(pagoBrutoTransportista) : ""))
+      : (pagoNetoTransportista != null
+          ? String(pagoNetoTransportista)
+          : draft.precioTransportistaExterno);
     return {
       transportistaId: draft.transportistaId,
-      precioTransportistaExterno: draft.precioTransportistaExterno,
+      precioTransportistaExterno: precioBase,
       monedaPrecioTransportistaExterno: draft.monedaPrecioTransportistaExterno,
     };
   }, [
     muestraPagosTransportista,
+    desgloseActivo,
+    pagoNetoTransportista,
+    pagoBrutoTransportista,
     draft.transportistaId,
     draft.precioTransportistaExterno,
     draft.monedaPrecioTransportistaExterno,
@@ -1416,7 +1435,13 @@ export function ViajeEditModal({
                             <span className={`${labelClass} text-right`}>Pago bruto</span>
                             <div className={readonlyMoneyClass}>
                               <span className="w-full truncate">
-                                {fmtReadonlyMoney(pagoBrutoTransportista)}
+                                {pagoBrutoTransportista != null ? (
+                                  fmtReadonlyMoney(pagoBrutoTransportista)
+                                ) : (
+                                  <span className="text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                    Pendiente
+                                  </span>
+                                )}
                               </span>
                             </div>
                           </div>
@@ -1427,7 +1452,13 @@ export function ViajeEditModal({
                               <span className={`${labelClass} text-right`}>Pago neto</span>
                               <div className={readonlyMoneyClass}>
                                 <span className="w-full truncate">
-                                  {fmtReadonlyMoney(pagoNetoTransportista)}
+                                  {pagoNetoTransportista != null ? (
+                                    fmtReadonlyMoney(pagoNetoTransportista)
+                                  ) : (
+                                    <span className="text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                      Pendiente
+                                    </span>
+                                  )}
                                 </span>
                               </div>
                             </div>
@@ -1435,7 +1466,13 @@ export function ViajeEditModal({
                               <span className={`${labelClass} text-right`}>Monto IVA</span>
                               <div className={readonlyMoneyClass}>
                                 <span className="w-full truncate">
-                                  {fmtReadonlyMoney(montoIvaTransportista)}
+                                  {montoIvaTransportista != null ? (
+                                    fmtReadonlyMoney(montoIvaTransportista)
+                                  ) : (
+                                    <span className="text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                      Pendiente
+                                    </span>
+                                  )}
                                 </span>
                               </div>
                             </div>
@@ -1534,7 +1571,13 @@ export function ViajeEditModal({
                               <span className={`${labelClass} text-right`}>Pago bruto</span>
                               <div className={readonlyMoneyClass}>
                                 <span className="w-full truncate">
-                                  {fmtReadonlyMoney(pagoBrutoTransportista)}
+                                  {pagoBrutoTransportista != null ? (
+                                    fmtReadonlyMoney(pagoBrutoTransportista)
+                                  ) : (
+                                    <span className="text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                      Pendiente
+                                    </span>
+                                  )}
                                 </span>
                               </div>
                             </div>
@@ -1542,7 +1585,13 @@ export function ViajeEditModal({
                               <span className={`${labelClass} text-right`}>Pago neto</span>
                               <div className={readonlyMoneyClass}>
                                 <span className="w-full truncate">
-                                  {fmtReadonlyMoney(pagoNetoTransportista)}
+                                  {pagoNetoTransportista != null ? (
+                                    fmtReadonlyMoney(pagoNetoTransportista)
+                                  ) : (
+                                    <span className="text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                      Pendiente
+                                    </span>
+                                  )}
                                 </span>
                               </div>
                             </div>
@@ -1550,7 +1599,13 @@ export function ViajeEditModal({
                               <span className={`${labelClass} text-right`}>Monto IVA</span>
                               <div className={readonlyMoneyClass}>
                                 <span className="w-full truncate">
-                                  {fmtReadonlyMoney(montoIvaTransportista)}
+                                  {montoIvaTransportista != null ? (
+                                    fmtReadonlyMoney(montoIvaTransportista)
+                                  ) : (
+                                    <span className="text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                      Pendiente
+                                    </span>
+                                  )}
                                 </span>
                               </div>
                             </div>

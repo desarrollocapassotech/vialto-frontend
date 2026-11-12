@@ -38,6 +38,7 @@ import {
   esEtiquetaCiudadValida,
   inferirPaisDesdeUbicacion,
 } from "@/lib/ciudades";
+import { evaluarValorizacionViaje } from "@/lib/viajesValorizacion";
 import { fechaHoraToIso, isoToFechaHora } from "@/lib/viajeFechaHora";
 import { productoItemsDesdeViaje, mergeOpcionesProducto } from "@/lib/productosViaje";
 import {
@@ -549,19 +550,70 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       return;
     }
     
-    const calcMonto = (draft.cantidadFactura.trim() || draft.precioUnitarioFactura.trim())
+    const calcMonto = (draft.cantidadFactura.trim() && draft.precioUnitarioFactura.trim())
       ? roundMoney2(
           (Number(draft.cantidadFactura.replace(",", ".")) || 0) *
             (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) || 0),
         )
-      : parseCurrencyForMoneda(draft.monto, draft.monedaMonto);
+      : (draft.monto.trim() ? parseCurrencyForMoneda(draft.monto, draft.monedaMonto) : null);
+    const montoValido = calcMonto != null && calcMonto >= 0.01;
 
-    if (calcMonto == null || calcMonto < 0.01) {
-      setError("Ingresá un monto a facturar mayor a 0.");
-      return;
+    const precioTransportistaNum = (draft.cantidadTransportista.trim() && draft.precioUnitarioTransportista.trim())
+      ? roundMoney2(
+          (Number(draft.cantidadTransportista.replace(",", ".")) || 0) *
+            (parseCurrencyForMoneda(draft.precioUnitarioTransportista, draft.monedaPrecioTransportistaExterno) || 0)
+        )
+      : (draft.precioTransportistaExterno.trim()
+          ? parseCurrencyForMoneda(
+              draft.precioTransportistaExterno,
+              draft.monedaPrecioTransportistaExterno,
+            )
+          : null);
+    const precioTranspValido =
+      precioTransportistaNum != null && precioTransportistaNum >= 0.01;
+
+    const valorizacion = evaluarValorizacionViaje({
+      monto: calcMonto ?? null,
+      cantidadFactura: draft.cantidadFactura.trim() ? Number(draft.cantidadFactura.replace(",", ".")) : null,
+      precioUnitarioFactura: draft.precioUnitarioFactura.trim() ? (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) ?? null) : null,
+      transportistaId: externo ? draft.transportistaId : null,
+      precioTransportistaExterno: precioTransportistaNum ?? null,
+      cantidadTransportista: externo && draft.cantidadTransportista.trim() ? Number(draft.cantidadTransportista.replace(",", ".")) : null,
+      precioUnitarioTransportista: externo && draft.precioUnitarioTransportista.trim() ? (parseCurrencyForMoneda(draft.precioUnitarioTransportista, draft.monedaPrecioTransportistaExterno) ?? null) : null,
+      clientesViaje: draft.clientesRows.map((r) => ({
+        clienteId: r.clienteId,
+        monto: r.montoStr.trim() ? (parseCurrencyForMoneda(r.montoStr, r.moneda) ?? null) : null,
+        cantidad: r.cantidadStr.trim() ? Number(r.cantidadStr.replace(",", ".")) : null,
+        precioUnitario: r.precioUnitarioStr.trim() ? (parseCurrencyForMoneda(r.precioUnitarioStr, r.moneda) ?? null) : null,
+      })),
+    });
+
+    if (draft.estado === "finalizado") {
+      if (!valorizacion.valorizado) {
+        if (valorizacion.faltaCliente && valorizacion.faltaTransportista) {
+          setError(
+            "No se puede pasar a Finalizado: faltan cargar los montos del cliente y del transportista.",
+          );
+          return;
+        }
+        if (valorizacion.faltaCliente) {
+          setError("No se puede pasar a Finalizado: falta cargar el monto del cliente.");
+          return;
+        }
+        if (valorizacion.faltaTransportista) {
+          setError("No se puede pasar a Finalizado: falta cargar el monto del transportista.");
+          return;
+        }
+      }
     }
 
-    if (draftRequiereGananciaBrutaManual(draft)) {
+    let etapaAGuardar = draft.estado;
+    const hoyIso = new Date().toISOString().slice(0, 10);
+    if (etapaAGuardar === "pendiente" && draft.fechaCarga.trim() && draft.fechaCarga <= hoyIso) {
+      etapaAGuardar = "en_curso";
+    }
+
+    if (montoValido && precioTranspValido && draftRequiereGananciaBrutaManual(draft)) {
       const manualPayload = gananciaBrutaManualPayloadFromDraft(draft);
       if (manualPayload.gananciaBrutaManual == null) {
         setError(
@@ -570,12 +622,6 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
         return;
       }
     }
-    const precioTransportistaNum = draft.cantidadTransportista.trim()
-      ? (Number(draft.cantidadTransportista.replace(",", ".")) || 0) * (parseCurrencyForMoneda(draft.precioUnitarioTransportista, draft.monedaPrecioTransportistaExterno) || 0)
-      : parseCurrencyForMoneda(
-          draft.precioTransportistaExterno,
-          draft.monedaPrecioTransportistaExterno,
-        );
     const pagosTransportistaApi = pagosTransportistaDraftsToApi(
       draft.pagosTransportista,
     );
@@ -647,7 +693,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
             numeroIdentificacionPersonalizado:
               draft.numeroIdentificacionPersonalizado.trim() || undefined,
             idPropio2: draft.idPropio2.trim() || undefined,
-            etapa: draft.estado,
+            etapa: etapaAGuardar,
             clienteId: clienteBloqueado ? undefined : draft.clienteId || undefined,
             ...(externo
               ? {
@@ -682,15 +728,15 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
             ),
             detalleCarga: draft.detalleCarga.trim() || undefined,
             observaciones: draft.observaciones.trim() || undefined,
-            monto: clienteBloqueado ? undefined : parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
+            monto: clienteBloqueado ? undefined : (calcMonto ?? (draft.monto.trim() ? parseCurrencyForMoneda(draft.monto, draft.monedaMonto) : null)),
             monedaMonto: clienteBloqueado ? undefined : draft.monedaMonto,
             cantidadFactura: clienteBloqueado ? undefined : (draft.cantidadFactura.trim() ? Number(draft.cantidadFactura.replace(",", ".")) : null),
-            precioUnitarioFactura: clienteBloqueado ? undefined : (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) ?? null),
+            precioUnitarioFactura: clienteBloqueado ? undefined : (draft.precioUnitarioFactura.trim() ? (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) ?? null) : null),
             cantidadTransportista: transporteBloqueado ? undefined : (externo ? (draft.cantidadTransportista.trim() ? Number(draft.cantidadTransportista.replace(",", ".")) : null) : null),
-            precioUnitarioTransportista: transporteBloqueado ? undefined : (externo ? (parseCurrencyForMoneda(draft.precioUnitarioTransportista, draft.monedaPrecioTransportistaExterno) ?? null) : null),
+            precioUnitarioTransportista: transporteBloqueado ? undefined : (externo ? (draft.precioUnitarioTransportista.trim() ? (parseCurrencyForMoneda(draft.precioUnitarioTransportista, draft.monedaPrecioTransportistaExterno) ?? null) : null) : null),
             kmRecorridos: kmResolved ?? null,
             litrosConsumidos: litResolved ?? null,
-            precioTransportistaExterno: transporteBloqueado ? undefined : (externo ? (precioTransportistaNum ?? null) : null),
+            precioTransportistaExterno: transporteBloqueado ? undefined : (externo ? precioTransportistaNum : null),
             monedaPrecioTransportistaExterno: transporteBloqueado ? undefined : draft.monedaPrecioTransportistaExterno,
             precioTransportistaIvaIncluidoPct: precioIvaBloqueado ? undefined : (externo ? (draft.precioTransportistaIvaIncluidoPct.trim() ? Number(draft.precioTransportistaIvaIncluidoPct.replace(",", ".")) : 0) : 0),
             ...(transporteBloqueado ? {} : gananciaBrutaManualPayloadFromDraft(draft)),

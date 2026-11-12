@@ -188,9 +188,15 @@ export function PagosTransportistaFieldset({
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded border border-black/10 bg-vialto-mist/60 px-3 py-2 text-xs">
           <span className="text-vialto-steel">
             Acordado:{" "}
-            <span className="font-medium text-vialto-charcoal">
-              {formatViajeImporteForListado(saldo.totalAcordado, saldo.moneda)}
-            </span>
+            {saldo.totalAcordado > 0 ? (
+              <span className="font-medium text-vialto-charcoal">
+                {formatViajeImporteForListado(saldo.totalAcordado, saldo.moneda)}
+              </span>
+            ) : (
+              <span className="font-normal text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[11px]">
+                Pendiente
+              </span>
+            )}
           </span>
           <span className="text-vialto-steel">
             Pagado:{" "}
@@ -200,24 +206,30 @@ export function PagosTransportistaFieldset({
           </span>
           <span className="text-vialto-steel">
             Saldo:{" "}
-            <span
-              className={`font-medium tabular-nums ${
-                saldoExcedido
-                  ? "text-red-700"
+            {saldo.totalAcordado > 0 ? (
+              <span
+                className={`font-medium tabular-nums ${
+                  saldoExcedido
+                    ? "text-red-700"
+                    : saldo.pagado
+                      ? "text-emerald-700"
+                      : "text-red-700"
+                }`}
+              >
+                {saldoExcedido
+                  ? formatViajeImporteForListado(
+                      Math.max(0, saldo.saldo),
+                      saldo.moneda,
+                    )
                   : saldo.pagado
-                    ? "text-emerald-700"
-                    : "text-red-700"
-              }`}
-            >
-              {saldoExcedido
-                ? formatViajeImporteForListado(
-                    Math.max(0, saldo.saldo),
-                    saldo.moneda,
-                  )
-                : saldo.pagado
-                  ? "Pagado"
-                  : formatViajeImporteForListado(saldo.saldo, saldo.moneda)}
-            </span>
+                    ? "Pagado"
+                    : formatViajeImporteForListado(saldo.saldo, saldo.moneda)}
+              </span>
+            ) : (
+              <span className="font-normal text-vialto-steel">
+                —
+              </span>
+            )}
           </span>
         </div>
       )}

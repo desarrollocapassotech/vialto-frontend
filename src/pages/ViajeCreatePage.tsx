@@ -654,7 +654,22 @@ export function ViajeCreatePage() {
     }
 
     const gananciaDraft = buildGananciaDraft();
-    if (draftRequiereGananciaBrutaManual(gananciaDraft)) {
+    const principalMonto = desgloseActivo
+      ? (Number(clientesRows[0]?.cantidadStr.replace(",", ".")) || 0) *
+        (parseCurrencyForMoneda(clientesRows[0]?.precioUnitarioStr, clientesRows[0]?.moneda) || 0)
+      : parseCurrencyForMoneda(clientesRows[0]?.montoStr, clientesRows[0]?.moneda);
+    const precioTransp = desgloseActivo
+      ? (Number(cantidadTransportista.replace(",", ".")) || 0) *
+        (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0)
+      : parseCurrencyForMoneda(precioTransportistaExterno, monedaPrecioTransportista);
+
+    if (
+      principalMonto != null &&
+      principalMonto > 0 &&
+      precioTransp != null &&
+      precioTransp > 0 &&
+      draftRequiereGananciaBrutaManual(gananciaDraft)
+    ) {
       if (
         parseCurrencyForMoneda(gananciaBrutaManual, monedaGananciaBrutaManual) ==
         null
@@ -666,24 +681,12 @@ export function ViajeCreatePage() {
       }
     }
 
-    const precioTransportistaNum = desgloseActivo
-      ? (Number(cantidadTransportista.replace(",", ".")) || 0) *
-        (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0)
-      : parseCurrencyForMoneda(precioTransportistaExterno, monedaPrecioTransportista);
-
-    if (externo && (!precioTransportistaNum || precioTransportistaNum <= 0)) {
-      setError(
-        desgloseActivo
-          ? "Cargá la cantidad y el precio unitario del transporte."
-          : "Ingresá el precio del transporte.",
-      );
-      return;
-    }
-
     const pagoTransportistaError = externo
       ? validarPagosTransportistaDraftForm({
           transportistaId: transportistaId.trim(),
-          precioTransportistaExterno: String(precioTransportistaNum || 0),
+          precioTransportistaExterno: String(
+            (pagoNetoTransportista ?? pagoBrutoTransportista ?? 0)
+          ),
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
           pagosTransportista,
         })
@@ -841,17 +844,25 @@ export function ViajeCreatePage() {
             (parseCurrencyForMoneda(principal.precioUnitarioStr, principal.moneda) || 0),
         )
       : parseCurrencyForMoneda(principal.montoStr, principal.moneda);
-    if (montoNum == null || montoNum < 0.01) {
-      setError("Cargá el monto de este cliente.");
-      setStep(1);
-      return;
-    }
+    const montoValido = montoNum != null && montoNum >= 0.01;
+
+    const precioTransportistaNum = desgloseActivo
+      ? (Number(cantidadTransportista.replace(",", ".")) || 0) *
+        (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0)
+      : parseCurrencyForMoneda(precioTransportistaExterno, monedaPrecioTransportista);
+    const precioTransportistaValido =
+      precioTransportistaNum != null && precioTransportistaNum >= 0.01;
+
     const gananciaDraft = buildGananciaDraft();
     let gananciaBrutaManualPayload: {
       gananciaBrutaManual: number | null;
       monedaGananciaBrutaManual: string | null;
     } = { gananciaBrutaManual: null, monedaGananciaBrutaManual: null };
-    if (draftRequiereGananciaBrutaManual(gananciaDraft)) {
+    if (
+      montoValido &&
+      precioTransportistaValido &&
+      draftRequiereGananciaBrutaManual(gananciaDraft)
+    ) {
       const manual = parseCurrencyForMoneda(gananciaBrutaManual, monedaGananciaBrutaManual);
       if (manual == null) {
         setError(
@@ -865,16 +876,14 @@ export function ViajeCreatePage() {
         monedaGananciaBrutaManual,
       };
     }
-    const precioTransportistaNum = desgloseActivo
-      ? (Number(cantidadTransportista.replace(",", ".")) || 0) *
-        (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0)
-      : parseCurrencyForMoneda(precioTransportistaExterno, monedaPrecioTransportista);
     const pagosTransportistaApi =
       pagosTransportistaDraftsToApi(pagosTransportista);
     const pagoTransportistaError = externo
       ? validarPagosTransportistaDraftForm({
           transportistaId: transportistaId.trim(),
-          precioTransportistaExterno: String(precioTransportistaNum || 0),
+          precioTransportistaExterno: String(
+            (pagoNetoTransportista ?? pagoBrutoTransportista ?? 0)
+          ),
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
           pagosTransportista,
         })
@@ -958,18 +967,18 @@ export function ViajeCreatePage() {
             litNum !== undefined && Number.isFinite(litNum)
               ? litNum
               : undefined,
-          monto: desgloseActivo ? undefined : montoNum,
+          monto: desgloseActivo ? undefined : (montoValido ? montoNum : undefined),
           monedaMonto: principal.moneda,
-          precioTransportistaExterno: desgloseActivo ? undefined : precioTransportistaNum,
+          precioTransportistaExterno: desgloseActivo ? undefined : (precioTransportistaValido ? precioTransportistaNum : undefined),
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
           precioTransportistaIvaIncluidoPct:
             externo && precioTransportistaIvaIncluidoPct.trim()
               ? Number(precioTransportistaIvaIncluidoPct.replace(",", "."))
               : undefined,
           cantidadFactura: desgloseActivo && principal.cantidadStr.trim() ? Number(principal.cantidadStr.replace(",", ".")) : undefined,
-          precioUnitarioFactura: desgloseActivo ? parseCurrencyForMoneda(principal.precioUnitarioStr, principal.moneda) : undefined,
+          precioUnitarioFactura: desgloseActivo && principal.precioUnitarioStr.trim() ? (parseCurrencyForMoneda(principal.precioUnitarioStr, principal.moneda) ?? undefined) : undefined,
           cantidadTransportista: desgloseActivo && externo && cantidadTransportista.trim() ? Number(cantidadTransportista.replace(",", ".")) : undefined,
-          precioUnitarioTransportista: desgloseActivo && externo ? parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) : undefined,
+          precioUnitarioTransportista: desgloseActivo && externo && precioUnitarioTransportista.trim() ? (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) ?? undefined) : undefined,
           ...gananciaBrutaManualPayload,
           otrosGastos: otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
           pagosTransportista: externo ? pagosTransportistaApi : [],
@@ -1039,24 +1048,30 @@ export function ViajeCreatePage() {
 
   // Pago bruto al transportista: con desglose = cantidad × precio unitario; sin desglose =
   // el "Precio transporte" cargado. Con % IVA visible, se engrosa a pago neto / monto IVA.
-  const pagoBrutoTransportista = desgloseActivo
-    ? (Number(cantidadTransportista.replace(",", ".")) || 0) *
-      (parseCurrencyForMoneda(
-        precioUnitarioTransportista,
-        monedaPrecioTransportista,
-      ) || 0)
-    : parseCurrencyForMoneda(
-        precioTransportistaExterno,
-        monedaPrecioTransportista,
-      ) || 0;
+  const pagoBrutoTransportista: number | null = desgloseActivo
+    ? (cantidadTransportista.trim() && precioUnitarioTransportista.trim()
+        ? (Number(cantidadTransportista.replace(",", ".")) || 0) *
+          (parseCurrencyForMoneda(
+            precioUnitarioTransportista,
+            monedaPrecioTransportista,
+          ) || 0)
+        : null)
+    : (precioTransportistaExterno.trim()
+        ? (parseCurrencyForMoneda(
+            precioTransportistaExterno,
+            monedaPrecioTransportista,
+          ) ?? null)
+        : null);
   const pctIvaTransportista =
     Number(precioTransportistaIvaIncluidoPct.replace(",", ".")) || 0;
-  const pagoNetoTransportista = engrosarConIva(
-    pagoBrutoTransportista,
-    pctIvaTransportista,
-  );
+  const pagoNetoTransportista =
+    pagoBrutoTransportista != null
+      ? engrosarConIva(pagoBrutoTransportista, pctIvaTransportista)
+      : null;
   const montoIvaTransportista =
-    pagoNetoTransportista - pagoBrutoTransportista;
+    pagoNetoTransportista != null && pagoBrutoTransportista != null
+      ? pagoNetoTransportista - pagoBrutoTransportista
+      : null;
 
   function handleMonedaPrecioTransportistaChange(m: ViajeMonedaCodigo) {
     if (!desgloseActivo) {
@@ -1088,15 +1103,20 @@ export function ViajeCreatePage() {
   const faltantesOp = {
     transportista: opExterno && !transportistaId.trim(),
     cantidadTransportista:
-      opExterno && desgloseActivo && !(Number(cantidadTransportista.replace(",", ".")) > 0),
+      opExterno &&
+      desgloseActivo &&
+      cantidadTransportista.trim() !== "" &&
+      !(Number(cantidadTransportista.replace(",", ".")) >= 0),
     precioUnitarioTransportista:
       opExterno &&
       desgloseActivo &&
-      !((parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) ?? 0) > 0),
+      precioUnitarioTransportista.trim() !== "" &&
+      !((parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) ?? -1) >= 0),
     precioTransportista:
       opExterno &&
       !desgloseActivo &&
-      !((parseCurrencyForMoneda(precioTransportistaExterno, monedaPrecioTransportista) ?? 0) > 0),
+      precioTransportistaExterno.trim() !== "" &&
+      !((parseCurrencyForMoneda(precioTransportistaExterno, monedaPrecioTransportista) ?? -1) >= 0),
     chofer: !opExterno && isVisible("alta_viaje", "choferId") && !choferId.trim(),
     vehiculos:
       !opExterno &&

@@ -141,10 +141,10 @@ export function clientesPayloadParaApi(rows: ViajeClienteDraft[]): ViajeClienteA
     };
     if (row.cantidadStr.trim() || row.precioUnitarioStr.trim()) {
       const cantidad = row.cantidadStr.trim() ? Number(row.cantidadStr.replace(',', '.')) : undefined;
-      const precioUnitario = parseCurrencyForMoneda(row.precioUnitarioStr, row.moneda);
+      const precioUnitario = row.precioUnitarioStr.trim() ? parseCurrencyForMoneda(row.precioUnitarioStr, row.moneda) : undefined;
       if (cantidad != null && Number.isFinite(cantidad)) item.cantidad = cantidad;
       if (precioUnitario != null) item.precioUnitario = precioUnitario;
-    } else {
+    } else if (row.montoStr.trim()) {
       const monto = parseCurrencyForMoneda(row.montoStr, row.moneda);
       if (monto != null) item.monto = monto;
     }
@@ -204,24 +204,27 @@ export function faltantesClienteRow(
   const falta: CampoClienteFaltante[] = [];
   if (!row.clienteId.trim()) falta.push('cliente');
   const cantidadOk = (() => {
+    if (row.cantidadStr.trim() === '') return true;
     const n = Number(row.cantidadStr.replace(',', '.'));
-    return row.cantidadStr.trim() !== '' && Number.isFinite(n) && n >= 0;
+    return Number.isFinite(n) && n >= 0;
   })();
-  const tarifa = parseCurrencyForMoneda(row.precioUnitarioStr, row.moneda);
-  const tarifaOk = row.precioUnitarioStr.trim() !== '' && tarifa != null && tarifa >= 0;
+  const tarifaOk = (() => {
+    if (row.precioUnitarioStr.trim() === '') return true;
+    const tarifa = parseCurrencyForMoneda(row.precioUnitarioStr, row.moneda);
+    return tarifa != null && tarifa >= 0;
+  })();
+  if (!cantidadOk) falta.push('cantidad');
+  if (!tarifaOk) falta.push('tarifa');
   if (principal) {
     if (!row.origen.trim()) falta.push('origen');
     if (!row.destinosRows.some((d) => d.etiqueta.trim())) falta.push('destino');
-    if (o.desglose) {
-      if (!cantidadOk) falta.push('cantidad');
-      if (!tarifaOk) falta.push('tarifa');
-    } else {
+    if (!o.desglose && row.montoStr.trim()) {
       const monto = parseCurrencyForMoneda(row.montoStr, row.moneda);
       if (monto == null || monto <= 0) falta.push('monto');
     }
-  } else if (o.desglose && (row.cantidadStr.trim() || row.precioUnitarioStr.trim())) {
-    if (!cantidadOk) falta.push('cantidad');
-    if (!tarifaOk) falta.push('tarifa');
+  } else if (!o.desglose && row.montoStr.trim()) {
+    const monto = parseCurrencyForMoneda(row.montoStr, row.moneda);
+    if (monto == null || monto <= 0) falta.push('monto');
   }
   return falta;
 }
@@ -305,21 +308,18 @@ export async function validarClientesRows(
       continue;
     }
 
-    // Alta: en los clientes adicionales el cobro es opcional (igual que en el backend).
-    const sinCobro =
-      !row.cantidadStr.trim() && !row.precioUnitarioStr.trim() && !row.montoStr.trim();
-    if (opciones.completo && !esClientePrincipal(i, opciones) && sinCobro) continue;
-
     if (row.cantidadStr.trim() || row.precioUnitarioStr.trim()) {
-      const cantidad = Number(row.cantidadStr.replace(',', '.'));
-      const precioUnitario = parseCurrencyForMoneda(row.precioUnitarioStr, row.moneda);
-      if (!Number.isFinite(cantidad) || cantidad < 0 || precioUnitario == null || precioUnitario < 0) {
-        rowErrors[i] = 'Cargá la cantidad y el precio unitario de este cliente.';
+      const cantidad = row.cantidadStr.trim() ? Number(row.cantidadStr.replace(',', '.')) : null;
+      const precioUnitario = row.precioUnitarioStr.trim() ? parseCurrencyForMoneda(row.precioUnitarioStr, row.moneda) : null;
+      if (cantidad != null && (!Number.isFinite(cantidad) || cantidad < 0)) {
+        rowErrors[i] = 'La cantidad de este cliente no es válida.';
+      } else if (precioUnitario != null && precioUnitario < 0) {
+        rowErrors[i] = 'La tarifa de este cliente no es válida.';
       }
-    } else {
+    } else if (row.montoStr.trim()) {
       const monto = parseCurrencyForMoneda(row.montoStr, row.moneda);
       if (monto == null || monto <= 0) {
-        rowErrors[i] = 'Cargá el monto de este cliente.';
+        rowErrors[i] = 'El monto de este cliente no es válido.';
       }
     }
   }
