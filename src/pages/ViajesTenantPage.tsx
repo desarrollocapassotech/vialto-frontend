@@ -5,6 +5,7 @@ import {
 import { AgregarDocumentoViajeModal } from "@/components/viajes/ViajeAdjuntosSeccion";
 import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
 import { adjuntosActivosViaje } from "@/lib/viajesAdjuntos";
+import { evaluarValorizacionViaje } from "@/lib/viajesValorizacion";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { createPortal } from "react-dom";
 import { useAuth, useUser } from "@clerk/clerk-react";
@@ -2108,6 +2109,16 @@ export function ViajesTenantPage({
   }
 
   function liquidarViaje(v: Viaje) {
+    const tienePrecio =
+      (typeof v.precioTransportistaExterno === "number" && v.precioTransportistaExterno > 0) ||
+      (typeof v.cantidadTransportista === "number" &&
+        v.cantidadTransportista > 0 &&
+        typeof v.precioUnitarioTransportista === "number" &&
+        v.precioUnitarioTransportista > 0);
+    if (!tienePrecio) {
+      showToast("No se puede liquidar el viaje: falta cargar el monto del transportista.", "error");
+      return;
+    }
     if (arcaBloqueaLiquidarUsd(hasLiquidoProductoArcaResuelto, v.monedaPrecioTransportistaExterno)) {
       showToast(MSG_ARCA_NO_LIQUIDA_USD, "error");
       return;
@@ -2130,6 +2141,29 @@ export function ViajesTenantPage({
   }
 
   function proceedAfterMultiClientSelector(v: Viaje, targetClienteId?: string) {
+    const cid = targetClienteId ?? v.clienteId;
+    let tieneMonto = false;
+    if (v.clienteId === cid) {
+      tieneMonto =
+        (typeof v.monto === "number" && v.monto > 0) ||
+        (typeof v.cantidadFactura === "number" &&
+          v.cantidadFactura > 0 &&
+          typeof v.precioUnitarioFactura === "number" &&
+          v.precioUnitarioFactura > 0);
+    } else {
+      const cv = v.clientesViaje?.find((c) => c.clienteId === cid);
+      tieneMonto = cv
+        ? (typeof cv.monto === "number" && cv.monto > 0) ||
+          (typeof cv.cantidad === "number" &&
+            cv.cantidad > 0 &&
+            typeof cv.precioUnitario === "number" &&
+            cv.precioUnitario > 0)
+        : false;
+    }
+    if (!tieneMonto) {
+      showToast("No se puede facturar el viaje: falta cargar el monto del cliente.", "error");
+      return;
+    }
     if (hasFacturasArca) {
       const cid = targetClienteId ?? v.clienteId;
       const cliente =
@@ -3499,62 +3533,73 @@ export function ViajesTenantPage({
                 </span>
               </td>
             ),
-            etapa: mostrarColumnaEstado && (
-              <td className="h-8 px-3 py-1" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center gap-1.5">
-                  {mostrarColumnaEtapa && <ViajeEtapaIcono etapa={v.etapa} />}
-                  {v.etapa?.toLowerCase() !== "cancelado" && (
-                    <>
-                      {mostrarColumnaFactura && (
-                        <ViajeFacturacionIndicador
-                          viaje={v}
-                          idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
-                          idPropio2Label={idPropio2Label(currentTenant)}
-                          tenantId={platform ? tid : undefined}
-                          variante="icono"
-                          onClickOverride={
-                            (v.clientesViaje ?? []).length > 0
-                              ? () => openVerFacturaFlow(v)
-                              : undefined
-                          }
-                          onFacturar={
-                            puedeFacturarDesdeGrilla
-                              ? () => facturarViaje(v, undefined)
-                              : undefined
-                          }
-                        />
-                      )}
-                      {mostrarColumnaLiquidacion &&
-                        (hasLiquidacionesResuelto ? (
-                          <ViajeLiquidacionIndicador
+            etapa: mostrarColumnaEstado && (() => {
+              const valorizacion = evaluarValorizacionViaje(v);
+              return (
+                <td className="h-8 px-3 py-1" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-1.5">
+                    {mostrarColumnaEtapa && <ViajeEtapaIcono etapa={v.etapa} />}
+                    {!valorizacion.valorizado && v.etapa?.toLowerCase() !== "cancelado" && (
+                      <span
+                        className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 cursor-help whitespace-nowrap"
+                        title={`Pendiente de carga de montos (no valorizado):\n${valorizacion.mensajePendiente}`}
+                      >
+                        No valorizado
+                      </span>
+                    )}
+                    {v.etapa?.toLowerCase() !== "cancelado" && (
+                      <>
+                        {mostrarColumnaFactura && (
+                          <ViajeFacturacionIndicador
                             viaje={v}
                             idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
                             idPropio2Label={idPropio2Label(currentTenant)}
                             tenantId={platform ? tid : undefined}
-                            hasArca={hasLiquidoProductoArcaResuelto}
-                            onRegistrarPago={() => setRegistrarPagoViaje(v)}
-                            onLiquidar={
-                              hasLiquidacionesResuelto ? () => liquidarViaje(v) : undefined
-                            }
-                            onEmitir={
-                              hasLiquidoProductoArcaResuelto
-                                ? (liq) => setEmitirLiquidacion(liq)
+                            variante="icono"
+                            onClickOverride={
+                              (v.clientesViaje ?? []).length > 0
+                                ? () => openVerFacturaFlow(v)
                                 : undefined
                             }
-                            variante="icono"
+                            onFacturar={
+                              puedeFacturarDesdeGrilla
+                                ? () => facturarViaje(v, undefined)
+                                : undefined
+                            }
                           />
-                        ) : (
-                          <ViajePagoTransportistaIndicador
-                            viaje={v}
-                            onClick={() => setRegistrarPagoViaje(v)}
-                            variante="icono"
-                          />
-                        ))}
-                    </>
-                  )}
-                </div>
-              </td>
-            ),
+                        )}
+                        {mostrarColumnaLiquidacion &&
+                          (hasLiquidacionesResuelto ? (
+                            <ViajeLiquidacionIndicador
+                              viaje={v}
+                              idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+                              idPropio2Label={idPropio2Label(currentTenant)}
+                              tenantId={platform ? tid : undefined}
+                              hasArca={hasLiquidoProductoArcaResuelto}
+                              onRegistrarPago={() => setRegistrarPagoViaje(v)}
+                              onLiquidar={
+                                hasLiquidacionesResuelto ? () => liquidarViaje(v) : undefined
+                              }
+                              onEmitir={
+                                hasLiquidoProductoArcaResuelto
+                                  ? (liq) => setEmitirLiquidacion(liq)
+                                  : undefined
+                              }
+                              variante="icono"
+                            />
+                          ) : (
+                            <ViajePagoTransportistaIndicador
+                              viaje={v}
+                              onClick={() => setRegistrarPagoViaje(v)}
+                              variante="icono"
+                            />
+                          ))}
+                      </>
+                    )}
+                  </div>
+                </td>
+              );
+            })(),
             origenDestino: (
               <td className="h-8 px-3 py-1">
                 <ViajeOrigenDestinoLinea

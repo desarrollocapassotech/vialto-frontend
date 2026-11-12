@@ -73,9 +73,9 @@ interface Props {
   precioTransportistaIvaIncluidoPct: string;
   onPrecioTransportistaIvaIncluidoPctChange: (v: string) => void;
 
-  desglosePagoBruto: number;
-  desglosePagoNeto: number;
-  desgloseMontoIva: number;
+  desglosePagoBruto: number | null;
+  desglosePagoNeto: number | null;
+  desgloseMontoIva: number | null;
 
   precioTransportistaExterno: string;
   onPrecioTransportistaExternoChange: (v: string) => void;
@@ -364,19 +364,43 @@ export function ViajeCreateStep2Operacion({
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={`${fieldLabelClass} text-right`}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
                       <div className={readonlyMoneyClass}>
-                        <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
+                        <span className="w-full truncate">
+                          {desglosePagoBruto != null ? (
+                            fmtReadonlyMoney(desglosePagoBruto)
+                          ) : (
+                            <span className="text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                              Pendiente
+                            </span>
+                          )}
+                        </span>
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={`${fieldLabelClass} text-right`}>Pago neto</span>
                       <div className={readonlyMoneyClass}>
-                        <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoNeto)}</span>
+                        <span className="w-full truncate">
+                          {desglosePagoNeto != null ? (
+                            fmtReadonlyMoney(desglosePagoNeto)
+                          ) : (
+                            <span className="text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                              Pendiente
+                            </span>
+                          )}
+                        </span>
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={`${fieldLabelClass} text-right`}>Monto IVA</span>
                       <div className={readonlyMoneyClass}>
-                        <span className="w-full truncate">{fmtReadonlyMoney(desgloseMontoIva)}</span>
+                        <span className="w-full truncate">
+                          {desgloseMontoIva != null ? (
+                            fmtReadonlyMoney(desgloseMontoIva)
+                          ) : (
+                            <span className="text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                              Pendiente
+                            </span>
+                          )}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -384,7 +408,15 @@ export function ViajeCreateStep2Operacion({
                   <div className="flex min-w-0 flex-col gap-1 sm:max-w-xs">
                     <span className={`${fieldLabelClass} text-right`}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
                     <div className={readonlyMoneyClass}>
-                      <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
+                      <span className="w-full truncate">
+                        {desglosePagoBruto != null ? (
+                          fmtReadonlyMoney(desglosePagoBruto)
+                        ) : (
+                          <span className="text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                            Pendiente
+                          </span>
+                        )}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -435,19 +467,43 @@ export function ViajeCreateStep2Operacion({
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={`${fieldLabelClass} text-right`}>{tl.propio ? `Pago bruto a ${transpFrase}` : "Pago bruto a transporte"}</span>
                       <div className={readonlyMoneyClass}>
-                        <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
+                        <span className="w-full truncate">
+                          {desglosePagoBruto != null ? (
+                            fmtReadonlyMoney(desglosePagoBruto)
+                          ) : (
+                            <span className="text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                              Pendiente
+                            </span>
+                          )}
+                        </span>
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={`${fieldLabelClass} text-right`}>Pago neto</span>
                       <div className={readonlyMoneyClass}>
-                        <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoNeto)}</span>
+                        <span className="w-full truncate">
+                          {desglosePagoNeto != null ? (
+                            fmtReadonlyMoney(desglosePagoNeto)
+                          ) : (
+                            <span className="text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                              Pendiente
+                            </span>
+                          )}
+                        </span>
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={`${fieldLabelClass} text-right`}>Monto IVA</span>
                       <div className={readonlyMoneyClass}>
-                        <span className="w-full truncate">{fmtReadonlyMoney(desgloseMontoIva)}</span>
+                        <span className="w-full truncate">
+                          {desgloseMontoIva != null ? (
+                            fmtReadonlyMoney(desgloseMontoIva)
+                          ) : (
+                            <span className="text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                              Pendiente
+                            </span>
+                          )}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -534,7 +590,14 @@ export function ViajeCreateStep2Operacion({
             onChange={onPagosTransportistaChange}
             saldoContext={{
               transportistaId,
-              precioTransportistaExterno,
+              precioTransportistaExterno:
+                desgloseActivo
+                  ? (desglosePagoNeto != null
+                      ? String(desglosePagoNeto)
+                      : (desglosePagoBruto != null ? String(desglosePagoBruto) : ""))
+                  : (desglosePagoNeto != null
+                      ? String(desglosePagoNeto)
+                      : precioTransportistaExterno),
               monedaPrecioTransportistaExterno: monedaPrecioTransportista,
             }}
           />
