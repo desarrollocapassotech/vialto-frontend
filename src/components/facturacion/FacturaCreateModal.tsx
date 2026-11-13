@@ -46,6 +46,8 @@ import {
   type FacturaDraft,
 } from "@/components/facturacion/FacturaEditModal";
 import { ComprobanteManualFields } from "@/components/shared/ComprobanteManualFields";
+import { NumeroComprobanteField } from "@/components/shared/NumeroComprobanteField";
+import { URL_NUMERO_INTERNO } from "@/lib/numeroInterno";
 import type { ComprobanteManualErrores } from "@/lib/comprobanteManual";
 import {
   FacturaTramosEditor,
@@ -127,7 +129,9 @@ function validateFacturaDraft(
   hasArca: boolean,
 ): string | null {
   // Sin ARCA el número es obligatorio (con ARCA lo asigna AFIP al emitir).
-  if (!hasArca && !draft.numero.trim()) return "Ingresá el número de comprobante.";
+  if (!hasArca && !draft.numeroInterno && !draft.numero.trim()) {
+    return "Ingresá el número de comprobante.";
+  }
   if (!draft.fechaEmision) return "Ingresá la fecha de emisión.";
   if (monedaUnicaDeViajes(draft.viajeIds, viajes) === null) {
     return "Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.";
@@ -861,7 +865,7 @@ export function FacturaCreateModal({
         notifyError(primerErrorCbte);
         return;
       }
-    } else if (!conArca && !draft.numero.trim()) {
+    } else if (!conArca && !draft.numeroInterno && !draft.numero.trim()) {
       notifyError("Ingresá el número de comprobante.");
       return;
     }
@@ -978,7 +982,8 @@ export function FacturaCreateModal({
       checked={Boolean(draft.manual)}
       disabled={busy}
       onChange={(manual) => {
-        patch({ manual });
+        // Sin el tilde se emite en ARCA: el número interno deja de aplicar.
+        patch(manual ? { manual } : { manual, numeroInterno: false });
         setLocalError(null);
       }}
     />
@@ -1129,33 +1134,56 @@ export function FacturaCreateModal({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {/* Con ARCA el número lo asigna AFIP al emitir: no se carga a mano. Factura
             manual: tipo + punto de venta + número por separado (Libro IVA). */}
-        {draft.manual ? (
-          <ComprobanteManualFields
-            value={comprobanteManualDeDraft(draft)}
-            onChange={(comprobanteManual) => {
-              patch({ comprobanteManual });
-              setCbteManualErrores({});
-            }}
-            errores={cbteManualErrores}
-            disabled={busy}
-            labelClassName="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel"
-            inputClassName="h-9 w-full border border-black/20 bg-white px-3 text-sm"
-            className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-3"
-          />
+        {/* "Comprobante interno": número interno que asigna el backend al guardar (en una
+            factura manual reemplaza al tipo + punto de venta + número). */}
+        {draft.manual && !draft.numeroInterno ? (
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 self-end text-[11px] text-vialto-steel">
+              <input
+                type="checkbox"
+                className="h-3.5 w-3.5 border-black/20"
+                checked={false}
+                disabled={busy}
+                onChange={() => {
+                  patch({ numeroInterno: true });
+                  setCbteManualErrores({});
+                }}
+              />
+              Comprobante interno
+            </label>
+            <ComprobanteManualFields
+              value={comprobanteManualDeDraft(draft)}
+              onChange={(comprobanteManual) => {
+                patch({ comprobanteManual });
+                setCbteManualErrores({});
+              }}
+              errores={cbteManualErrores}
+              disabled={busy}
+              labelClassName="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel"
+              inputClassName="h-9 w-full border border-black/20 bg-white px-3 text-sm"
+              className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+            />
+          </div>
         ) : (
           !conArca && (
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Número de comprobante <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={draft.numero}
-                onChange={(e) => patch({ numero: e.target.value })}
-                placeholder="0001-00000001"
-                className="h-9 border border-black/20 bg-white px-3 text-sm"
-              />
-            </div>
+            <NumeroComprobanteField
+              id="factura-numero"
+              label={
+                <>
+                  Número de comprobante <span className="text-red-500">*</span>
+                </>
+              }
+              labelClassName="mb-1 text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel"
+              inputClassName="h-9 w-full border border-black/20 bg-white px-3 text-sm"
+              value={draft.numero}
+              onChange={(numero) => patch({ numero })}
+              placeholder="0001-00000001"
+              disabled={busy}
+              automatico={Boolean(draft.numeroInterno)}
+              onAutomaticoChange={(numeroInterno) => patch({ numeroInterno })}
+              urlNumeroInterno={URL_NUMERO_INTERNO.facturas(tenantId?.trim() || undefined)}
+              getToken={() => getToken()}
+            />
           )
         )}
         <FacturaContraparteField

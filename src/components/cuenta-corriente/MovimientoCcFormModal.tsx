@@ -27,6 +27,8 @@ import {
   type FacturaLineaDraft,
 } from '@/components/facturacion/FacturaLineasEditor';
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { NumeroComprobanteField } from '@/components/shared/NumeroComprobanteField';
+import { URL_NUMERO_INTERNO } from '@/lib/numeroInterno';
 import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 import { roundMoney2 } from '@/lib/facturaTotales';
 import {
@@ -101,6 +103,8 @@ export function MovimientoCcFormModal({
   const [fecha, setFecha] = useState(() => hoyArgentinaIso());
   const [fechaVencimiento, setFechaVencimiento] = useState('');
   const [numeroComprobante, setNumeroComprobante] = useState('');
+  // "Comprobante interno": el backend asigna el próximo número interno al guardar.
+  const [numeroAutomatico, setNumeroAutomatico] = useState(false);
   const [formaPago, setFormaPago] = useState('');
   const [saving, setSaving] = useState(false);
   const [importandoAfip, setImportandoAfip] = useState(false);
@@ -162,7 +166,7 @@ export function MovimientoCcFormModal({
     // Venta/compra: el total (neto + IVA de cada línea) lo calcula el backend igual que el pie del editor.
     const importe = esCargo ? undefined : parseCurrencyAr(importeStr);
     // Todo movimiento manual (venta, compra, cobro, pago) se identifica por su comprobante.
-    if (!numeroComprobante.trim()) {
+    if (!numeroAutomatico && !numeroComprobante.trim()) {
       setError('Ingresá el número de comprobante.');
       return;
     }
@@ -216,7 +220,8 @@ export function MovimientoCcFormModal({
         moneda,
         fecha,
         fechaVencimiento: fechaVencimiento || undefined,
-        numeroComprobante: numeroComprobante.trim() || undefined,
+        numeroComprobante: numeroAutomatico ? undefined : numeroComprobante.trim() || undefined,
+        numeroAutomatico: numeroAutomatico || undefined,
         formaPago: formaPago.trim() || undefined,
         viajes: esCompra && viajes.length > 0 ? viajesCompraToApi(viajes) : undefined,
       });
@@ -295,21 +300,23 @@ export function MovimientoCcFormModal({
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass} htmlFor="cc-comprobante">
-                  Número de comprobante <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="cc-comprobante"
-                  type="text"
-                  maxLength={64}
-                  className={inputClass}
-                  value={numeroComprobante}
-                  onChange={(e) => setNumeroComprobante(e.target.value)}
-                  placeholder="Ej. 0001-00001234"
-                  required
-                />
-              </div>
+              <NumeroComprobanteField
+                id="cc-comprobante"
+                label={
+                  <>
+                    Número de comprobante <span className="text-red-500">*</span>
+                  </>
+                }
+                labelClassName={labelClass}
+                inputClassName={inputClass}
+                value={numeroComprobante}
+                onChange={setNumeroComprobante}
+                placeholder="Ej. 0001-00001234"
+                automatico={numeroAutomatico}
+                onAutomaticoChange={setNumeroAutomatico}
+                urlNumeroInterno={URL_NUMERO_INTERNO.cuentaCorriente}
+                getToken={() => getToken()}
+              />
               <div>
                 <label className={labelClass} htmlFor="cc-moneda">
                   Moneda
@@ -340,21 +347,23 @@ export function MovimientoCcFormModal({
           {/* Cobro/pago: comprobante, importe y moneda arriba; debajo emisión y medio de cobro. */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem]">
             {/* Comprobante propio del cobro/pago (recibo, orden de pago): es lo que muestra la grilla. */}
-            <div>
-              <label className={labelClass} htmlFor="cc-comprobante-pago">
-                Número de comprobante <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="cc-comprobante-pago"
-                type="text"
-                maxLength={64}
-                className={inputClass}
-                value={numeroComprobante}
-                onChange={(e) => setNumeroComprobante(e.target.value)}
-                placeholder={esCliente ? 'Ej. Recibo 0001-00000123' : 'Ej. Orden de pago 0001-00000123'}
-                required
-              />
-            </div>
+            <NumeroComprobanteField
+              id="cc-comprobante-pago"
+              label={
+                <>
+                  Número de comprobante <span className="text-red-500">*</span>
+                </>
+              }
+              labelClassName={labelClass}
+              inputClassName={inputClass}
+              value={numeroComprobante}
+              onChange={setNumeroComprobante}
+              placeholder={esCliente ? 'Ej. Recibo 0001-00000123' : 'Ej. Orden de pago 0001-00000123'}
+              automatico={numeroAutomatico}
+              onAutomaticoChange={setNumeroAutomatico}
+              urlNumeroInterno={URL_NUMERO_INTERNO.cuentaCorriente}
+              getToken={() => getToken()}
+            />
             <div>
               <label className={labelClass} htmlFor="cc-importe">
                 Importe

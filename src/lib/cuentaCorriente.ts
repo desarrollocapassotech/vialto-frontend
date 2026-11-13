@@ -281,6 +281,8 @@ export type CreateMovimientoCcInput = {
   fecha: string;
   fechaVencimiento?: string;
   numeroComprobante?: string;
+  /** true = el backend asigna el siguiente número interno (se ignora `numeroComprobante`). */
+  numeroAutomatico?: boolean;
   formaPago?: string;
   referencia?: string;
   /** Cobro/pago: facturas/liquidaciones a imputar (el backend reparte del más viejo al más nuevo). */

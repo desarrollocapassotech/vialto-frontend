@@ -42,6 +42,7 @@ import {
   importeNetoViajeParaFactura,
 } from "@/lib/facturaTotales";
 import { hoyArgentinaIso, vencimientoPorDefecto } from "@/lib/facturaFechaEmision";
+import { esNumeroInterno } from "@/lib/numeroInterno";
 import {
   comprobanteManualDraftDesde,
   emptyComprobanteManualDraft,
@@ -98,6 +99,11 @@ export type FacturaDraft = {
   manual?: boolean;
   /** Factura manual: tipo + punto de venta + número por separado (obligatorios, Libro IVA). */
   comprobanteManual?: ComprobanteManualDraft;
+  /**
+   * Número interno ("Comprobante interno"): en el alta lo asigna el backend; en la edición
+   * es el `INT-…` ya guardado. No lleva tipo/punto de venta por separado.
+   */
+  numeroInterno?: boolean;
 };
 
 export function comprobanteManualDeDraft(draft: FacturaDraft): ComprobanteManualDraft {
@@ -111,7 +117,9 @@ export function comprobanteManualDeDraft(draft: FacturaDraft): ComprobanteManual
 export function erroresComprobanteFacturaManual(
   draft: FacturaDraft,
 ): ComprobanteManualErrores {
-  return draft.manual ? validarComprobanteManual(comprobanteManualDeDraft(draft), false) : {};
+  return draft.manual && !draft.numeroInterno
+    ? validarComprobanteManual(comprobanteManualDeDraft(draft), false)
+    : {};
 }
 
 // Hoy en Argentina, no en UTC (desde las 21 h el UTC ya es el día siguiente).
@@ -183,7 +191,15 @@ export function facturaPayloadFromDraft(
   if (comprobanteUrl !== undefined) {
     base.comprobanteUrl = comprobanteUrl ?? "";
   }
-  if (draft.manual) {
+  if (draft.numeroInterno) {
+    // Alta: el backend asigna el número. Edición: se conserva el `INT-…` guardado.
+    if (draft.numero.trim()) base.numero = draft.numero.trim();
+    else {
+      delete base.numero;
+      base.numeroAutomatico = true;
+    }
+    if (draft.manual) base.manual = true;
+  } else if (draft.manual) {
     base.manual = true;
     // El backend arma `numero` con estos tres campos.
     const cbte = comprobanteManualDeDraft(draft);
@@ -232,6 +248,7 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
     comprobanteUrl: f.comprobanteUrl ?? null,
     comprobanteFile: null,
     manual: Boolean(f.manual),
+    numeroInterno: esNumeroInterno(f.numero),
     comprobanteManual: comprobanteManualDraftDesde({
       cbteTipo: f.manualCbteTipo,
       ptoVenta: f.manualPtoVenta,
@@ -803,7 +820,7 @@ export function FacturaEditModal({
             />
           )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {draft.manual ? (
+            {draft.manual && !draft.numeroInterno ? (
               <ComprobanteManualFields
                 value={comprobanteManualDeDraft(draft)}
                 onChange={(comprobanteManual) => patch({ comprobanteManual })}
@@ -819,12 +836,19 @@ export function FacturaEditModal({
                   <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
                     Número de comprobante
                   </label>
+                  {/* Número interno: lo asignó el sistema, no se edita. */}
                   <input
                     type="text"
                     value={draft.numero}
+                    readOnly={draft.numeroInterno}
+                    title={draft.numeroInterno ? "Numeración interna" : undefined}
                     onChange={(e) => patch({ numero: e.target.value })}
                     placeholder="0001-00000001"
-                    className="h-9 border border-black/20 bg-white px-3 text-sm"
+                    className={
+                      draft.numeroInterno
+                        ? "h-9 cursor-default border border-dashed border-black/20 bg-vialto-mist/60 px-3 text-sm tabular-nums text-vialto-steel"
+                        : "h-9 border border-black/20 bg-white px-3 text-sm"
+                    }
                   />
                 </div>
               )

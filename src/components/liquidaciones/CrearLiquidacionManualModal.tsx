@@ -37,6 +37,8 @@ import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFa
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { ComprobanteManualFields } from "@/components/shared/ComprobanteManualFields";
+import { NumeroComprobanteField } from "@/components/shared/NumeroComprobanteField";
+import { URL_NUMERO_INTERNO } from "@/lib/numeroInterno";
 import {
   comprobanteManualDraftDesde,
   payloadComprobanteLiquidacion,
@@ -404,6 +406,8 @@ export function CrearLiquidacionManualModal({
   const [numeroComprobanteProveedor, setNumeroComprobanteProveedor] = useState(
     existente?.numeroComprobanteProveedor ?? "",
   );
+  // "Comprobante interno" (solo alta sin Líquido Producto): número interno que asigna el backend.
+  const [numeroAutomatico, setNumeroAutomatico] = useState(false);
   // Liquidación manual (empresa con ARCA, transportista monotributista): la factura del
   // transportista va por separado — tipo, punto de venta, número y fecha (Libro IVA).
   const [cbteProveedor, setCbteProveedor] = useState<ComprobanteManualDraft>(() =>
@@ -577,6 +581,8 @@ export function CrearLiquidacionManualModal({
   /** Esta liquidación va por ARCA (emisión, pto. de venta, datos fiscales completos). */
   const conArca = hasLiquidoProductoArca && !liquidacionManual;
   const showComprobante = !conArca;
+  /** Número de comprobante libre (sin ARCA): va en la primera fila, junto a comisión e IVA. */
+  const campoNumeroEnFila = showComprobante && !liquidacionManual;
   const rangoFechaArca = rangoFechaEmisionArca();
   const errorFechaEmision = conArca ? errorFechaEmisionArca(fechaEmision) : null;
   const cvlpClaseBAlerta = conArca && cvlpClaseBEsperada(condicionIva);
@@ -1163,6 +1169,7 @@ export function CrearLiquidacionManualModal({
       } else if (showComprobante) {
         const nro = numeroComprobanteProveedor.trim();
         if (existente) body.numeroComprobanteProveedor = nro || null;
+        else if (numeroAutomatico) body.numeroAutomatico = true;
         else if (nro) body.numeroComprobanteProveedor = nro;
       }
 
@@ -1553,8 +1560,54 @@ export function CrearLiquidacionManualModal({
                     detalleAbierto ? "lg:border-r lg:border-black/10" : ""
                   }`}
                 >
-                  {/* Transportista, comisión e IVA en una sola fila. */}
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                  {/* Una sola fila: sin ARCA, número de comprobante + transportista + comisión + IVA
+                      (mismo orden que Nueva factura); con ARCA, transportista + fecha de emisión +
+                      comisión + IVA. */}
+                  <div
+                    className={`grid grid-cols-1 gap-3 ${
+                      campoNumeroEnFila
+                        ? "sm:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                        : conArca
+                          ? "sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                          : "sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                    }`}
+                  >
+                    {/* Número de comprobante (sin ARCA) a la izquierda, como en Nueva factura. */}
+                    {campoNumeroEnFila &&
+                      (existente ? (
+                        <div>
+                          <label htmlFor="numeroComprobanteProveedor" className={labelClass}>
+                            Número de comprobante
+                          </label>
+                          <input
+                            id="numeroComprobanteProveedor"
+                            type="text"
+                            maxLength={64}
+                            value={numeroComprobanteProveedor}
+                            onChange={(e) => setNumeroComprobanteProveedor(e.target.value)}
+                            placeholder="Ej. 0001-00001234"
+                            className={inputClass}
+                            disabled={submitting}
+                          />
+                        </div>
+                      ) : (
+                        <NumeroComprobanteField
+                          id="numeroComprobanteProveedor"
+                          label="Número de comprobante"
+                          labelClassName={labelClass}
+                          inputClassName={inputClass}
+                          value={numeroComprobanteProveedor}
+                          onChange={setNumeroComprobanteProveedor}
+                          placeholder="Ej. 0001-00001234"
+                          disabled={submitting}
+                          automatico={numeroAutomatico}
+                          onAutomaticoChange={setNumeroAutomatico}
+                          urlNumeroInterno={URL_NUMERO_INTERNO.liquidaciones(
+                            plataforma ? tenantId! : undefined,
+                          )}
+                          getToken={getToken}
+                        />
+                      ))}
                     <div>
                       <label className={labelClass}>
                         {tl.singular} <span className="text-red-500">*</span>
@@ -1933,24 +1986,6 @@ export function CrearLiquidacionManualModal({
                         labelClassName={labelClass}
                         inputClassName={inputClass}
                         className="grid grid-cols-1 gap-3 sm:grid-cols-2"
-                      />
-                    </div>
-                  )}
-
-                  {showComprobante && !liquidacionManual && (
-                    <div>
-                      <label htmlFor="numeroComprobanteProveedor" className={labelClass}>
-                        Número de comprobante
-                      </label>
-                      <input
-                        id="numeroComprobanteProveedor"
-                        type="text"
-                        maxLength={64}
-                        value={numeroComprobanteProveedor}
-                        onChange={(e) => setNumeroComprobanteProveedor(e.target.value)}
-                        placeholder="Ej. 0001-00001234"
-                        className={inputClass}
-                        disabled={submitting}
                       />
                     </div>
                   )}
