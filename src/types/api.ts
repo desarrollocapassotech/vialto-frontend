@@ -41,6 +41,11 @@ export interface OtroGasto {
   createdBy?: string;
   /** Nombre o correo resuelto vía Clerk (solo en detalle). */
   createdByLabel?: string | null;
+  /**
+   * Gasto que viene de una compra de Cuenta corriente vinculada al viaje: no se edita ni
+   * se borra desde el viaje (se cambia desde la compra). Ver `vialto-backend/.../compra-viajes.ts`.
+   */
+  ccCompraId?: string;
 }
 
 /** Cliente adicional de un viaje multi-cliente: origen/destino(s)/productos y cobro propios. */

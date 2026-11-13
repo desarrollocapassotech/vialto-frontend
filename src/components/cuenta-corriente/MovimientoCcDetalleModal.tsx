@@ -28,6 +28,14 @@ import { fechaDiaYmd, fmtDateUtc } from '@/lib/fmtDateUtc';
 import { friendlyError } from '@/lib/friendlyError';
 import { useToast } from '@/lib/toast';
 import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
+import { roundMoney2 } from '@/lib/facturaTotales';
+import {
+  ViajesCompraField,
+  errorRepartoViajes,
+  viajeCompraDraftFromApi,
+  viajesCompraToApi,
+  type ViajeCompraDraft,
+} from './ViajesCompraField';
 import {
   actualizarMovimiento,
   claseMontoCobroPago,
@@ -220,6 +228,14 @@ export function MovimientoCcDetalleModal({
   const [formaPago, setFormaPago] = useState(m.referencia ?? '');
   const [lineas, setLineas] = useState<FacturaLineaDraft[]>(() => lineasIniciales(m));
   const [lineasIncompletas, setLineasIncompletas] = useState<number[]>([]);
+  // Compra manual: viajes a los que se carga como gasto (opcional).
+  const esCompra = esCargo && !esCliente;
+  const viajesGuardados = m.viajesCompra ?? [];
+  const [viajes, setViajes] = useState<ViajeCompraDraft[]>(() =>
+    viajesGuardados.map(viajeCompraDraftFromApi),
+  );
+  const [marcarErrorViajes, setMarcarErrorViajes] = useState(false);
+  const netoLineas = roundMoney2(lineas.reduce((s, l) => s + (Number(l.importe) || 0), 0));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Mensaje de la confirmación de cambio de importe con imputaciones (null = cerrada). */
@@ -302,6 +318,14 @@ export function MovimientoCcDetalleModal({
       setError('Ingresá un importe mayor a 0.');
       return false;
     }
+    if (esCompra) {
+      const errViajes = errorRepartoViajes(viajes, netoLineas);
+      if (errViajes) {
+        setMarcarErrorViajes(true);
+        setError(errViajes);
+        return false;
+      }
+    }
     return true;
   }
 
@@ -327,6 +351,7 @@ export function MovimientoCcDetalleModal({
               })),
             }
           : { importe }),
+        ...(esCompra ? { viajes: viajesCompraToApi(viajes) } : {}),
       });
       // Venta/compra en femenino, cobro/pago en masculino.
       showToast(
@@ -523,6 +548,20 @@ export function MovimientoCcDetalleModal({
             />
           )}
 
+          {esCompra && (
+            <ViajesCompraField
+              neto={netoLineas}
+              moneda={moneda}
+              value={viajes}
+              onChange={(rows) => {
+                setViajes(rows);
+                setError(null);
+              }}
+              marcarError={marcarErrorViajes}
+              repartoManualInicial={viajesGuardados.length > 0}
+            />
+          )}
+
         </form>
       ) : (
         <div className="space-y-5">
@@ -616,6 +655,33 @@ export function MovimientoCcDetalleModal({
               </p>
             )}
           </div>
+
+          {viajesGuardados.length > 0 && (
+            <section>
+              <p className="mb-1 text-xs uppercase tracking-wider text-vialto-steel">
+                Cargada como gasto de {viajesGuardados.length === 1 ? 'un viaje' : `${viajesGuardados.length} viajes`} (importe sin IVA)
+              </p>
+              <ul className="divide-y divide-black/10 border border-black/10 text-sm">
+                {viajesGuardados.map((v) => (
+                  <li key={v.viajeId} className="flex items-center gap-2 px-3 py-2">
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="font-medium">{v.numero}</span>
+                      <span className="ml-2 text-xs text-vialto-steel">
+                        {[
+                          v.fechaCarga ? fmtDateUtc(v.fechaCarga) : null,
+                          v.cliente,
+                          [v.origen, v.destino].filter(Boolean).join(' → '),
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    </span>
+                    <span className="shrink-0 tabular-nums">{monto(v.importe, m.moneda)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {tieneImputaciones && (
             <section>

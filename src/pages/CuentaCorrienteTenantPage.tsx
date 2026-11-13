@@ -229,6 +229,11 @@ export function CuentaCorrienteTenantPage() {
             tipoContraparte={tipoContraparte}
             contraparteId={contraparteId}
             contraparteNombre={contraparteNombre}
+            proveedorTipo={
+              tipoContraparte === 'proveedor'
+                ? (transportistas.find((t) => t.id === contraparteId)?.tipo ?? null)
+                : null
+            }
             saldosSlot={saldosSlot}
             accionesSlot={accionesSlot}
             limpiarFiltrosSlot={limpiarSlot}

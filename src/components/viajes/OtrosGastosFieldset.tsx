@@ -24,6 +24,8 @@ export interface OtroGastoDraft {
   fecha: string;
   createdBy?: string;
   createdByLabel?: string | null;
+  /** Viene de una compra de Cuenta corriente: se muestra de solo lectura y no se manda al guardar. */
+  ccCompraId?: string;
 }
 
 export function otroGastoAutorFromClerk(
@@ -102,12 +104,18 @@ export function otroGastoDraftFromApi(g: OtroGasto): OtroGastoDraft {
     fecha: g.fecha ? (fechaDiaYmd(g.fecha) ?? '') : '',
     createdBy: g.createdBy,
     createdByLabel: g.createdByLabel,
+    ...(g.ccCompraId ? { ccCompraId: g.ccCompraId } : {}),
   };
 }
 
+/**
+ * Gasto para mandar al guardar el viaje. Los que vienen de compras de Cuenta corriente
+ * no se mandan: el backend conserva los que ya tiene (`mergeGastosConCompras`).
+ */
 export function otroGastoDraftToApi(
   d: OtroGastoDraft,
 ): OtroGasto | null {
+  if (d.ccCompraId) return null;
   const monto = parseCurrencyForMoneda(d.montoStr, d.moneda);
   if (!d.descripcion.trim() || monto == null || monto < 0) return null;
   const out: OtroGasto = {
@@ -132,6 +140,7 @@ export function faltantesOtroGasto(d: OtroGastoDraft): { descripcion: boolean; m
 /** true = algún gasto tiene obligatorios vacíos (no se agrega otro ni se crea el viaje). */
 export function otrosGastosIncompletos(rows: OtroGastoDraft[]): boolean {
   return rows.some((r) => {
+    if (r.ccCompraId) return false;
     const f = faltantesOtroGasto(r);
     return f.descripcion || f.monto;
   });
@@ -169,6 +178,24 @@ function formatGastoSummary(row: OtroGastoDraft): string {
   const monto = parseCurrencyForMoneda(row.montoStr, row.moneda);
   if (monto == null) return '';
   return `${row.moneda} ${monto.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** Gasto que viene de una compra de Cuenta corriente: solo lectura (se cambia desde la compra). */
+function GastoDeCompraFila({ row }: { row: OtroGastoDraft }) {
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border border-black/10 bg-vialto-mist/50 px-3 py-2 text-sm">
+      <div className="min-w-0">
+        <p className="truncate text-vialto-charcoal" title={row.descripcion}>
+          {row.descripcion}
+        </p>
+        <p className="text-xs text-vialto-steel">
+          De una compra de Cuenta corriente: se edita desde la compra.
+          {row.fecha ? ` · ${row.fecha.split('-').reverse().join('/')}` : ''}
+        </p>
+      </div>
+      <span className="shrink-0 tabular-nums">{formatGastoSummary(row)}</span>
+    </div>
+  );
 }
 
 interface Props {
@@ -217,6 +244,9 @@ export function OtrosGastosFieldset({
       </div>
 
       {rows.map((row, i) => {
+        if (row.ccCompraId) {
+          return <GastoDeCompraFila key={`cc-${row.ccCompraId}`} row={row} />;
+        }
         const f = marcarIncompletos
           ? faltantesOtroGasto(row)
           : { descripcion: false, monto: false };

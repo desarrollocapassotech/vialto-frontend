@@ -74,7 +74,47 @@ export type MovimientoCc = {
     anulacionCae: string | null;
     anulacionManualComprobanteUrl: string | null;
   } | null;
+  /** Compra manual vinculada (opcional) a viajes: parte del neto que se carga a cada uno. */
+  viajesCompra?: ViajeCompraCc[];
 };
+
+/** Viaje vinculado a una compra (o elegible para vincular), con su parte del neto. */
+export type ViajeCompraCc = {
+  viajeId: string;
+  /** ID propio 1 del viaje, o su número interno. */
+  numero: string;
+  fechaCarga: string | null;
+  origen: string | null;
+  destino: string | null;
+  cliente: string | null;
+  importe: number;
+};
+
+/** Viajes para elegir en una compra (`GET cuenta-corriente/viajes-para-compra`). */
+export async function fetchViajesParaCompra(
+  getToken: () => Promise<string | null>,
+  q: string,
+): Promise<Omit<ViajeCompraCc, 'importe'>[]> {
+  const qs = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : '';
+  return apiJson(`/api/cuenta-corriente/viajes-para-compra${qs}`, getToken);
+}
+
+/** Neto (sin IVA) de una compra: lo que se reparte entre sus viajes. */
+export function netoCompraCc(mov: Pick<MovimientoCc, 'importe' | 'importeNeto'>): number {
+  return roundMoney2(mov.importeNeto ?? mov.importe);
+}
+
+/**
+ * Reparte `total` en partes iguales entre `n` viajes (en centavos, el sobrante en los
+ * primeros) — el reparto por defecto al elegir viajes.
+ */
+export function repartirEnPartesIguales(total: number, n: number): number[] {
+  if (n <= 0) return [];
+  const centavos = Math.round(total * 100);
+  const base = Math.floor(centavos / n);
+  const resto = centavos - base * n;
+  return Array.from({ length: n }, (_, i) => (base + (i < resto ? 1 : 0)) / 100);
+}
 
 export type SaldoPorMoneda = { moneda: string; saldo: number };
 
@@ -245,6 +285,8 @@ export type CreateMovimientoCcInput = {
   referencia?: string;
   /** Cobro/pago: facturas/liquidaciones a imputar (el backend reparte del más viejo al más nuevo). */
   imputarACargoIds?: string[];
+  /** Compra (opcional): viajes a los que se carga como gasto, con su parte del neto. */
+  viajes?: { viajeId: string; importe: number }[];
 };
 
 export function createMovimiento(getToken: GetToken, input: CreateMovimientoCcInput) {
@@ -270,6 +312,8 @@ export function actualizarMovimiento(
     importe?: number;
     lineas?: { descripcion: string; importe: number; ivaPct: number }[];
     formaPago?: string;
+    /** Solo compras: reemplaza los viajes vinculados (`[]` = sin viajes). */
+    viajes?: { viajeId: string; importe: number }[];
   },
 ) {
   return apiJson<MovimientoCc>(`/api/cuenta-corriente/movimientos/${encodeURIComponent(id)}`, getToken, {

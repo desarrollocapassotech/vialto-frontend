@@ -66,6 +66,7 @@ import {
   comprasNacenDeLiquidaciones,
   ventasNacenDeFacturas,
 } from '@/lib/tenantModules';
+import type { ProveedorTipo } from '@/types/api';
 import { ExportarEstadoCuentaModal } from './ExportarEstadoCuentaModal';
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { FiltrosRapidos, type FiltroRapidoOpcion } from '@/components/listado/FiltrosRapidos';
@@ -188,12 +189,15 @@ type Props = {
   limpiarFiltrosSlot?: HTMLElement | null;
   /** Junto al título: embudo + chips de filtro rápido ("Sin imputar"), como en Viajes. */
   filtrosRapidosSlot?: HTMLElement | null;
+  /** Tipo del proveedor (solo lado proveedor): decide si se puede cargar una compra a mano. */
+  proveedorTipo?: ProveedorTipo | null;
 };
 
 export function CuentaContraparteView({
   tipoContraparte,
   contraparteId,
   contraparteNombre,
+  proveedorTipo = null,
   saldosSlot,
   accionesSlot,
   limpiarFiltrosSlot,
@@ -203,14 +207,16 @@ export function CuentaContraparteView({
   const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
   const { tenant } = useCurrentTenant();
   // Venta/compra manual solo si la empresa no tiene el módulo que la genera (con
-  // Facturación las ventas salen de las facturas; con Liquidaciones, las compras de las
-  // liquidaciones). Hasta saber los módulos no se ofrece, para no mostrarla de más.
+  // Facturación las ventas salen de las facturas; con Liquidaciones, las compras a
+  // transportistas salen de las liquidaciones — a un taller u otro proveedor sí se cargan).
+  // Hasta saber los módulos no se ofrece, para no mostrarla de más.
   const modulos = tenant?.modules ?? [];
   const permiteCargoManual =
     tenant != null &&
     (tipoContraparte === 'cliente'
       ? !ventasNacenDeFacturas(modulos)
-      : !comprasNacenDeLiquidaciones(modulos));
+      : !comprasNacenDeLiquidaciones(modulos) ||
+        (proveedorTipo != null && proveedorTipo !== 'transportista'));
   // "Ver factura/liquidación" solo si la empresa tiene el módulo (si no, no puede abrirla).
   const puedeVerFacturas = ventasNacenDeFacturas(modulos);
   const puedeVerLiquidaciones = comprasNacenDeLiquidaciones(modulos);

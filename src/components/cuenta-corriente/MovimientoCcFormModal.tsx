@@ -28,6 +28,13 @@ import {
 } from '@/components/facturacion/FacturaLineasEditor';
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
+import { roundMoney2 } from '@/lib/facturaTotales';
+import {
+  ViajesCompraField,
+  errorRepartoViajes,
+  viajesCompraToApi,
+  type ViajeCompraDraft,
+} from './ViajesCompraField';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
@@ -102,6 +109,11 @@ export function MovimientoCcFormModal({
 
   const esCargo = tipo === 'cargo';
   const esCliente = tipoContraparte === 'cliente';
+  // Compra: viajes a los que se carga como gasto (opcional), con el reparto del neto.
+  const esCompra = esCargo && !esCliente;
+  const [viajes, setViajes] = useState<ViajeCompraDraft[]>([]);
+  const [marcarErrorViajes, setMarcarErrorViajes] = useState(false);
+  const netoLineas = roundMoney2(lineas.reduce((s, l) => s + (Number(l.importe) || 0), 0));
   /** Vencimiento anterior a la emisión (YYYY-MM-DD, se comparan como texto). */
   const vencimientoAnterior = !!fechaVencimiento && !!fecha && fechaVencimiento < fecha;
 
@@ -175,6 +187,14 @@ export function MovimientoCcFormModal({
       setError('Ingresá un importe mayor a 0.');
       return;
     }
+    if (esCompra) {
+      const errViajes = errorRepartoViajes(viajes, netoLineas);
+      if (errViajes) {
+        setMarcarErrorViajes(true);
+        setError(errViajes);
+        return;
+      }
+    }
     setSaving(true);
     setError(null);
     try {
@@ -198,6 +218,7 @@ export function MovimientoCcFormModal({
         fechaVencimiento: fechaVencimiento || undefined,
         numeroComprobante: numeroComprobante.trim() || undefined,
         formaPago: formaPago.trim() || undefined,
+        viajes: esCompra && viajes.length > 0 ? viajesCompraToApi(viajes) : undefined,
       });
       onCreated();
       onClose();
@@ -493,6 +514,19 @@ export function MovimientoCcFormModal({
             totalesALaDerecha
             labelImporte="Importe"
             mostrarSubtotal
+          />
+        )}
+
+        {esCompra && (
+          <ViajesCompraField
+            neto={netoLineas}
+            moneda={moneda}
+            value={viajes}
+            onChange={(rows) => {
+              setViajes(rows);
+              setError(null);
+            }}
+            marcarError={marcarErrorViajes}
           />
         )}
 
