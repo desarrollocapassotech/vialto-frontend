@@ -45,6 +45,14 @@ import {
 import { hoyArgentinaIso, vencimientoPorDefecto } from "@/lib/facturaFechaEmision";
 import { esNumeroInterno } from "@/lib/numeroInterno";
 import {
+  conceptoDraftDesde,
+  conceptosIncompletos,
+  conceptosValidos,
+  sincronizarConceptosConViajes,
+  type FacturaConceptoDraft,
+} from "@/lib/facturaConceptos";
+import { FacturaConceptosEditor } from "@/components/facturacion/FacturaConceptosEditor";
+import {
   numeroActualComprobanteManual,
   useAutocompletarNumeroComprobante,
 } from "@/hooks/useAutocompletarNumeroComprobante";
@@ -94,6 +102,8 @@ export type FacturaDraft = {
   tramos: FacturaTramoDraft[];
   /** Observaciones de la factura (texto sin importe, van en el PDF debajo de los viajes). */
   observaciones: string[];
+  /** Conceptos que se suman además de los viajes (precargados con los gastos de los viajes). */
+  conceptos?: FacturaConceptoDraft[];
   /** Letra AFIP elegida al facturar desde un viaje (A o B). */
   letraComprobante?: "a" | "b" | null;
   /** URL ya guardada (edición) o vacía si se quitó. */
@@ -148,6 +158,7 @@ export function emptyFacturaDraft(): FacturaDraft {
     facturarPorTramo: false,
     tramos: [],
     observaciones: [],
+    conceptos: [],
     letraComprobante: null,
     comprobanteUrl: null,
     comprobanteFile: null,
@@ -192,6 +203,7 @@ export function facturaPayloadFromDraft(
       ? toFacturaTramosPayload(draft.tramos)
       : [],
     observaciones: observacionesFacturaPayload(draft.observaciones ?? []),
+    conceptos: conceptosValidos(draft.conceptos ?? [], ivaN),
   };
   if (comprobanteUrl !== undefined) {
     base.comprobanteUrl = comprobanteUrl ?? "";
@@ -250,6 +262,7 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
           ? [emptyFacturaTramoDraft(ivaDefault)]
           : [],
     observaciones: f.observaciones ?? [],
+    conceptos: (f.conceptos ?? []).map(conceptoDraftDesde),
     comprobanteUrl: f.comprobanteUrl ?? null,
     comprobanteFile: null,
     manual: Boolean(f.manual),
@@ -312,14 +325,12 @@ export function FacturaTotalesPreview({
   viajes: Viaje[];
 }) {
   const ivaN = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0;
-  const totales = (() => {
+  const pct = Number.isFinite(ivaN) ? ivaN : 0;
+  // Conceptos además de los viajes: cada uno con su IVA.
+  const conceptos = conceptosValidos(draft.conceptos ?? [], pct);
+  const totalesViajes = (() => {
     if (draft.facturarPorTramo && draft.viajeIds.length > 0) {
-      return computeTotalesFacturaPorTramo(
-        draft.viajeIds,
-        viajes,
-        draft.tramos,
-        Number.isFinite(ivaN) ? ivaN : 0,
-      );
+      return computeTotalesFacturaPorTramo(draft.viajeIds, viajes, draft.tramos, pct);
     }
     const neto =
       draft.viajeIds.length > 0
@@ -328,9 +339,15 @@ export function FacturaTotalesPreview({
             return sum + (v ? importeNetoViajeParaFactura(v) : 0);
           }, 0)
         : 0;
-    const pct = Number.isFinite(ivaN) ? ivaN : 0;
     return computeFacturaTotalesFromBases([{ importe: neto, ivaPct: pct }]);
   })();
+  const totalesConceptos = computeFacturaTotalesFromBases(
+    conceptos.map((c) => ({ importe: c.importe, ivaPct: c.ivaPct })),
+  );
+  const totales = {
+    neto: totalesViajes.neto + totalesConceptos.neto,
+    total: totalesViajes.total + totalesConceptos.total,
+  };
 
   if (totales.neto <= 0 && totales.total <= 0) return null;
 
@@ -621,6 +638,7 @@ export function FacturaEditModal({
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [tramosLocalError, setTramosLocalError] = useState<string | null>(null);
   const [cbteManualErrores, setCbteManualErrores] = useState<ComprobanteManualErrores>({});
+  const [conceptosIncompletosIdx, setConceptosIncompletos] = useState<number[]>([]);
   // Factura de ARCA adjunta: completa el número (o tipo + punto de venta + número en una
   // factura manual) leyéndolo del archivo. Draft vigente en un ref (la lectura es async).
   const autocompletarNumero = useAutocompletarNumeroComprobante();
@@ -734,6 +752,10 @@ export function FacturaEditModal({
     setDraft((prev) => (prev ? { ...prev, ...p } : prev));
   }
 
+  /** IVA con el que entran los conceptos (los gastos precargados y los nuevos). */
+  const ivaDraft = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0;
+  const ivaPctConceptos = Number.isFinite(ivaDraft) ? ivaDraft : 21;
+
   function patchViajeIds(ids: string[]) {
     const tramos = filterFacturaTramosByViajeIds(draft.tramos, ids);
     const facturarPorTramo =
@@ -742,8 +764,18 @@ export function FacturaEditModal({
       viajeIds: ids,
       facturarPorTramo,
       tramos: facturarPorTramo ? tramos : [],
+      // Los gastos de los viajes que se agregan entran como conceptos; los de los quitados se van.
+      conceptos: sincronizarConceptosConViajes(
+        draft.conceptos ?? [],
+        draft.viajeIds,
+        ids,
+        derivedViajes,
+        draft.clienteId,
+        ivaPctConceptos,
+      ),
     });
     setTramosIncomplete([]);
+    setConceptosIncompletos([]);
     setTramosLocalError(null);
   }
 
@@ -774,6 +806,13 @@ export function FacturaEditModal({
     if (!check.ok) {
       setTramosIncomplete(check.indices);
       setTramosLocalError(check.message);
+      return;
+    }
+    // Conceptos a medio cargar (los renglones vacíos se descartan al guardar).
+    const incompletos = conceptosIncompletos(draft.conceptos ?? [], ivaPctConceptos);
+    setConceptosIncompletos(incompletos);
+    if (incompletos.length > 0) {
+      setTramosLocalError("Completá el concepto, la cantidad y el monto unitario en los conceptos marcados.");
       return;
     }
     setTramosIncomplete([]);
@@ -877,6 +916,8 @@ export function FacturaEditModal({
                       viajeIds: [],
                       facturarPorTramo: false,
                       tramos: [],
+                      // Sin viajes se van sus gastos; quedan los conceptos cargados a mano.
+                      conceptos: (draft.conceptos ?? []).filter((c) => !c.viajeId),
                     })
                   }
                 />
@@ -1052,6 +1093,26 @@ export function FacturaEditModal({
                 />
               </div>
             )}
+
+            <div className="col-span-full">
+              <FacturaConceptosEditor
+                conceptos={draft.conceptos ?? []}
+                onChange={(conceptos) => {
+                  patch({ conceptos });
+                  setConceptosIncompletos([]);
+                  setTramosLocalError(null);
+                }}
+                ivaPctDefault={ivaPctConceptos}
+                incompletos={conceptosIncompletosIdx}
+                onIncompletos={(indices) => {
+                  setConceptosIncompletos(indices);
+                  setTramosLocalError(
+                    "Completá el concepto, la cantidad y el monto unitario antes de agregar otro.",
+                  );
+                }}
+                disabled={saving}
+              />
+            </div>
 
             <div className="col-span-full">
               <FacturaObservacionesEditor

@@ -597,6 +597,14 @@ export interface Factura {
   tramos?: FacturaTramo[];
   /** Renglones de texto sin importe que van en el PDF debajo de los viajes. */
   observaciones?: string[];
+  /** Conceptos además de los viajes (estadía, gastos del viaje…): neto e IVA de cada uno. */
+  conceptos?: {
+    descripcion: string;
+    cantidad?: number;
+    precioUnitario?: number;
+    importe: number;
+    ivaPct: number;
+  }[];
   comprobanteUrl: string | null;
   cbteTipo?: number | null;
   cbteNro?: number | null;

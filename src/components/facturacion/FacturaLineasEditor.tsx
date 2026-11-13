@@ -13,6 +13,7 @@ import {
 } from '@/lib/currencyMask';
 import { marcarModalModificado } from '@/lib/descarteModal';
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
+import { conceptosValidos, type FacturaConceptoDraft } from '@/lib/facturaConceptos';
 import {
   computeFacturaTotalesFromBases,
   importeNetoViajeParaFactura,
@@ -149,6 +150,12 @@ function lineasFromTramos(
   ];
 }
 
+/**
+ * Líneas de la factura: las de los viajes (o tramos) y, al final, sus conceptos (estadía,
+ * gastos del viaje…), cada uno con su IVA. Son las que se muestran, se totalizan y se mandan a
+ * ARCA al emitir. Sin viajes, la línea vacía de "Servicios de transporte" solo queda si no hay
+ * conceptos.
+ */
 export function defaultFacturaLineasFromDraft(
   draft: {
     viajeIds: string[];
@@ -156,10 +163,35 @@ export function defaultFacturaLineasFromDraft(
     numero: string;
     facturarPorTramo?: boolean;
     tramos?: FacturaTramoDraft[];
+    conceptos?: FacturaConceptoDraft[];
   },
   viajes: Viaje[],
 ): FacturaLineaDraft[] {
   const ivaPct = draft.ivaPct.trim() !== '' ? Number(draft.ivaPct) : 21;
+  const conceptos: FacturaLineaDraft[] = conceptosValidos(draft.conceptos ?? [], ivaPct).map(
+    (c) => ({
+      descripcion: c.descripcion,
+      cantidad: c.cantidad,
+      precioUnitario: c.precioUnitario,
+      importe: c.importe,
+      ivaPct: c.ivaPct,
+    }),
+  );
+  const deViajes = lineasDeViajesFromDraft(draft, viajes, ivaPct);
+  if (conceptos.length === 0) return deViajes;
+  return [...deViajes.filter((l) => l.importe !== 0), ...conceptos];
+}
+
+function lineasDeViajesFromDraft(
+  draft: {
+    viajeIds: string[];
+    numero: string;
+    facturarPorTramo?: boolean;
+    tramos?: FacturaTramoDraft[];
+  },
+  viajes: Viaje[],
+  ivaPct: number,
+): FacturaLineaDraft[] {
   if (draft.facturarPorTramo && (draft.tramos?.length ?? 0) > 0) {
     const fromTramos = lineasFromTramos(
       draft.viajeIds,
@@ -212,7 +244,35 @@ export function defaultFacturaLineasFromDraft(
   ];
 }
 
+/**
+ * Líneas de una factura ya guardada (ej. emitir un borrador desde la grilla): viajes o tramos
+ * y, al final, sus conceptos. El `importe` de la factura ya incluye los conceptos: para la
+ * línea de respaldo de los viajes se descuentan.
+ */
 export function defaultFacturaLineas(
+  factura: Factura,
+  viajes: Viaje[],
+): FacturaLineaDraft[] {
+  const conceptos = factura.conceptos ?? [];
+  const netoConceptos = roundMoney2(conceptos.reduce((s, c) => s + c.importe, 0));
+  const deViajes = lineasDeViajesDeFactura(
+    { ...factura, importe: roundMoney2(factura.importe - netoConceptos) },
+    viajes,
+  );
+  if (conceptos.length === 0) return deViajes;
+  return [
+    ...deViajes.filter((l) => l.importe !== 0),
+    ...conceptos.map((c) => ({
+      descripcion: c.descripcion,
+      cantidad: c.cantidad ?? 1,
+      precioUnitario: c.precioUnitario ?? c.importe,
+      importe: c.importe,
+      ivaPct: c.ivaPct,
+    })),
+  ];
+}
+
+function lineasDeViajesDeFactura(
   factura: Factura,
   viajes: Viaje[],
 ): FacturaLineaDraft[] {

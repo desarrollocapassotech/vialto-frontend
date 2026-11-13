@@ -48,6 +48,14 @@ import {
 import { ComprobanteManualFields } from "@/components/shared/ComprobanteManualFields";
 import { NumeroComprobanteField } from "@/components/shared/NumeroComprobanteField";
 import { URL_NUMERO_INTERNO } from "@/lib/numeroInterno";
+import { FacturaConceptosEditor } from "@/components/facturacion/FacturaConceptosEditor";
+import { FaltaCampo } from "@/components/shared/FaltaCampo";
+import { conBordeError } from "@/lib/bordeError";
+import {
+  conceptosIncompletos as indicesConceptosIncompletos,
+  sincronizarConceptosConViajes,
+  type FacturaConceptoDraft,
+} from "@/lib/facturaConceptos";
 import { numeroDesdeComprobanteManual } from "@/lib/comprobanteManual";
 import {
   numeroActualComprobanteManual,
@@ -167,6 +175,7 @@ function FacturaContraparteField({
   onClienteChange,
   compact = false,
   loading = false,
+  error = false,
 }: {
   clienteId: string;
   clientes: Cliente[];
@@ -176,26 +185,30 @@ function FacturaContraparteField({
    * pueda elegir un cliente de la lista sin filtrar (ver `allAvailableClientes`) que
    * un instante después queda excluido por no tener nada disponible para facturar. */
   loading?: boolean;
+  /** Se intentó guardar sin cliente: borde rojo + "Falta completar". */
+  error?: boolean;
 }) {
   const labelClass = compact
     ? compactLabelClass
     : "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
   const inputClass = compact ? compactInputClass : standardInputClass;
 
+  // Obligatorio, como en Nueva liquidación: los viajes se eligen recién con el cliente.
   return (
     <div className="flex flex-col gap-1">
-      <label className={labelClass}>Cliente</label>
+      <label className={labelClass}>
+        Cliente <span className="text-red-500">*</span>
+      </label>
       <ClienteSearchSelect
         clientes={clientes}
         value={clienteId}
         onChange={onClienteChange}
-        inputClassName={inputClass}
-        allowEmptyValue
-        emptyListChoiceLabel="— Sin cliente —"
-        placeholderCerrado="— Sin cliente —"
+        inputClassName={conBordeError(inputClass, error)}
+        placeholderCerrado="Elegí un cliente…"
         loading={loading}
         aria-label="Cliente"
       />
+      <FaltaCampo show={error} />
     </div>
   );
 }
@@ -441,6 +454,12 @@ export function FacturaCreateModal({
   // `ivaPrecargadoRef`); si el usuario lo borra, se factura sin IVA.
   const ivaPctDefault =
     draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0;
+  /** IVA con el que entran los conceptos (los gastos precargados y los nuevos). */
+  const ivaPctConceptos = Number.isFinite(ivaPctDefault) ? ivaPctDefault : 21;
+  const [conceptosIncompletos, setConceptosIncompletos] = useState<number[]>([]);
+  /** Se intentó guardar sin cliente (obligatorio): se marca hasta que se elija uno. */
+  const [marcarCliente, setMarcarCliente] = useState(false);
+  const faltaCliente = marcarCliente && !draft.clienteId;
 
   const bloqueadoUsd = useMemo(() => {
     if (!conArca) return false;
@@ -659,6 +678,27 @@ export function FacturaCreateModal({
     setLineasIncomplete([]);
   }, [lineas]);
 
+  // Borrador que llega con viajes ya elegidos (ej. "Facturar" desde la grilla de Viajes) y sin
+  // conceptos (`undefined`): se precargan los gastos de esos viajes cuando terminan de cargar.
+  useEffect(() => {
+    if (!open || draft.conceptos !== undefined || viajesLoading) return;
+    setDraft((prev) =>
+      prev.conceptos !== undefined
+        ? prev
+        : {
+            ...prev,
+            conceptos: sincronizarConceptosConViajes(
+              [],
+              [],
+              prev.viajeIds,
+              derivedViajes,
+              prev.clienteId,
+              ivaPctConceptos,
+            ),
+          },
+    );
+  }, [open, draft.conceptos, viajesLoading, derivedViajes, ivaPctConceptos, setDraft]);
+
   if (!open) return null;
 
   function patch(p: Partial<FacturaDraft>) {
@@ -719,9 +759,54 @@ export function FacturaCreateModal({
       viajeIds: ids,
       facturarPorTramo,
       tramos: facturarPorTramo ? tramos : [],
+      // Los gastos de los viajes nuevos entran como conceptos; los de los quitados se van.
+      conceptos: sincronizarConceptosConViajes(
+        draft.conceptos ?? [],
+        draft.viajeIds,
+        ids,
+        derivedViajes,
+        draft.clienteId,
+        ivaPctConceptos,
+      ),
     });
     setTramosIncomplete([]);
+    setConceptosIncompletos([]);
     setLocalError(null);
+  }
+
+  function cambiarConceptos(conceptos: FacturaConceptoDraft[]) {
+    patch({ conceptos });
+    setConceptosIncompletos([]);
+    setLocalError(null);
+  }
+
+  /**
+   * Conceptos a medio cargar: se marcan en rojo y se avisa en el pie. Devuelve false si hay.
+   * Los renglones totalmente vacíos no cuentan (se descartan al guardar).
+   */
+  /** "+ Agregar concepto" con conceptos sin completar: los marca y avisa en el pie. */
+  function avisarConceptosIncompletos(indices: number[]) {
+    setConceptosIncompletos(indices);
+    notifyError("Completá el concepto, la cantidad y el monto unitario antes de agregar otro.");
+  }
+
+  function validarConceptos(): boolean {
+    const incompletos = indicesConceptosIncompletos(draft.conceptos ?? [], ivaPctConceptos);
+    setConceptosIncompletos(incompletos);
+    if (incompletos.length === 0) return true;
+    notifyError("Completá el concepto, la cantidad y el monto unitario en los conceptos marcados.");
+    return false;
+  }
+
+  /** Cambio de cliente: se limpian los viajes y con ellos sus gastos (quedan los manuales). */
+  function cambiarCliente(id: string) {
+    patch({
+      clienteId: id,
+      viajeIds: [],
+      facturarPorTramo: false,
+      tramos: [],
+      conceptos: (draft.conceptos ?? []).filter((c) => !c.viajeId),
+    });
   }
 
   function handleToggleFacturarPorTramo(checked: boolean) {
@@ -770,8 +855,17 @@ export function FacturaCreateModal({
     });
   }
 
+  /** Cliente obligatorio: sin él, marca el campo y avisa en el pie. */
+  function validarCliente(): boolean {
+    if (draft.clienteId) return true;
+    setMarcarCliente(true);
+    notifyError("Completá los campos marcados en rojo.");
+    return false;
+  }
+
   async function handleUnifiedSubmit(action: "borrador" | "emitir") {
     if (busy) return;
+    if (!validarCliente()) return;
     const validationError = validateFacturaDraft(draft, viajes, conArca);
     if (validationError) {
       notifyError(validationError);
@@ -783,6 +877,7 @@ export function FacturaCreateModal({
       notifyError(tramosCheck.message);
       return;
     }
+    if (!validarConceptos()) return;
 
     if (action === "emitir") {
       if (emisionBloqueada) {
@@ -899,6 +994,7 @@ export function FacturaCreateModal({
 
   async function handleManualSave() {
     if (busy) return;
+    if (!validarCliente()) return;
 
     if (draft.manual) {
       const errsCbte = erroresComprobanteFacturaManual(draft);
@@ -918,6 +1014,7 @@ export function FacturaCreateModal({
       notifyError(tramosCheck.message);
       return;
     }
+    if (!validarConceptos()) return;
     setTramosIncomplete([]);
     setLocalError(null);
 
@@ -1054,15 +1151,9 @@ export function FacturaCreateModal({
           clienteId={draft.clienteId}
           clientes={filteredClientes}
           loading={viajesLoading}
-          onClienteChange={(id) =>
-            patch({
-              clienteId: id,
-              viajeIds: [],
-              facturarPorTramo: false,
-              tramos: [],
-            })
-          }
+          onClienteChange={cambiarCliente}
           compact
+          error={faltaCliente}
         />
         {/* Con ARCA no hay campo Número: el IVA ocupa el lugar libre al lado del cliente. */}
         {hasArca && compactIvaField}
@@ -1096,6 +1187,8 @@ export function FacturaCreateModal({
         </div>
         {!hasArca && <div className="sm:col-span-2">{compactIvaField}</div>}
       </div>
+      {/* Como en Nueva liquidación: los viajes aparecen recién con el cliente elegido. */}
+      {draft.clienteId && (
       <div className="flex min-h-[14rem] flex-1 flex-col gap-1 overflow-hidden">
         <p className={compactLabelClass}>
           Viajes <span className="text-red-500">*</span>
@@ -1126,6 +1219,7 @@ export function FacturaCreateModal({
           />
         </div>
       </div>
+      )}
       {draft.viajeIds.length > 0 && (
         <label className="inline-flex items-center gap-2 text-xs text-vialto-charcoal">
           <input
@@ -1153,12 +1247,18 @@ export function FacturaCreateModal({
           incompleteIndices={tramosIncomplete}
         />
       )}
+      <FacturaConceptosEditor
+        conceptos={draft.conceptos ?? []}
+        onChange={cambiarConceptos}
+        ivaPctDefault={ivaPctConceptos}
+        incompletos={conceptosIncompletos}
+            onIncompletos={avisarConceptosIncompletos}
+        disabled={busy}
+      />
       <FacturaObservacionesEditor
         observaciones={draft.observaciones ?? []}
         onChange={(observaciones) => patch({ observaciones })}
         disabled={busy}
-        labelClassName={compactLabelClass}
-        inputClassName={compactInputClass}
       />
       {/* Sin Neto/Total acá: ya los muestra el panel de la derecha (FacturaArcaPreviewPanel). */}
       {monedaInvalida && (
@@ -1174,7 +1274,7 @@ export function FacturaCreateModal({
   const standardFields = (
     <>
       {manualCheckbox}
-      {/* Orden: cliente + fechas · adjunto + número + IVA · viajes · observaciones. */}
+      {/* Orden: cliente + fechas · adjunto + número + IVA · viajes · conceptos · observaciones. */}
       <div className="grid grid-cols-1 gap-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
           <div className="sm:col-span-2 lg:col-span-1">
@@ -1182,14 +1282,8 @@ export function FacturaCreateModal({
               clienteId={draft.clienteId}
               clientes={filteredClientes}
               loading={viajesLoading}
-              onClienteChange={(id) =>
-                patch({
-                  clienteId: id,
-                  viajeIds: [],
-                  facturarPorTramo: false,
-                  tramos: [],
-                })
-              }
+              onClienteChange={cambiarCliente}
+              error={faltaCliente}
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -1313,6 +1407,8 @@ export function FacturaCreateModal({
             />
           </div>
         </div>
+        {/* Como en Nueva liquidación: los viajes aparecen recién con el cliente elegido. */}
+        {draft.clienteId && (
         <div className="col-span-full flex flex-col gap-1">
           <div className="flex items-baseline justify-between gap-2">
             <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
@@ -1340,6 +1436,7 @@ export function FacturaCreateModal({
             unidadCantidad={unidadCantidadViajes(tenantEfectivo)}
           />
         </div>
+        )}
         {draft.viajeIds.length > 0 && (
           <div className="col-span-full">
             <label className="inline-flex items-center gap-2 text-sm text-vialto-charcoal">
@@ -1372,12 +1469,20 @@ export function FacturaCreateModal({
           </div>
         )}
         <div className="col-span-full">
+          <FacturaConceptosEditor
+            conceptos={draft.conceptos ?? []}
+            onChange={cambiarConceptos}
+            ivaPctDefault={ivaPctConceptos}
+            incompletos={conceptosIncompletos}
+            onIncompletos={avisarConceptosIncompletos}
+            disabled={busy}
+          />
+        </div>
+        <div className="col-span-full">
           <FacturaObservacionesEditor
             observaciones={draft.observaciones ?? []}
             onChange={(observaciones) => patch({ observaciones })}
             disabled={busy}
-            labelClassName="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel"
-            inputClassName="h-9 w-full border border-black/20 bg-white px-3 text-sm"
           />
         </div>
       </div>

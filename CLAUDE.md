@@ -288,6 +288,15 @@ rowActions={(r) => [
 
 ---
 
+## Conceptos de la factura (nov 2026)
+
+Nueva y Editar factura tienen "Conceptos" (`FacturaConceptosEditor`, debajo de los viajes y antes de las observaciones), **con el mismo formato que los conceptos de liquidación** (`ConceptosLiquidacionLineasEditor`): una tarjeta por concepto con Concepto · Cantidad · Monto unitario · IVA (%) · Subtotal c/IVA y el tacho (`Trash2`) para quitar. Diferencias: el concepto es texto libre (sin catálogo) y **solo suman** (sin "Operación"). Importe = cantidad × unitario; el IVA arranca con el de la factura. Si se cambia algo del formato de un editor, cambiar el otro. Lógica en `lib/facturaConceptos.ts`:
+- **Precarga desde los gastos del viaje**: al elegir viajes, `sincronizarConceptosConViajes` agrega un concepto por cada `otrosGastos` de los viajes nuevos (misma moneda que la factura; solo si el cliente es el principal del viaje, así un gasto no se factura dos veces) y saca los de los viajes quitados. Lo cargado o editado a mano se respeta. Un borrador que llega con viajes ya elegidos y `conceptos: undefined` (ej. "Facturar" desde Viajes) se precarga al abrir el modal.
+- Las líneas (`defaultFacturaLineasFromDraft` / `defaultFacturaLineas`) agregan los conceptos al final: así salen en el panel de detalle, en los totales y en lo que se manda a ARCA. "Ver factura" los lista.
+- Renglón a medio cargar = borde rojo + aviso en el pie; uno totalmente vacío se descarta al guardar. "+ Agregar concepto" no suma otro mientras haya uno sin completar: los marca y avisa (`onIncompletos`). Observaciones usa el mismo armado (título, renglones, tacho y "+ Agregar" abajo a la izquierda).
+- **Cliente obligatorio en Nueva factura (nov 2026)**, como el transportista en Nueva liquidación: asterisco, `FaltaCampo` + borde rojo si se guarda sin él, y la sección de viajes aparece recién al elegirlo. El backend también lo exige (`createFactura`).
+- Backend y la trampa del neto recalculado desde los viajes: `vialto-backend/CLAUDE.md`, "Conceptos de la factura además de los viajes".
+
 ## Badges de estado: ejes aditivos, nunca se reemplazan (Facturas, Liquidaciones, Viajes)
 
 **Regla global para toda pantalla que muestre el estado de un comprobante o de un viaje.**
