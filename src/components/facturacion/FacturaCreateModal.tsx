@@ -36,7 +36,6 @@ import { PadronValidacionEstado } from "@/components/shared/PadronValidacionEsta
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import {
   FacturaManualCheckbox,
-  FacturaTotalesPreview,
   facturaPayloadFromDraft,
   filterFacturaTramosByViajeIds,
   validateFacturaDraftTramos,
