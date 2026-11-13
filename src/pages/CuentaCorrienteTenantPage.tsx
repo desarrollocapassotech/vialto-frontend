@@ -52,7 +52,6 @@ export function CuentaCorrienteTenantPage() {
   }, [proveedoresApi.proveedores, sessionTransportistas]);
 
   const [quickCreate, setQuickCreate] = useState<QuickCreate>(null);
-  const [saldosSlot, setSaldosSlot] = useState<HTMLDivElement | null>(null);
   const [accionesSlot, setAccionesSlot] = useState<HTMLDivElement | null>(null);
   const [limpiarSlot, setLimpiarSlot] = useState<HTMLDivElement | null>(null);
   const [filtrosRapidosSlot, setFiltrosRapidosSlot] = useState<HTMLDivElement | null>(null);
@@ -208,8 +207,6 @@ export function CuentaCorrienteTenantPage() {
       <div className="mt-6">
         {/* Siempre montada: los portales de CuentaContraparteView ya tienen dónde dibujar. */}
         <div className={contraparteId ? 'mb-6 flex flex-wrap items-end gap-3' : 'hidden'}>
-          {/* Las tarjetas de saldo de la cuenta elegida se dibujan acá (portal desde CuentaContraparteView). */}
-          <div ref={setSaldosSlot} className="flex flex-wrap gap-2" />
           {/* Exportar / Nueva venta / Registrar cobro, a la derecha en la misma fila (portal). */}
           <div ref={setAccionesSlot} className="ml-auto flex empty:hidden" />
         </div>
@@ -234,7 +231,6 @@ export function CuentaCorrienteTenantPage() {
                 ? (transportistas.find((t) => t.id === contraparteId)?.tipo ?? null)
                 : null
             }
-            saldosSlot={saldosSlot}
             accionesSlot={accionesSlot}
             limpiarFiltrosSlot={limpiarSlot}
             filtrosRapidosSlot={filtrosRapidosSlot}

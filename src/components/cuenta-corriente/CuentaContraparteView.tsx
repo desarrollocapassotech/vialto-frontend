@@ -10,11 +10,9 @@ import {
   FileSearch,
   FileSpreadsheet,
   FileText,
-  Filter,
   History,
   Trash2,
   Undo2,
-  X,
 } from 'lucide-react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
@@ -33,8 +31,6 @@ import { formatCurrencyArFromNumber } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   fetchMovimientos,
-  fetchSaldoCliente,
-  fetchSaldoProveedor,
   fmtSaldoCc as fmtSaldo,
   cuentaEnHistorialCc,
   esDebeCc,
@@ -42,7 +38,6 @@ import {
   ESTADO_IMPUTACION_COMPROBANTE_LABEL,
   type EstadoImputacionComprobanteCc,
   type MovimientoCc,
-  type SaldoPorMoneda,
   type TipoContraparte,
   type TipoMovimientoCc,
   apiPathOrdenPago,
@@ -180,12 +175,7 @@ type Props = {
   tipoContraparte: TipoContraparte;
   contraparteId: string;
   contraparteNombre: string;
-  /**
-   * Lugar de la página donde dibujar las tarjetas de saldo (en la fila del selector de
-   * cuenta, para aprovechar el espacio). Sin él, van arriba de la grilla.
-   */
-  saldosSlot?: HTMLElement | null;
-  /** Misma fila que el selector y los saldos: Exportar / Nueva venta / Registrar cobro. */
+  /** Fila de acciones de la página: Exportar / Nueva venta / Registrar cobro. */
   accionesSlot?: HTMLElement | null;
   /** Junto al título de la página: ahí va "Limpiar filtros" (regla global). */
   limpiarFiltrosSlot?: HTMLElement | null;
@@ -200,7 +190,6 @@ export function CuentaContraparteView({
   contraparteId,
   contraparteNombre,
   proveedorTipo = null,
-  saldosSlot,
   accionesSlot,
   limpiarFiltrosSlot,
   filtrosRapidosSlot,
@@ -224,7 +213,6 @@ export function CuentaContraparteView({
   const puedeVerLiquidaciones = comprasNacenDeLiquidaciones(modulos);
   const hasArcaLiquidaciones = canAccessEmisionLiquidoProductoArca(modulos);
   const [movimientos, setMovimientos] = useState<MovimientoCc[] | null>(null);
-  const [saldos, setSaldos] = useState<SaldoPorMoneda[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -233,21 +221,14 @@ export function CuentaContraparteView({
   const cargarDatos = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return;
     try {
-      const [movs, saldo] = await Promise.all([
-        fetchMovimientos(
-          () => getToken(),
-          tipoContraparte === 'cliente' ? { clienteId: contraparteId } : { proveedorId: contraparteId },
-        ),
-        tipoContraparte === 'cliente'
-          ? fetchSaldoCliente(() => getToken(), contraparteId)
-          : fetchSaldoProveedor(() => getToken(), contraparteId),
-      ]);
+      const movs = await fetchMovimientos(
+        () => getToken(),
+        tipoContraparte === 'cliente' ? { clienteId: contraparteId } : { proveedorId: contraparteId },
+      );
       setMovimientos(movs);
-      setSaldos(saldo.saldos);
       setError(null);
     } catch (e) {
       setMovimientos(null);
-      setSaldos(null);
       setError(friendlyError(e, 'cuentaCorriente'));
     }
   }, [getToken, isLoaded, isSignedIn, tipoContraparte, contraparteId]);
@@ -306,9 +287,8 @@ export function CuentaContraparteView({
   const [comprobanteFiltro, setComprobanteFiltro] = useState('');
   // Estado de imputación (Sin imputar / Imputado en parte / Imputado). Vacío = todos.
   const [imputacionFiltro, setImputacionFiltro] = useState<EstadoImputacionComprobanteCc | ''>('');
-  // Se elige tocando la tarjeta de saldo de esa moneda (solo si la cuenta tiene más de una).
+  // Filtro de la columna Moneda.
   const [monedaFiltro, setMonedaFiltro] = useState('');
-  const multimoneda = (saldos?.length ?? 0) > 1;
   // Filtros rápidos junto al título (mismo componente que Viajes/Facturas/Liquidaciones),
   // excluyentes entre sí.
   const [filtroRapido, setFiltroRapido] = useState<FiltroRapidoCc | ''>('');
@@ -710,59 +690,6 @@ export function CuentaContraparteView({
     </select>
   );
 
-  // Una tarjeta chica por moneda. Con más de una moneda, tocarla filtra la grilla.
-  const saldosNode =
-    saldos && saldos.length > 0 ? (
-      <div className="flex flex-wrap gap-2">
-        {saldos.map((s) => {
-          const activa = monedaFiltro === s.moneda;
-          const monto = (
-            <span
-              className="font-[family-name:var(--font-display)] text-lg tracking-wide tabular-nums text-white"
-            >
-              {fmtSaldo(s.saldo)}
-            </span>
-          );
-          // Mismo alto que el select de la cuenta (h-9), alineadas abajo con él.
-          const cardClass = `flex h-9 min-w-[9.5rem] items-center px-3 text-left ${
-            activa ? 'bg-vialto-charcoal ring-2 ring-vialto-fire' : 'bg-vialto-graphite'
-          }`;
-          return (
-            <div key={s.moneda} className="flex flex-col">
-              <span className="mb-1 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel">
-                Saldo {s.moneda}
-              </span>
-              {/* Con una sola moneda no hay nada que filtrar: la tarjeta es solo informativa. */}
-              {multimoneda ? (
-                <button
-                  type="button"
-                  onClick={() => setMonedaFiltro(activa ? '' : s.moneda)}
-                  aria-pressed={activa}
-                  title={activa ? 'Ver todas las monedas' : `Ver solo movimientos en ${s.moneda}`}
-                  className={`${cardClass} group cursor-pointer justify-between gap-3 transition hover:brightness-110`}
-                >
-                  {monto}
-                  {/* Pista de que filtra: embudo; activa, una ✕ para volver a todas. */}
-                  {activa ? (
-                    <X className="h-3.5 w-3.5 shrink-0 text-white" aria-hidden />
-                  ) : (
-                    <Filter
-                      className="h-3.5 w-3.5 shrink-0 text-white/50 transition group-hover:text-white"
-                      aria-hidden
-                    />
-                  )}
-                </button>
-              ) : (
-                <div className={cardClass}>{monto}</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    ) : saldos ? (
-      <p className="text-sm text-vialto-steel">Sin movimientos todavía.</p>
-    ) : null;
-
   const accionesNode = (
     <div className="ml-auto flex flex-wrap gap-2">
       <button
@@ -804,7 +731,6 @@ export function CuentaContraparteView({
   return (
     <div>
       {visorAdjunto}
-      {saldosSlot ? createPortal(saldosNode, saldosSlot) : null}
       {accionesSlot ? createPortal(accionesNode, accionesSlot) : null}
       {/* Filtro rápido junto al título, igual que Viajes. */}
       {filtrosRapidosSlot &&
@@ -831,11 +757,8 @@ export function CuentaContraparteView({
         onClick={limpiarFiltros}
         soloDesktop
       />
-      {(!saldosSlot || !accionesSlot) && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          {!saldosSlot && saldosNode}
-          {!accionesSlot && accionesNode}
-        </div>
+      {!accionesSlot && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">{accionesNode}</div>
       )}
 
       {error && (

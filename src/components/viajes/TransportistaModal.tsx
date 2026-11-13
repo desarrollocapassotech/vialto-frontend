@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
+import { isValidPhoneNumber } from 'libphonenumber-js';
 import { ApiError, apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorPieModal } from '@/components/shared/ErrorPieModal';
 import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
+import { TelefonoInput } from '@/components/forms/TelefonoInput';
+import { VencimientoPermisoInput } from '@/components/forms/VencimientoPermisoInput';
 import { useTenantPaisFijo } from '@/hooks/useTenantPaisFijo';
+import { useFieldConfig } from '@/hooks/useFieldConfig';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { Transportista } from '@/types/api';
 import { useTransportistaLabels } from '@/hooks/useTransportistaLabels';
 import type { TipoProveedorElegido } from '@/lib/proveedorTipo';
 import { ProveedorTipoSelect } from '@/components/transportistas/ProveedorTipoSelect';
+import { AvisoSinDatosFiscales } from '@/components/transportistas/AvisoSinDatosFiscales';
 import { transportistaEnFrase } from '@/lib/transportistaLabel';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
 import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
@@ -20,6 +25,10 @@ import { ArcaPadronStatus } from '@/components/shared/ArcaPadronStatus';
 /**
  * Alta rápida de un proveedor. Desde Viajes/Liquidaciones crea siempre un transportista;
  * con `elegirTipo` (Cuenta corriente) se elige el tipo: transportista, taller u otro.
+ * Mismas reglas que "Crear proveedor" de Base de datos (`TransportistaCreatePage`): campos
+ * visibles según "Campos por empresa", país e ID fiscal recomendados (si faltan, hay que
+ * confirmar "Entiendo, guardar igual"), ID fiscal y padrón de ARCA, teléfono válido para el
+ * país, domicilio y, si es transportista, los datos para Nómina.
  */
 export function TransportistaModal({
   getToken,
@@ -42,6 +51,7 @@ export function TransportistaModal({
     categoria: '',
   });
   const tipo = elegirTipo ? tipoElegido.tipo : 'transportista';
+  const esTransportista = tipo === 'transportista';
   const [nombre, setNombre] = useState('');
   const [pais, setPais] = useState<PaisCodigo | ''>('');
   const [idFiscal, setIdFiscal] = useState('');
@@ -49,26 +59,50 @@ export function TransportistaModal({
   const [condicionTributaria, setCondicionTributaria] = useState('');
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [domicilio, setDomicilio] = useState('');
+  const [paut, setPaut] = useState('');
+  const [permisoInternacional, setPermisoInternacional] = useState('');
+  const [fechaVencimientoPermiso, setFechaVencimientoPermiso] = useState('');
+  const [confirmarSinDatosFiscales, setConfirmarSinDatosFiscales] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const { solicitarCierre, dialogo } = useConfirmarDescarte(onClose);
 
+  const { isVisible } = useFieldConfig('transportistas');
   const { paisFijo, loading: paisFijoLoading, tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
+  const paisVisible = isVisible('alta_transportista', 'pais') && !paisFijo;
+  const idFiscalVisible = isVisible('alta_transportista', 'idFiscal');
+  const condicionVisible = isVisible('alta_transportista', 'condicionIvaTributaria');
+  const domicilioVisible = isVisible('alta_transportista', 'domicilio');
+  const emailVisible = isVisible('alta_transportista', 'email');
+  const telefonoVisible = isVisible('alta_transportista', 'telefono');
+  // Datos para Nómina: solo de un transportista.
+  const pautVisible = esTransportista && isVisible('alta_transportista', 'paut');
+  const permisoInternacionalVisible =
+    esTransportista && isVisible('alta_transportista', 'permisoInternacional');
+  const fechaVencimientoPermisoVisible =
+    esTransportista && isVisible('alta_transportista', 'fechaVencimientoPermiso');
+
+  const faltanPais = paisVisible && !pais;
+  const faltanIdFiscal = idFiscalVisible && !idFiscal.trim();
+  const faltanDatosFiscales = faltanPais || faltanIdFiscal;
 
   const arca = useArcaPadron({
     getToken,
     habilitado: tenantEfectivo?.validacionCuitArcaHabilitada === true,
     pais,
-    idFiscal,
+    idFiscal: idFiscalVisible ? idFiscal : '',
     nombre: { value: nombre, set: setNombre },
-    condicionIva: { value: condicionIva, set: setCondicionIva },
+    domicilio: domicilioVisible ? { value: domicilio, set: setDomicilio } : undefined,
+    condicionIva: condicionVisible ? { value: condicionIva, set: setCondicionIva } : undefined,
   });
 
   function handlePaisChange(newPais: PaisCodigo | '') {
     setPais(newPais);
     setCondicionIva(null);
     setCondicionTributaria('');
+    setTelefono('');
   }
 
   // País oculto por config de superadmin: se completa solo con el país fijo del
@@ -77,9 +111,16 @@ export function TransportistaModal({
     if (paisFijo && pais !== paisFijo) setPais(paisFijo);
   }, [paisFijo, pais]);
 
-  const errorFiscal = idFiscal.trim() ? validarIdFiscal(pais, idFiscal.trim()) : null;
+  const errorFiscal =
+    idFiscalVisible && idFiscal.trim() ? validarIdFiscal(pais, idFiscal.trim()) : null;
   const condInfo = condicionTributariaPorPais(pais);
   const idFiscalError = fieldErrors.idFiscal ?? errorFiscal;
+  const faltante = [
+    faltanPais ? 'país' : null,
+    faltanIdFiscal ? idFiscalPorPais(pais).label.toLowerCase() : null,
+  ]
+    .filter(Boolean)
+    .join(' y/o ');
 
   async function submit() {
     const errs: Record<string, string> = {};
@@ -91,14 +132,17 @@ export function TransportistaModal({
     if (tipo === 'otro' && !tipoElegido.categoria.trim()) {
       errs.categoria = 'Escribí qué tipo de proveedor es.';
     }
-    if (!paisFijo && !pais) errs.pais = 'Seleccioná el país.';
-    if (!idFiscal.trim()) {
-      const label = pais ? idFiscalPorPais(pais).label : 'ID fiscal';
-      errs.idFiscal = `Ingresá el ${label.toLowerCase()}.`;
+    if (telefonoVisible && telefono.trim() && !isValidPhoneNumber(telefono)) {
+      errs.telefono = 'Ingresá un teléfono válido para el país seleccionado.';
     }
-    if (Object.keys(errs).length > 0) { setFieldErrors(errs); return; }
-    const fiscalErr = validarIdFiscal(pais, idFiscal.trim());
-    if (fiscalErr) { setFieldErrors({ idFiscal: fiscalErr }); return; }
+    if (errorFiscal) errs.idFiscal = errorFiscal;
+    if (faltanDatosFiscales && !confirmarSinDatosFiscales) {
+      errs.confirmarSinDatosFiscales = `Para guardar sin ${faltante}, tildá "Entiendo, guardar igual".`;
+    }
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
+      return;
+    }
     setFieldErrors({});
     setSaving(true);
     setError(null);
@@ -112,12 +156,17 @@ export function TransportistaModal({
           tipo,
           categoria: tipo === 'otro' ? tipoElegido.categoria.trim() : undefined,
           nombre: nombre.trim(),
-          pais,
-          idFiscal: idFiscal.trim(),
+          pais: pais || undefined,
+          idFiscal: idFiscal.trim() || undefined,
           condicionIva: pais === 'AR' ? (condicionIva ?? undefined) : undefined,
           condicionTributaria: pais !== 'AR' ? (condicionTributaria.trim() || undefined) : undefined,
           email: email.trim() || undefined,
-          telefono: telefono.trim() || undefined,
+          telefono: telefono || undefined,
+          domicilio: domicilio.trim() || undefined,
+          paut: (esTransportista && paut.trim()) || undefined,
+          permisoInternacional: (esTransportista && permisoInternacional.trim()) || undefined,
+          fechaVencimientoPermiso: (esTransportista && fechaVencimientoPermiso) || undefined,
+          confirmarSinDatosFiscales: faltanDatosFiscales ? confirmarSinDatosFiscales : undefined,
         }),
       });
       onSaved(result);
@@ -135,7 +184,7 @@ export function TransportistaModal({
   if (paisFijoLoading) {
     return (
       <div className={modalQuickCreateOverlayClass(stacked)}>
-        <div className="flex w-full max-w-md flex-col rounded border border-black/10 bg-white p-5 shadow-xl">
+        <div className="flex w-full max-w-2xl flex-col rounded border border-black/10 bg-white p-5 shadow-xl">
           <div className="h-40 animate-pulse rounded bg-vialto-mist/60" />
         </div>
       </div>
@@ -144,13 +193,14 @@ export function TransportistaModal({
 
   const L = 'text-xs uppercase tracking-[0.08em] text-vialto-steel';
   const I = 'h-9 w-full border px-2 text-sm';
+  const nomina = pautVisible || permisoInternacionalVisible || fechaVencimientoPermisoVisible;
 
   return (
     <div className={modalQuickCreateOverlayClass(stacked)}>
       <div
         role="dialog"
         aria-modal="true"
-        className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded border border-black/10 bg-white shadow-xl"
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded border border-black/10 bg-white shadow-xl"
       >
         <div className="flex shrink-0 items-center justify-between border-b border-black/10 px-5 pt-5 pb-4">
           <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">
@@ -165,9 +215,9 @@ export function TransportistaModal({
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <div className="grid gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {elegirTipo && (
-              <label className="flex flex-col gap-1">
+              <label className="flex flex-col gap-1 sm:col-span-2">
                 <span className={L}>Tipo <span className="text-red-500">*</span></span>
                 <ProveedorTipoSelect
                   value={tipoElegido}
@@ -180,7 +230,7 @@ export function TransportistaModal({
                 />
               </label>
             )}
-            <label className="flex flex-col gap-1">
+            <label className="flex flex-col gap-1 sm:col-span-2">
               <span className={L}>Nombre <span className="text-red-500">*</span></span>
               <input
                 autoFocus
@@ -190,24 +240,28 @@ export function TransportistaModal({
                 className={`${I} ${fieldErrors.nombre ? 'border-red-400' : 'border-black/15'}`}
               />
             </label>
-            {!paisFijo && (
+            {paisVisible && (
               <label className="flex flex-col gap-1">
-                <span className={L}>País <span className="text-red-500">*</span></span>
+                <span className={L}>País (recomendado)</span>
                 <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />
               </label>
             )}
-            <label className="flex flex-col gap-1">
-              <span className={L}>{idFiscalPorPais(pais).label} <span className="text-red-500">*</span></span>
-              <input
-                value={idFiscal}
-                onChange={(e) => setIdFiscal(e.target.value)}
-                onBlur={arca.onIdFiscalBlur}
-                placeholder={idFiscalPorPais(pais).placeholder}
-                className={`${I} ${idFiscalError ? 'border-red-400' : 'border-black/15'}`}
-              />
-            </label>
-            <ArcaPadronStatus {...arca} />
-            {pais && (
+            {idFiscalVisible && (
+              <label className="flex flex-col gap-1">
+                <span className={L}>{idFiscalPorPais(pais).label} (recomendado)</span>
+                <input
+                  value={idFiscal}
+                  onChange={(e) => setIdFiscal(e.target.value)}
+                  onBlur={arca.onIdFiscalBlur}
+                  placeholder={idFiscalPorPais(pais).placeholder}
+                  className={`${I} ${idFiscalError ? 'border-red-400' : 'border-black/15'}`}
+                />
+              </label>
+            )}
+            <div className="sm:col-span-2 empty:hidden">
+              <ArcaPadronStatus {...arca} />
+            </div>
+            {condicionVisible && pais && (
               <label className="flex flex-col gap-1">
                 <span className={L}>{condInfo.label}</span>
                 {condInfo.type === 'select' ? (
@@ -233,24 +287,97 @@ export function TransportistaModal({
                 )}
               </label>
             )}
-            <label className="flex flex-col gap-1">
-              <span className={L}>Email</span>
-              <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Ej: contacto@empresa.com"
-                className={`${I} border-black/15`}
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className={L}>Teléfono</span>
-              <input
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
-                placeholder="Ej: +54 9 11 1234-5678"
-                className={`${I} border-black/15`}
-              />
-            </label>
+            {domicilioVisible && (
+              <label className="flex flex-col gap-1">
+                <span className={L}>Domicilio</span>
+                <input
+                  value={domicilio}
+                  onChange={(e) => setDomicilio(e.target.value)}
+                  placeholder="Ej: Av. Libertador 1234, Buenos Aires"
+                  className={`${I} border-black/15`}
+                />
+              </label>
+            )}
+            {emailVisible && (
+              <label className="flex flex-col gap-1">
+                <span className={L}>Email</span>
+                <input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Ej: contacto@empresa.com"
+                  className={`${I} border-black/15`}
+                />
+              </label>
+            )}
+            {telefonoVisible && (
+              // Toda la fila: el selector de país ocupa 15rem y en media columna el número
+              // quedaba casi sin lugar.
+              <label className="flex flex-col gap-1 sm:col-span-2">
+                <span className={L}>Teléfono</span>
+                <TelefonoInput
+                  pais={pais}
+                  value={telefono}
+                  onChange={setTelefono}
+                  error={fieldErrors.telefono}
+                />
+              </label>
+            )}
+            {nomina && (
+              <div className="mt-1 grid grid-cols-1 gap-3 border-t border-black/10 pt-3 sm:col-span-2 sm:grid-cols-3">
+                <p className={`${L} sm:col-span-3`}>Datos para Nómina</p>
+                {pautVisible && (
+                  <label className="flex flex-col gap-1">
+                    <span className={L}>N° PAUT</span>
+                    <input
+                      value={paut}
+                      onChange={(e) => setPaut(e.target.value)}
+                      placeholder="Ej: 17597"
+                      className={`${I} border-black/15`}
+                    />
+                  </label>
+                )}
+                {permisoInternacionalVisible && (
+                  <label className="flex flex-col gap-1">
+                    <span className={L}>Permiso Internacional</span>
+                    <input
+                      value={permisoInternacional}
+                      onChange={(e) => setPermisoInternacional(e.target.value)}
+                      placeholder="Ej: 20113C19113"
+                      className={`${I} border-black/15`}
+                    />
+                  </label>
+                )}
+                {fechaVencimientoPermisoVisible && (
+                  <label className="flex flex-col gap-1">
+                    <span className={L}>Vencimiento del permiso</span>
+                    <VencimientoPermisoInput
+                      value={fechaVencimientoPermiso}
+                      onChange={setFechaVencimientoPermiso}
+                    />
+                  </label>
+                )}
+              </div>
+            )}
+            {/* Al final del formulario, mientras falten país o CUIT. */}
+            {faltanDatosFiscales && (
+              <div className="sm:col-span-2">
+                <AvisoSinDatosFiscales
+                  faltante={faltante}
+                  confirmado={confirmarSinDatosFiscales}
+                  onConfirmadoChange={(v) => {
+                    setConfirmarSinDatosFiscales(v);
+                    if (v) {
+                      setFieldErrors((prev) => {
+                        const resto = { ...prev };
+                        delete resto.confirmarSinDatosFiscales;
+                        return resto;
+                      });
+                    }
+                  }}
+                  error={!!fieldErrors.confirmarSinDatosFiscales}
+                />
+              </div>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-black/10 px-5 py-4">
@@ -265,7 +392,7 @@ export function TransportistaModal({
           </button>
           <button
             type="button"
-            disabled={saving || !!errorFiscal}
+            disabled={saving}
             onClick={() => void submit()}
             className="inline-flex items-center gap-2 h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
           >
