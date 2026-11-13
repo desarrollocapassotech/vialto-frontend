@@ -118,7 +118,7 @@ import type {
   ArcaConfig,
 } from "@/types/api";
 import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
-import { proveedoresActivos } from "@/lib/proveedorTipo";
+import { TransportistaSearchSelect } from "@/components/forms/MaestroSearchSelects";
 
 type ViajeItem = Pick<
   Viaje,
@@ -335,6 +335,20 @@ export function CrearLiquidacionManualModal({
   const elegirTransportistaEnViaje =
     viajeInicial != null &&
     viajePermiteElegirTransportistaLiquidacion(viajeInicial);
+  /**
+   * Opciones del selector de transportista: desde un viaje, solo los del viaje con su rol
+   * ("Contratante", "Efectivo") en el nombre; si no, todos (el selector oculta los inactivos).
+   */
+  const transportistasSelect = useMemo<Transportista[]>(
+    () =>
+      viajeInicial
+        ? transportistaOpcionesViaje.map((o) => ({
+            ...(transportistas.find((t) => t.id === o.id) ?? ({ id: o.id } as Transportista)),
+            nombre: o.rolLabel ? `${o.nombre} — ${o.rolLabel}` : o.nombre,
+          }))
+        : transportistas,
+    [viajeInicial, transportistaOpcionesViaje, transportistas],
+  );
 
   // — Campos del formulario —
   const [transportistaId, setTransportistaId] = useState(
@@ -1693,32 +1707,19 @@ export function CrearLiquidacionManualModal({
                           {transportistaNombre}
                         </div>
                       ) : (
-                        <select
-                          required
+                        /* Con buscador (nombre o CUIT). Desde un viaje: solo sus transportistas,
+                           con el rol en el nombre; si no, los activos. */
+                        <TransportistaSearchSelect
+                          transportistas={transportistasSelect}
                           value={transportistaId}
-                          onChange={(e) => setTransportistaId(e.target.value)}
-                          className={selectClass}
-                        >
-                          <option value="">
-                            — Seleccioná un {tFrase} —
-                          </option>
-                          {ordenarAlfabetico(
-                            viajeInicial
-                              ? transportistaOpcionesViaje
-                              : proveedoresActivos(transportistas, transportistaId).map((t) => ({
-                                  id: t.id,
-                                  nombre: t.nombre,
-                                  rolLabel: "",
-                                })),
-                            (opt) => opt.nombre,
-                          ).map((opt) => (
-                            <option key={opt.id} value={opt.id}>
-                              {opt.rolLabel
-                                ? `${opt.nombre} — ${opt.rolLabel}`
-                                : opt.nombre}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setTransportistaId}
+                          incluirInactivos={Boolean(viajeInicial)}
+                          inputClassName={inputClass}
+                          placeholderCerrado={`Elegí un ${tFrase}…`}
+                          placeholderBuscar={`Buscar ${tFrase}…`}
+                          emptyListChoiceLabel={`Elegí un ${tFrase}…`}
+                          aria-label={tl.singular}
+                        />
                       )}
                     </div>
                     {/* La condición frente al IVA del transportista se ve en el tooltip del Receptor (panel derecho). */}
