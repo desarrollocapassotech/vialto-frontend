@@ -1,6 +1,7 @@
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { formatIdFiscal } from '@/lib/ciudades/paises';
 import { labelTipoVehiculo } from '@/lib/vehiculoTipos';
+import { proveedoresActivos } from '@/lib/proveedorTipo';
 import {
   filtrarChoferes,
   filtrarClientesPorQuery,
@@ -269,6 +270,7 @@ export function TransportistaSearchSelect({
   id,
   'aria-label': ariaLabel,
   onNuevo,
+  incluirInactivos = false,
 }: BaseProps & {
   transportistas: Transportista[];
   value: string;
@@ -277,10 +279,12 @@ export function TransportistaSearchSelect({
   placeholderBuscar?: string;
   emptyListChoiceLabel?: string;
   onNuevo?: () => void;
+  /** Filtros de grilla: también los desactivados (tienen historial). Al cargar un dato, no. */
+  incluirInactivos?: boolean;
 }) {
   return (
     <SearchableEntitySelect<Transportista>
-      items={transportistas}
+      items={incluirInactivos ? transportistas : proveedoresActivos(transportistas, value)}
       value={value}
       onChange={onChange}
       disabled={disabled}

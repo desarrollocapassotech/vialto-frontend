@@ -26,6 +26,8 @@ import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHead
 import type { ConEmpresa, Transportista } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 import { compararAlfabetico } from "@/lib/ordenAlfabetico";
+import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
+import { proveedorTipoLabel, QUERY_TODOS_LOS_PROVEEDORES } from "@/lib/proveedorTipo";
 
 export function TransportistasSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -40,6 +42,7 @@ export function TransportistasSuperadminPage() {
 
   const { isVisible } = useFieldConfig("transportistas");
   const idFiscalLabel = useIdFiscalLabel(filtroEmpresa || undefined);
+  const labels = useTransportistaLabels(filtroEmpresa || undefined);
   const idFiscalVisible = isVisible("detalle_transportista", "idFiscal");
   const paisVisible = isVisible("detalle_transportista", "pais");
   const emailVisible = isVisible("detalle_transportista", "email");
@@ -126,7 +129,7 @@ export function TransportistasSuperadminPage() {
     (async () => {
       try {
         const data = await apiJson<ConEmpresa<Transportista>[]>(
-          `/api/platform/transportistas?tenantId=${encodeURIComponent(filtroEmpresa)}`,
+          `/api/platform/transportistas?tenantId=${encodeURIComponent(filtroEmpresa)}&${QUERY_TODOS_LOS_PROVEEDORES}`,
           () => getToken(),
         );
         if (!cancelled) {
@@ -166,10 +169,10 @@ export function TransportistasSuperadminPage() {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <div className="min-w-0">
           <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
-            Transportistas
+            Proveedores
           </h1>
           <p className="mt-2 text-vialto-steel max-w-3xl">
-            Elegí una empresa para ver y administrar sus transportistas.
+            Elegí una empresa para ver y administrar sus proveedores.
           </p>
         </div>
         {anyFiltroActivo && (
@@ -189,7 +192,7 @@ export function TransportistasSuperadminPage() {
             }`}
             aria-disabled={!filtroEmpresa}
           >
-            Crear transportista
+            Crear proveedor
           </Link>
         </div>
       </div>
@@ -214,7 +217,7 @@ export function TransportistasSuperadminPage() {
 
       <ListadoDatos
         className="mt-6"
-        tableColSpan={2 + (idFiscalVisible ? 1 : 0) + (paisVisible ? 1 : 0) + (contactoVisible ? 1 : 0) + (pautVisible ? 1 : 0)}
+        tableColSpan={3 + (idFiscalVisible ? 1 : 0) + (paisVisible ? 1 : 0) + (contactoVisible ? 1 : 0) + (pautVisible ? 1 : 0)}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -246,6 +249,9 @@ export function TransportistasSuperadminPage() {
                   ))}
                 </select>
               </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Tipo
             </th>
             {idFiscalVisible && (
               <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -361,6 +367,13 @@ export function TransportistasSuperadminPage() {
             cell: (t) => t.nombre,
             tdClassName: listadoTablaTdClass,
           },
+          {
+            id: "tipo",
+            header: "Tipo",
+            cell: (t: Transportista) =>
+              `${proveedorTipoLabel(t.tipo ?? "transportista", labels)}${t.activo === false ? " (inactivo)" : ""}`,
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
           ...(idFiscalVisible ? [{
             id: "idFiscal",
             header: idFiscalLabel,
@@ -390,16 +403,16 @@ export function TransportistasSuperadminPage() {
         rowKey={(t) => t.id}
         emptyMessage={
           !filtroEmpresa
-            ? "Seleccioná una empresa para ver los transportistas."
+            ? "Seleccioná una empresa para ver los proveedores."
             : error
-              ? "No se pudieron cargar los transportistas."
+              ? "No se pudieron cargar los proveedores."
               : anyFiltroActivo
-                ? "No hay transportistas que coincidan con los filtros aplicados."
-                : "No hay transportistas cargados para esta empresa."
+                ? "No hay proveedores que coincidan con los filtros aplicados."
+                : "No hay proveedores cargados para esta empresa."
         }
         loadingMessage="Cargando…"
         rowActions={(t) => [
-          { id: "ver", label: "Ver transportista", icon: Eye, onClick: () => setViewingTransportista(t) },
+          { id: "ver", label: "Ver proveedor", icon: Eye, onClick: () => setViewingTransportista(t) },
         ]}
       />
 
@@ -407,7 +420,7 @@ export function TransportistasSuperadminPage() {
         <ListadoPagination
           meta={metaListado}
           pageSize={pageSize}
-          totalLabel="transportistas"
+          totalLabel="proveedores"
           onPageChange={setPage}
           onPageSizeChange={cambiarPageSize}
         />

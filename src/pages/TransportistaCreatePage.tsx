@@ -28,6 +28,9 @@ import { isValidPhoneNumber } from "libphonenumber-js";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useArcaPadron } from "@/hooks/useArcaPadron";
 import { ArcaPadronStatus } from "@/components/shared/ArcaPadronStatus";
+import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
+import { AYUDA_TIPO, proveedorTipoOpciones } from "@/lib/proveedorTipo";
+import type { ProveedorTipo } from "@/types/api";
 
 export function TransportistaCreatePage() {
   const { getToken } = useAuth();
@@ -36,6 +39,12 @@ export function TransportistaCreatePage() {
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
   const { showToast } = useToast();
+  const labels = useTransportistaLabels(tenantId || undefined);
+  const tipoInicial = searchParams.get("tipo");
+  const [tipo, setTipo] = useState<ProveedorTipo>(
+    tipoInicial === "taller" || tipoInicial === "otro" ? tipoInicial : "transportista",
+  );
+  const esTransportista = tipo === "transportista";
   const [nombre, setNombre] = useState("");
   const [pais, setPais] = useState<PaisCodigo | "">("");
   const [idFiscal, setIdFiscal] = useState("");
@@ -61,9 +70,12 @@ export function TransportistaCreatePage() {
   const domicilioVisible = isVisible("alta_transportista", "domicilio");
   const emailVisible = isVisible("alta_transportista", "email");
   const telefonoVisible = isVisible("alta_transportista", "telefono");
-  const pautVisible = isVisible("alta_transportista", "paut");
-  const permisoInternacionalVisible = isVisible("alta_transportista", "permisoInternacional");
-  const fechaVencimientoPermisoVisible = isVisible("alta_transportista", "fechaVencimientoPermiso");
+  // Datos para Nómina: solo de un transportista.
+  const pautVisible = esTransportista && isVisible("alta_transportista", "paut");
+  const permisoInternacionalVisible =
+    esTransportista && isVisible("alta_transportista", "permisoInternacional");
+  const fechaVencimientoPermisoVisible =
+    esTransportista && isVisible("alta_transportista", "fechaVencimientoPermiso");
 
   const faltanPais = paisVisible && !pais;
   const faltanIdFiscal = idFiscalVisible && !idFiscal.trim();
@@ -94,7 +106,7 @@ export function TransportistaCreatePage() {
 
   async function onSubmit() {
     const errs: Record<string, string> = {};
-    if (!nombre.trim()) errs.nombre = "Ingresá el nombre del transportista.";
+    if (!nombre.trim()) errs.nombre = "Ingresá el nombre del proveedor.";
     if (telefono.trim() && !isValidPhoneNumber(telefono)) {
       errs.telefono = "Ingresá un teléfono válido para el país seleccionado.";
     }
@@ -117,7 +129,7 @@ export function TransportistaCreatePage() {
       );
       if (yaExiste) {
         setFieldErrors({
-          idFiscal: `Ya existe un transportista con ese ${idFiscalPorPais(pais).label}.`,
+          idFiscal: `Ya existe un proveedor con ese ${idFiscalPorPais(pais).label}.`,
         });
         return;
       }
@@ -132,6 +144,7 @@ export function TransportistaCreatePage() {
       await apiJson(path, () => getToken(), {
         method: "POST",
         body: JSON.stringify({
+          tipo,
           nombre: nombre.trim(),
           pais: pais || undefined,
           idFiscal: idFiscal.trim() || undefined,
@@ -141,23 +154,23 @@ export function TransportistaCreatePage() {
           condicionIva: pais === "AR" ? (condicionIva ?? undefined) : undefined,
           condicionTributaria:
             pais !== "AR" ? condicionTributaria.trim() || undefined : undefined,
-          paut: paut.trim() || undefined,
-          permisoInternacional: permisoInternacional.trim() || undefined,
-          fechaVencimientoPermiso: fechaVencimientoPermiso || undefined,
+          paut: (esTransportista && paut.trim()) || undefined,
+          permisoInternacional: (esTransportista && permisoInternacional.trim()) || undefined,
+          fechaVencimientoPermiso: (esTransportista && fechaVencimientoPermiso) || undefined,
           confirmarSinDatosFiscales: faltanDatosFiscales
             ? confirmarSinDatosFiscales
             : undefined,
         }),
       });
-      if (!tenantId) void maestro.refreshTransportistas();
-      showToast("Transportista creado exitosamente", "success");
+      if (!tenantId && esTransportista) void maestro.refreshTransportistas();
+      showToast("Proveedor creado exitosamente", "success");
       navigate(
         `/base-de-datos?tab=transportistas${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
         { replace: true },
       );
     } catch (e) {
       setError(friendlyError(e, "transportistas"));
-      showToast("No se pudo crear el transportista", "error");
+      showToast("No se pudo crear el proveedor", "error");
     } finally {
       setLoading(false);
     }
@@ -179,7 +192,7 @@ export function TransportistaCreatePage() {
 
   if (paisFijoLoading) {
     return (
-      <CrudPageLayout title="Crear transportista">
+      <CrudPageLayout title="Crear proveedor">
         <div className="mt-6 h-64 animate-pulse rounded bg-vialto-mist/60" />
       </CrudPageLayout>
     );
@@ -187,7 +200,7 @@ export function TransportistaCreatePage() {
 
   return (
     <CrudPageLayout
-      title="Crear transportista"
+      title="Crear proveedor"
     >
       <form
         className="mt-6 grid gap-4"
@@ -196,6 +209,17 @@ export function TransportistaCreatePage() {
           onSubmit();
         }}
       >
+        <label className="grid gap-1.5">
+          <CrudFieldLabel required>Tipo</CrudFieldLabel>
+          <CrudSelect value={tipo} onChange={(e) => setTipo(e.target.value as ProveedorTipo)}>
+            {proveedorTipoOpciones(labels).map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </CrudSelect>
+          <span className="text-xs text-vialto-steel">{AYUDA_TIPO[tipo]}</span>
+        </label>
         <label className="grid gap-1.5">
           <CrudFieldLabel required>Nombre</CrudFieldLabel>
           <CrudInput
@@ -268,7 +292,7 @@ export function TransportistaCreatePage() {
         {faltanDatosFiscales && (
           <div className="space-y-2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <p>
-              Estás guardando el transportista sin {warningText} — esto puede
+              Estás guardando el proveedor sin {warningText} — esto puede
               afectar la facturación/liquidaciones más adelante si no se
               completa.
             </p>
@@ -360,7 +384,7 @@ export function TransportistaCreatePage() {
         <CrudFormErrorAlert message={error} />
         <CrudSubmitButton
           loading={loading}
-          label="Crear transportista"
+          label="Crear proveedor"
           disabled={
             !!errorFiscal ||
             (faltanDatosFiscales && !confirmarSinDatosFiscales)

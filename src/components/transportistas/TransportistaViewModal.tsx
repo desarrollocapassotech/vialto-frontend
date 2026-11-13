@@ -11,6 +11,8 @@ import type { Transportista } from '@/types/api';
 import { useFieldConfig } from '@/hooks/useFieldConfig';
 import { condicionIvaLabel } from '@/lib/arcaCbteTipo';
 import { formatIdFiscal, idFiscalPorPais, paisCodigoDesdeTexto } from '@/lib/ciudades/paises';
+import { useTransportistaLabels } from '@/hooks/useTransportistaLabels';
+import { proveedorTipoLabel } from '@/lib/proveedorTipo';
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return '—';
@@ -27,7 +29,8 @@ export function TransportistaViewModal({
   editTo: string;
 }) {
   const { isVisible } = useFieldConfig("transportistas");
-  
+  const labels = useTransportistaLabels(transportista.tenantId);
+
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
@@ -54,6 +57,8 @@ export function TransportistaViewModal({
       <div className={viewModalGridClass}>
         {[
           { label: 'Nombre', value: transportista.nombre, visible: true },
+          { label: 'Tipo', value: proveedorTipoLabel(transportista.tipo ?? 'transportista', labels), visible: true },
+          { label: 'Estado', value: transportista.activo === false ? 'Inactivo' : 'Activo', visible: true },
           { label: idFiscalPorPais(paisCodigoDesdeTexto(transportista.pais ?? '')).label, value: transportista.idFiscal ? formatIdFiscal(transportista.idFiscal, transportista.pais) : transportista.idFiscal, visible: isVisible("detalle_transportista", "idFiscal") },
           { label: 'País', value: transportista.pais, visible: isVisible("detalle_transportista", "pais") },
           { label: 'Email', value: transportista.email, visible: isVisible("detalle_transportista", "email") },

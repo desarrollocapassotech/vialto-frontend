@@ -111,6 +111,7 @@ import type {
   ArcaConfig,
 } from "@/types/api";
 import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
+import { proveedoresActivos } from "@/lib/proveedorTipo";
 
 type ViajeItem = Pick<
   Viaje,
@@ -1575,7 +1576,7 @@ export function CrearLiquidacionManualModal({
                           {ordenarAlfabetico(
                             viajeInicial
                               ? transportistaOpcionesViaje
-                              : transportistas.map((t) => ({
+                              : proveedoresActivos(transportistas, transportistaId).map((t) => ({
                                   id: t.id,
                                   nombre: t.nombre,
                                   rolLabel: "",

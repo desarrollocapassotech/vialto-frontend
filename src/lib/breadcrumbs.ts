@@ -94,7 +94,7 @@ const ENTRIES: Entry[] = [
     ],
   },
   ...entidadEntries("clientes", "Nuevo cliente", "Editar cliente"),
-  ...entidadEntries("transportistas", "Nuevo transportista", "Editar transportista"),
+  ...entidadEntries("transportistas", "Nuevo proveedor", "Editar proveedor"),
   ...entidadEntries("choferes", "Nuevo chofer", "Editar chofer"),
   ...entidadEntries("destinatarios", "Nuevo destinatario", "Editar destinatario"),
   ...entidadEntries("vehiculos", "Nuevo vehículo", "Editar vehículo"),

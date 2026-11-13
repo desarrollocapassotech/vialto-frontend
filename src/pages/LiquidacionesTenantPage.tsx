@@ -1366,6 +1366,7 @@ export function LiquidacionesTenantPage() {
               >
                 <TransportistaSearchSelect
                   id="liquidaciones-col-filtro-transportista"
+                  incluirInactivos
                   transportistas={transportistas}
                   value={transportistaFilter}
                   onChange={(id) => aplicarFiltroTransportista(id)}

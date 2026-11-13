@@ -7,25 +7,36 @@ import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { useTenantPaisFijo } from '@/hooks/useTenantPaisFijo';
 import type { PaisCodigo } from '@/lib/ciudades';
-import type { Transportista } from '@/types/api';
+import type { ProveedorTipo, Transportista } from '@/types/api';
+import { useTransportistaLabels } from '@/hooks/useTransportistaLabels';
+import { proveedorTipoOpciones } from '@/lib/proveedorTipo';
+import { transportistaEnFrase } from '@/lib/transportistaLabel';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
 import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 import { useArcaPadron } from '@/hooks/useArcaPadron';
 import { ArcaPadronStatus } from '@/components/shared/ArcaPadronStatus';
 
+/**
+ * Alta rápida de un proveedor. Desde Viajes/Liquidaciones crea siempre un transportista;
+ * con `elegirTipo` (Cuenta corriente) se elige el tipo: transportista, taller u otro.
+ */
 export function TransportistaModal({
   getToken,
   onClose,
   onSaved,
   tenantId,
   stacked,
+  elegirTipo = false,
 }: {
   getToken: () => Promise<string | null>;
   onClose: () => void;
   onSaved: (transportista: Transportista) => void;
   tenantId?: string;
   stacked?: boolean;
+  elegirTipo?: boolean;
 }) {
+  const labels = useTransportistaLabels(tenantId);
+  const [tipo, setTipo] = useState<ProveedorTipo>('transportista');
   const [nombre, setNombre] = useState('');
   const [pais, setPais] = useState<PaisCodigo | ''>('');
   const [idFiscal, setIdFiscal] = useState('');
@@ -67,7 +78,11 @@ export function TransportistaModal({
 
   async function submit() {
     const errs: Record<string, string> = {};
-    if (!nombre.trim()) errs.nombre = 'Ingresá el nombre del transportista.';
+    if (!nombre.trim()) {
+      errs.nombre = elegirTipo
+        ? 'Ingresá el nombre del proveedor.'
+        : `Ingresá el nombre del ${transportistaEnFrase(labels.singular)}.`;
+    }
     if (!paisFijo && !pais) errs.pais = 'Seleccioná el país.';
     if (!idFiscal.trim()) {
       const label = pais ? idFiscalPorPais(pais).label : 'ID fiscal';
@@ -86,6 +101,7 @@ export function TransportistaModal({
       const result = await apiJson<Transportista>(path, () => getToken(), {
         method: 'POST',
         body: JSON.stringify({
+          tipo: elegirTipo ? tipo : 'transportista',
           nombre: nombre.trim(),
           pais,
           idFiscal: idFiscal.trim(),
@@ -99,7 +115,7 @@ export function TransportistaModal({
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 409
-          ? `Ya existe un transportista con ese ${idFiscalPorPais(pais).label}.`
+          ? `Ya existe un proveedor con ese ${idFiscalPorPais(pais).label}.`
           : friendlyError(e, 'transportistas'),
       );
     } finally {
@@ -128,7 +144,9 @@ export function TransportistaModal({
         className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded border border-black/10 bg-white shadow-xl"
       >
         <div className="flex shrink-0 items-center justify-between border-b border-black/10 px-5 pt-5 pb-4">
-          <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">Nuevo transportista</h2>
+          <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">
+            {elegirTipo ? 'Nuevo proveedor' : `Nuevo ${transportistaEnFrase(labels.singular)}`}
+          </h2>
           <button
             type="button"
             onClick={solicitarCierre}
@@ -139,6 +157,22 @@ export function TransportistaModal({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <div className="grid gap-3">
+            {elegirTipo && (
+              <label className="flex flex-col gap-1">
+                <span className={L}>Tipo <span className="text-red-500">*</span></span>
+                <select
+                  value={tipo}
+                  onChange={(e) => setTipo(e.target.value as ProveedorTipo)}
+                  className={`${I} border-black/15 bg-white`}
+                >
+                  {proveedorTipoOpciones(labels).map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label className="flex flex-col gap-1">
               <span className={L}>Nombre <span className="text-red-500">*</span></span>
               <input

@@ -2687,6 +2687,7 @@ export function ViajesTenantPage({
       >
         <TransportistaSearchSelect
           id="viajes-col-filtro-transporte"
+          incluirInactivos
           transportistas={transportistasFiltroColumna}
           value={transportistaIdFiltroActivo}
           onChange={(id) => aplicarFiltroColumnaTransportista(id)}
@@ -3116,6 +3117,7 @@ export function ViajesTenantPage({
         >
           <TransportistaSearchSelect
             id="viajes-filtro-transporte"
+            incluirInactivos
             transportistas={transportistasFiltroColumna}
             value={transportistaIdFiltroActivo}
             onChange={(id) => aplicarFiltroColumnaTransportista(id)}

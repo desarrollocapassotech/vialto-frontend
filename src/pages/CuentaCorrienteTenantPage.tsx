@@ -1,10 +1,10 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronDown, FileDown, Plus, Truck, Users } from 'lucide-react';
+import { ChevronDown, FileDown, Plus, Store, Users } from 'lucide-react';
 import { SelectorOpcionesSheet, selectorTriggerClass } from '@/components/ui/SelectorOpcionesSheet';
 import { useMaestroData } from '@/hooks/useMaestroData';
-import { useTipoFlotaVisible } from '@/hooks/useTipoFlotaVisible';
+import { useProveedores } from '@/hooks/useProveedores';
 import { useBreadcrumbOverride } from '@/hooks/useBreadcrumbOverride';
 import { ListadoCuentasCc } from '@/components/cuenta-corriente/ListadoCuentasCc';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
@@ -19,7 +19,7 @@ type QuickCreate = 'cliente' | 'transportista' | null;
 
 const TABS: { id: TipoContraparte; label: string; icon: typeof Users }[] = [
   { id: 'cliente', label: 'Clientes', icon: Users },
-  { id: 'proveedor', label: 'Proveedores', icon: Truck },
+  { id: 'proveedor', label: 'Proveedores', icon: Store },
 ];
 
 export function CuentaCorrienteTenantPage() {
@@ -27,16 +27,15 @@ export function CuentaCorrienteTenantPage() {
   // Pestaña y cuenta abierta en la URL (`?tipo=proveedor&id=...`): el Atrás del navegador vuelve
   // al listado, y es el mismo link que usa el tablero del dashboard.
   const [searchParams, setSearchParams] = useSearchParams();
-  const tipoElegido: TipoContraparte = searchParams.get('tipo') === 'proveedor' ? 'proveedor' : 'cliente';
-  // Empresa solo de flota propia (Tenant.tipoFlota): no tiene transportistas,
-  // así que no hay cuentas de proveedores — queda fijo en Clientes, sin selector.
-  const { transportistaExternoVisible: hayProveedores } = useTipoFlotaVisible();
-  const tipoContraparte: TipoContraparte = hayProveedores ? tipoElegido : 'cliente';
+  // Proveedores de todo tipo (transportistas, talleres, otros): la pestaña está siempre,
+  // también en empresas solo de flota propia.
+  const tipoContraparte: TipoContraparte = searchParams.get('tipo') === 'proveedor' ? 'proveedor' : 'cliente';
   const contraparteId = searchParams.get('id') ?? '';
   const [descargando, setDescargando] = useState(false);
   const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
   const maestro = useMaestroData();
-  const maestroLoading = maestro.loading;
+  const proveedoresApi = useProveedores();
+  const maestroLoading = tipoContraparte === 'cliente' ? maestro.loading : proveedoresApi.loading;
 
   // Se muestran de inmediato tras crearlos desde el select (antes de que termine el
   // refetch de `useMaestroData`), igual que en la creación de un viaje.
@@ -48,9 +47,9 @@ export function CuentaCorrienteTenantPage() {
 
   const [sessionTransportistas, setSessionTransportistas] = useState<Transportista[]>([]);
   const transportistas = useMemo(() => {
-    const ids = new Set(maestro.transportistas.map((t) => t.id));
-    return [...maestro.transportistas, ...sessionTransportistas.filter((t) => !ids.has(t.id))];
-  }, [maestro.transportistas, sessionTransportistas]);
+    const ids = new Set(proveedoresApi.proveedores.map((t) => t.id));
+    return [...proveedoresApi.proveedores, ...sessionTransportistas.filter((t) => !ids.has(t.id))];
+  }, [proveedoresApi.proveedores, sessionTransportistas]);
 
   const [quickCreate, setQuickCreate] = useState<QuickCreate>(null);
   const [saldosSlot, setSaldosSlot] = useState<HTMLDivElement | null>(null);
@@ -156,8 +155,7 @@ export function CuentaCorrienteTenantPage() {
       )}
 
       {/* Pestañas Clientes / Proveedores: mismo estilo que Mantenimiento. */}
-      {hayProveedores && (
-        <div className="mt-6 border-b border-black/15">
+      <div className="mt-6 border-b border-black/15">
           <div className="pb-3 lg:hidden">
             <button
               type="button"
@@ -206,7 +204,6 @@ export function CuentaCorrienteTenantPage() {
             ))}
           </nav>
         </div>
-      )}
 
       <div className="mt-6">
         {/* Siempre montada: los portales de CuentaContraparteView ya tienen dónde dibujar. */}
@@ -261,12 +258,14 @@ export function CuentaCorrienteTenantPage() {
       {quickCreate === 'transportista' && (
         <TransportistaModal
           getToken={getToken}
+          elegirTipo
           onClose={() => setQuickCreate(null)}
           onSaved={(t) => {
             setSessionTransportistas((prev) => [...prev, t]);
             setSearchParams(urlDe('proveedor', t.id));
             setQuickCreate(null);
-            void maestro.refreshTransportistas();
+            void proveedoresApi.refresh();
+            if (t.tipo === 'transportista') void maestro.refreshTransportistas();
           }}
         />
       )}

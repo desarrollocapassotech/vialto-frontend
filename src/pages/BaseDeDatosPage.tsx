@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import {
@@ -10,7 +9,7 @@ import {
   MapPin,
   Package,
   ShieldCheck,
-  Truck,
+  Store,
   Upload,
   UserCheck,
   Users,
@@ -44,6 +43,8 @@ import {
   canAccessFacturacion,
   canAccessEmisionFacturasArca,
   canAccessCombustible,
+  canAccessCuentaCorriente,
+  canAccessMantenimiento,
 } from "@/lib/tenantModules";
 import {
   isPlatformSuperadmin,
@@ -67,7 +68,7 @@ type Tab =
 
 const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "clientes", label: "Clientes", icon: Users },
-  { id: "transportistas", label: "Transportistas", icon: Truck },
+  { id: "transportistas", label: "Proveedores", icon: Store },
   { id: "choferes", label: "Choferes", icon: UserCheck },
   { id: "destinatarios", label: "Destinatarios", icon: MapPin },
   { id: "vehiculos", label: "Vehículos", icon: Car },
@@ -95,8 +96,8 @@ const GRUPOS: { id: GrupoTab; label: string }[] = [
 function grupoDeTab(tab: Tab, conStock: boolean): GrupoTab {
   switch (tab) {
     case "clientes":
-      return "general";
     case "transportistas":
+      return "general";
     case "choferes":
     case "vehiculos":
     case "paises":
@@ -136,29 +137,28 @@ export function BaseDeDatosPage() {
     canAccessFacturacion(modules) ||
     canAccessEmisionFacturasArca(modules);
   const hasCombustible = superadmin || canAccessCombustible(modules);
+  const hasCuentaCorriente = superadmin || canAccessCuentaCorriente(modules);
+  const hasMantenimiento = superadmin || canAccessMantenimiento(modules);
   const isOrgAdmin =
     superadmin ||
     userIsOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
 
   const productoLabelsTenant = useProductoLabels();
-  // Nombre que la empresa le da al transportista (superadmin): pestaña "Fleteros", etc.
-  const transportistaLabelsTenant = useTransportistaLabels();
   // Con Stock la pestaña es el catálogo de Stock: siempre "Productos". El label
   // propio de la empresa (ej. "Cargas") solo aplica si no tiene Stock.
   const visibleTabs = ALL_TABS.map((tab) =>
     tab.id === "productos" && !canAccessStock(modules)
       ? { ...tab, label: productoLabelsTenant.plural }
-      : tab.id === "transportistas"
-        ? { ...tab, label: transportistaLabelsTenant.plural }
-        : tab,
+      : tab,
   ).filter((tab) => {
     switch (tab.id) {
       case "clientes":
         return hasViajes || hasStock || hasFacturacion;
       case "transportistas":
-        // Empresa solo de flota propia (superadmin deshabilitó la opción
-        // "Transportista externo" del chofer): no trabaja con transportistas.
-        return hasViajes && (superadmin || transportistaExternoVisible);
+        // Proveedores de todo tipo (nov 2026): transportistas para Viajes,
+        // talleres para Mantenimiento y cualquiera para Cuenta corriente. Una
+        // empresa solo de flota propia también puede tener talleres u otros.
+        return hasViajes || hasCuentaCorriente || hasMantenimiento;
       case "vehiculos":
         // Superadmin apagó "Vehículos" (Configuración por empresa → General,
         // campo `vehiculosRows` de Viajes): la empresa no trabaja con vehículos.

@@ -180,6 +180,8 @@ function stubTransportista(
     id: t.id,
     tenantId: v.tenantId,
     nombre: t.nombre,
+    tipo: "transportista",
+    activo: true,
     pais: null,
     idFiscal: null,
     email: null,

@@ -346,6 +346,10 @@ export interface VehiculoKmEdicion {
   createdAt: string;
 }
 
+/** Espejo de `PROVEEDOR_TIPOS` del backend (`shared/util/proveedor-tipo.ts`). */
+export type ProveedorTipo = 'transportista' | 'taller' | 'otro';
+
+/** Proveedor (tabla `transportistas`): transportista, taller u otro. */
 export interface Transportista {
   id: string;
   tenantId: string;
@@ -357,8 +361,14 @@ export interface Transportista {
   domicilio: string | null;
   condicionIva: number | null;
   condicionTributaria: string | null;
-  /** En API siempre `externo` para subcontratistas; flota propia = sin vinculo en chofer/vehiculo. */
-  tipo?: string;
+  /**
+   * Tipo de proveedor (nov 2026): la tabla guarda todos los proveedores de la empresa.
+   * Solo `transportista` se ofrece en Viajes/Liquidaciones/Choferes/Vehículos y solo
+   * `taller` en las órdenes de trabajo. Ver `lib/proveedorTipo.ts`.
+   */
+  tipo: ProveedorTipo;
+  /** false = desactivado: no se ofrece en los selectores, conserva el historial. */
+  activo: boolean;
   paut: string | null;
   permisoInternacional: string | null;
   fechaVencimientoPermiso: string | null;

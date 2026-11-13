@@ -1,6 +1,7 @@
 import { CrudSelect } from '@/components/crud/CrudFields';
 import type { Transportista } from '@/types/api';
 import { ordenarAlfabetico } from '@/lib/ordenAlfabetico';
+import { proveedoresActivos } from '@/lib/proveedorTipo';
 
 export type AsignacionModo = 'propio' | 'externo';
 
@@ -80,7 +81,7 @@ export function TransportistaAsignacionFields({
             <option value="">
               {loadingTransportistas ? 'Cargando…' : 'Seleccioná un transportista…'}
             </option>
-            {ordenarAlfabetico(transportistas, (t) => t.nombre).map((t) => (
+            {ordenarAlfabetico(proveedoresActivos(transportistas, transportistaId), (t) => t.nombre).map((t) => (
               <option key={t.id} value={t.id}>
                 {t.nombre}
               </option>
@@ -88,7 +89,7 @@ export function TransportistaAsignacionFields({
           </CrudSelect>
           {!loadingTransportistas && transportistas.length === 0 && (
             <span className="text-xs text-vialto-steel">
-              No hay transportistas cargados. Creá uno en Transportistas primero.
+              No hay transportistas cargados. Creá uno en Base de datos → Proveedores primero.
             </span>
           )}
         </label>
