@@ -40,6 +40,8 @@ export type FacturaLineaDraft = {
   precioUnitario?: number;
   /** Solo para mostrar (tooltip de "Detalles del viaje"); no viaja al backend. */
   viaje?: Viaje;
+  /** Línea de un concepto de la factura (no de un viaje): el detalle la muestra aparte. */
+  esConcepto?: boolean;
 };
 
 const inputClass =
@@ -175,6 +177,7 @@ export function defaultFacturaLineasFromDraft(
       precioUnitario: c.precioUnitario,
       importe: c.importe,
       ivaPct: c.ivaPct,
+      esConcepto: true,
     }),
   );
   const deViajes = lineasDeViajesFromDraft(draft, viajes, ivaPct);
@@ -268,6 +271,7 @@ export function defaultFacturaLineas(
       precioUnitario: c.precioUnitario ?? c.importe,
       importe: c.importe,
       ivaPct: c.ivaPct,
+      esConcepto: true,
     })),
   ];
 }

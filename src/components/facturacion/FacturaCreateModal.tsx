@@ -481,6 +481,8 @@ export function FacturaCreateModal({
   // Panel de detalle oculto por defecto (debajo queda la barra de totales). Si aparece
   // un aviso que solo vive en el panel, se abre solo para que no pase desapercibido.
   const [detalleAbierto, setDetalleAbierto] = useState(false);
+  /** Moneda de los viajes elegidos (para el detalle y los totales; ARS si no hay). */
+  const monedaFactura = monedaUnicaDeViajes(draft.viajeIds, derivedViajes) ?? "ARS";
   const avisoEnPanel = bloqueadoUsd || sinConfigArca || arcaConfigMissing;
   useEffect(() => {
     if (avisoEnPanel) setDetalleAbierto(true);
@@ -1486,7 +1488,6 @@ export function FacturaCreateModal({
           />
         </div>
       </div>
-      <FacturaTotalesPreview draft={draft} viajes={derivedViajes} />
       {monedaInvalida && (
         <p className="mt-3 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
           Los viajes seleccionados tienen distintas monedas. Una factura no
@@ -1514,11 +1515,8 @@ export function FacturaCreateModal({
           className={[
             "relative flex max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl sm:rounded-lg sm:border sm:border-black/15",
             step === "autorizada" ? "h-auto" : "h-full",
-            step === "autorizada"
-              ? "sm:h-auto"
-              : unifiedArca
-                ? "sm:h-[92vh]"
-                : "sm:h-auto sm:max-h-[92vh]",
+            // Con y sin ARCA: formulario + panel de detalle ocultable (como Nueva liquidación).
+            step === "autorizada" ? "sm:h-auto" : "sm:h-[92vh]",
             step === "autorizada"
               ? "max-w-[min(34rem,calc(100vw-1rem))]"
               : "max-w-[min(110rem,calc(100vw-1rem))]",
@@ -1584,9 +1582,7 @@ export function FacturaCreateModal({
           <div
             className={[
               "min-h-0 flex-1 overflow-hidden",
-              step === "form" && unifiedArca
-                ? "flex flex-col"
-                : "overflow-y-auto",
+              step === "form" ? "flex flex-col" : "overflow-y-auto",
             ].join(" ")}
           >
             {step === "form" ? (
@@ -1679,9 +1675,51 @@ export function FacturaCreateModal({
                 )}
                 </>
               ) : (
-                <div className="overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-                  {standardFields}
+                // Sin ARCA (o factura hecha por fuera del sistema): mismo armado que con ARCA y
+                // que Nueva liquidación — panel de detalle a la derecha, ocultable, y barra de
+                // totales abajo mientras está oculto.
+                <>
+                <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+                  <div
+                    className={[
+                      "relative flex min-h-0 flex-col overflow-y-auto px-4 py-4 sm:px-6 sm:py-5",
+                      detalleAbierto
+                        ? "border-b border-black/10 lg:w-[68%] lg:max-w-[68%] lg:shrink-0 lg:border-b-0 lg:border-r"
+                        : "flex-1",
+                    ].join(" ")}
+                  >
+                    {!detalleAbierto && (
+                      <div className="mb-3 flex justify-end">
+                        <VerDetalleButton onClick={() => setDetalleAbierto(true)} />
+                      </div>
+                    )}
+                    {standardFields}
+                  </div>
+                  {detalleAbierto && (
+                  <div className="min-h-0 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:w-[32%] lg:max-w-[32%] lg:shrink-0 lg:min-w-0">
+                    <DetalleComprobanteEncabezado onOcultar={() => setDetalleAbierto(false)} />
+                    <FacturaArcaPreviewPanel
+                      sinArca
+                      numero={draft.numeroInterno ? "Comprobante interno" : draft.numero}
+                      moneda={monedaFactura}
+                      arcaConfig={null}
+                      clienteDetalle={clienteDetalle}
+                      fechaEmision={draft.fechaEmision}
+                      lineas={lineas}
+                      onLineasChange={() => {}}
+                      ivaPctDefault={ivaPctDefault}
+                      lineasDisabled
+                      tenantId={tenantId}
+                    />
+                  </div>
+                  )}
                 </div>
+                {!detalleAbierto && (
+                  <ResumenTotalesBarra
+                    {...totalesResumenFactura(lineas, ivaPctDefault, monedaFactura)}
+                  />
+                )}
+                </>
               )
             ) : (
               <div className="overflow-y-auto px-4 py-5 sm:px-6">
