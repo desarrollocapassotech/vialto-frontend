@@ -70,8 +70,13 @@ export async function abrirAdjuntoEnPestana(
   },
   getToken: () => Promise<string | null>,
   titulo = 'Comprobante',
+  /**
+   * Pestaña ya abierta por el host en el click (cuando antes tiene que esperar otra cosa, ej.
+   * guardar el pago y después abrir su orden de pago): si no, el navegador la bloquea.
+   */
+  ventanaAbierta?: Window | null,
 ) {
-  const win = window.open('', '_blank');
+  const win = ventanaAbierta !== undefined ? ventanaAbierta : window.open('', '_blank');
   if (win) escribirEnPestana(win, titulo, 'Cargando…');
   try {
     let objectUrl: string;

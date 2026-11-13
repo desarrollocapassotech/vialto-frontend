@@ -45,21 +45,23 @@ export function NumeroComprobanteField({
 }: Props) {
   const [previo, setPrevio] = useState<string | null>(null);
   const [falloPrevio, setFalloPrevio] = useState(false);
+  /** Con el tilde, el número lo genera el sistema: se muestra cuál va a ser. */
+  const urlVistaPrevia = automatico ? urlNumeroInterno : undefined;
 
   useEffect(() => {
-    if (!automatico) return;
+    if (!urlVistaPrevia) return;
     let vigente = true;
     setPrevio(null);
     setFalloPrevio(false);
-    apiJson<{ numero: string }>(urlNumeroInterno, getToken)
+    apiJson<{ numero: string }>(urlVistaPrevia, getToken)
       .then((r) => vigente && setPrevio(r.numero))
       .catch(() => vigente && setFalloPrevio(true));
     return () => {
       vigente = false;
     };
-    // getToken cambia de referencia en cada render en algunos hosts: solo se pide al tildar.
+    // getToken cambia de referencia en cada render en algunos hosts: solo se pide al cambiar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [automatico, urlNumeroInterno]);
+  }, [urlVistaPrevia]);
 
   const valorAuto = previo ?? (falloPrevio ? 'Se asigna al guardar' : 'Calculando…');
 
@@ -69,7 +71,7 @@ export function NumeroComprobanteField({
       <label className={labelClassName} htmlFor={id}>
         {label}
       </label>
-      {automatico ? (
+      {urlVistaPrevia ? (
         <input
           id={id}
           type="text"

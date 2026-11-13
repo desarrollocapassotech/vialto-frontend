@@ -295,6 +295,16 @@ export type CreateMovimientoCcInput = {
   viajes?: { viajeId: string; importe: number }[];
 };
 
+/** PDF de la orden de pago de un pago a proveedor (lo genera la API al pedirlo). */
+export function apiPathOrdenPago(movimientoId: string): string {
+  return `/api/cuenta-corriente/movimientos/${encodeURIComponent(movimientoId)}/orden-pago/pdf`;
+}
+
+/** Pago a proveedor cargado a mano: tiene orden de pago. */
+export function tieneOrdenPago(m: Pick<MovimientoCc, 'tipo' | 'origen' | 'proveedorId'>): boolean {
+  return m.tipo === 'pago' && m.origen === 'manual' && !!m.proveedorId;
+}
+
 export function createMovimiento(getToken: GetToken, input: CreateMovimientoCcInput) {
   return apiJson<MovimientoCc>('/api/cuenta-corriente/movimientos', getToken, {
     method: 'POST',

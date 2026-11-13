@@ -13,6 +13,7 @@ import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { formatCurrencyArFromNumber, maskCurrencyArInput, parseCurrencyAr } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
 import {
+  apiPathOrdenPago,
   createMovimiento,
   type MovimientoCc,
   type TipoContraparte,
@@ -30,6 +31,7 @@ import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { NumeroComprobanteField } from '@/components/shared/NumeroComprobanteField';
 import { ComprobanteAdjuntoField } from '@/components/shared/ComprobanteAdjuntoField';
 import { uploadComprobante } from '@/lib/comprobanteUpload';
+import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
 import { useAutocompletarNumeroComprobante } from '@/hooks/useAutocompletarNumeroComprobante';
 import { URL_NUMERO_INTERNO } from '@/lib/numeroInterno';
 import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
@@ -144,6 +146,10 @@ export function MovimientoCcFormModal({
 
   const esCargo = tipo === 'cargo';
   const esCliente = tipoContraparte === 'cliente';
+  /** Cobro: recibo que se le da al cliente; pago: orden de pago al proveedor. */
+  const nombreNumeroCobroPago = 'Número de recibo';
+  /** Pago a proveedor: el sistema numera la orden de pago y genera su PDF. */
+  const esPagoProveedor = !esCargo && !esCliente;
   // Compra: viajes a los que se carga como gasto (opcional), con el reparto del neto.
   const esCompra = esCargo && !esCliente;
   const [viajes, setViajes] = useState<ViajeCompraDraft[]>([]);
@@ -196,9 +202,14 @@ export function MovimientoCcFormModal({
     e.preventDefault();
     // Venta/compra: el total (neto + IVA de cada línea) lo calcula el backend igual que el pie del editor.
     const importe = esCargo ? undefined : parseCurrencyAr(importeStr);
-    // Todo movimiento manual (venta, compra, cobro, pago) se identifica por su comprobante.
-    if (!numeroAutomatico && !numeroComprobante.trim()) {
-      setError('Ingresá el número de comprobante.');
+    // Venta/compra: se identifica por su factura; cobro, por su recibo. El pago a proveedor
+    // lleva la orden de pago que numera el sistema.
+    if (!esPagoProveedor && !numeroAutomatico && !numeroComprobante.trim()) {
+      setError(
+        esCargo
+          ? 'Ingresá el número de comprobante.'
+          : 'Ingresá el número de recibo.',
+      );
       return;
     }
     // Fechas YYYY-MM-DD: se comparan como texto. El backend valida lo mismo.
@@ -232,11 +243,14 @@ export function MovimientoCcFormModal({
     }
     setSaving(true);
     setError(null);
+    // Pago a proveedor: la orden de pago se abre en una pestaña nueva al guardar. La pestaña
+    // se abre ya, en el click (después de esperar al backend el navegador la bloquea).
+    const ventanaOrdenPago = esPagoProveedor ? window.open('', '_blank') : null;
     try {
       const comprobanteUrl = comprobanteFile
         ? await uploadComprobante(() => getToken(), comprobanteFile, 'cuenta-corriente')
         : undefined;
-      await createMovimiento(() => getToken(), {
+      const creado = await createMovimiento(() => getToken(), {
         comprobanteUrl,
         ...(tipoContraparte === 'cliente'
           ? { clienteId: contraparteId }
@@ -255,14 +269,25 @@ export function MovimientoCcFormModal({
         moneda,
         fecha,
         fechaVencimiento: fechaVencimiento || undefined,
-        numeroComprobante: numeroAutomatico ? undefined : numeroComprobante.trim() || undefined,
-        numeroAutomatico: numeroAutomatico || undefined,
+        // Pago a proveedor sin número: el backend asigna el de la orden de pago.
+        numeroComprobante:
+          numeroAutomatico || esPagoProveedor ? undefined : numeroComprobante.trim() || undefined,
+        numeroAutomatico: (!esPagoProveedor && numeroAutomatico) || undefined,
         formaPago: formaPago.trim() || undefined,
         viajes: esCompra && viajes.length > 0 ? viajesCompraToApi(viajes) : undefined,
       });
+      if (esPagoProveedor) {
+        void abrirAdjuntoEnPestana(
+          { apiPath: apiPathOrdenPago(creado.id) },
+          () => getToken(),
+          'Orden de pago',
+          ventanaOrdenPago,
+        );
+      }
       onCreated();
       onClose();
     } catch (err) {
+      ventanaOrdenPago?.close();
       setError(friendlyError(err, 'cuentaCorriente'));
     } finally {
       setSaving(false);
@@ -380,27 +405,37 @@ export function MovimientoCcFormModal({
           </>
         ) : (
           <>
-          {/* Cobro/pago: comprobante, importe y moneda arriba; debajo emisión y medio de cobro. */}
-          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_7rem]">
-            {campoArchivo}
-            {/* Comprobante propio del cobro/pago (recibo, orden de pago): es lo que muestra la grilla. */}
-            <NumeroComprobanteField
-              id="cc-comprobante-pago"
-              label={
-                <>
-                  Número de comprobante <span className="text-red-500">*</span>
-                </>
-              }
-              labelClassName={labelClass}
-              inputClassName={inputClass}
-              value={numeroComprobante}
-              onChange={setNumeroComprobante}
-              placeholder={esCliente ? 'Ej. Recibo 0001-00000123' : 'Ej. Orden de pago 0001-00000123'}
-              automatico={numeroAutomatico}
-              onAutomaticoChange={setNumeroAutomatico}
-              urlNumeroInterno={URL_NUMERO_INTERNO.cuentaCorriente}
-              getToken={() => getToken()}
-            />
+          {/* Cobro/pago: número de recibo, importe y moneda arriba; debajo emisión y medio de
+              cobro. Sin archivo, y "recibo" en vez de "comprobante": se confundía con la
+              factura que cancela. */}
+          {/* Pago a proveedor: sin campo de número, la orden de pago la numera siempre el
+              sistema al guardar (y se abre su PDF). */}
+          <div
+            className={`grid grid-cols-1 items-start gap-3 ${
+              esPagoProveedor
+                ? 'sm:grid-cols-[minmax(0,1fr)_7rem]'
+                : 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem]'
+            }`}
+          >
+            {!esPagoProveedor && (
+              <NumeroComprobanteField
+                id="cc-recibo"
+                label={
+                  <>
+                    {nombreNumeroCobroPago} <span className="text-red-500">*</span>
+                  </>
+                }
+                labelClassName={labelClass}
+                inputClassName={inputClass}
+                value={numeroComprobante}
+                onChange={setNumeroComprobante}
+                placeholder="Ej. 0001-00000123"
+                automatico={numeroAutomatico}
+                onAutomaticoChange={setNumeroAutomatico}
+                urlNumeroInterno={URL_NUMERO_INTERNO.cuentaCorriente}
+                getToken={() => getToken()}
+              />
+            )}
             <div>
               <label className={labelClass} htmlFor="cc-importe">
                 Importe

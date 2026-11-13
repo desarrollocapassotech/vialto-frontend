@@ -40,8 +40,11 @@ import {
   viajesCompraToApi,
   type ViajeCompraDraft,
 } from './ViajesCompraField';
+import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
 import {
   actualizarMovimiento,
+  apiPathOrdenPago,
+  tieneOrdenPago,
   claseMontoCobroPago,
   eliminarMovimiento,
   estadoMovimientoCcLabel,
@@ -200,7 +203,15 @@ export function MovimientoCcDetalleModal({
   const nombre = nombreMovimientoCc(m);
   const esCargo = m.tipo === 'cargo';
   const esCliente = !!m.clienteId;
+  /** Venta/compra: su factura; cobro: el recibo; pago: la orden de pago. */
+  const nombreNumero = esCargo
+    ? 'Número de comprobante'
+    : esCliente
+      ? 'Número de recibo'
+      : 'Número de orden de pago';
   const manual = m.origen === 'manual';
+  /** Pago a proveedor: el número de la orden de pago lo asigna el sistema, no se edita. */
+  const esPagoProveedor = m.tipo === 'pago' && !esCliente;
   const anulado = m.estadoDisponibilidad === 'anulado';
   const porId = new Map(movimientos.map((x) => [x.id, x]));
 
@@ -317,8 +328,8 @@ export function MovimientoCcDetalleModal({
 
   /** Validaciones del formulario; muestra el error y devuelve false si algo falta. */
   function validarFormulario(): boolean {
-    if (!numero.trim()) {
-      setError('Ingresá el número de comprobante.');
+    if (!esPagoProveedor && !numero.trim()) {
+      setError(`Ingresá el ${nombreNumero.toLowerCase()}.`);
       return false;
     }
     if (!fecha) {
@@ -358,14 +369,17 @@ export function MovimientoCcDetalleModal({
     setError(null);
     try {
       // Archivo: uno nuevo se sube; "Quitar" sin elegir otro lo borra; si no, no se toca.
-      const comprobanteUrl = comprobanteFile
+      const comprobanteUrl = !esCargo
+        ? undefined
+        : comprobanteFile
         ? await uploadComprobante(() => getToken(), comprobanteFile, 'cuenta-corriente')
         : quitarArchivo
           ? null
           : undefined;
       await actualizarMovimiento(() => getToken(), m.id, {
         ...(comprobanteUrl !== undefined ? { comprobanteUrl } : {}),
-        numeroComprobante: numero.trim(),
+        // La orden de pago la numera el sistema: no se toca.
+        ...(esPagoProveedor ? {} : { numeroComprobante: numero.trim() }),
         fecha,
         ...(esCargo ? { fechaVencimiento: vencimiento || null } : { formaPago: formaPago.trim() }),
         // El importe se manda siempre: con imputaciones, el backend las ajusta al nuevo total.
@@ -454,31 +468,52 @@ export function MovimientoCcDetalleModal({
     >
       {editando ? (
         <form id="detalle-cc-form" onSubmit={guardar} className="space-y-4">
-          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_7rem]">
-            {/* Archivo a la izquierda del número, como en Nueva factura. */}
-            <div className="min-w-0 sm:max-w-[14rem]">
-              <ComprobanteAdjuntoField
-                file={comprobanteFile}
-                existingUrl={quitarArchivo ? null : m.comprobanteUrl}
-                onFileChange={cambiarArchivo}
-                onClearExisting={() => setQuitarArchivo(true)}
-                disabled={saving}
-                labelClassName={labelClass}
-              />
-            </div>
+          <div
+            className={`grid grid-cols-1 items-start gap-3 ${
+              esCargo
+                ? 'sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_7rem]'
+                : 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem]'
+            }`}
+          >
+            {/* Venta/compra: archivo a la izquierda del número, como en Nueva factura.
+                Cobro/pago no lleva archivo (se confundía con la factura que cancela). */}
+            {esCargo && (
+              <div className="min-w-0 sm:max-w-[14rem]">
+                <ComprobanteAdjuntoField
+                  file={comprobanteFile}
+                  existingUrl={quitarArchivo ? null : m.comprobanteUrl}
+                  onFileChange={cambiarArchivo}
+                  onClearExisting={() => setQuitarArchivo(true)}
+                  disabled={saving}
+                  labelClassName={labelClass}
+                />
+              </div>
+            )}
             <div>
               <label className={labelClass} htmlFor="det-numero">
-                Número de comprobante <span className="text-red-500">*</span>
+                {nombreNumero} {!esPagoProveedor && <span className="text-red-500">*</span>}
               </label>
-              <input
-                id="det-numero"
-                type="text"
-                maxLength={64}
-                className={inputClass}
-                value={numero}
-                onChange={(e) => setNumero(e.target.value)}
-                required
-              />
+              {esPagoProveedor ? (
+                // La orden de pago la numera el sistema: solo se muestra.
+                <input
+                  id="det-numero"
+                  type="text"
+                  readOnly
+                  tabIndex={-1}
+                  value={numero || 's/n'}
+                  className={`${inputClass} cursor-default border-dashed bg-vialto-mist/60 tabular-nums text-vialto-steel`}
+                />
+              ) : (
+                <input
+                  id="det-numero"
+                  type="text"
+                  maxLength={64}
+                  className={inputClass}
+                  value={numero}
+                  onChange={(e) => setNumero(e.target.value)}
+                  required
+                />
+              )}
             </div>
             {esCargo ? (
               <div>
@@ -617,6 +652,23 @@ export function MovimientoCcDetalleModal({
             )}
             <Dato label="Moneda">{m.moneda}</Dato>
             <Dato label="Estado">{estadoMovimientoCcLabel(m)}</Dato>
+            {tieneOrdenPago(m) && (
+              <Dato label="Orden de pago">
+                <button
+                  type="button"
+                  className="text-vialto-charcoal underline-offset-2 hover:underline"
+                  onClick={() =>
+                    void abrirAdjuntoEnPestana(
+                      { apiPath: apiPathOrdenPago(m.id) },
+                      () => getToken(),
+                      'Orden de pago',
+                    )
+                  }
+                >
+                  Ver PDF
+                </button>
+              </Dato>
+            )}
             {manual && m.comprobanteUrl?.trim() && (
               <Dato label="Comprobante">
                 <button

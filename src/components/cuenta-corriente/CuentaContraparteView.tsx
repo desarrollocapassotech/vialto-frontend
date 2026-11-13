@@ -45,6 +45,8 @@ import {
   type SaldoPorMoneda,
   type TipoContraparte,
   type TipoMovimientoCc,
+  apiPathOrdenPago,
+  tieneOrdenPago,
 } from '@/lib/cuentaCorriente';
 import { MovimientoCcFormModal } from './MovimientoCcFormModal';
 import { ImputarPagoModal } from './ImputarPagoModal';
@@ -403,7 +405,8 @@ export function CuentaContraparteView({
    * Clips de la columna Comprobante, mismo criterio y colores que las grillas de Facturas y
    * Liquidaciones: gris = comprobante (adjunto o PDF de ARCA), azul = PDF de liquidación
    * (sin ARCA), rojo = anulación. Un cargo muestra los suyos; una anulación, el de la
-   * anulación del cargo que compensa. Los cobros/pagos no llevan clip.
+   * anulación del cargo que compensa. Un movimiento manual, su adjunto; un pago a proveedor,
+   * además el PDF de su orden de pago (azul).
    */
   function clipsDe(m: MovimientoConSaldo): ReactNode {
     const tk = () => getToken();
@@ -442,10 +445,25 @@ export function CuentaContraparteView({
       return abrir ? <ComprobanteAdjuntoClip onClick={abrir} tono="anulacion" titulo={titulo} /> : null;
     }
 
-    // Venta/compra/cobro/pago manual: su archivo adjunto (factura, recibo, orden de pago).
+    // Movimiento manual: su archivo adjunto (si tiene) y, en un pago a proveedor, el PDF de
+    // su orden de pago (azul, como el PDF de liquidación).
     if (m.origen === 'manual') {
+      const manuales: ReactNode[] = [];
       const abrir = adjunto(m.comprobanteUrl ?? null, 'Comprobante');
-      return abrir ? <ComprobanteAdjuntoClip onClick={abrir} /> : null;
+      if (abrir) manuales.push(<ComprobanteAdjuntoClip key="cbte" onClick={abrir} />);
+      if (tieneOrdenPago(m)) {
+        manuales.push(
+          <ComprobanteAdjuntoClip
+            key="op"
+            onClick={() =>
+              void abrirAdjuntoEnPestana({ apiPath: apiPathOrdenPago(m.id) }, tk, 'Orden de pago')
+            }
+            tono="pdf"
+            titulo="Ver orden de pago"
+          />,
+        );
+      }
+      return manuales.length ? <>{manuales}</> : null;
     }
     if (m.tipo !== 'cargo') return null;
     const clips: ReactNode[] = [];
