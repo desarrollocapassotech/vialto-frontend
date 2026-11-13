@@ -442,6 +442,11 @@ export function CuentaContraparteView({
       return abrir ? <ComprobanteAdjuntoClip onClick={abrir} tono="anulacion" titulo={titulo} /> : null;
     }
 
+    // Venta/compra/cobro/pago manual: su archivo adjunto (factura, recibo, orden de pago).
+    if (m.origen === 'manual') {
+      const abrir = adjunto(m.comprobanteUrl ?? null, 'Comprobante');
+      return abrir ? <ComprobanteAdjuntoClip onClick={abrir} /> : null;
+    }
     if (m.tipo !== 'cargo') return null;
     const clips: ReactNode[] = [];
     const f = m.facturaComprobantes;

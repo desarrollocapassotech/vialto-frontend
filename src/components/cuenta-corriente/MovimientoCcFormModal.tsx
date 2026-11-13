@@ -28,6 +28,9 @@ import {
 } from '@/components/facturacion/FacturaLineasEditor';
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { NumeroComprobanteField } from '@/components/shared/NumeroComprobanteField';
+import { ComprobanteAdjuntoField } from '@/components/shared/ComprobanteAdjuntoField';
+import { uploadComprobante } from '@/lib/comprobanteUpload';
+import { useAutocompletarNumeroComprobante } from '@/hooks/useAutocompletarNumeroComprobante';
 import { URL_NUMERO_INTERNO } from '@/lib/numeroInterno';
 import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
 import { roundMoney2 } from '@/lib/facturaTotales';
@@ -107,6 +110,34 @@ export function MovimientoCcFormModal({
   const [numeroAutomatico, setNumeroAutomatico] = useState(false);
   const [formaPago, setFormaPago] = useState('');
   const [saving, setSaving] = useState(false);
+  // Archivo del comprobante (factura, recibo, orden de pago). Al adjuntar una factura de
+  // ARCA se completa el número leyéndolo del archivo (estado vigente en un ref: es async).
+  const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
+  const autocompletarNumero = useAutocompletarNumeroComprobante();
+  const estadoAdjuntoRef = useRef({ comprobanteFile, numeroComprobante, numeroAutomatico });
+  estadoAdjuntoRef.current = { comprobanteFile, numeroComprobante, numeroAutomatico };
+  function cambiarArchivo(file: File | null) {
+    setComprobanteFile(file);
+    if (!file) return;
+    void autocompletarNumero(file, {
+      vigente: () =>
+        estadoAdjuntoRef.current.comprobanteFile === file &&
+        !estadoAdjuntoRef.current.numeroAutomatico,
+      numeroActual: () => estadoAdjuntoRef.current.numeroComprobante,
+      aplicar: (_leido, numero) => setNumeroComprobante(numero),
+    });
+  }
+  // Va a la izquierda del número de comprobante, en la misma fila (como en Nueva factura).
+  const campoArchivo = (
+    <div className="min-w-0 sm:max-w-[14rem]">
+      <ComprobanteAdjuntoField
+        file={comprobanteFile}
+        onFileChange={cambiarArchivo}
+        disabled={saving}
+        labelClassName={labelClass}
+      />
+    </div>
+  );
   const [importandoAfip, setImportandoAfip] = useState(false);
   const descarte = useConfirmarDescarte(onClose);
   const [error, setError] = useState<string | null>(null);
@@ -202,7 +233,11 @@ export function MovimientoCcFormModal({
     setSaving(true);
     setError(null);
     try {
+      const comprobanteUrl = comprobanteFile
+        ? await uploadComprobante(() => getToken(), comprobanteFile, 'cuenta-corriente')
+        : undefined;
       await createMovimiento(() => getToken(), {
+        comprobanteUrl,
         ...(tipoContraparte === 'cliente'
           ? { clienteId: contraparteId }
           : { proveedorId: contraparteId }),
@@ -299,7 +334,8 @@ export function MovimientoCcFormModal({
                 Importar desde AFIP
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)_7rem]">
+              {campoArchivo}
               <NumeroComprobanteField
                 id="cc-comprobante"
                 label={
@@ -345,7 +381,8 @@ export function MovimientoCcFormModal({
         ) : (
           <>
           {/* Cobro/pago: comprobante, importe y moneda arriba; debajo emisión y medio de cobro. */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem]">
+          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_7rem]">
+            {campoArchivo}
             {/* Comprobante propio del cobro/pago (recibo, orden de pago): es lo que muestra la grilla. */}
             <NumeroComprobanteField
               id="cc-comprobante-pago"

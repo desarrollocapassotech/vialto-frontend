@@ -34,6 +34,8 @@ export type MovimientoCc = {
   fecha: string;
   fechaVencimiento: string | null;
   numeroComprobante: string | null;
+  /** Archivo adjunto de un movimiento manual (las facturas/liquidaciones lo traen en `*Comprobantes`). */
+  comprobanteUrl?: string | null;
   referencia: string | null;
   estadoDisponibilidad: string;
   estadoImputacion: string;
@@ -283,6 +285,8 @@ export type CreateMovimientoCcInput = {
   numeroComprobante?: string;
   /** true = el backend asigna el siguiente número interno (se ignora `numeroComprobante`). */
   numeroAutomatico?: boolean;
+  /** Archivo ya subido (`uploadComprobante(…, 'cuenta-corriente')`). */
+  comprobanteUrl?: string;
   formaPago?: string;
   referencia?: string;
   /** Cobro/pago: facturas/liquidaciones a imputar (el backend reparte del más viejo al más nuevo). */
@@ -307,6 +311,8 @@ export function actualizarMovimiento(
   id: string,
   datos: {
     numeroComprobante?: string;
+    /** Archivo ya subido; `null` lo quita. */
+    comprobanteUrl?: string | null;
     fecha?: string;
     /** `null` quita el vencimiento. */
     fechaVencimiento?: string | null;

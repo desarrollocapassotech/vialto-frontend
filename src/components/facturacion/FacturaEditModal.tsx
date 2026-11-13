@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
@@ -43,6 +44,10 @@ import {
 } from "@/lib/facturaTotales";
 import { hoyArgentinaIso, vencimientoPorDefecto } from "@/lib/facturaFechaEmision";
 import { esNumeroInterno } from "@/lib/numeroInterno";
+import {
+  numeroActualComprobanteManual,
+  useAutocompletarNumeroComprobante,
+} from "@/hooks/useAutocompletarNumeroComprobante";
 import {
   comprobanteManualDraftDesde,
   emptyComprobanteManualDraft,
@@ -616,6 +621,46 @@ export function FacturaEditModal({
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [tramosLocalError, setTramosLocalError] = useState<string | null>(null);
   const [cbteManualErrores, setCbteManualErrores] = useState<ComprobanteManualErrores>({});
+  // Factura de ARCA adjunta: completa el número (o tipo + punto de venta + número en una
+  // factura manual) leyéndolo del archivo. Draft vigente en un ref (la lectura es async).
+  const autocompletarNumero = useAutocompletarNumeroComprobante();
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  function autocompletarNumeroDesdeAdjunto(file: File) {
+    void autocompletarNumero(file, {
+      vigente: () =>
+        draftRef.current?.comprobanteFile === file && !draftRef.current?.numeroInterno,
+      numeroActual: () => {
+        const d = draftRef.current;
+        if (!d) return "";
+        if (!d.manual) return d.numero;
+        const cbte = comprobanteManualDeDraft(d);
+        return numeroActualComprobanteManual(cbte, numeroDesdeComprobanteManual(cbte));
+      },
+      aplicar: (leido, numero) => {
+        const d = draftRef.current;
+        if (!d) return;
+        if (d.manual) {
+          setDraft((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  comprobanteManual: {
+                    ...comprobanteManualDeDraft(prev),
+                    cbteTipo: String(leido.cbteTipo),
+                    ptoVenta: String(leido.ptoVenta),
+                    cbteNro: String(leido.cbteNro),
+                  },
+                }
+              : prev,
+          );
+          setCbteManualErrores({});
+        } else {
+          setDraft((prev) => (prev ? { ...prev, numero } : prev));
+        }
+      },
+    });
+  }
 
   useEffect(() => {
     if (!open) {
@@ -820,91 +865,125 @@ export function FacturaEditModal({
             />
           )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {draft.manual && !draft.numeroInterno ? (
-              <ComprobanteManualFields
-                value={comprobanteManualDeDraft(draft)}
-                onChange={(comprobanteManual) => patch({ comprobanteManual })}
-                errores={cbteManualErrores}
-                disabled={saving}
-                labelClassName="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel"
-                inputClassName="h-9 w-full border border-black/20 bg-white px-3 text-sm"
-                className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-3"
-              />
-            ) : (
-              !conArca && (
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                    Número de comprobante
-                  </label>
-                  {/* Número interno: lo asignó el sistema, no se edita. */}
-                  <input
-                    type="text"
-                    value={draft.numero}
-                    readOnly={draft.numeroInterno}
-                    title={draft.numeroInterno ? "Numeración interna" : undefined}
-                    onChange={(e) => patch({ numero: e.target.value })}
-                    placeholder="0001-00000001"
-                    className={
-                      draft.numeroInterno
-                        ? "h-9 cursor-default border border-dashed border-black/20 bg-vialto-mist/60 px-3 text-sm tabular-nums text-vialto-steel"
-                        : "h-9 border border-black/20 bg-white px-3 text-sm"
+            {/* Mismo orden que Nueva factura: cliente + fechas · archivo + número + IVA. */}
+            <div className="col-span-full grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+              <div className="sm:col-span-2 lg:col-span-1">
+                <FacturaContraparteField
+                  clienteId={draft.clienteId}
+                  clientes={filteredClientes}
+                  onClienteChange={(id) =>
+                    patch({
+                      clienteId: id,
+                      viajeIds: [],
+                      facturarPorTramo: false,
+                      tramos: [],
+                    })
+                  }
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                  Fecha de emisión <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={draft.fechaEmision}
+                  onChange={(e) => patch({ fechaEmision: e.target.value })}
+                  className="h-9 border border-black/20 bg-white px-3 text-sm"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                  Fecha de vencimiento
+                </label>
+                <input
+                  type="date"
+                  value={draft.fechaVencimiento}
+                  onChange={(e) => patch({ fechaVencimiento: e.target.value })}
+                  className="h-9 border border-black/20 bg-white px-3 text-sm"
+                />
+              </div>
+            </div>
+
+            <div
+              className={`col-span-full grid grid-cols-1 items-start gap-4 ${
+                showComprobanteAdjunto
+                  ? conArca
+                    ? "sm:grid-cols-[auto_minmax(0,12rem)]"
+                    : "sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,12rem)]"
+                  : conArca
+                    ? "sm:grid-cols-[minmax(0,12rem)]"
+                    : "sm:grid-cols-[minmax(0,1fr)_minmax(0,12rem)]"
+              }`}
+            >
+              {showComprobanteAdjunto && (
+                <div className="min-w-0 sm:max-w-[16rem]">
+                  <ComprobanteAdjuntoField
+                    file={draft.comprobanteFile}
+                    existingUrl={draft.comprobanteUrl}
+                    onFileChange={(file) => {
+                      patch(
+                        file
+                          ? { comprobanteFile: file, comprobanteUrl: null }
+                          : { comprobanteFile: null },
+                      );
+                      if (file) autocompletarNumeroDesdeAdjunto(file);
+                    }}
+                    onClearExisting={() =>
+                      patch({ comprobanteUrl: null, comprobanteFile: null })
                     }
+                    disabled={saving}
                   />
                 </div>
-              )
-            )}
-
-            <FacturaContraparteField
-              clienteId={draft.clienteId}
-              clientes={filteredClientes}
-              onClienteChange={(id) =>
-                patch({
-                  clienteId: id,
-                  viajeIds: [],
-                  facturarPorTramo: false,
-                  tramos: [],
-                })
-              }
-            />
-
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Fecha de emisión <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={draft.fechaEmision}
-                onChange={(e) => patch({ fechaEmision: e.target.value })}
-                className="h-9 border border-black/20 bg-white px-3 text-sm"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Fecha de vencimiento
-              </label>
-              <input
-                type="date"
-                value={draft.fechaVencimiento}
-                onChange={(e) => patch({ fechaVencimiento: e.target.value })}
-                className="h-9 border border-black/20 bg-white px-3 text-sm"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                {ivaLabel}
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={draft.ivaPct}
-                onChange={(e) => patch({ ivaPct: e.target.value })}
-                placeholder="0"
-                className="h-9 border border-black/20 bg-white px-3 text-sm"
-              />
+              )}
+              {draft.manual && !draft.numeroInterno ? (
+                <ComprobanteManualFields
+                  value={comprobanteManualDeDraft(draft)}
+                  onChange={(comprobanteManual) => patch({ comprobanteManual })}
+                  errores={cbteManualErrores}
+                  disabled={saving}
+                  labelClassName="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel"
+                  inputClassName="h-9 w-full border border-black/20 bg-white px-3 text-sm"
+                  className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+                />
+              ) : (
+                !conArca && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                      Número de comprobante
+                    </label>
+                    {/* Número interno: lo asignó el sistema, no se edita. */}
+                    <input
+                      type="text"
+                      value={draft.numero}
+                      readOnly={draft.numeroInterno}
+                      title={draft.numeroInterno ? "Numeración interna" : undefined}
+                      onChange={(e) => patch({ numero: e.target.value })}
+                      placeholder="0001-00000001"
+                      className={
+                        draft.numeroInterno
+                          ? "h-9 cursor-default border border-dashed border-black/20 bg-vialto-mist/60 px-3 text-sm tabular-nums text-vialto-steel"
+                          : "h-9 border border-black/20 bg-white px-3 text-sm"
+                      }
+                    />
+                  </div>
+                )
+              )}
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                  {ivaLabel}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={draft.ivaPct}
+                  onChange={(e) => patch({ ivaPct: e.target.value })}
+                  placeholder="0"
+                  className="h-9 border border-black/20 bg-white px-3 text-sm"
+                />
+              </div>
             </div>
 
             <div className="col-span-full flex flex-col gap-1">
@@ -993,26 +1072,6 @@ export function FacturaEditModal({
                 factura por moneda.
               </p>
             )}
-
-          {showComprobanteAdjunto && (
-            <div className="mt-4">
-              <ComprobanteAdjuntoField
-                file={draft.comprobanteFile}
-                existingUrl={draft.comprobanteUrl}
-                onFileChange={(file) =>
-                  patch(
-                    file
-                      ? { comprobanteFile: file, comprobanteUrl: null }
-                      : { comprobanteFile: null },
-                  )
-                }
-                onClearExisting={() =>
-                  patch({ comprobanteUrl: null, comprobanteFile: null })
-                }
-                disabled={saving}
-              />
-            </div>
-          )}
         </div>
 
         <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">

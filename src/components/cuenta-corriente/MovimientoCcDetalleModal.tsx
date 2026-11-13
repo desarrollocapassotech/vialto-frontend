@@ -1,5 +1,9 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { ComprobanteAdjuntoField } from '@/components/shared/ComprobanteAdjuntoField';
+import { uploadComprobante } from '@/lib/comprobanteUpload';
+import { useAbrirAdjunto } from '@/hooks/useAbrirAdjunto';
+import { useAutocompletarNumeroComprobante } from '@/hooks/useAutocompletarNumeroComprobante';
 import { ChevronRight } from 'lucide-react';
 import {
   ViewModalShell,
@@ -238,6 +242,24 @@ export function MovimientoCcDetalleModal({
   const netoLineas = roundMoney2(lineas.reduce((s, l) => s + (Number(l.importe) || 0), 0));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Archivo del comprobante (movimiento manual). Al adjuntar una factura de ARCA se
+  // completa el número si está vacío o lo había completado el sistema.
+  const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
+  const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
+  const [quitarArchivo, setQuitarArchivo] = useState(false);
+  const autocompletarNumero = useAutocompletarNumeroComprobante();
+  const estadoAdjuntoRef = useRef({ comprobanteFile, numero });
+  estadoAdjuntoRef.current = { comprobanteFile, numero };
+  function cambiarArchivo(file: File | null) {
+    setComprobanteFile(file);
+    if (!file) return;
+    setQuitarArchivo(false);
+    void autocompletarNumero(file, {
+      vigente: () => estadoAdjuntoRef.current.comprobanteFile === file,
+      numeroActual: () => estadoAdjuntoRef.current.numero,
+      aplicar: (_leido, nuevo) => setNumero(nuevo),
+    });
+  }
   /** Mensaje de la confirmación de cambio de importe con imputaciones (null = cerrada). */
   const [confirmarImporte, setConfirmarImporte] = useState<string | null>(null);
   /** Vencimiento anterior a la emisión (YYYY-MM-DD, se comparan como texto). */
@@ -335,7 +357,14 @@ export function MovimientoCcDetalleModal({
     setSaving(true);
     setError(null);
     try {
+      // Archivo: uno nuevo se sube; "Quitar" sin elegir otro lo borra; si no, no se toca.
+      const comprobanteUrl = comprobanteFile
+        ? await uploadComprobante(() => getToken(), comprobanteFile, 'cuenta-corriente')
+        : quitarArchivo
+          ? null
+          : undefined;
       await actualizarMovimiento(() => getToken(), m.id, {
+        ...(comprobanteUrl !== undefined ? { comprobanteUrl } : {}),
         numeroComprobante: numero.trim(),
         fecha,
         ...(esCargo ? { fechaVencimiento: vencimiento || null } : { formaPago: formaPago.trim() }),
@@ -425,7 +454,18 @@ export function MovimientoCcDetalleModal({
     >
       {editando ? (
         <form id="detalle-cc-form" onSubmit={guardar} className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem]">
+          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_7rem]">
+            {/* Archivo a la izquierda del número, como en Nueva factura. */}
+            <div className="min-w-0 sm:max-w-[14rem]">
+              <ComprobanteAdjuntoField
+                file={comprobanteFile}
+                existingUrl={quitarArchivo ? null : m.comprobanteUrl}
+                onFileChange={cambiarArchivo}
+                onClearExisting={() => setQuitarArchivo(true)}
+                disabled={saving}
+                labelClassName={labelClass}
+              />
+            </div>
             <div>
               <label className={labelClass} htmlFor="det-numero">
                 Número de comprobante <span className="text-red-500">*</span>
@@ -577,6 +617,17 @@ export function MovimientoCcDetalleModal({
             )}
             <Dato label="Moneda">{m.moneda}</Dato>
             <Dato label="Estado">{estadoMovimientoCcLabel(m)}</Dato>
+            {manual && m.comprobanteUrl?.trim() && (
+              <Dato label="Comprobante">
+                <button
+                  type="button"
+                  className="text-vialto-charcoal underline-offset-2 hover:underline"
+                  onClick={() => abrirAdjunto({ url: m.comprobanteUrl! }, 'Comprobante')}
+                >
+                  Ver archivo
+                </button>
+              </Dato>
+            )}
           </dl>
 
           {esCargo && lineasVista && (
@@ -772,6 +823,7 @@ export function MovimientoCcDetalleModal({
           }}
         />
       )}
+      {visorAdjunto}
     </ViewModalShell>
   );
 }

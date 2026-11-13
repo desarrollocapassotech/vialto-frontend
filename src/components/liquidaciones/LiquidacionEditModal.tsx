@@ -1,6 +1,11 @@
 import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
 import { transportistaEnFrase } from "@/lib/transportistaLabel";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  numeroActualComprobanteManual,
+  useAutocompletarNumeroComprobante,
+} from "@/hooks/useAutocompletarNumeroComprobante";
+import { numeroDesdeComprobanteManual } from "@/lib/comprobanteManual";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
@@ -269,6 +274,41 @@ export function LiquidacionEditModal({
   );
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+
+  // Factura de ARCA adjunta: completa el número (o la factura del transportista, con fecha,
+  // en la liquidación manual) leyéndolo del archivo. Estado vigente en un ref (lectura async).
+  const autocompletarNumero = useAutocompletarNumeroComprobante();
+  const estadoAdjuntoRef = useRef({ comprobanteFile, numeroComprobanteProveedor, cbteProveedor });
+  estadoAdjuntoRef.current = { comprobanteFile, numeroComprobanteProveedor, cbteProveedor };
+
+  function autocompletarNumeroDesdeAdjunto(file: File) {
+    const est = () => estadoAdjuntoRef.current;
+    void autocompletarNumero(file, {
+      vigente: () => est().comprobanteFile === file,
+      numeroActual: () =>
+        liquidacionManual
+          ? numeroActualComprobanteManual(
+              est().cbteProveedor,
+              numeroDesdeComprobanteManual(est().cbteProveedor),
+            )
+          : est().numeroComprobanteProveedor,
+      aplicar: (leido, numero) => {
+        if (liquidacionManual) {
+          const cbte = est().cbteProveedor;
+          setCbteProveedor({
+            ...cbte,
+            cbteTipo: String(leido.cbteTipo),
+            ptoVenta: String(leido.ptoVenta),
+            cbteNro: String(leido.cbteNro),
+            fecha: cbte.fecha || leido.fecha || "",
+          });
+          setCbteProveedorErrores({});
+        } else {
+          setNumeroComprobanteProveedor(numero);
+        }
+      },
+    });
+  }
   // Errores de validación (campos con borde rojo + viajes): el texto va al pie del modal.
   const erroresPie = useMemo(
     () => ({ ...fieldErrors, viajes: viajesFieldError }),
@@ -812,6 +852,37 @@ export function LiquidacionEditModal({
           </p>
         )}
 
+        {/* Archivo a la izquierda del número (o de la factura del transportista), como en
+            Nueva factura. */}
+        <div
+          className={
+            showComprobante
+              ? "grid grid-cols-1 items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)]"
+              : ""
+          }
+        >
+        {showComprobante && (
+          <div className="min-w-0 sm:max-w-[14rem]">
+            <ComprobanteAdjuntoField
+              file={comprobanteFile}
+              existingUrl={comprobanteUrl}
+              onFileChange={(file) => {
+                setComprobanteFile(file);
+                if (file) {
+                  setComprobanteUrl(null);
+                  autocompletarNumeroDesdeAdjunto(file);
+                }
+              }}
+              onClearExisting={() => {
+                setComprobanteUrl(null);
+                setComprobanteFile(null);
+              }}
+              disabled={saving}
+              label="Comprobante"
+              labelClassName={LABEL}
+            />
+          </div>
+        )}
         {liquidacionManual && (
           <div>
             <p className={LABEL}>Factura del {tFrase}</p>
@@ -848,23 +919,7 @@ export function LiquidacionEditModal({
             />
           </div>
         )}
-
-        {showComprobante && (
-          <ComprobanteAdjuntoField
-            file={comprobanteFile}
-            existingUrl={comprobanteUrl}
-            onFileChange={(file) => {
-              setComprobanteFile(file);
-              if (file) setComprobanteUrl(null);
-            }}
-            onClearExisting={() => {
-              setComprobanteUrl(null);
-              setComprobanteFile(null);
-            }}
-            disabled={saving}
-            label="Comprobante"
-          />
-        )}
+        </div>
       </form>
     </ViewModalShell>
   );

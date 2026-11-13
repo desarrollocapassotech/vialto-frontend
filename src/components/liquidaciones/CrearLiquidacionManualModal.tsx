@@ -39,6 +39,11 @@ import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { ComprobanteManualFields } from "@/components/shared/ComprobanteManualFields";
 import { NumeroComprobanteField } from "@/components/shared/NumeroComprobanteField";
 import { URL_NUMERO_INTERNO } from "@/lib/numeroInterno";
+import { numeroDesdeComprobanteManual } from "@/lib/comprobanteManual";
+import {
+  numeroActualComprobanteManual,
+  useAutocompletarNumeroComprobante,
+} from "@/hooks/useAutocompletarNumeroComprobante";
 import {
   comprobanteManualDraftDesde,
   payloadComprobanteLiquidacion,
@@ -583,6 +588,76 @@ export function CrearLiquidacionManualModal({
   const showComprobante = !conArca;
   /** Número de comprobante libre (sin ARCA): va en la primera fila, junto a comisión e IVA. */
   const campoNumeroEnFila = showComprobante && !liquidacionManual;
+
+  // — Autocompletar el número desde la factura de ARCA adjunta —
+  const autocompletarNumero = useAutocompletarNumeroComprobante();
+  /** Estado vigente, para decidir después de leer el archivo (async). */
+  const estadoAdjuntoRef = useRef({
+    comprobanteFile,
+    numeroAutomatico,
+    numeroComprobanteProveedor,
+    cbteProveedor,
+    liquidacionManual,
+  });
+  estadoAdjuntoRef.current = {
+    comprobanteFile,
+    numeroAutomatico,
+    numeroComprobanteProveedor,
+    cbteProveedor,
+    liquidacionManual,
+  };
+
+  /**
+   * Factura de ARCA adjunta: completa el número de comprobante (o tipo + punto de venta +
+   * número + fecha en la liquidación manual del monotributista) leyéndolo del PDF/QR. Solo si
+   * está vacío o lo había completado el sistema: nunca pisa lo que escribió el usuario.
+   */
+  /** Archivo del comprobante: siempre a la izquierda del número (o de la factura del transportista). */
+  function renderAdjunto() {
+    return (
+      <div className="min-w-0 sm:max-w-[14rem]">
+        <ComprobanteAdjuntoField
+          file={comprobanteFile}
+          onFileChange={(file) => {
+            setComprobanteFile(file);
+            if (file) void autocompletarNumeroDesdeAdjunto(file);
+          }}
+          disabled={submitting}
+          labelClassName={labelClass}
+        />
+      </div>
+    );
+  }
+
+  function autocompletarNumeroDesdeAdjunto(file: File) {
+    const est = () => estadoAdjuntoRef.current;
+    return autocompletarNumero(file, {
+      vigente: () =>
+        est().comprobanteFile === file && (est().liquidacionManual || !est().numeroAutomatico),
+      numeroActual: () =>
+        est().liquidacionManual
+          ? numeroActualComprobanteManual(
+              est().cbteProveedor,
+              numeroDesdeComprobanteManual(est().cbteProveedor),
+            )
+          : est().numeroComprobanteProveedor,
+      aplicar: (leido, numero) => {
+        if (est().liquidacionManual) {
+          const cbte = est().cbteProveedor;
+          setCbteProveedor({
+            ...cbte,
+            cbteTipo: String(leido.cbteTipo),
+            ptoVenta: String(leido.ptoVenta),
+            cbteNro: String(leido.cbteNro),
+            fecha: cbte.fecha || leido.fecha || "",
+          });
+          setCbteProveedorErrores({});
+        } else {
+          setNumeroComprobanteProveedor(numero);
+        }
+      },
+    });
+  }
   const rangoFechaArca = rangoFechaEmisionArca();
   const errorFechaEmision = conArca ? errorFechaEmisionArca(fechaEmision) : null;
   const cvlpClaseBAlerta = conArca && cvlpClaseBEsperada(condicionIva);
@@ -1566,13 +1641,14 @@ export function CrearLiquidacionManualModal({
                   <div
                     className={`grid grid-cols-1 gap-3 ${
                       campoNumeroEnFila
-                        ? "sm:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                        ? "items-start sm:grid-cols-2 lg:grid-cols-[auto_minmax(0,1.3fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
                         : conArca
                           ? "sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]"
                           : "sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
                     }`}
                   >
-                    {/* Número de comprobante (sin ARCA) a la izquierda, como en Nueva factura. */}
+                    {/* Sin ARCA: archivo + número de comprobante a la izquierda, como en Nueva factura. */}
+                    {campoNumeroEnFila && renderAdjunto()}
                     {campoNumeroEnFila &&
                       (existente ? (
                         <div>
@@ -1971,31 +2047,27 @@ export function CrearLiquidacionManualModal({
                     </p>
                   )}
 
+                  {/* Monotributista: archivo a la izquierda de la factura del transportista. */}
                   {liquidacionManual && (
-                    <div>
-                      <p className={labelClass}>Factura del {tFrase}</p>
-                      <ComprobanteManualFields
-                        value={cbteProveedor}
-                        onChange={(v) => {
-                          setCbteProveedor(v);
-                          setCbteProveedorErrores({});
-                        }}
-                        errores={cbteProveedorErrores}
-                        conFecha
-                        disabled={submitting}
-                        labelClassName={labelClass}
-                        inputClassName={inputClass}
-                        className="grid grid-cols-1 gap-3 sm:grid-cols-2"
-                      />
+                    <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)]">
+                      {renderAdjunto()}
+                      <div>
+                        <p className={labelClass}>Factura del {tFrase}</p>
+                        <ComprobanteManualFields
+                          value={cbteProveedor}
+                          onChange={(v) => {
+                            setCbteProveedor(v);
+                            setCbteProveedorErrores({});
+                          }}
+                          errores={cbteProveedorErrores}
+                          conFecha
+                          disabled={submitting}
+                          labelClassName={labelClass}
+                          inputClassName={inputClass}
+                          className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+                        />
+                      </div>
                     </div>
-                  )}
-
-                  {showComprobante && (
-                    <ComprobanteAdjuntoField
-                      file={comprobanteFile}
-                      onFileChange={setComprobanteFile}
-                      disabled={submitting}
-                    />
                   )}
 
                   {cvlpClaseBAlerta && (

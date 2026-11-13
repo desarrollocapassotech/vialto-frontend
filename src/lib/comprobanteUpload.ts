@@ -13,14 +13,16 @@ export function isComprobanteFile(file: File): boolean {
 export async function uploadComprobante(
   getToken: () => Promise<string | null>,
   file: File,
-  module: 'facturacion' | 'integracion-arca',
+  /** `cuenta-corriente`: movimientos manuales de CC (sin variante superadmin). */
+  module: 'facturacion' | 'integracion-arca' | 'cuenta-corriente',
   tenantId?: string,
 ): Promise<string> {
   const form = new FormData();
   form.append('file', file);
-  const base = tenantId
-    ? `/api/platform/${module === 'facturacion' ? 'facturacion' : 'integracion-arca'}/upload-comprobante?tenantId=${encodeURIComponent(tenantId)}`
-    : `/api/${module}/upload-comprobante`;
+  const base =
+    tenantId && module !== 'cuenta-corriente'
+      ? `/api/platform/${module}/upload-comprobante?tenantId=${encodeURIComponent(tenantId)}`
+      : `/api/${module}/upload-comprobante`;
   const res = await apiJson<{ url: string }>(base, getToken, { method: 'POST', body: form });
   return res.url;
 }
