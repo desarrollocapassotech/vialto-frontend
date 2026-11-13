@@ -27,7 +27,7 @@ import type { ConEmpresa, Transportista } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
-import { proveedorTipoLabel, QUERY_TODOS_LOS_PROVEEDORES } from "@/lib/proveedorTipo";
+import { etiquetaTipoProveedor, QUERY_TODOS_LOS_PROVEEDORES } from "@/lib/proveedorTipo";
 
 export function TransportistasSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -371,7 +371,7 @@ export function TransportistasSuperadminPage() {
             id: "tipo",
             header: "Tipo",
             cell: (t: Transportista) =>
-              `${proveedorTipoLabel(t.tipo ?? "transportista", labels)}${t.activo === false ? " (inactivo)" : ""}`,
+              `${etiquetaTipoProveedor(t, labels)}${t.activo === false ? " (inactivo)" : ""}`,
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           ...(idFiscalVisible ? [{

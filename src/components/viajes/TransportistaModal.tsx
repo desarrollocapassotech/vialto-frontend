@@ -7,9 +7,10 @@ import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { useTenantPaisFijo } from '@/hooks/useTenantPaisFijo';
 import type { PaisCodigo } from '@/lib/ciudades';
-import type { ProveedorTipo, Transportista } from '@/types/api';
+import type { Transportista } from '@/types/api';
 import { useTransportistaLabels } from '@/hooks/useTransportistaLabels';
-import { proveedorTipoOpciones } from '@/lib/proveedorTipo';
+import type { TipoProveedorElegido } from '@/lib/proveedorTipo';
+import { ProveedorTipoSelect } from '@/components/transportistas/ProveedorTipoSelect';
 import { transportistaEnFrase } from '@/lib/transportistaLabel';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
 import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
@@ -36,7 +37,11 @@ export function TransportistaModal({
   elegirTipo?: boolean;
 }) {
   const labels = useTransportistaLabels(tenantId);
-  const [tipo, setTipo] = useState<ProveedorTipo>('transportista');
+  const [tipoElegido, setTipoElegido] = useState<TipoProveedorElegido>({
+    tipo: 'transportista',
+    categoria: '',
+  });
+  const tipo = elegirTipo ? tipoElegido.tipo : 'transportista';
   const [nombre, setNombre] = useState('');
   const [pais, setPais] = useState<PaisCodigo | ''>('');
   const [idFiscal, setIdFiscal] = useState('');
@@ -83,6 +88,9 @@ export function TransportistaModal({
         ? 'Ingresá el nombre del proveedor.'
         : `Ingresá el nombre del ${transportistaEnFrase(labels.singular)}.`;
     }
+    if (tipo === 'otro' && !tipoElegido.categoria.trim()) {
+      errs.categoria = 'Escribí qué tipo de proveedor es.';
+    }
     if (!paisFijo && !pais) errs.pais = 'Seleccioná el país.';
     if (!idFiscal.trim()) {
       const label = pais ? idFiscalPorPais(pais).label : 'ID fiscal';
@@ -101,7 +109,8 @@ export function TransportistaModal({
       const result = await apiJson<Transportista>(path, () => getToken(), {
         method: 'POST',
         body: JSON.stringify({
-          tipo: elegirTipo ? tipo : 'transportista',
+          tipo,
+          categoria: tipo === 'otro' ? tipoElegido.categoria.trim() : undefined,
           nombre: nombre.trim(),
           pais,
           idFiscal: idFiscal.trim(),
@@ -160,17 +169,15 @@ export function TransportistaModal({
             {elegirTipo && (
               <label className="flex flex-col gap-1">
                 <span className={L}>Tipo <span className="text-red-500">*</span></span>
-                <select
-                  value={tipo}
-                  onChange={(e) => setTipo(e.target.value as ProveedorTipo)}
-                  className={`${I} border-black/15 bg-white`}
-                >
-                  {proveedorTipoOpciones(labels).map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                <ProveedorTipoSelect
+                  value={tipoElegido}
+                  onChange={setTipoElegido}
+                  tenantId={tenantId}
+                  selectClassName={`${I} border-black/15 bg-white`}
+                  inputClassName={`${I} border-black/15`}
+                  error={!!fieldErrors.categoria}
+                  mostrarAyuda={false}
+                />
               </label>
             )}
             <label className="flex flex-col gap-1">

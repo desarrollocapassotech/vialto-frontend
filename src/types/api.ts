@@ -372,6 +372,8 @@ export interface Transportista {
    * `taller` en las órdenes de trabajo. Ver `lib/proveedorTipo.ts`.
    */
   tipo: ProveedorTipo;
+  /** Solo tipo `otro`: nombre del tipo que cargó la empresa (ej. "Combustible"). */
+  categoria?: string | null;
   /** false = desactivado: no se ofrece en los selectores, conserva el historial. */
   activo: boolean;
   paut: string | null;

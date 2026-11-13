@@ -19,8 +19,9 @@ import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHead
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useIdFiscalLabel } from "@/hooks/useIdFiscalLabel";
 import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
-import { proveedorTipoLabel, proveedorTipoOpciones } from "@/lib/proveedorTipo";
-import type { PaginatedMeta, ProveedorTipo, Transportista } from "@/types/api";
+import { etiquetaTipoProveedor, opcionesFiltroTipo } from "@/lib/proveedorTipo";
+import { useCategoriasProveedor } from "@/hooks/useCategoriasProveedor";
+import type { PaginatedMeta, Transportista } from "@/types/api";
 import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
 import { ListadoFiltroBuscador } from "@/components/listado/ListadoFiltroBuscador";
 
@@ -29,7 +30,8 @@ type TransportistasPaginatedResponse = {
   meta: PaginatedMeta;
 };
 
-type FiltroTipo = ProveedorTipo | "todos";
+/** `transportista`, `taller`, `otro` (todos los otros) o `cat:<nombre>` (un tipo propio). */
+type FiltroTipo = string;
 type FiltroEstado = "todos" | "activos" | "inactivos";
 
 /**
@@ -57,6 +59,7 @@ export function TransportistasTenantPage() {
   const telefonoVisible = isVisible("detalle_transportista", "telefono");
   const idFiscalLabel = useIdFiscalLabel();
   const labels = useTransportistaLabels();
+  const categorias = useCategoriasProveedor();
 
   // Estados de los filtros de columna
   const [filtroNombre, setFiltroNombre] = useState("");
@@ -85,8 +88,9 @@ export function TransportistasTenantPage() {
         const params = new URLSearchParams({
           page: String(pageApi),
           pageSize: String(pageSizeApi),
-          tipo: filtroTipo,
+          tipo: filtroTipo.startsWith("cat:") ? "otro" : filtroTipo,
         });
+        if (filtroTipo.startsWith("cat:")) params.set("categoria", filtroTipo.slice(4));
         if (filtroNombre.trim()) {
           params.set("nombre", filtroNombre.trim());
         }
@@ -230,7 +234,7 @@ export function TransportistasTenantPage() {
                   aria-label="Filtrar por tipo de proveedor"
                 >
                   <option value="todos">Todos</option>
-                  {proveedorTipoOpciones(labels).map((o) => (
+                  {opcionesFiltroTipo(labels, categorias).map((o) => (
                     <option key={o.id} value={o.id}>
                       {o.label}
                     </option>
@@ -312,7 +316,7 @@ export function TransportistasTenantPage() {
           {
             id: "tipo",
             header: "Tipo",
-            cell: (t: Transportista) => proveedorTipoLabel(t.tipo, labels),
+            cell: (t: Transportista) => etiquetaTipoProveedor(t, labels),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           ...(idFiscalVisible ? [{

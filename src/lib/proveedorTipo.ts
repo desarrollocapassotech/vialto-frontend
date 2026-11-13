@@ -22,6 +22,39 @@ export function proveedorTipoOpciones(labels: TransportistaLabels) {
   return PROVEEDOR_TIPOS.map((id) => ({ id, label: proveedorTipoLabel(id, labels) }));
 }
 
+/** Lo que se muestra como tipo de un proveedor: la categoría propia si es "otro" con nombre. */
+export function etiquetaTipoProveedor(
+  p: Pick<Transportista, "tipo" | "categoria">,
+  labels: TransportistaLabels,
+): string {
+  if (p.tipo === "otro" && p.categoria?.trim()) return p.categoria.trim();
+  return proveedorTipoLabel(p.tipo ?? "transportista", labels);
+}
+
+/** Tipo elegido en el selector: el tipo de fondo y, si es "otro", su nombre. */
+export type TipoProveedorElegido = { tipo: ProveedorTipo; categoria: string };
+
+/**
+ * Valor del `<select>` de tipo: `transportista`, `taller`, `cat:<nombre>` (tipo propio ya
+ * usado) o `nuevo` (escribir uno). Un "otro" sin nombre no tiene opción propia: muestra el
+ * campo para escribirlo.
+ */
+export function valorSelectTipo(t: TipoProveedorElegido, categorias: string[], nuevo: boolean): string {
+  if (t.tipo !== "otro") return t.tipo;
+  if (nuevo) return "nuevo";
+  const c = t.categoria.trim();
+  return c && categorias.includes(c) ? `cat:${c}` : "nuevo";
+}
+
+/** Opciones del filtro de tipo del listado (tipos + categorías propias). */
+export function opcionesFiltroTipo(labels: TransportistaLabels, categorias: string[]) {
+  return [
+    { id: "transportista", label: proveedorTipoLabel("transportista", labels) },
+    { id: "taller", label: "Taller" },
+    ...categorias.map((c) => ({ id: `cat:${c}`, label: c })),
+  ];
+}
+
 /** Para qué se usa cada tipo (texto de ayuda debajo del selector de tipo). */
 export const AYUDA_TIPO: Record<ProveedorTipo, string> = {
   transportista: "Se puede asignar a viajes, choferes y vehículos, y liquidarle fletes.",

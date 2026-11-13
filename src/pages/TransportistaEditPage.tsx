@@ -26,8 +26,8 @@ import {
 } from "@/lib/ciudades";
 import type { PaisCodigo } from "@/lib/ciudades";
 import type { ProveedorTipo, Transportista } from "@/types/api";
-import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
-import { AYUDA_TIPO, proveedorTipoOpciones } from "@/lib/proveedorTipo";
+import { ProveedorTipoSelect } from "@/components/transportistas/ProveedorTipoSelect";
+import type { TipoProveedorElegido } from "@/lib/proveedorTipo";
 import { VencimientoPermisoInput } from "@/components/forms/VencimientoPermisoInput";
 import { TelefonoInput } from "@/components/forms/TelefonoInput";
 import { isValidPhoneNumber } from "libphonenumber-js";
@@ -43,8 +43,11 @@ export function TransportistaEditPage() {
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
   const { showToast } = useToast();
-  const labels = useTransportistaLabels(tenantId || undefined);
-  const [tipo, setTipo] = useState<ProveedorTipo>("transportista");
+  const [tipoElegido, setTipoElegido] = useState<TipoProveedorElegido>({
+    tipo: "transportista",
+    categoria: "",
+  });
+  const tipo = tipoElegido.tipo;
   const [tipoGuardado, setTipoGuardado] = useState<ProveedorTipo>("transportista");
   const esTransportista = tipo === "transportista";
   const [nombre, setNombre] = useState("");
@@ -122,7 +125,7 @@ export function TransportistaEditPage() {
           : `/api/transportistas/${encodeURIComponent(id)}`;
         const row = await apiJson<Transportista>(detailPath, withToken);
         if (!cancelled) {
-          setTipo(row.tipo ?? "transportista");
+          setTipoElegido({ tipo: row.tipo ?? "transportista", categoria: row.categoria ?? "" });
           setTipoGuardado(row.tipo ?? "transportista");
           setNombre(row.nombre);
           setPais(paisCodigoDesdeTexto(row.pais ?? ""));
@@ -168,6 +171,10 @@ export function TransportistaEditPage() {
     if (!id) return;
     const errs: Record<string, string> = {};
     if (!nombre.trim()) errs.nombre = "Ingresá el nombre del proveedor.";
+    // Todo proveedor "otro" lleva el nombre de su tipo (no hay "otro sin especificar").
+    if (tipo === "otro" && !tipoElegido.categoria.trim()) {
+      errs.categoria = "Escribí qué tipo de proveedor es.";
+    }
     if (telefono.trim() && !isValidPhoneNumber(telefono)) {
       errs.telefono = "Ingresá un teléfono válido para el país seleccionado.";
     }
@@ -206,6 +213,7 @@ export function TransportistaEditPage() {
         method: "PATCH",
         body: JSON.stringify({
           tipo,
+          categoria: tipo === "otro" ? tipoElegido.categoria.trim() : undefined,
           nombre: nombre.trim(),
           pais: pais || "",
           idFiscal: idFiscal.trim(),
@@ -289,14 +297,13 @@ export function TransportistaEditPage() {
           >
             <label className="grid gap-1.5">
               <CrudFieldLabel required>Tipo</CrudFieldLabel>
-              <CrudSelect value={tipo} onChange={(e) => setTipo(e.target.value as ProveedorTipo)}>
-                {proveedorTipoOpciones(labels).map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-              </CrudSelect>
-              <span className="text-xs text-vialto-steel">{AYUDA_TIPO[tipo]}</span>
+              <ProveedorTipoSelect
+                value={tipoElegido}
+                onChange={setTipoElegido}
+                tenantId={tenantId || undefined}
+                error={!!fieldErrors.categoria}
+              />
+              <CrudFieldError message={fieldErrors.categoria} />
               {tipo !== tipoGuardado && (
                 <p className="text-xs text-amber-800/90">
                   Si ya tiene viajes, liquidaciones u órdenes de trabajo cargadas con el tipo

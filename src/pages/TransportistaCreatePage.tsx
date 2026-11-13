@@ -28,9 +28,8 @@ import { isValidPhoneNumber } from "libphonenumber-js";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useArcaPadron } from "@/hooks/useArcaPadron";
 import { ArcaPadronStatus } from "@/components/shared/ArcaPadronStatus";
-import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
-import { AYUDA_TIPO, proveedorTipoOpciones } from "@/lib/proveedorTipo";
-import type { ProveedorTipo } from "@/types/api";
+import { ProveedorTipoSelect } from "@/components/transportistas/ProveedorTipoSelect";
+import type { TipoProveedorElegido } from "@/lib/proveedorTipo";
 
 export function TransportistaCreatePage() {
   const { getToken } = useAuth();
@@ -39,11 +38,12 @@ export function TransportistaCreatePage() {
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
   const { showToast } = useToast();
-  const labels = useTransportistaLabels(tenantId || undefined);
   const tipoInicial = searchParams.get("tipo");
-  const [tipo, setTipo] = useState<ProveedorTipo>(
-    tipoInicial === "taller" || tipoInicial === "otro" ? tipoInicial : "transportista",
-  );
+  const [tipoElegido, setTipoElegido] = useState<TipoProveedorElegido>({
+    tipo: tipoInicial === "taller" || tipoInicial === "otro" ? tipoInicial : "transportista",
+    categoria: "",
+  });
+  const tipo = tipoElegido.tipo;
   const esTransportista = tipo === "transportista";
   const [nombre, setNombre] = useState("");
   const [pais, setPais] = useState<PaisCodigo | "">("");
@@ -107,6 +107,9 @@ export function TransportistaCreatePage() {
   async function onSubmit() {
     const errs: Record<string, string> = {};
     if (!nombre.trim()) errs.nombre = "Ingresá el nombre del proveedor.";
+    if (tipo === "otro" && !tipoElegido.categoria.trim()) {
+      errs.categoria = "Escribí qué tipo de proveedor es.";
+    }
     if (telefono.trim() && !isValidPhoneNumber(telefono)) {
       errs.telefono = "Ingresá un teléfono válido para el país seleccionado.";
     }
@@ -145,6 +148,7 @@ export function TransportistaCreatePage() {
         method: "POST",
         body: JSON.stringify({
           tipo,
+          categoria: tipo === "otro" ? tipoElegido.categoria.trim() : undefined,
           nombre: nombre.trim(),
           pais: pais || undefined,
           idFiscal: idFiscal.trim() || undefined,
@@ -211,14 +215,13 @@ export function TransportistaCreatePage() {
       >
         <label className="grid gap-1.5">
           <CrudFieldLabel required>Tipo</CrudFieldLabel>
-          <CrudSelect value={tipo} onChange={(e) => setTipo(e.target.value as ProveedorTipo)}>
-            {proveedorTipoOpciones(labels).map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </CrudSelect>
-          <span className="text-xs text-vialto-steel">{AYUDA_TIPO[tipo]}</span>
+          <ProveedorTipoSelect
+            value={tipoElegido}
+            onChange={setTipoElegido}
+            tenantId={tenantId || undefined}
+            error={!!fieldErrors.categoria}
+          />
+          <CrudFieldError message={fieldErrors.categoria} />
         </label>
         <label className="grid gap-1.5">
           <CrudFieldLabel required>Nombre</CrudFieldLabel>
