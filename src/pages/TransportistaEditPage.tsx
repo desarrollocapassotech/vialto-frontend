@@ -27,6 +27,7 @@ import {
 import type { PaisCodigo } from "@/lib/ciudades";
 import type { ProveedorTipo, Transportista } from "@/types/api";
 import { ProveedorTipoSelect } from "@/components/transportistas/ProveedorTipoSelect";
+import { AvisoSinDatosFiscales } from "@/components/transportistas/AvisoSinDatosFiscales";
 import type { TipoProveedorElegido } from "@/lib/proveedorTipo";
 import { VencimientoPermisoInput } from "@/components/forms/VencimientoPermisoInput";
 import { TelefonoInput } from "@/components/forms/TelefonoInput";
@@ -64,8 +65,7 @@ export function TransportistaEditPage() {
   const [fechaVencimientoPermiso, setFechaVencimientoPermiso] = useState("");
   const [confirmDelete, setConfirmDelete] = useState("");
   const [confirmarSinDatosFiscales, setConfirmarSinDatosFiscales] =
-    useState(false);
-  const [loading, setLoading] = useState(false);
+    useState(false);  const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -189,6 +189,8 @@ export function TransportistaEditPage() {
       setFieldErrors({ idFiscal: errorFiscal });
       return;
     }
+    // Falta país/CUIT: hay que confirmar en el aviso de abajo antes de guardar.
+    if (faltanDatosFiscales && !confirmarSinDatosFiscales) return;
     // No aplica cuando se edita para otro tenant desde superadmin: maestro.transportistas
     // refleja la organización activa de Clerk, no el tenant elegido por query param.
     if (!tenantId && idFiscal.trim()) {
@@ -382,26 +384,6 @@ export function TransportistaEditPage() {
               </div>
             )}
             <ArcaPadronStatus {...arca} />
-            {faltanDatosFiscales && (
-              <div className="space-y-2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                <p>
-                  Estás guardando el proveedor sin {warningText} — esto puede
-                  afectar la facturación/liquidaciones más adelante si no se
-                  completa.
-                </p>
-                <label className="flex items-center gap-2 font-medium">
-                  <input
-                    type="checkbox"
-                    checked={confirmarSinDatosFiscales}
-                    onChange={(e) =>
-                      setConfirmarSinDatosFiscales(e.target.checked)
-                    }
-                    className="h-4 w-4 accent-vialto-charcoal"
-                  />
-                  Entiendo, guardar igual
-                </label>
-              </div>
-            )}
             {domicilioVisible && (
               <label className="grid gap-1.5">
                 <span className={labelClass}>Domicilio</span>
@@ -474,14 +456,20 @@ export function TransportistaEditPage() {
               </div>
             )}
 
+            {/* Al final del formulario, mientras falten país o CUIT. */}
+            {faltanDatosFiscales && (
+              <AvisoSinDatosFiscales
+                faltante={warningText}
+                confirmado={confirmarSinDatosFiscales}
+                onConfirmadoChange={setConfirmarSinDatosFiscales}
+              />
+            )}
             <CrudFormErrorAlert message={error} />
             <CrudSubmitButton
               loading={loading}
               label="Guardar cambios"
-              disabled={
-                !!errorFiscal ||
-                (faltanDatosFiscales && !confirmarSinDatosFiscales)
-              }
+              // Faltando país o CUIT, hasta tildar "Entiendo, guardar igual".
+              disabled={!!errorFiscal || (faltanDatosFiscales && !confirmarSinDatosFiscales)}
             />
           </form>
 
