@@ -56,6 +56,7 @@ import {
 import type { PaisCodigo } from "@/lib/ciudades";
 import {
   etapaViajeLabel,
+  facturacionPermiteVincular,
   liquidacionPermiteVincular,
   VIAJE_ETAPAS_TODAS,
   tooltipEtapaViaje,
@@ -289,7 +290,6 @@ export function ViajeEditModal({
   tenantId,
   tenant,
   hasLiquidoProductoArca = false,
-  hasFacturasArca = false,
   onRegistrarPago,
   onProductoCreado,
   onClienteCreado,
@@ -481,27 +481,21 @@ export function ViajeEditModal({
 
   const { datosClienteBloqueados, datosTransporteBloqueados } = useMemo(() => {
     if (!snapshotViaje) return { datosClienteBloqueados: false, datosTransporteBloqueados: false };
-    const facturado =
-      snapshotViaje.facturacionEstado === "facturado" ||
-      snapshotViaje.facturacionEstado === "cobrado";
+    // Mismos estados que el backend (FACTURACION/LIQUIDACION_ESTADOS_DISPONIBLES).
+    const facturado = !facturacionPermiteVincular(
+      String(snapshotViaje.facturacionEstado ?? "sin_facturar"),
+    );
+    const liquidado = !liquidacionPermiteVincular(
+      (snapshotViaje as any).liquidacionEstado ?? null,
+    );
 
-    // Cast a any por si liquidacionEstado no está tipado estrictamente en Viaje aún
-    const liquidado =
-      (snapshotViaje as any).liquidacionEstado === "liquidado" ||
-      (snapshotViaje as any).liquidacionEstado === "pagado";
-
-    const hasArca = Boolean(hasFacturasArca || hasLiquidoProductoArca);
-
-    if (hasArca) {
-      const bloqueado = facturado || liquidado;
-      return { datosClienteBloqueados: bloqueado, datosTransporteBloqueados: bloqueado };
-    }
-
+    // Lock por lado, con o sin ARCA (mismo criterio que ViajesService.update): la
+    // factura bloquea el lado cliente y la liquidación el lado transportista.
     return {
       datosClienteBloqueados: facturado,
       datosTransporteBloqueados: liquidado,
     };
-  }, [snapshotViaje, hasFacturasArca, hasLiquidoProductoArca]);
+  }, [snapshotViaje]);
 
   // true si el viaje tiene una liquidación vigente (no disponible para vincular
   // una nueva). Se usa para: (1) bloquear "% de IVA que suma el transportista" — mismo
