@@ -1,9 +1,13 @@
+import { AlertTriangle } from "lucide-react";
 import {
   ViewModalShell,
   viewModalBtnGhost,
   viewModalBtnPrimary,
 } from "@/components/ui/ViewModalShell";
-import { viajePendienteComprobanteCliente } from "@/lib/viajesComprobantes";
+import {
+  viajePendienteComprobanteCliente,
+  viajeTieneMontoCliente,
+} from "@/lib/viajesComprobantes";
 import {
   facturacionEstadoBadgeClass,
   facturacionEstadoLabel,
@@ -24,10 +28,7 @@ export function ViajeFacturacionDetalleModal({
   onClose,
   onFacturar,
 }: {
-  viaje: Pick<
-    Viaje,
-    "facturacionEstado" | "factura" | "cliente" | "clienteId" | "clientesViaje" | "etapa"
-  >;
+  viaje: Viaje;
   onClose: () => void;
   /** Abre el alta de factura para este viaje. Sin pasar, el modal es solo informativo. */
   onFacturar?: () => void;
@@ -36,10 +37,31 @@ export function ViajeFacturacionDetalleModal({
 }) {
   const estado = (viaje.facturacionEstado ?? "sin_facturar") as FacturacionEstado;
   const lifecycle = facturacionLifecycleEstado(estado);
-  const puedeFacturar =
-    Boolean(onFacturar) &&
-    viaje.etapa?.toLowerCase() !== "cancelado" &&
-    viajePendienteComprobanteCliente(viaje);
+
+  const tienePermisoFacturar = Boolean(onFacturar);
+  const esCancelado = viaje.etapa?.toLowerCase() === "cancelado";
+  const esFinalizado = viaje.etapa?.toLowerCase() === "finalizado";
+  const tieneMontoCliente = viajeTieneMontoCliente(viaje);
+  const pendienteFacturar = viajePendienteComprobanteCliente(viaje);
+
+  let motivoBloqueo: string | null = null;
+  if (esCancelado) {
+    motivoBloqueo = "No se puede facturar porque el viaje está cancelado.";
+  } else if (!esFinalizado && !tieneMontoCliente) {
+    motivoBloqueo =
+      "No se puede facturar: el viaje debe estar en etapa Finalizado y tener cargado el monto del cliente.";
+  } else if (!esFinalizado) {
+    motivoBloqueo = "Para facturar, el viaje debe estar en etapa Finalizado.";
+  } else if (!tieneMontoCliente) {
+    motivoBloqueo = "No se puede facturar el viaje: falta cargar el monto del cliente.";
+  }
+
+  const listoParaFacturar =
+    tienePermisoFacturar &&
+    !esCancelado &&
+    esFinalizado &&
+    tieneMontoCliente &&
+    pendienteFacturar;
 
   return (
     <ViewModalShell
@@ -50,14 +72,17 @@ export function ViajeFacturacionDetalleModal({
           <button type="button" onClick={onClose} className={viewModalBtnGhost}>
             Cerrar
           </button>
-          {puedeFacturar && (
+          {tienePermisoFacturar && (
             <button
               type="button"
+              disabled={!listoParaFacturar}
+              title={motivoBloqueo ?? undefined}
               onClick={() => {
+                if (!listoParaFacturar) return;
                 onClose();
                 onFacturar?.();
               }}
-              className={viewModalBtnPrimary}
+              className={`${viewModalBtnPrimary} disabled:cursor-not-allowed`}
             >
               Facturar
             </button>
@@ -75,6 +100,13 @@ export function ViajeFacturacionDetalleModal({
         <p className="text-sm text-vialto-steel/70">
           Todavía no hay ninguna factura vinculada a este viaje.
         </p>
+
+        {motivoBloqueo && tienePermisoFacturar && (
+          <div className="flex items-start gap-2 rounded border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <span>{motivoBloqueo}</span>
+          </div>
+        )}
       </div>
     </ViewModalShell>
   );

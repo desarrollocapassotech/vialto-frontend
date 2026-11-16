@@ -185,6 +185,26 @@ export function liquidacionBorradorIdDeViaje(
     ?.liquidacion.id;
 }
 
+export function viajeTieneMontoTransportista(
+  v: Partial<
+    Pick<
+      Viaje,
+      | 'precioTransportistaExterno'
+      | 'cantidadTransportista'
+      | 'precioUnitarioTransportista'
+    >
+  >,
+): boolean {
+  return (
+    (typeof v.precioTransportistaExterno === 'number' &&
+      v.precioTransportistaExterno > 0) ||
+    (typeof v.cantidadTransportista === 'number' &&
+      v.cantidadTransportista > 0 &&
+      typeof v.precioUnitarioTransportista === 'number' &&
+      v.precioUnitarioTransportista > 0)
+  );
+}
+
 export function viajePendienteComprobanteTransportista(
   v: Pick<
     Viaje,
@@ -209,15 +229,7 @@ export function viajePendienteComprobanteTransportista(
     v.precioTransportistaExterno !== undefined ||
     v.cantidadTransportista !== undefined
   ) {
-    const tienePrecio =
-      (typeof v.precioTransportistaExterno === 'number' &&
-        v.precioTransportistaExterno > 0) ||
-      (typeof v.cantidadTransportista === 'number' &&
-        v.cantidadTransportista > 0 &&
-        typeof v.precioUnitarioTransportista === 'number' &&
-        v.precioUnitarioTransportista > 0);
-
-    if (!tienePrecio) return false;
+    if (!viajeTieneMontoTransportista(v)) return false;
   }
 
   if (viajePermiteElegirTransportistaLiquidacion(v)) {

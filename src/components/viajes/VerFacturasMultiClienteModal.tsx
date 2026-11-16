@@ -1,14 +1,22 @@
 import type { Viaje } from "@/types/api";
 import { formatViajeImporteForListado } from "@/lib/viajesFlota";
 import { useMaestroData } from "@/hooks/useMaestroData";
-import { ViewModalShell } from "@/components/ui/ViewModalShell";
+import {
+  ViewModalShell,
+  viewModalBtnGhost,
+  viewModalBtnPrimary,
+} from "@/components/ui/ViewModalShell";
+import {
+  viajePendienteComprobanteCliente,
+  viajeTieneMontoCliente,
+} from "@/lib/viajesComprobantes";
 import {
   facturacionEstadoBadgeClass,
   facturacionEstadoLabel,
   getVisualFacturacionEstado,
   type FacturacionEstado,
 } from "@/lib/viajesIndicadores";
-import { FileText, ExternalLink } from "lucide-react";
+import { AlertTriangle, ExternalLink, FileText } from "lucide-react";
 import { importeNetoViajeParaFactura } from "@/lib/facturaTotales";
 
 interface FacturaRow {
@@ -35,12 +43,39 @@ export function VerFacturasMultiClienteModal({
   viaje,
   onClose,
   onVerFactura,
+  onFacturar,
 }: {
   viaje: Viaje;
   onClose: () => void;
   onVerFactura: (facturaId: string, clienteId: string) => void;
+  onFacturar?: () => void;
 }) {
   const { clientes } = useMaestroData();
+
+  const tienePermisoFacturar = Boolean(onFacturar);
+  const esCancelado = viaje.etapa?.toLowerCase() === "cancelado";
+  const esFinalizado = viaje.etapa?.toLowerCase() === "finalizado";
+  const tieneMontoCliente = viajeTieneMontoCliente(viaje);
+  const pendienteFacturar = viajePendienteComprobanteCliente(viaje);
+
+  let motivoBloqueo: string | null = null;
+  if (esCancelado) {
+    motivoBloqueo = "No se puede facturar porque el viaje está cancelado.";
+  } else if (!esFinalizado && !tieneMontoCliente) {
+    motivoBloqueo =
+      "No se puede facturar: el viaje debe estar en etapa Finalizado y tener cargado el monto del cliente.";
+  } else if (!esFinalizado) {
+    motivoBloqueo = "Para facturar, el viaje debe estar en etapa Finalizado.";
+  } else if (!tieneMontoCliente) {
+    motivoBloqueo = "No se puede facturar el viaje: falta cargar el monto del cliente.";
+  }
+
+  const listoParaFacturar =
+    tienePermisoFacturar &&
+    !esCancelado &&
+    esFinalizado &&
+    tieneMontoCliente &&
+    pendienteFacturar;
 
   const rows: FacturaRow[] = [];
 
@@ -114,15 +149,49 @@ export function VerFacturasMultiClienteModal({
       }
       onClose={onClose}
       maxWidthClass="sm:max-w-4xl"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={viewModalBtnGhost}>
+            Cerrar
+          </button>
+          {tienePermisoFacturar && pendienteFacturar && (
+            <button
+              type="button"
+              disabled={!listoParaFacturar}
+              title={motivoBloqueo ?? undefined}
+              onClick={() => {
+                if (!listoParaFacturar) return;
+                onClose();
+                onFacturar?.();
+              }}
+              className={`${viewModalBtnPrimary} disabled:cursor-not-allowed`}
+            >
+              Facturar
+            </button>
+          )}
+        </>
+      }
     >
       <div className="p-4 sm:p-6 bg-[#f8f9fa]">
         <p className="mb-4 text-sm text-vialto-steel">
           Este viaje tiene las siguientes facturas vinculadas a sus clientes (borradores o emitidos).
         </p>
 
+        {motivoBloqueo && tienePermisoFacturar && pendienteFacturar && (
+          <div className="mb-4 flex items-start gap-2 rounded border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <span>{motivoBloqueo}</span>
+          </div>
+        )}
+
         {rows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-black/15 bg-black/5 py-8 text-center text-sm text-vialto-steel">
-            No hay facturas vinculadas a este viaje.
+            <p>No hay facturas vinculadas a este viaje.</p>
+            {listoParaFacturar && (
+              <p className="mt-1 text-xs text-vialto-steel/80">
+                Podés iniciar la facturación seleccionando el cliente a facturar.
+              </p>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-black/5 bg-white shadow-sm">
