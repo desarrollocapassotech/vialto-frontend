@@ -9,7 +9,7 @@ import { evaluarValorizacionViaje } from "@/lib/viajesValorizacion";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { createPortal } from "react-dom";
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { isOrgAdmin } from "@/lib/roleLabels";
+import { isOrgAdmin, puedeGestionarComoAdminEmpresa } from "@/lib/roleLabels";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useViajeEditor } from "@/hooks/useViajeEditor";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
@@ -106,14 +106,12 @@ import {
   liquidacionBorradorIdDeViaje,
 } from "@/lib/viajesComprobantes";
 import {
-  etapaViajeBadgeClass,
-  etapaViajeBadgeClassDefault,
   etapaViajeLabel,
   tooltipEtapaViaje,
   VIAJE_ETAPAS_TODAS,
 } from "@/lib/viajesIndicadores";
 import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
-import { ViajeEtapaIcono } from "@/components/viajes/ViajeEtapaIcono";
+import { ViajeEtapaSelectorPopover } from "@/components/viajes/ViajeEtapaSelectorPopover";
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
 import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
 import {
@@ -423,6 +421,7 @@ export function ViajesTenantPage({
   });
 
   const platform = Boolean(tenantId?.trim());
+  const esAdmin = puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
   const puedeImportar =
     !embeddedInSuperadmin &&
     isOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata }) &&
@@ -2121,6 +2120,34 @@ export function ViajesTenantPage({
     viajeApiUrl,
   ]);
 
+  async function handleCambiarEtapaViaje(v: Viaje, nuevaEtapa: string) {
+    if (v.etapa === nuevaEtapa) return;
+    try {
+      const updated = await apiJson<Viaje>(viajeApiUrl(v.id), () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ etapa: nuevaEtapa }),
+      });
+      setRows((prev) =>
+        prev ? prev.map((r) => (r.id === updated.id ? updated : r)) : prev,
+      );
+      const etapaFinal = updated.etapa ?? nuevaEtapa;
+      if (nuevaEtapa === "pendiente" && etapaFinal === "en_curso") {
+        showToast(
+          `Por fecha de carga alcanzada, el viaje se actualizó a "${etapaViajeLabel[etapaFinal] ?? etapaFinal}"`,
+          "success",
+        );
+      } else {
+        showToast(
+          `Se actualizó el viaje a "${etapaViajeLabel[etapaFinal] ?? etapaFinal}"`,
+          "success",
+        );
+      }
+    } catch (e) {
+      showToast(friendlyError(e, "viajes"), "error");
+      throw e;
+    }
+  }
+
   function openVerFacturaFlow(v: Viaje) {
     if ((v.clientesViaje ?? []).length > 0) {
       setVerFacturasMultiClienteViaje(v);
@@ -3586,7 +3613,15 @@ export function ViajesTenantPage({
               return (
                 <td className="h-8 px-3 py-1" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1.5">
-                    {mostrarColumnaEtapa && <ViajeEtapaIcono etapa={v.etapa} />}
+                    {mostrarColumnaEtapa && (
+                      <ViajeEtapaSelectorPopover
+                        viaje={v}
+                        esAdmin={esAdmin}
+                        onCambiarEtapa={(nuevaEtapa) =>
+                          handleCambiarEtapaViaje(v, nuevaEtapa)
+                        }
+                      />
+                    )}
                     {!valorizacion.valorizado && v.etapa?.toLowerCase() !== "cancelado" && (
                       <span
                         className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 cursor-help whitespace-nowrap"
@@ -3847,16 +3882,14 @@ export function ViajesTenantPage({
               onClick={(e) => e.stopPropagation()}
             >
               {mostrarColumnaEtapa && (
-                // Solo lectura: la etapa se actualiza sola por fechas; los cambios
-                // manuales (cancelar, viajes sin fechas) se hacen desde el modal del viaje.
-                <span
-                  title={tooltipEtapaViaje(v.etapa)}
-                  className={`inline-block self-start whitespace-nowrap rounded-sm border font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 ${
-                    etapaViajeBadgeClass[v.etapa] ?? etapaViajeBadgeClassDefault
-                  }`}
-                >
-                  {etapaViajeLabel[v.etapa] ?? "Sin clasificar"}
-                </span>
+                <ViajeEtapaSelectorPopover
+                  viaje={v}
+                  esAdmin={esAdmin}
+                  variante="badge"
+                  onCambiarEtapa={(nuevaEtapa) =>
+                    handleCambiarEtapaViaje(v, nuevaEtapa)
+                  }
+                />
               )}
               {v.etapa?.toLowerCase() !== "cancelado" && (
                 <>
