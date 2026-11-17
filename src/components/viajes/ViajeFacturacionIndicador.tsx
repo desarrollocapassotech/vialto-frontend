@@ -19,10 +19,7 @@ import { useToast } from '@/lib/toast';
 import type { Factura, Viaje } from '@/types/api';
 
 type Props = {
-  viaje: Pick<
-    Viaje,
-    'facturacionEstado' | 'factura' | 'cliente' | 'clienteId' | 'clientesViaje' | 'etapa'
-  >;
+  viaje: Viaje;
   /** Clerk org id: solo se pasa en vista superadmin (cross-tenant). */
   tenantId?: string;
   onClickOverride?: () => void;

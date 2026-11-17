@@ -2200,6 +2200,14 @@ export function ViajesTenantPage({
   }
 
   function facturarViaje(v: Viaje, targetClienteId?: string) {
+    if (v.etapa?.toLowerCase() !== "finalizado") {
+      showToast(
+        "No se puede facturar el viaje: debe estar en etapa Finalizado.",
+        "error",
+      );
+      return;
+    }
+
     if (arcaBloqueaFacturarUsd(hasFacturasArca, v.monedaMonto)) {
       showToast(MSG_ARCA_NO_FACTURA_USD, "error");
       return;
@@ -4614,6 +4622,15 @@ export function ViajesTenantPage({
           <VerFacturasMultiClienteModal
             viaje={verFacturasMultiClienteViaje}
             onClose={() => setVerFacturasMultiClienteViaje(null)}
+            onFacturar={
+              puedeFacturarDesdeGrilla
+                ? () => {
+                    const v = verFacturasMultiClienteViaje;
+                    setVerFacturasMultiClienteViaje(null);
+                    facturarViaje(v);
+                  }
+                : undefined
+            }
             onVerFactura={(facturaId, clienteId) => {
               void abrirFacturaModalEnContexto(
                 verFacturasMultiClienteViaje,
