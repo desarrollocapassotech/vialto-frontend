@@ -620,10 +620,19 @@ export function ViajeViewModal({
   // ── Liquidación / pago al transportista ──────────────────────────────────
   const conTransportista = !!viaje.transportistaId;
   const monedaTransp = viaje.monedaPrecioTransportistaExterno;
-  const ivaEfectivoTxt =
-    ver("precioTransportistaIvaIncluidoPct") && viaje.precioTransportistaIvaIncluidoPct
-      ? `+${viaje.precioTransportistaIvaIncluidoPct}% IVA en efectivo`
-      : undefined;
+  const tramosIva = viaje.tramosTransportista ?? [];
+  const ivaEfectivoTxt = !ver("precioTransportistaIvaIncluidoPct")
+    ? undefined
+    : tramosIva.length > 0
+      ? `IVA por tramo: ${tramosIva
+          .map(
+            (t) =>
+              `${t.detalle} ${t.monto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} al ${t.ivaPct}%`,
+          )
+          .join(" · ")}${viaje.precioTransportistaIvaIncluidoPct ? ` · resto al ${viaje.precioTransportistaIvaIncluidoPct}%` : ""}`
+      : viaje.precioTransportistaIvaIncluidoPct
+        ? `+${viaje.precioTransportistaIvaIncluidoPct}% IVA en efectivo`
+        : undefined;
   const verPrecioTransp = ver("precioTransportistaExterno");
   /** Celdas del precio al transportista: Toneladas/Unidades | Tarifa transportista | Total. */
   const celdasPrecioTransp: Record<string, CeldaDetalle> = {};

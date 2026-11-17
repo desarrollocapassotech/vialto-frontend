@@ -70,6 +70,11 @@ import {
   engrosarConIva,
 } from "@/lib/viajesTransportistaPagos";
 import { fechaHoraToIso } from "@/lib/viajeFechaHora";
+import {
+  tramosTransportistaDraftToApi,
+  validarTramosTransportista,
+  type TramoTransportistaDraft,
+} from "@/lib/viajeTramosTransportista";
 import type {
   Chofer,
   Cliente,
@@ -194,6 +199,9 @@ export function ViajeCreatePage() {
   const [precioUnitarioTransportista, setPrecioUnitarioTransportista] = useState("");
   const [precioTransportistaIvaIncluidoPct, setPrecioTransportistaIvaIncluidoPct] =
     useState("");
+  const [tramosTransportista, setTramosTransportista] = useState<
+    TramoTransportistaDraft[]
+  >([]);
   const [gananciaBrutaManual, setGananciaBrutaManual] = useState("");
   const [monedaGananciaBrutaManual, setMonedaGananciaBrutaManual] =
     useState<ViajeMonedaCodigo>("ARS");
@@ -893,6 +901,15 @@ export function ViajeCreatePage() {
       setStep(2);
       return;
     }
+    const tramosError =
+      externo && ivaTransportistaVisible
+        ? validarTramosTransportista(tramosTransportista, pagoBrutoTransportista)
+        : null;
+    if (tramosError) {
+      setError(tramosError);
+      setStep(2);
+      return;
+    }
 
     // 7. Chequeo para mostrar Modal de Km/Litros si corresponde al estado
     if (
@@ -974,6 +991,10 @@ export function ViajeCreatePage() {
           precioTransportistaIvaIncluidoPct:
             externo && precioTransportistaIvaIncluidoPct.trim()
               ? Number(precioTransportistaIvaIncluidoPct.replace(",", "."))
+              : undefined,
+          tramosTransportista:
+            externo && ivaTransportistaVisible
+              ? tramosTransportistaDraftToApi(tramosTransportista)
               : undefined,
           cantidadFactura: desgloseActivo && principal.cantidadStr.trim() ? Number(principal.cantidadStr.replace(",", ".")) : undefined,
           precioUnitarioFactura: desgloseActivo && principal.precioUnitarioStr.trim() ? (parseCurrencyForMoneda(principal.precioUnitarioStr, principal.moneda) ?? undefined) : undefined,
@@ -1066,7 +1087,13 @@ export function ViajeCreatePage() {
     Number(precioTransportistaIvaIncluidoPct.replace(",", ".")) || 0;
   const pagoNetoTransportista =
     pagoBrutoTransportista != null
-      ? engrosarConIva(pagoBrutoTransportista, pctIvaTransportista)
+      ? engrosarConIva(
+          pagoBrutoTransportista,
+          pctIvaTransportista,
+          ivaTransportistaVisible
+            ? tramosTransportistaDraftToApi(tramosTransportista)
+            : undefined,
+        )
       : null;
   const montoIvaTransportista =
     pagoNetoTransportista != null && pagoBrutoTransportista != null
@@ -1263,6 +1290,9 @@ export function ViajeCreatePage() {
                 onMonedaPrecioTransportistaChange={handleMonedaPrecioTransportistaChange}
                 precioTransportistaIvaIncluidoPct={precioTransportistaIvaIncluidoPct}
                 onPrecioTransportistaIvaIncluidoPctChange={setPrecioTransportistaIvaIncluidoPct}
+                tramosTransportista={tramosTransportista}
+                onTramosTransportistaChange={setTramosTransportista}
+                marcarTramosIncompletos={Boolean(error)}
                 desglosePagoBruto={pagoBrutoTransportista}
                 desglosePagoNeto={pagoNetoTransportista}
                 desgloseMontoIva={montoIvaTransportista}

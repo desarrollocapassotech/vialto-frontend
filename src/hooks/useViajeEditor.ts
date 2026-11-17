@@ -55,6 +55,11 @@ import {
 } from "@/lib/viajesClientes";
 import { validarPagosTransportistaDraftForm } from "@/lib/viajesTransportistaPagos";
 import {
+  tramosTransportistaDraftFromApi,
+  tramosTransportistaDraftToApi,
+  validarTramosTransportista,
+} from "@/lib/viajeTramosTransportista";
+import {
   facturacionPermiteVincular,
   liquidacionPermiteVincular,
 } from "@/lib/viajesIndicadores";
@@ -285,6 +290,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
         v.precioTransportistaIvaIncluidoPct != null
           ? String(v.precioTransportistaIvaIncluidoPct)
           : "",
+      tramosTransportista: tramosTransportistaDraftFromApi(v.tramosTransportista),
       cantidadTransportista: v.cantidadTransportista != null ? String(v.cantidadTransportista) : "",
       precioUnitarioTransportista: v.precioUnitarioTransportista != null ? String(v.precioUnitarioTransportista) : "",
       gananciaBrutaManual: formatNumberForMoneda(
@@ -671,6 +677,15 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     // que un viaje ya facturado pero todavía sin liquidar no quede con el % atascado
     // apenas se emite la factura al cliente.
     const precioIvaBloqueado = liquidado;
+    // Tramos de IVA del transportista: mismo lock angosto que el % (solo liquidación).
+    const tramosError =
+      externo && !precioIvaBloqueado
+        ? validarTramosTransportista(draft.tramosTransportista, precioTransportistaNum)
+        : null;
+    if (tramosError) {
+      setError(tramosError);
+      return;
+    }
     // Lock angosto, independiente del `bloqueado` general: si algún cliente adicional
     // ya tiene su propio tramo facturado, el backend rechaza CUALQUIER reemplazo del
     // array `clientes` (aunque esa fila puntual no cambie) — se omite el campo entero
@@ -739,6 +754,11 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
             precioTransportistaExterno: transporteBloqueado ? undefined : (externo ? precioTransportistaNum : null),
             monedaPrecioTransportistaExterno: transporteBloqueado ? undefined : draft.monedaPrecioTransportistaExterno,
             precioTransportistaIvaIncluidoPct: precioIvaBloqueado ? undefined : (externo ? (draft.precioTransportistaIvaIncluidoPct.trim() ? Number(draft.precioTransportistaIvaIncluidoPct.replace(",", ".")) : 0) : 0),
+            tramosTransportista: precioIvaBloqueado
+              ? undefined
+              : externo
+                ? tramosTransportistaDraftToApi(draft.tramosTransportista)
+                : [],
             ...(transporteBloqueado ? {} : gananciaBrutaManualPayloadFromDraft(draft)),
             otrosGastos: transporteBloqueado ? undefined : draft.otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
             pagosTransportista: transporteBloqueado ? undefined : (externo ? pagosTransportistaApi : []),

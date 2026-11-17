@@ -92,6 +92,7 @@ import {
   signedMontoConIvaConcepto,
   signedMontoNetoConcepto,
 } from "@/lib/liquidacionConceptosIva";
+import { tramosIvaParaLiquidacion } from "@/lib/viajeTramosTransportista";
 import { useToast } from "@/lib/toast";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import {
@@ -134,6 +135,7 @@ type ViajeItem = Pick<
   | "precioTransportistaExterno"
   | "monedaPrecioTransportistaExterno"
   | "precioTransportistaIvaIncluidoPct"
+  | "tramosTransportista"
   | "cantidadTransportista"
   | "precioUnitarioTransportista"
   | "liquidacionesViaje"
@@ -1373,14 +1375,24 @@ export function CrearLiquidacionManualModal({
   );
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
   const ivaPctNum = ivaPct.trim() !== "" ? Number(ivaPct) : 0;
+  // Flete de cada viaje por alícuota: sus tramos de IVA si tiene, o un solo % para
+  // todo (mismo criterio que el backend al liquidar).
+  const partesFleteViaje = (v: ViajeItem) => {
+    const vBruto = v.precioTransportistaExterno ?? 0;
+    return (
+      tramosIvaParaLiquidacion(
+        vBruto,
+        v.precioTransportistaIvaIncluidoPct,
+        v.tramosTransportista,
+      ) ?? [{ base: vBruto, ivaPct: v.precioTransportistaIvaIncluidoPct || ivaPctNum }]
+    );
+  };
   let ivaGeneral = 0;
   if (selectedViajes.length > 0) {
     let ivaFletes = 0;
     for (const v of selectedViajes) {
-      const vIva = v.precioTransportistaIvaIncluidoPct || ivaPctNum;
-      const vBruto = v.precioTransportistaExterno ?? 0;
-      if (vIva > 0) {
-        ivaFletes += (vBruto * vIva) / 100;
+      for (const parte of partesFleteViaje(v)) {
+        if (parte.ivaPct > 0) ivaFletes += (parte.base * parte.ivaPct) / 100;
       }
     }
     const ivaComision = ivaPctNum > 0 ? (comisionMonto * ivaPctNum) / 100 : 0;
@@ -1411,8 +1423,9 @@ export function CrearLiquidacionManualModal({
     };
     if (selectedViajes.length > 0) {
       for (const v of selectedViajes) {
-        const pct = v.precioTransportistaIvaIncluidoPct || ivaPctNum;
-        if (pct > 0) sumar(pct, ((v.precioTransportistaExterno ?? 0) * pct) / 100);
+        for (const parte of partesFleteViaje(v)) {
+          if (parte.ivaPct > 0) sumar(parte.ivaPct, (parte.base * parte.ivaPct) / 100);
+        }
       }
       if (ivaPctNum > 0) sumar(ivaPctNum, -(comisionMonto * ivaPctNum) / 100);
     } else {

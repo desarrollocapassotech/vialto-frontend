@@ -114,6 +114,11 @@ import {
 } from "@/lib/viajesClientes";
 import { conBordeError } from "@/lib/bordeError";
 import { FaltaCampo } from "@/components/shared/FaltaCampo";
+import { TramosTransportistaEditor } from "@/components/viajes/TramosTransportistaEditor";
+import {
+  tramosTransportistaDraftToApi,
+  type TramoTransportistaDraft,
+} from "@/lib/viajeTramosTransportista";
 
 /** A qué campo aplicar el país recién creado desde "+ Nuevo país". */
 type PaisQuickCreateTarget =
@@ -153,6 +158,8 @@ export type ViajeInlineDraft = {
   precioTransportistaExterno: string;
   monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
   precioTransportistaIvaIncluidoPct: string;
+  /** Tramos del pago al transportista con su propio % de IVA. */
+  tramosTransportista: TramoTransportistaDraft[];
   cantidadTransportista: string;
   precioUnitarioTransportista: string;
   otrosGastos: OtroGastoDraft[];
@@ -537,7 +544,11 @@ export function ViajeEditModal({
     Number(draft.precioTransportistaIvaIncluidoPct.replace(",", ".")) || 0;
   const pagoNetoTransportista =
     pagoBrutoTransportista != null
-      ? engrosarConIva(pagoBrutoTransportista, pctIvaTransportista)
+      ? engrosarConIva(
+          pagoBrutoTransportista,
+          pctIvaTransportista,
+          tramosTransportistaDraftToApi(draft.tramosTransportista),
+        )
       : null;
   const montoIvaTransportista =
     pagoNetoTransportista != null && pagoBrutoTransportista != null
@@ -1606,6 +1617,16 @@ export function ViajeEditModal({
                           </div>
                         )}
                       </>
+                    )}
+                    {ivaTransportistaVisible && (
+                      <TramosTransportistaEditor
+                        tramos={draft.tramosTransportista}
+                        onChange={(tramosTransportista) =>
+                          setDraft((p) => (p ? { ...p, tramosTransportista } : p))
+                        }
+                        disabled={liquidacionVigente}
+                        marcarIncompletos={Boolean(error)}
+                      />
                     )}
                   </div>
                 }
