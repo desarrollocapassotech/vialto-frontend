@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { Navigate } from 'react-router-dom';
 import { useMaestroData } from '@/hooks/useMaestroData';
@@ -13,7 +14,7 @@ export function HomePage() {
 
   if (!isLoaded) {
     return (
-      <div className="text-vialto-steel py-12 text-center">Un momento…</div>
+      <CargandoVialto mensaje="Preparando tu inicio…" />
     );
   }
 
@@ -25,7 +26,7 @@ export function HomePage() {
   // Se espera al tenant para no mostrar el dashboard un instante antes de redirigir.
   if (tenantLoading) {
     return (
-      <div className="text-vialto-steel py-12 text-center">Un momento…</div>
+      <CargandoVialto mensaje="Preparando tu inicio…" />
     );
   }
   if (tenant && !dashboardHabilitado(tenant)) {

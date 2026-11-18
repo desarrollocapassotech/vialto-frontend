@@ -1,4 +1,4 @@
-import {
+﻿import {
   AdjuntarComprobanteClip,
   ComprobanteAdjuntoClip,
 } from "@/components/shared/ComprobanteAdjuntoClip";
@@ -1528,7 +1528,7 @@ export function FacturacionTenantPage({
         emptyMessage={
           error ? "No se pudieron cargar las facturas." : facturasEmptyMessage
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando facturas…"
         tableColSpan={7}
         filters={facturasListadoFiltros}
         activeFilterCount={activeFilterCount}

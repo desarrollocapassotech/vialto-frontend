@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
@@ -239,7 +240,7 @@ export function SuperadminEmpresaPage() {
         )}
 
         {config.loading && !tenant && (
-          <p className="mt-6 text-sm text-vialto-steel">Cargando…</p>
+          <CargandoVialto mensaje="Cargando la empresa…" />
         )}
 
         {catalogo && configConTenant && (

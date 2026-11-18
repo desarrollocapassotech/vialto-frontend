@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { formatIdFiscal } from "@/lib/ciudades/paises";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -363,7 +363,7 @@ export function TransportistasTenantPage() {
               ? "No hay proveedores que coincidan con los filtros aplicados."
               : "Todavía no hay proveedores cargados."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando proveedores…"
         rowActionsMaxIconos={3}
         rowActionsSubtitle={(t) => t.nombre}
         rowActions={(t) => [

@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react';
+﻿import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Wallet } from 'lucide-react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
@@ -135,6 +135,7 @@ export function ListadoCuentasCc({ tipoContraparte, cuentas, cargandoCuentas, on
         <p className="mb-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>
       )}
       <ListadoDatos
+        loadingMessage="Cargando cuentas…"
         columns={[
           {
             id: 'nombre',

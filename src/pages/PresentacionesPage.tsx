@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useUser } from '@clerk/clerk-react';
 import { isPlatformSuperadmin } from '@/lib/roleLabels';
 import { PresentacionesTenantPage } from '@/pages/PresentacionesTenantPage';
@@ -7,7 +8,7 @@ export function PresentacionesPage() {
   const { user, isLoaded } = useUser();
 
   if (!isLoaded) {
-    return <div className="text-vialto-steel py-12 text-center">Un momento…</div>;
+    return <CargandoVialto mensaje="Cargando presentaciones…" />;
   }
 
   if (isPlatformSuperadmin(user?.publicMetadata)) {

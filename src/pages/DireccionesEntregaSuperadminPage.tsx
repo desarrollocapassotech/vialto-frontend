@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { DireccionEntregaViewModal } from "@/components/direcciones-entrega/DireccionEntregaViewModal";
@@ -317,7 +317,7 @@ export function DireccionesEntregaSuperadminPage() {
                 ? "No hay direcciones que coincidan con los filtros aplicados."
                 : "No hay direcciones para esta empresa."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando direcciones de entrega…"
         rowActions={(d) => [
           {
             id: "ver",

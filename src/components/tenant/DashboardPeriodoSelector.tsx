@@ -107,9 +107,8 @@ export function DashboardPeriodoSelector({
 
       {/* Desktop */}
       <div className="hidden items-center gap-1 rounded-xl border border-black/10 bg-white p-1 shadow-sm lg:flex">
-        <span className="flex items-center gap-1.5 px-2.5 text-xs font-medium text-vialto-steel">
-          <Filter className="h-3.5 w-3.5" aria-hidden />
-          Período
+        <span className="pl-2 pr-0.5 text-vialto-steel/35" title="Período">
+          <Filter className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
         </span>
         <div role="radiogroup" aria-label="Período del panel" className="flex gap-1">
           {PERIODOS.map((p) => {

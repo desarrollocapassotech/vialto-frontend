@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, Pencil } from "lucide-react";
@@ -324,7 +324,7 @@ export function ChoferesSuperadminPage() {
                 ? "No hay choferes que coincidan con los filtros aplicados."
                 : "No hay choferes cargados para esta empresa."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando choferes…"
         rowActionsSubtitle={(c) => c.nombre}
         rowActions={(c) => [
           {

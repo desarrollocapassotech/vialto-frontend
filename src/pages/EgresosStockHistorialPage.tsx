@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useUser } from '@clerk/clerk-react';
 import { isPlatformSuperadmin } from '@/lib/roleLabels';
 import { EgresosStockHistorialSuperadminPage } from './EgresosStockHistorialSuperadminPage';
@@ -7,7 +8,7 @@ export function EgresosStockHistorialPage() {
   const { user, isLoaded } = useUser();
 
   if (!isLoaded) {
-    return <div className="text-vialto-steel py-12 text-center">Un momento…</div>;
+    return <CargandoVialto mensaje="Cargando egresos de stock…" />;
   }
 
   if (isPlatformSuperadmin(user?.publicMetadata)) {

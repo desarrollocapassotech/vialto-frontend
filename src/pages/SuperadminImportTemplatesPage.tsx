@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
@@ -57,7 +58,7 @@ export function SuperadminImportTemplatesPage() {
         {tenant && <p className="mt-2 text-vialto-steel">{tenant.name}</p>}
 
         {tenantLoading && (
-          <p className="mt-6 text-sm text-vialto-steel">Cargando empresa…</p>
+          <CargandoVialto mensaje="Cargando la empresa…" />
         )}
         {tenantError && <p className="mt-6 text-sm text-red-600">{tenantError}</p>}
 

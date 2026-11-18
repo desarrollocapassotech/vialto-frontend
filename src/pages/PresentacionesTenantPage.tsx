@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import {
   useCallback,
   useEffect,
@@ -344,7 +344,7 @@ export function PresentacionesTenantPage() {
               ? "No hay presentaciones que coincidan con los filtros aplicados."
               : "No hay presentaciones cargadas. Creá una para usarla en los productos."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando presentaciones…"
         rowActions={(row) => [
           {
             id: "editar",

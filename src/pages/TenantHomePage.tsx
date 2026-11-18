@@ -2,6 +2,7 @@ import { useAuth, useOrganization } from "@clerk/clerk-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { TenantOwnerDashboard } from "@/components/tenant/TenantOwnerDashboard";
+import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { ViajeEditModal } from "@/components/viajes/ViajeEditModal";
@@ -163,9 +164,7 @@ export function TenantHomePage() {
       )}
 
       {organization && loading && !error && (
-        <p className="mt-6 text-sm text-vialto-steel">
-          Cargando datos de tu empresa…
-        </p>
+        <CargandoVialto mensaje="Cargando el panel de tu empresa…" />
       )}
 
       {mostrarDashboard && organization && tenant && (

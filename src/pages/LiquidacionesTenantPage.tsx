@@ -1,4 +1,4 @@
-import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
+﻿import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
 import { transportistaEnFrase } from "@/lib/transportistaLabel";
 import {
   AdjuntarComprobanteClip,
@@ -1661,7 +1661,7 @@ export function LiquidacionesTenantPage() {
                 ? "No hay liquidaciones que coincidan con los filtros aplicados."
                 : "Todavía no hay liquidaciones..."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando liquidaciones…"
         onRowClick={(liq) => setAccionesAbiertoLiqId(liq.id)}
         renderActions={(liq) => (
           <LiquidacionAccionesMenu {...accionesProps(liq)} />

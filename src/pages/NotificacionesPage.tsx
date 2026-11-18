@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
@@ -162,7 +163,7 @@ export function NotificacionesPage() {
       )}
 
       <div className="mt-6 flex flex-col gap-3">
-        {grupos === null && !error && <p className="text-sm text-vialto-steel">Cargando…</p>}
+        {grupos === null && !error && <CargandoVialto mensaje="Cargando notificaciones…" />}
 
         {grupos?.length === 0 && (
           <div className="flex flex-col items-center gap-2 border border-dashed border-black/15 bg-white px-4 py-12 text-center">

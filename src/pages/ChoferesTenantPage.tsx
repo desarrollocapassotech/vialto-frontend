@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, Pencil, Power, RotateCcw } from "lucide-react";
@@ -272,7 +272,7 @@ export function ChoferesTenantPage() {
               ? "No hay choferes que coincidan con los filtros aplicados."
               : "Todavía no tenés choferes cargados."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando choferes…"
         rowActionsMaxIconos={3}
         rowActionsSubtitle={(c) => c.nombre}
         rowActions={(c) => [

@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useUser } from "@clerk/clerk-react";
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
@@ -12,7 +13,7 @@ export function SuperadminOnly({ children }: SuperadminOnlyProps) {
 
   if (!isLoaded) {
     return (
-      <div className="text-vialto-steel py-12 text-center">Un momento…</div>
+      <CargandoVialto mensaje="Verificando permisos…" />
     );
   }
 

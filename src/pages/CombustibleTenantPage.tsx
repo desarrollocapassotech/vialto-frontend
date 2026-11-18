@@ -1,4 +1,4 @@
-import { fmtDateUtc } from "@/lib/fmtDateUtc";
+﻿import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -1104,7 +1104,7 @@ export function CombustibleTenantPage({
                   ? "No se pudieron cargar las cargas."
                   : "Sin cargas registradas para esta empresa."
             }
-            loadingMessage="Cargando…"
+            loadingMessage="Cargando cargas de combustible…"
             actionsTdClassName={`${listadoTablaAccionesTdClass} text-right`}
           />
 

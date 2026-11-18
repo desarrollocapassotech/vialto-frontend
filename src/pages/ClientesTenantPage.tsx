@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { formatIdFiscal } from "@/lib/ciudades/paises";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -283,7 +283,7 @@ export function ClientesTenantPage() {
               ? "No hay clientes que coincidan con los filtros aplicados."
               : "Todavía no tenés clientes cargados."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando clientes…"
         rowActions={(c) => [
           { id: "ver", label: "Ver cliente", icon: Eye, onClick: () => setViewingCliente(c) },
         ]}

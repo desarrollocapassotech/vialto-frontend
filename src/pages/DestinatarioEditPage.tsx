@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -134,7 +135,7 @@ export function DestinatarioEditPage() {
       title="Editar destinatario"
     >
       {initialLoading ? (
-        <p className="text-sm text-vialto-steel">Cargando…</p>
+        <CargandoVialto mensaje="Cargando el destinatario…" />
       ) : (
         <form
           className="max-w-lg grid gap-4"

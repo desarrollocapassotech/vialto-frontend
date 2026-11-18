@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { Sparkles } from "lucide-react";
@@ -362,7 +363,7 @@ export function ImportTemplatesConfig({
       <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="max-w-4xl flex-1 space-y-6 border border-black/10 bg-white p-6">
           {loadingTpls && (
-            <p className="text-sm text-vialto-steel">Cargando templates…</p>
+            <CargandoVialto mensaje="Cargando templates de importación…" chico />
           )}
           {tplError && (
             <div className="rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">

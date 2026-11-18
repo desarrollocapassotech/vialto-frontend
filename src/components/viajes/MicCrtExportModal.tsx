@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Viaje } from '@/types/api';
@@ -439,7 +440,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-3">
-          {loading && <p className="text-xs text-vialto-steel">Cargando datos…</p>}
+          {loading && <CargandoVialto mensaje="Cargando datos del documento…" chico />}
 
           {form && !loading && <MicCrtLegalDisclaimer />}
 

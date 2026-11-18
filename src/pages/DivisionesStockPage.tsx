@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useUser } from "@clerk/clerk-react";
 import { isPlatformSuperadmin } from "@/lib/roleLabels";
 import { DivisionesStockSuperadminPage } from "./DivisionesStockSuperadminPage";
@@ -8,7 +9,7 @@ export function DivisionesStockPage() {
 
   if (!isLoaded) {
     return (
-      <div className="py-12 text-center text-vialto-steel">Un momento…</div>
+      <CargandoVialto mensaje="Preparando la división de stock…" />
     );
   }
 

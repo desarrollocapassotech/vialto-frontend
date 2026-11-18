@@ -1,4 +1,5 @@
-﻿import { useNavigate } from "react-router-dom";
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
+import { useNavigate } from "react-router-dom";
 import { Eye, FileText, HandCoins } from "lucide-react";
 import type { ReactNode } from "react";
 import type { useTenantOwnerDashboard } from "@/hooks/useTenantOwnerDashboard";
@@ -344,7 +345,7 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
         </DashboardPendientesMarco>
       ) : mant.loading ? (
         <DashboardPendientesMarco titulo={def.label}>
-          <p className="px-4 py-6 text-sm text-vialto-steel">Cargando…</p>
+          <CargandoVialto mensaje="Cargando vencimientos…" chico />
         </DashboardPendientesMarco>
       ) : (
         <ProximosVencimientosLista filas={mant.proximos} hayPlanes={(mant.filas?.length ?? 0) > 0} />
@@ -359,7 +360,7 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
               tenantId={datos.tenantId}
             />
           ) : (
-            <p className="text-sm text-vialto-steel">Cargando…</p>
+            <CargandoVialto mensaje="Cargando alertas de combustible…" chico />
           )}
         </TituloAnalisis>
       );

@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye } from "lucide-react";
 import { CeldaAccionesFila } from "@/components/ui/AccionesFila";
@@ -301,7 +302,7 @@ export function ViajesFunnelPanel({
 }) {
   const accionesViaje = useAccionesVerViaje(onViewViaje, loadingViajeId);
   const funnel = data?.viajesFunnel;
-  if (loading || !funnel) return <EmptyState text="Cargando…" />;
+  if (loading || !funnel) return <CargandoVialto mensaje="Cargando viajes…" chico />;
 
   return (
     <div className="flex flex-col gap-4">
@@ -427,7 +428,7 @@ export function LiquidacionesPanel({
   loading: boolean;
 }) {
   const liq = data?.liquidaciones;
-  if (loading || !liq) return <EmptyState text="Cargando…" />;
+  if (loading || !liq) return <CargandoVialto mensaje="Cargando liquidaciones…" chico />;
 
   const acordadoTotal: FinancieroMoney = { ARS: 0, USD: 0 };
   const pagadoTotal: FinancieroMoney = { ARS: 0, USD: 0 };
@@ -503,7 +504,7 @@ export function FacturacionPanel({
   loading: boolean;
 }) {
   const fac = data?.facturacion;
-  if (loading || !fac) return <EmptyState text="Cargando…" />;
+  if (loading || !fac) return <CargandoVialto mensaje="Cargando facturación…" chico />;
 
   return (
     <div className="flex flex-col gap-4">

@@ -1,4 +1,4 @@
-import { fechaDiaYmd, fmtDateUtc } from "@/lib/fmtDateUtc";
+﻿import { fechaDiaYmd, fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -897,7 +897,7 @@ export function CuentaContraparteView({
               ? 'No hay movimientos que coincidan con los filtros aplicados.'
               : 'Todavía no hay movimientos para esta cuenta.'
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando movimientos de la cuenta…"
         activeFilterCount={activeFilterCount}
         onClearFilters={limpiarFiltros}
         filters={

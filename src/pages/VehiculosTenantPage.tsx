@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, Pencil, Power, RotateCcw } from "lucide-react";
@@ -371,7 +371,7 @@ export function VehiculosTenantPage() {
               ? "No hay vehículos que coincidan con los filtros aplicados."
               : "Todavía no tenés vehículos cargados."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando vehículos…"
         rowActionsMaxIconos={3}
         rowActionsSubtitle={(v) => v.patente}
         rowActions={(v) => [

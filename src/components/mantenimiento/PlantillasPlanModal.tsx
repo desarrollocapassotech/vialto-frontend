@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
@@ -95,7 +96,7 @@ export function PlantillasPlanModal({
         vehículos.
       </p>
       {plantillas === null ? (
-        <p className="text-sm text-vialto-steel">Cargando…</p>
+        <CargandoVialto mensaje="Cargando plantillas…" chico />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

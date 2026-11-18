@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useUser } from "@clerk/clerk-react";
 import { isPlatformSuperadmin } from "@/lib/roleLabels";
 import { CuentaCorrienteSuperadminPage } from "@/pages/CuentaCorrienteSuperadminPage";
@@ -9,7 +10,7 @@ export function CuentaCorrientePage() {
 
   if (!isLoaded) {
     return (
-      <div className="py-12 text-center text-vialto-steel">Un momento…</div>
+      <CargandoVialto mensaje="Cargando cuenta corriente…" />
     );
   }
 

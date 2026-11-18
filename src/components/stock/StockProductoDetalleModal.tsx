@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useEffect, useState } from 'react';
 import { ViewModalShell, viewModalBtnGhost } from '@/components/ui/ViewModalShell';
 import { apiJson } from '@/lib/api';
@@ -65,7 +66,7 @@ export function StockProductoDetalleModal({
         </div>
       }
     >
-      {loading && <p className="p-4 text-sm text-vialto-steel">Cargando…</p>}
+      {loading && <CargandoVialto mensaje="Cargando el detalle del producto…" chico />}
 
       {error && (
         <p className="p-4 text-sm text-red-700">{error}</p>

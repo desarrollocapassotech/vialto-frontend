@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useUser } from '@clerk/clerk-react';
 import { isPlatformSuperadmin } from '@/lib/roleLabels';
 import { DireccionesEntregaSuperadminPage } from '@/pages/DireccionesEntregaSuperadminPage';
@@ -8,7 +9,7 @@ export function DireccionesEntregaPage() {
 
   if (!isLoaded) {
     return (
-      <div className="text-vialto-steel py-12 text-center">Un momento…</div>
+      <CargandoVialto mensaje="Cargando direcciones de entrega…" />
     );
   }
 

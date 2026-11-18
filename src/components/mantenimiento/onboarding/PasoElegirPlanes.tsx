@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useEffect, useState } from "react";
 import { Check, FileText, Plus, Wrench } from "lucide-react";
 import { PlanModal } from "@/components/mantenimiento/PlanModal";
@@ -95,7 +96,7 @@ export function PasoElegirPlanes({
     }
   }
 
-  if (opciones === null) return <p className="text-sm text-vialto-steel">Cargando…</p>;
+  if (opciones === null) return <CargandoVialto mensaje="Cargando planes sugeridos…" chico />;
 
   const grupos: { titulo: string; icon: typeof Wrench; items: Opcion[] }[] = [
     { titulo: "Mantenimiento mecánico", icon: Wrench, items: opciones.filter((o) => o.categoria === "mecanico") },

@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -447,7 +447,7 @@ export function ProductosSuperadminPage() {
                 ? `No se pudieron cargar los ${pluralFrase}.`
                 : `No hay ${pluralFrase} que coincidan.`
             }
-            loadingMessage="Cargando…"
+            loadingMessage="Cargando productos…"
             rowActions={(r) => [
               {
                 id: "ver",

@@ -1,7 +1,6 @@
 ﻿import { Fragment, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
-import { VialtoTruckLoader } from "@/components/shared/VialtoTruckLoader";
+import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import type { useTenantOwnerDashboard } from "@/hooks/useTenantOwnerDashboard";
 import { useMantenimientoDashboard } from "@/hooks/useMantenimientoDashboard";
 import {
@@ -17,7 +16,7 @@ import {
   tarjetaDosMonedas,
   tarjetasPorFila,
 } from "@/lib/dashboardBloques";
-import { periodoAFechas } from "@/lib/dashboardPeriodo";
+import { frasePeriodo, periodoAFechas } from "@/lib/dashboardPeriodo";
 import type { Tenant } from "@/types/api";
 import { DashboardPeriodoSelector } from "./DashboardPeriodoSelector";
 import { DashboardBloque, type DashboardDatos } from "./DashboardBloque";
@@ -173,18 +172,12 @@ export function TenantOwnerDashboard({
 
       {/* Cambio de período: toda la pantalla queda bloqueada bajo un difuminado blanco,
           dejando ver detrás los skeletons de las tarjetas, con el camión en el centro. */}
-      {cargando &&
-        createPortal(
-          <div
-            role="status"
-            aria-live="polite"
-            className="fixed inset-0 z-[60] flex animate-[fadeIn_150ms_ease-out] flex-col items-center justify-center gap-2 bg-white/55 backdrop-blur-[3px]"
-          >
-            <VialtoTruckLoader className="h-48 w-auto drop-shadow-sm" label="Actualizando datos" />
-            <span className="text-sm font-medium text-vialto-steel">Actualizando datos…</span>
-          </div>,
-          document.body,
-        )}
+      {cargando && (
+        <CargandoVialto
+          variante="pantalla"
+          mensaje={`Actualizando el panel ${frasePeriodo(dash.period, dash.customFrom, dash.customTo)}…`}
+        />
+      )}
 
       <div aria-busy={cargando}>
         <div className="space-y-6 lg:space-y-8">

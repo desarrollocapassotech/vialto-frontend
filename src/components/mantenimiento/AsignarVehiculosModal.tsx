@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useEffect, useMemo, useState } from "react";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { FechaPicker } from "@/components/mantenimiento/FechaPicker";
@@ -243,7 +244,7 @@ export function AsignarVehiculosModal({
         </div>
 
         {!asignados ? (
-          <p className="text-sm text-vialto-steel">Cargando…</p>
+          <CargandoVialto mensaje="Cargando vehículos…" chico />
         ) : visibles.length === 0 ? (
           <p className="text-sm text-vialto-steel">No hay vehículos que coincidan.</p>
         ) : (

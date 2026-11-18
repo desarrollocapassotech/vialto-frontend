@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import {
   ChevronDown,
@@ -767,7 +768,7 @@ export function StockPanelTenantPage({
       {/* Solo renderizamos el contenido si estamos en modo normal o si ya se seleccionó una empresa */}
       {(!isPlatform || activeTenantId) && (
         <>
-          {loading && <p className="text-sm text-vialto-steel">Cargando…</p>}
+          {loading && <CargandoVialto mensaje="Cargando stock…" />}
 
           {!loading && depositos.length === 0 && (
             <p className="text-sm text-vialto-steel">
@@ -906,6 +907,7 @@ export function StockPanelTenantPage({
               )}
 
               <ListadoDatos
+                loadingMessage="Cargando stock…"
                 columns={[]}
                 rows={paginatedItems}
                 rowKey={(item) => item.id}

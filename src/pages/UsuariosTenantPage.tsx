@@ -1,4 +1,4 @@
-import { useAuth, useUser } from "@clerk/clerk-react";
+﻿import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -756,7 +756,7 @@ export function UsuariosTenantPage() {
             ? "No hay usuarios que coincidan con los filtros aplicados."
             : "No hay usuarios en esta organización."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando usuarios…"
         rowActions={(u) =>
           u.userId
             ? [

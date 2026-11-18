@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -287,7 +288,7 @@ export function TransportistaEditPage() {
   return (
     <CrudPageLayout title="Editar proveedor">
       {initialLoading || paisFijoLoading ? (
-        <p className="mt-6 text-vialto-steel">Cargando…</p>
+        <CargandoVialto mensaje="Cargando el proveedor…" />
       ) : (
         <>
           <form

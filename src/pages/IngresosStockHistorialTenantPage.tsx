@@ -413,7 +413,7 @@ export function IngresosStockHistorialTenantPage({
         rows={loading ? null : items}
         rowKey={(op) => op.id}
         emptyMessage="No hay ingresos registrados."
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando ingresos de stock…"
         rowActions={(op) => [
           { id: "ver", label: "Ver ingreso", icon: Eye, onClick: () => setViendo(op) },
         ]}

@@ -1,4 +1,4 @@
-import { fmtDateUtc } from "@/lib/fmtDateUtc";
+﻿import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { History, Gauge, ListOrdered, Trash2, Truck } from "lucide-react";
@@ -294,7 +294,7 @@ export function AsignacionVehiculoSection({
         rows={asignaciones === null ? null : filasFiltradas}
         rowKey={(r) => r.id}
         emptyMessage="No hay choferes cargados para esta empresa."
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando asignaciones de vehículos…"
         tableColSpan={5}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>

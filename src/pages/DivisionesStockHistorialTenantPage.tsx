@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useState } from "react";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -408,7 +408,7 @@ export function DivisionesStockHistorialTenantPage({
             rows={loading ? null : items}
             rowKey={(op) => op.id}
             emptyMessage="No hay divisiones registradas."
-            loadingMessage="Cargando…"
+            loadingMessage="Cargando divisiones de stock…"
             rowActions={(op) => [
               { id: "ver", label: "Ver división", icon: Eye, onClick: () => setViendo(op) },
             ]}

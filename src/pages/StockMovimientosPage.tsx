@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { isPlatformSuperadmin, isStockViewer } from '@/lib/roleLabels';
 import { StockMovimientosSuperadminPage } from './StockMovimientosSuperadminPage';
@@ -8,7 +9,7 @@ export function StockMovimientosPage() {
   const { orgRole, isLoaded: authLoaded } = useAuth();
 
   if (!userLoaded || !authLoaded) {
-    return <div className="text-vialto-steel py-12 text-center">Un momento…</div>;
+    return <CargandoVialto mensaje="Cargando movimientos de stock…" />;
   }
 
   const ctx = { orgRole, publicMetadata: user?.publicMetadata };

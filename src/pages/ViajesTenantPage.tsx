@@ -1,4 +1,4 @@
-import {
+﻿import {
   AdjuntarComprobanteClip,
   ComprobanteAdjuntoClip,
 } from "@/components/shared/ComprobanteAdjuntoClip";
@@ -3484,7 +3484,7 @@ export function ViajesTenantPage({
         rows={mostrarCargandoListado ? null : (rows ?? [])}
         rowKey={(v) => v.id}
         emptyMessage="Todavía no hay viajes cargados."
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando viajes…"
         tableColSpan={tableColSpan}
         filters={viajesListadoFiltros}
         activeFilterCount={cantidadFiltrosColumnasActivos}

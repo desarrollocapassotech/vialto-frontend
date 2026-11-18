@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { Download, Eye, FileText } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ListadoCard } from "@/components/listado/ListadoCard";
@@ -801,7 +801,7 @@ export function StockMovimientosTenantPage({
         rows={loading ? null : items}
         rowKey={(op) => op.id}
         emptyMessage="No hay movimientos para mostrar."
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando movimientos de stock…"
         renderMobileCard={(op, { acciones, onClick }) => {
           const impacto =
             op.tipo === "division" ? getDivisionImpacto(op) : null;

@@ -1,4 +1,4 @@
-import { useAuth, useUser } from "@clerk/clerk-react";
+﻿import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -413,7 +413,7 @@ export function ProductosTenantPage() {
             ? `No se pudieron cargar los ${pluralFrase}.`
             : `No hay ${pluralFrase} que coincidan con el criterio.`
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando productos…"
         rowActions={(r) => [
           {
             id: "ver",

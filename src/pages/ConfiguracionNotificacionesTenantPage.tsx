@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { ChevronDown } from "lucide-react";
@@ -275,7 +276,7 @@ export function ConfiguracionNotificacionesTenantPage({
 
       <div className="mt-6 space-y-8">
         {loading && (
-          <p className="text-sm text-vialto-steel">Cargando…</p>
+          <CargandoVialto mensaje="Cargando notificaciones…" />
         )}
 
         {!loading && grupos.length === 0 && !error && (

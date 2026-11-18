@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { friendlyError } from "@/lib/friendlyError";
@@ -155,7 +156,7 @@ export function ViajesColumnasOrdenModal({
             lote va siempre primera y Acciones siempre última.
           </p>
           {!habilitadas && !errorCarga && (
-            <p className="py-6 text-center text-sm text-vialto-steel">Cargando…</p>
+            <CargandoVialto mensaje="Cargando columnas…" chico />
           )}
           {habilitadas && (
             <ol className="divide-y divide-black/10 border border-black/15">

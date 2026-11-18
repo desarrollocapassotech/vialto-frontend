@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -1200,7 +1201,7 @@ export function ViajeCreatePage() {
         }
       >
         {loadingRefs ? (
-          <p className="mt-6 text-vialto-steel">Cargando referencias…</p>
+          <CargandoVialto mensaje="Preparando el alta del viaje…" />
         ) : (
           <form
             autoComplete="off"

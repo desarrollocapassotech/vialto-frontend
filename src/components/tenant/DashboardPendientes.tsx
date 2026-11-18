@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 import { CeldaAccionesFila } from "@/components/ui/AccionesFila";
@@ -47,7 +48,7 @@ export function DashboardPendientes({
       verTodoTo={cantidad > 0 ? verTodoTo : undefined}
     >
       {loading ? (
-        <p className="px-4 py-6 text-sm text-vialto-steel">Cargando…</p>
+        <CargandoVialto mensaje={`Cargando ${titulo.toLowerCase()}…`} chico />
       ) : visibles.length === 0 ? (
         <p className="px-4 py-6 text-sm text-vialto-steel">{vacio}</p>
       ) : (

@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, Pencil } from "lucide-react";
@@ -329,7 +329,7 @@ export function VehiculosSuperadminPage() {
                 ? "No hay vehículos que coincidan con los filtros aplicados."
                 : "No hay vehículos cargados para esta empresa."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando vehículos…"
         rowActionsSubtitle={(v) => v.patente}
         rowActions={(v) => [
           {

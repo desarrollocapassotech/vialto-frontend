@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useState } from "react";
 import { PaisModal } from "@/components/viajes/PaisModal";
 import { PaisViewModal } from "@/components/viajes/PaisViewModal";
@@ -140,7 +140,7 @@ export function PaisesTenantPage() {
             ? "No se pudieron cargar los países."
             : "Todavía no tenés países cargados."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando países…"
         rowActionsMaxIconos={3}
         rowActions={(p) => [
           { id: "ver", label: "Ver país", icon: Eye, onClick: () => setViewingPais(p) },

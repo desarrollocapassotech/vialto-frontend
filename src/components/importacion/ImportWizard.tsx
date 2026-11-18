@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth } from "@clerk/clerk-react";
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -2543,7 +2544,7 @@ function EtapaOpcional<T>({
       {hasItems && <p className="text-sm text-vialto-steel">{descripcion}</p>}
 
       {!preview && loading && (
-        <p className="text-sm text-vialto-steel">Cargando…</p>
+        <CargandoVialto mensaje="Preparando la vista previa…" />
       )}
 
       {/* Si `onPedirPreview` falló, `loading` ya bajó pero `preview` sigue en null: sin esto el usuario quedaría sin forma de reintentar o saltear la etapa. */}

@@ -1,6 +1,7 @@
 import { useOrganizationList, useClerk } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { CargandoVialto } from '@/components/shared/CargandoVialto';
 
 export function TaskChooseOrganizationPage() {
   const { isLoaded, userMemberships, userInvitations, setActive } = useOrganizationList({
@@ -44,8 +45,9 @@ export function TaskChooseOrganizationPage() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-vialto-charcoal">
-        <p className="text-white/60 text-sm">Cargando…</p>
+      // Fondo claro mientras carga: el logo (V y ruta negras) no se ve sobre el charcoal.
+      <div className="min-h-screen flex items-center justify-center bg-vialto-mist">
+        <CargandoVialto mensaje="Cargando tus empresas…" />
       </div>
     );
   }

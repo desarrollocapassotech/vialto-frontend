@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { formatIdFiscal } from "@/lib/ciudades/paises";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -411,7 +411,7 @@ export function TransportistasSuperadminPage() {
                 ? "No hay proveedores que coincidan con los filtros aplicados."
                 : "No hay proveedores cargados para esta empresa."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando proveedores…"
         rowActions={(t) => [
           { id: "ver", label: "Ver proveedor", icon: Eye, onClick: () => setViewingTransportista(t) },
         ]}

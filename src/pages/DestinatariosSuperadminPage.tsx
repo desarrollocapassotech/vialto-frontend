@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { DestinatarioViewModal } from "@/components/destinatarios/DestinatarioViewModal";
@@ -314,7 +314,7 @@ export function DestinatariosSuperadminPage() {
                 ? "No hay destinatarios que coincidan con los filtros aplicados."
                 : "No hay destinatarios para esta empresa."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando destinatarios…"
         rowActions={(d) => [
           {
             id: "ver",

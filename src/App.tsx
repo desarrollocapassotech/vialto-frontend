@@ -6,6 +6,7 @@ import {
 } from "@clerk/clerk-react";
 import { Link, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
+import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { MaestroDataProvider, useMaestroData } from "@/hooks/useMaestroData";
 import {
   isPlatformSuperadmin,
@@ -73,8 +74,8 @@ function RequireAuth() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-vialto-mist text-vialto-steel">
-        Un momento…
+      <div className="min-h-screen flex items-center justify-center bg-vialto-mist">
+        <CargandoVialto mensaje="Iniciando Vialto…" />
       </div>
     );
   }
@@ -247,8 +248,8 @@ function RequireModule({ module }: { module: string }) {
     tenantLoading
   ) {
     return (
-      <div className="min-h-[40vh] flex items-center justify-center text-vialto-steel">
-        Un momento…
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <CargandoVialto mensaje="Preparando tu empresa…" />
       </div>
     );
   }

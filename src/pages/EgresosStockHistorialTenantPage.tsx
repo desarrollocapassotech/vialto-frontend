@@ -422,7 +422,7 @@ export function EgresosStockHistorialTenantPage({
         rows={loading ? null : items}
         rowKey={(op) => op.id}
         emptyMessage="No hay egresos registrados."
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando egresos de stock…"
         rowActions={(op) => [
           { id: "ver", label: "Ver egreso", icon: Eye, onClick: () => setViendo(op) },
           {

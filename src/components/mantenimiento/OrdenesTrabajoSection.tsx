@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Ban, Eye, History, Trash2 } from "lucide-react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -280,7 +280,7 @@ export function OrdenesTrabajoSection({
               ? "No hay órdenes que coincidan con los filtros aplicados."
               : "Todavía no hay órdenes de trabajo registradas."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando órdenes de trabajo…"
         actionsTdClassName={`${listadoTablaAccionesTdClass} text-right`}
         rowActionsDestacadas={["ver", "historial"]}
         rowActions={(o) => {

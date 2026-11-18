@@ -157,6 +157,16 @@ Este patrón evita condicionales gigantes y mejora reutilización.
 - Usar tokens (`vialto-*`) en lugar de colores hardcodeados.
 - Mantener consistencia visual entre vistas tenant y superadmin.
 
+### Loader único: `CargandoVialto` (nov 2026)
+
+**Regla global para toda carga, actual y futura.** Se muestra el logo de Vialto con el camión que entra por la ruta, descarga, carga y sigue hasta la flecha (`components/shared/VialtoTruckLoader.tsx`), con un **mensaje que dice qué se está cargando**: "Cargando viajes…", "Cargando el chofer…", "Emitiendo la factura en ARCA… No cierres esta ventana.". Nunca "Cargando…" o "Un momento…" a secas. Componente: `CargandoVialto` (`components/shared/CargandoVialto.tsx`):
+
+- `variante="bloque"` (default): centrado donde va el contenido (página, sección, cuerpo de un modal). `chico` en modales y secciones angostas.
+- `variante="modal"`: capa sobre todo el panel del modal que bloquea (panel `relative`). Es lo que usa `BloqueoModal`.
+- `variante="pantalla"`: capa fija sobre toda la pantalla con difuminado blanco, dejando ver los skeletons detrás (cambio de período del dashboard).
+- **Grillas**: `ListadoDatos` ya lo dibuja mientras `rows` es `null`; pasar `loadingMessage="Cargando <entidad>…"`.
+- **Quedan con texto chico, sin camión** (no se distingue a ese tamaño): textos de botones ("Cargando datos…", "Guardando…"), opciones/placeholder de selects y valores de una celda o campo suelto.
+
 ---
 
 ## Integración con arquitectura general de Vialto
@@ -758,7 +768,7 @@ Pendientes conocidos (no hechos a propósito): Facturas/Liquidaciones no guardan
 - Crear tipos en `src/types` antes de consumir endpoints.
 - Reutilizar `lib/api.ts` y `friendlyError.ts`.
 - Extraer componentes y hooks para evitar páginas extensas.
-- Verificar estados de carga, error y vacío.
+- Verificar estados de carga, error y vacío. **La carga con `CargandoVialto` y un mensaje de qué se carga** — ver "Loader único: `CargandoVialto`".
 - Mantener textos y UX consistentes con el resto del producto.
 - **Aplicar el patrón VER → modal read-only → EDITAR** en la columna de acciones de toda grilla nueva.
 - **Toda tabla nueva usa el formato de acciones de Viajes**: header "Acciones", 2–3 íconos + flecha con el resto (`AccionesFila`), "Ver …" primero, click en la fila = única acción o modal de acciones. Con `ListadoDatos`, `rowActions`; a mano, `CeldaAccionesFila` + `clickFilaAcciones` — ver "Columna de acciones de toda grilla: formato de Viajes".

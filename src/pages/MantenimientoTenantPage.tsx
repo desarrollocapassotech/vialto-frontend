@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -146,7 +147,7 @@ export function MantenimientoTenantPage({
         </div>
       </div>
 
-      {vista === "cargando" && <p className="mt-6 text-sm text-vialto-steel">Cargando…</p>}
+      {vista === "cargando" && <CargandoVialto mensaje="Cargando mantenimiento…" />}
       {vista === "asistente" && (
         <MantenimientoOnboarding getToken={token} tenantId={tenantId} onTerminar={salirDelAsistente} />
       )}

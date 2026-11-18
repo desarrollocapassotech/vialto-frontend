@@ -1,4 +1,5 @@
 import { hoyArgentinaIso } from "@/lib/facturaFechaEmision";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import type { DashboardPeriodKind } from "@/types/ownerDashboard";
 
 /**
@@ -26,4 +27,17 @@ export function periodoAFechas(
   }
   if (customFrom && customTo) return { from: customFrom, to: customTo };
   return null;
+}
+
+/** "de este mes", "de los últimos 3 meses", "del 01/10/2026 al 18/11/2026" (para mensajes). */
+export function frasePeriodo(
+  period: DashboardPeriodKind,
+  customFrom: string,
+  customTo: string,
+): string {
+  if (period === "week") return "de esta semana";
+  if (period === "month") return "de este mes";
+  if (period === "3months") return "de los últimos 3 meses";
+  if (customFrom && customTo) return `del ${fmtDateUtc(customFrom)} al ${fmtDateUtc(customTo)}`;
+  return "";
 }

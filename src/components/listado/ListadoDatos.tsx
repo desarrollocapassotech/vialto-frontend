@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { ListadoFiltrosSheet } from '@/components/listado/ListadoFiltrosSheet';
 import { TablaScrollHorizontal } from '@/components/listado/TablaScrollHorizontal';
+import { CargandoVialto } from '@/components/shared/CargandoVialto';
 import { AccionesFila } from '@/components/ui/AccionesFila';
 import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import { TooltipsDelegados } from '@/components/ui/TooltipsDelegados';
@@ -44,6 +45,7 @@ export type ListadoDatosProps<T> = {
   rows: T[] | null | undefined;
   rowKey: (row: T) => string;
   emptyMessage: string;
+  /** Qué se está cargando, para el loader de Vialto (ej. "Cargando viajes…"). */
   loadingMessage?: string;
   className?: string;
   /** Thead personalizado (p. ej. columnas especiales). Solo desktop. */
@@ -107,7 +109,7 @@ export function ListadoDatos<T>({
   rows,
   rowKey,
   emptyMessage,
-  loadingMessage = 'Cargando…',
+  loadingMessage = 'Cargando datos…',
   className = '',
   tableHead,
   mobileToolbar,
@@ -228,9 +230,7 @@ export function ListadoDatos<T>({
       <div className={[listadoDatosWrapperClass].filter(Boolean).join(' ')}>
 
       <div className={listadoCardListClass}>
-        {loading && (
-          <p className="px-1 py-6 text-center text-sm text-vialto-steel">{loadingMessage}</p>
-        )}
+        {loading && <CargandoVialto mensaje={loadingMessage} chico />}
         {isEmpty && (
           <p className="px-1 py-6 text-center text-sm text-vialto-steel">{emptyMessage}</p>
         )}
@@ -271,8 +271,8 @@ export function ListadoDatos<T>({
           <tbody className={listadoTablaTbodyClass}>
             {loading && (
               <tr>
-                <td colSpan={colSpan} className={listadoTablaEmptyCellClass}>
-                  {loadingMessage}
+                <td colSpan={colSpan}>
+                  <CargandoVialto mensaje={loadingMessage} />
                 </td>
               </tr>
             )}

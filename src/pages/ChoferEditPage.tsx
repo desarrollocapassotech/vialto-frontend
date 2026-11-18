@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -208,7 +209,7 @@ export function ChoferEditPage() {
       title="Editar chofer"
     >
       {initialLoading ? (
-        <p className="mt-6 text-vialto-steel">Cargando…</p>
+        <CargandoVialto mensaje="Cargando el chofer…" />
       ) : form ? (
         <>
           <form

@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -408,7 +408,7 @@ export function SuperadminUsersPage() {
                   ? "No hay usuarios que coincidan con los filtros aplicados."
                   : "No hay usuarios en esta empresa."
           }
-          loadingMessage="Cargando…"
+          loadingMessage="Cargando usuarios…"
           rowActions={(u) =>
             u.userId
               ? [{ id: "ver", label: "Ver usuario", icon: Eye, onClick: () => setViewingUser(u) }]
