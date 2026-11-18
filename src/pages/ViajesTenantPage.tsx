@@ -84,11 +84,7 @@ import { ViajeEditModal } from "@/components/viajes/ViajeEditModal";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { ViajeAccionesMenu } from "@/components/viajes/ViajeAccionesMenu";
 import { TruncarInicio } from "@/components/ui/TruncarInicio";
-import {
-  ViajesResumenFiltros,
-  resumenPendientes,
-} from "@/components/viajes/ViajesResumenFiltros";
-import { FiltrosRapidosBoton } from "@/components/listado/FiltrosRapidos";
+import { ViajesResumenFiltros } from "@/components/viajes/ViajesResumenFiltros";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner } from "@/components/ui/Spinner";
 import { otroGastoDraftFromApi } from "@/components/viajes/OtrosGastosFieldset";
@@ -608,7 +604,6 @@ export function ViajesTenantPage({
   );
   const [pagoTransportistaFiltro, setPagoTransportistaFiltro] =
     useState<ViajePagoTransportistaFiltro>(filtrosIniciales.pagoTransportista);
-  const [showFiltrosRapidos, setShowFiltrosRapidos] = useState(false);
   const [tipoFechaFiltro, setTipoFechaFiltro] = useState<
     "" | "carga" | "descarga"
   >(filtrosIniciales.tipoFecha);
@@ -1641,10 +1636,6 @@ export function ViajesTenantPage({
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
   }
-
-  const cantidadFiltrosRapidosActivos =
-    (facturacionFiltro.trim() ? 1 : 0) +
-    (pagoTransportistaFiltro.trim() ? 1 : 0);
 
   const hayFiltrosColumnasActivos =
     !!numeroFiltroActivo.trim() ||
@@ -3327,18 +3318,6 @@ export function ViajesTenantPage({
   const filtroRapidoContent = (
     <>
       {resumen && (
-        <FiltrosRapidosBoton
-          abierto={showFiltrosRapidos}
-          onToggle={() => setShowFiltrosRapidos((v) => !v)}
-          cantidadActivos={cantidadFiltrosRapidosActivos}
-          pendientes={resumenPendientes(resumen, {
-            mostrarFiltroPago: mostrarPagosTransportista,
-            mostrarFiltroLiquidacion: mostrarColumnaLiquidacion,
-          })}
-        />
-      )}
-
-      {resumen && showFiltrosRapidos && (
         <div className="min-w-0">
           <ViajesResumenFiltros
             resumen={resumen}

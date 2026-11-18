@@ -29,6 +29,7 @@ import {
   Trash2,
   Paperclip,
   BookOpen,
+  FileX,
 } from "lucide-react";
 import { LibroIvaExportModal } from "@/components/shared/LibroIvaExportModal";
 import { FiltroRangoFechas } from "@/components/shared/FiltroRangoFechas";
@@ -1259,6 +1260,7 @@ export function LiquidacionesTenantPage() {
               {
                 id: "pendiente_anulacion",
                 label: "Pendientes de anular",
+                icon: FileX,
                 count: rows?.filter((r) => r.estado === "pendiente_anulacion")
                   .length,
               },

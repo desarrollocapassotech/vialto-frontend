@@ -13,6 +13,9 @@ import {
   History,
   Trash2,
   Undo2,
+  CalendarX,
+  Unlink,
+  Wallet,
 } from 'lucide-react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
@@ -758,11 +761,12 @@ export function CuentaContraparteView({
         createPortal(
           <FiltrosRapidos
             opciones={[
-              { id: 'sin_imputar', label: 'Sin imputar', count: cantidadesFiltroRapido.sin_imputar },
-              { id: 'vencidos', label: 'Vencidos', count: cantidadesFiltroRapido.vencidos },
+              { id: 'sin_imputar', label: 'Sin imputar', icon: Unlink, count: cantidadesFiltroRapido.sin_imputar },
+              { id: 'vencidos', label: 'Vencidos', icon: CalendarX, count: cantidadesFiltroRapido.vencidos },
               {
                 id: 'sin_cobrar',
                 label: tipoContraparte === 'cliente' ? 'Sin cobrar' : 'Sin pagar',
+                icon: Wallet,
                 count: cantidadesFiltroRapido.sin_cobrar,
               },
             ] satisfies FiltroRapidoOpcion<FiltroRapidoCc>[]}

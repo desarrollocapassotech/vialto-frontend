@@ -53,7 +53,7 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
-import { BookOpen, Clock, Download, FlaskConical } from "lucide-react";
+import { BookOpen, CalendarX, Clock, Download, FlaskConical, Wallet } from "lucide-react";
 import { LibroIvaExportModal } from "@/components/shared/LibroIvaExportModal";
 import {
   clientesConViajesPendientesFactura,
@@ -1459,11 +1459,12 @@ export function FacturacionTenantPage({
                   {
                     id: "sin_cobrar" as const,
                     label: "Sin cobrar",
+                    icon: Wallet,
                     count: resumenCobro?.sinCobrar,
                   },
                 ]
               : []),
-            { id: "vencida" as const, label: "Vencidas", count: resumenCobro?.vencidas },
+            { id: "vencida" as const, label: "Vencidas", icon: CalendarX, count: resumenCobro?.vencidas },
           ]}
           value={cobroFiltro}
           onChange={(v) => {

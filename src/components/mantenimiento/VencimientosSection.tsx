@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowUp, FileText, Gauge, History, Wrench } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarClock, CircleAlert, FileText, Gauge, History, Wrench } from "lucide-react";
 import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
@@ -95,6 +95,7 @@ export function VencimientosSection({
   const opcionesRapidas: FiltroRapidoOpcion<EstadoFiltroRapido>[] = ESTADOS_FILTRO_RAPIDO.map((e) => ({
     id: e,
     label: ESTADO_VENCIMIENTO[e].contador,
+    icon: e === "vencido" ? CircleAlert : CalendarClock,
     count: filas ? contadores[e] : undefined,
   }));
 
