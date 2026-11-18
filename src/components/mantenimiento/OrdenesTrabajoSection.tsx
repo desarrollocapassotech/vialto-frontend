@@ -180,6 +180,7 @@ export function OrdenesTrabajoSection({
                 title="Vehículo"
                 filterActive={!!vehiculoId}
                 filterSignature={vehiculoId}
+                valor={maestro.vehiculos.find((v) => v.id === vehiculoId)?.patente}
                 onClear={() => filtro(setVehiculoId)("")}
               >
                 <SearchableEntitySelect<Vehiculo>
@@ -201,7 +202,7 @@ export function OrdenesTrabajoSection({
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro title="Tipo" filterActive={!!tipo} filterSignature={tipo} onClear={() => filtro(setTipo)("")}>
+              <ViajesListadoHeaderFiltro title="Tipo" filterActive={!!tipo} filterSignature={tipo} valor={tipo ? TIPO_ORDEN_LABELS[tipo as TipoOrden] : null} onClear={() => filtro(setTipo)("")}>
                 <select
                   value={tipo}
                   onChange={(e) => filtro(setTipo)(e.target.value)}
@@ -222,6 +223,7 @@ export function OrdenesTrabajoSection({
                 title="Taller"
                 filterActive={!!tallerId}
                 filterSignature={tallerId}
+                valor={talleres.find((t) => t.id === tallerId)?.nombre}
                 onClear={() => filtro(setTallerId)("")}
               >
                 <select

@@ -1,4 +1,5 @@
-﻿import { fmtDateUtc } from "@/lib/fmtDateUtc";
+﻿import { etiquetaDeOpcion } from "@/components/listado/filtrosActivos";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { History, Gauge, ListOrdered, Trash2, Truck } from "lucide-react";
@@ -303,6 +304,7 @@ export function AsignacionVehiculoSection({
                 title="Chofer"
                 filterActive={!!choferFiltroId}
                 filterSignature={choferFiltroId}
+                valor={etiquetaDeOpcion(choferOptions, choferFiltroId)}
                 onClear={() => setChoferFiltroId("")}
               >
                 <SearchableSelect
@@ -321,6 +323,7 @@ export function AsignacionVehiculoSection({
                 title="Vehículo asignado"
                 filterActive={!!vehiculoFiltroId}
                 filterSignature={vehiculoFiltroId}
+                valor={etiquetaDeOpcion(vehiculoOptions, vehiculoFiltroId)}
                 onClear={() => setVehiculoFiltroId("")}
               >
                 <SearchableSelect

@@ -193,6 +193,7 @@ export function ListadoCuentasCc({ tipoContraparte, cuentas, cargandoCuentas, on
                 title={titulo}
                 filterActive={filtroActivo}
                 filterSignature={cuentaFiltroId}
+                valor={opcionesCuenta.find((o) => o.value === cuentaFiltroId)?.label}
                 onClear={() => setCuentaFiltroId('')}
                 orden={ordenColumna('nombre')}
               >

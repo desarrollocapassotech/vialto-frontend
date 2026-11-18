@@ -1268,6 +1268,7 @@ export function LiquidacionesTenantPage() {
             value={estadoFilter === "pendiente_anulacion" ? estadoFilter : ""}
             onChange={(v) => aplicarFiltroEstado(v || "todos")}
             ariaLabel="Filtros rápidos de liquidaciones"
+            cargando={rows === null && !error}
           />
         )}
         {activeTenantId && anyFiltroActivo && (
@@ -1365,6 +1366,7 @@ export function LiquidacionesTenantPage() {
                 title={tl.singular}
                 filterActive={!!transportistaFilter}
                 filterSignature={transportistaFilter}
+                valor={transportistas.find((t) => t.id === transportistaFilter)?.nombre}
                 onClear={() => aplicarFiltroTransportista("")}
               >
                 <TransportistaSearchSelect
@@ -1452,6 +1454,7 @@ export function LiquidacionesTenantPage() {
                   title="Estado"
                   filterActive={estadoFilter !== "todos"}
                   filterSignature={estadoFilter}
+                  valor={estadoFilter !== "todos" ? (ESTADO_LABEL as Record<string, string>)[estadoFilter] : null}
                   onClear={() => aplicarFiltroEstado("todos")}
                 >
                   <select

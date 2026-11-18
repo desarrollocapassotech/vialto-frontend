@@ -1,4 +1,5 @@
-﻿import { fmtDateUtc } from "@/lib/fmtDateUtc";
+﻿import { etiquetaDeOpcion } from "@/components/listado/filtrosActivos";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -976,6 +977,7 @@ export function CombustibleTenantPage({
                     title="Conductor"
                     filterActive={!!choferId}
                     filterSignature={choferId}
+                    valor={etiquetaDeOpcion(choferOptions, choferId)}
                     onClear={() => {
                       setChoferId("");
                       resetPage();
@@ -1001,6 +1003,7 @@ export function CombustibleTenantPage({
                     title="Vehículo"
                     filterActive={!!vehiculoId}
                     filterSignature={vehiculoId}
+                    valor={etiquetaDeOpcion(vehiculoOptions, vehiculoId)}
                     onClear={() => {
                       setVehiculoId("");
                       resetPage();
@@ -1051,6 +1054,7 @@ export function CombustibleTenantPage({
                     title="Pago"
                     filterActive={!!formaPago}
                     filterSignature={formaPago}
+                    valor={FORMA_PAGO_LABELS[formaPago]}
                     onClear={() => {
                       setFormaPago("");
                       resetPage();

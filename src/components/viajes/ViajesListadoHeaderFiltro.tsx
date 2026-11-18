@@ -1,7 +1,16 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { etiquetaDirOrden, type TipoOrden } from '@/lib/ordenListado';
+import { useRegistrarFiltroActivo, valorLegibleDeFirma } from '@/components/listado/filtrosActivos';
+
+/** "ORIGEN — DESTINO" → "Origen — destino" (los títulos de columna vienen en mayúscula). */
+function tituloBadge(title: string): string {
+  const t = title.trim();
+  if (t !== t.toUpperCase()) return t;
+  const min = t.toLowerCase();
+  return min.charAt(0).toUpperCase() + min.slice(1);
+}
 
 export const ViajesFiltroContext = createContext<{ cerrar: () => void } | null>(null);
 
@@ -41,6 +50,12 @@ type Props = {
   titleNoWrap?: boolean;
   /** Si se pasa y hay filtro aplicado, muestra una ✕ en el encabezado que lo quita. */
   onClear?: () => void;
+  /**
+   * Lo aplicado en palabras, para el badge de filtros activos arriba de la grilla
+   * ("Agnone Group"). Sin esto se usa `filterSignature` si es legible (texto buscado,
+   * fechas); si es un id, el badge muestra solo el título.
+   */
+  valor?: string | null;
   /** Si se pasa, el título ordena la grilla al hacer click (el embudo sigue filtrando). */
   orden?: OrdenColumna;
 };
@@ -154,8 +169,23 @@ export function ViajesListadoHeaderFiltro({
   titleNoWrap = false,
   onClear,
   orden,
+  valor,
 }: Props) {
   const [abierto, setAbierto] = useState(false);
+  // Badge "Título: valor ×" arriba de la grilla mientras el filtro está aplicado.
+  const idFiltro = useId();
+  useRegistrarFiltroActivo(
+    idFiltro,
+    filterActive && onClear
+      ? { titulo: tituloBadge(title), valor: valor ?? valorLegibleDeFirma(filterSignature) }
+      : null,
+    onClear
+      ? () => {
+          setAbierto(false);
+          onClear();
+        }
+      : undefined,
+  );
   const iconoMarcado = filterActive || abierto;
   const firmaPrev = useRef<string | null>(null);
   const filterActivePrev = useRef(filterActive);

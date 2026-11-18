@@ -16,6 +16,8 @@ type Props<T extends string> = {
   value: T | "";
   onChange: (value: T | "") => void;
   ariaLabel: string;
+  /** Se están contando los registros: los chips no se aplican hasta saber si hay. */
+  cargando?: boolean;
 };
 
 /**
@@ -29,6 +31,7 @@ export function FiltrosRapidos<T extends string>({
   value,
   onChange,
   ariaLabel,
+  cargando = false,
 }: Props<T>) {
   return (
     <FiltrosRapidosGrupo ariaLabel={ariaLabel}>
@@ -41,6 +44,7 @@ export function FiltrosRapidos<T extends string>({
             icon={o.icon}
             active={active}
             count={o.count}
+            cargando={cargando}
             onClick={() => onChange(active ? "" : o.id)}
           />
         );

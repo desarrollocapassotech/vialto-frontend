@@ -233,7 +233,7 @@ export function ViajeCreatePage() {
   const [localChoferesRapidos, setLocalChoferesRapidos] = useState<Chofer[]>(
     [],
   );
-  /** A qué fila de `clientesRows` aplicar el cliente recién creado desde "+ Nuevo cliente". */
+  /** A qué fila de `clientesRows` aplicar el cliente recién creado desde "Nuevo cliente". */
   const [clienteQuickCreateTarget, setClienteQuickCreateTarget] = useState(0);
 
   const [paises, setPaises] = useState<Pais[]>([]);

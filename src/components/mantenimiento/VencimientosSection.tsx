@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowDown, ArrowUp, CalendarClock, CircleAlert, FileText, Gauge, History, Wrench } from "lucide-react";
 import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
@@ -154,6 +154,7 @@ export function VencimientosSection({
             value={estado === "vencido" || estado === "proximo" ? estado : ""}
             onChange={(v) => setEstado(v)}
             ariaLabel="Filtrar vencimientos por estado"
+            cargando={filas === null && !error}
           />,
           limpiarFiltrosSlot,
         )}
@@ -188,6 +189,7 @@ export function VencimientosSection({
                 title="Estado"
                 filterActive={!!estado}
                 filterSignature={estado}
+                valor={estado ? ESTADO_VENCIMIENTO[estado].contador : null}
                 onClear={() => setEstado("")}
               >
                 <select
@@ -210,6 +212,7 @@ export function VencimientosSection({
                 title="Vehículo"
                 filterActive={!!vehiculoId}
                 filterSignature={vehiculoId}
+                valor={vehiculosConPlanes.find((veh) => veh.id === vehiculoId)?.patente}
                 onClear={() => setVehiculoId("")}
               >
                 <SearchableEntitySelect<Vehiculo>
@@ -235,6 +238,7 @@ export function VencimientosSection({
                 title="Plan"
                 filterActive={!!categoria}
                 filterSignature={categoria}
+                valor={categoria === "documental" ? "Documentales" : categoria === "mecanico" ? "Mecánicos" : null}
                 onClear={() => setCategoria("")}
               >
                 <select

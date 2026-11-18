@@ -773,6 +773,7 @@ export function CuentaContraparteView({
             value={filtroRapido}
             onChange={setFiltroRapido}
             ariaLabel="Filtros rápidos de cuenta corriente"
+            cargando={movimientosConSaldo == null && !error}
           />,
           filtrosRapidosSlot,
         )}

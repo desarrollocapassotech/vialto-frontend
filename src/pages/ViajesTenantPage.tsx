@@ -84,8 +84,13 @@ import { ViajeEditModal } from "@/components/viajes/ViajeEditModal";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { ViajeAccionesMenu } from "@/components/viajes/ViajeAccionesMenu";
 import { TruncarInicio } from "@/components/ui/TruncarInicio";
-import { ViajesResumenFiltros } from "@/components/viajes/ViajesResumenFiltros";
+import {
+  ViajesResumenFiltros,
+  type ViajesResumenFiltrosData,
+} from "@/components/viajes/ViajesResumenFiltros";
 import { ImportarExportarMenu } from "@/components/listado/ImportarExportarMenu";
+import { LimpiarFiltrosButton } from "@/components/listado/LimpiarFiltrosButton";
+import { textoCodigo, textoRangoFechas } from "@/components/listado/filtrosActivos";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner } from "@/components/ui/Spinner";
 import { otroGastoDraftFromApi } from "@/components/viajes/OtrosGastosFieldset";
@@ -173,7 +178,7 @@ import {
   VIAJES_FILTROS_VACIOS,
 } from "@/lib/viajesListadoPersistido";
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
-import { Columns3, CornerDownRight, X } from "lucide-react";
+import { Columns3, CornerDownRight } from "lucide-react";
 import { mutate } from "swr";
 import { ViajesColumnasOrdenModal } from "@/components/viajes/ViajesColumnasOrdenModal";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
@@ -654,11 +659,8 @@ export function ViajesTenantPage({
     null,
   );
 
-  const [resumen, setResumen] = useState<{
-    sinFacturar: number;
-    sinLiquidar: number;
-    pagados: number;
-  } | null>(null);
+  /** Conteos de los filtros rápidos. null = contando; un conteo que falló queda undefined (sin número). */
+  const [resumen, setResumen] = useState<ViajesResumenFiltrosData | null>(null);
   /** Se incrementa tras cada operación que puede cambiar los conteos de los chips. */
   const [resumenVersion, setResumenVersion] = useState(0);
   const refrescarResumen = () => setResumenVersion((v) => v + 1);
@@ -953,12 +955,13 @@ export function ViajesTenantPage({
         ),
       ]);
       if (cancelled) return;
+      // Un conteo que falló queda sin número (no 0: el chip se mostraría "sin registros").
       setResumen({
         sinFacturar:
-          estadoSF.status === "fulfilled" ? estadoSF.value.meta.total : 0,
+          estadoSF.status === "fulfilled" ? estadoSF.value.meta.total : undefined,
         sinLiquidar:
-          estadoSL.status === "fulfilled" ? estadoSL.value.meta.total : 0,
-        pagados: pagoPag.status === "fulfilled" ? pagoPag.value : 0,
+          estadoSL.status === "fulfilled" ? estadoSL.value.meta.total : undefined,
+        pagados: pagoPag.status === "fulfilled" ? pagoPag.value : undefined,
       });
     })();
     return () => {
@@ -2536,6 +2539,44 @@ export function ViajesTenantPage({
   }, [mostrarColumnaObservaciones]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mostrarCargandoListado = !error && (rows === null || listadoRefetching);
+
+  // Texto de los badges de filtros activos (arriba de la grilla): siempre lo aplicado.
+  const etiquetaOpcion = (
+    opciones: { value: string; label: string }[],
+    valor: string,
+    prefijo: string,
+  ) => {
+    const label = opciones.find((o) => o.value === valor)?.label ?? textoCodigo(valor);
+    // "Sin facturar" se entiende solo; "En borrador" necesita decir de qué.
+    return label.startsWith("Sin ") ? label : `${prefijo}: ${label.toLowerCase()}`;
+  };
+  const valorFiltroEtapa =
+    [
+      estadoFiltro.trim() ? (etapaViajeLabel[estadoFiltro] ?? textoCodigo(estadoFiltro)) : null,
+      facturacionFiltro.trim()
+        ? etiquetaOpcion(opcionesFiltroFacturacion, facturacionFiltro, "Factura")
+        : null,
+      liquidacionFiltro.trim()
+        ? etiquetaOpcion(opcionesFiltroLiquidacion, liquidacionFiltro, "Liquidación")
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || null;
+  const valorFiltroUbicacion = ubicacionFiltro.trim()
+    ? tipoUbicacionFiltro === "origen"
+      ? `Origen: ${ubicacionFiltro.trim()}`
+      : tipoUbicacionFiltro === "destino"
+        ? `Destino: ${ubicacionFiltro.trim()}`
+        : ubicacionFiltro.trim()
+    : null;
+  const rangoFechaFiltro = textoRangoFechas(fechaDesdeFiltro, fechaHastaFiltro);
+  const valorFiltroFecha = rangoFechaFiltro
+    ? tipoFechaFiltro === "carga"
+      ? `Carga: ${rangoFechaFiltro}`
+      : tipoFechaFiltro === "descarga"
+        ? `Descarga: ${rangoFechaFiltro}`
+        : rangoFechaFiltro
+    : null;
   const elegiblesEnPagina = (rows ?? []).filter(esElegibleLote);
   const cantidadFacturarLote = loteFacturarActivo
     ? viajesSeleccionados().filter(esElegibleFacturarLote).length
@@ -2682,6 +2723,7 @@ export function ViajesTenantPage({
           title="Cliente"
           filterActive={!!clienteIdFiltroActivo.trim()}
           filterSignature={clienteIdFiltroActivo}
+          valor={clientes.find((c) => c.id === clienteIdFiltroActivo)?.nombre}
           onClear={() => aplicarFiltroColumnaCliente("")}
         >
           <ClienteSearchSelect
@@ -2710,6 +2752,7 @@ export function ViajesTenantPage({
         title="Transporte"
         filterActive={!!transportistaIdFiltroActivo.trim()}
         filterSignature={transportistaIdFiltroActivo}
+        valor={transportistas.find((t) => t.id === transportistaIdFiltroActivo)?.nombre}
         onClear={() => aplicarFiltroColumnaTransportista("")}
       >
         <TransportistaSearchSelect
@@ -2738,6 +2781,7 @@ export function ViajesTenantPage({
           title="Chofer"
           filterActive={!!choferIdFiltroActivo.trim()}
           filterSignature={choferIdFiltroActivo}
+          valor={choferes.find((ch) => ch.id === choferIdFiltroActivo)?.nombre}
           onClear={() => aplicarFiltroColumnaChofer("")}
           minWidthClass="min-w-0"
         >
@@ -2771,6 +2815,7 @@ export function ViajesTenantPage({
             !!liquidacionFiltro.trim()
           }
           filterSignature={`${estadoFiltro}|${facturacionFiltro}|${liquidacionFiltro}`}
+          valor={valorFiltroEtapa}
           onClear={quitarFiltroEtapa}
           minWidthClass="min-w-0"
           titleNoWrap
@@ -2859,6 +2904,7 @@ export function ViajesTenantPage({
           title="Origen — Destino"
           filterActive={!!ubicacionFiltro.trim()}
           filterSignature={`${tipoUbicacionFiltro}|${paisUbicacionFiltro}|${ubicacionFiltro}`}
+          valor={valorFiltroUbicacion}
           onClear={() => aplicarTipoUbicacionFiltro("")}
           minWidthClass="min-w-0"
         >
@@ -2930,6 +2976,7 @@ export function ViajesTenantPage({
             !!fechaDesdeFiltro.trim() || !!fechaHastaFiltro.trim()
           }
           filterSignature={`${tipoFechaFiltro}|${fechaDesdeFiltro}|${fechaHastaFiltro}`}
+          valor={valorFiltroFecha}
           onClear={() => aplicarTipoFechaFiltro("")}
           minWidthClass="min-w-0"
         >
@@ -3318,7 +3365,8 @@ export function ViajesTenantPage({
 
   const filtroRapidoContent = (
     <>
-      {resumen && (
+      {/* Visible desde el principio: mientras cuenta, los chips dicen "Contando registros…". */}
+      {(!platform || !!tid) && (
         <div className="min-w-0">
           <ViajesResumenFiltros
             resumen={resumen}
@@ -3334,17 +3382,14 @@ export function ViajesTenantPage({
         </div>
       )}
 
+      {/* Se dibuja al final de la fila de badges de filtros aplicados, arriba de la grilla. */}
       {hayFiltrosColumnasActivos && (
-        <button
-          type="button"
+        <LimpiarFiltrosButton
           onClick={limpiarFiltrosColumnas}
           disabled={listadoRefetching}
-          className="hidden h-10 shrink-0 items-center gap-1 px-2 text-xs text-vialto-steel underline-offset-4 hover:text-vialto-charcoal hover:underline transition-colors disabled:opacity-50 disabled:pointer-events-none lg:inline-flex"
-          aria-label={`Limpiar filtros (${cantidadFiltrosColumnasActivos} columna${cantidadFiltrosColumnasActivos !== 1 ? "s" : ""} filtrada${cantidadFiltrosColumnasActivos !== 1 ? "s" : ""})`}
-        >
-          <X className="h-3.5 w-3.5" aria-hidden />
-          Limpiar filtros ({cantidadFiltrosColumnasActivos})
-        </button>
+          cantidad={cantidadFiltrosColumnasActivos}
+          soloDesktop
+        />
       )}
     </>
   );

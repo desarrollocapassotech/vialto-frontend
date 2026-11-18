@@ -2,11 +2,12 @@ import { Calculator, CircleCheck, FileClock, type LucideIcon } from 'lucide-reac
 import { FiltroRapidoChip, FiltrosRapidosGrupo } from '@/components/listado/FiltroRapidoChip';
 import type { ViajePagoTransportistaFiltro } from '@/lib/viajesFiltroPagoTransportista';
 
+/** Conteos de los chips. undefined = ese conteo falló (el chip queda sin número y se puede usar). */
 export type ViajesResumenFiltrosData = {
-  sinFacturar: number;
+  sinFacturar?: number;
   /** Viajes con liquidación al transportista pendiente (`liquidacionEstado=sin_liquidar`). */
-  sinLiquidar: number;
-  pagados: number;
+  sinLiquidar?: number;
+  pagados?: number;
 };
 
 type FiltroId = 'sin_facturar' | 'sin_liquidar' | 'pagado';
@@ -33,7 +34,8 @@ function opcionesVisibles(mostrarFiltroPago: boolean, mostrarFiltroLiquidacion: 
 }
 
 type Props = {
-  resumen: ViajesResumenFiltrosData;
+  /** null = se están contando: los chips no se aplican hasta saber si hay viajes. */
+  resumen: ViajesResumenFiltrosData | null;
   facturacionFiltro: string;
   /** Mismo filtro que el de la columna "Liquidación" de la grilla. */
   liquidacionFiltro: string;
@@ -78,7 +80,7 @@ export function ViajesResumenFiltros({
     <FiltrosRapidosGrupo ariaLabel="Filtros rápidos de viajes">
       {opciones.map((o) => {
         const active = valorActual[o.tipo] === o.id;
-        const count = resumen[o.countKey];
+        const count = resumen?.[o.countKey];
         return (
           <FiltroRapidoChip
             key={o.id}
@@ -86,6 +88,7 @@ export function ViajesResumenFiltros({
             icon={o.icon}
             active={active}
             count={count}
+            cargando={resumen === null}
             onClick={() => toggle(o.id, o.tipo)}
           />
         );

@@ -327,6 +327,8 @@ export function FacturacionTenantPage({
     sinCobrar: number;
     vencidas: number;
   } | null>(null);
+  /** El conteo de los filtros rápidos falló: los chips se habilitan igual (sin número). */
+  const [resumenCobroFallo, setResumenCobroFallo] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [libroIvaOpen, setLibroIvaOpen] = useState(false);
   const [exportandoExcel, setExportandoExcel] = useState(false);
@@ -505,10 +507,14 @@ export function FacturacionTenantPage({
       () => getToken(),
     )
       .then((r) => {
-        if (!cancelled) setResumenCobroApi(r);
+        if (!cancelled) {
+          setResumenCobroApi(r);
+          setResumenCobroFallo(false);
+        }
       })
       .catch(() => {
-        // Sin conteo, los chips se muestran igual (sin número).
+        // Sin conteo, los chips se muestran igual (sin número) y se pueden usar.
+        if (!cancelled) setResumenCobroFallo(true);
       });
     return () => {
       cancelled = true;
@@ -1473,6 +1479,7 @@ export function FacturacionTenantPage({
             setCobroFiltro(v);
           }}
           ariaLabel="Filtros rápidos de facturas"
+          cargando={resumenCobro == null && !resumenCobroFallo}
         />
         {anyFiltroActivo && (
           <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
@@ -1582,6 +1589,7 @@ export function FacturacionTenantPage({
                 title="Cliente"
                 filterActive={!!clienteIdFiltro}
                 filterSignature={clienteIdFiltro}
+                valor={clientes.find((c) => c.id === clienteIdFiltro)?.nombre}
                 onClear={() => {
                   setListadoRefetching(true);
                   setPage(1);

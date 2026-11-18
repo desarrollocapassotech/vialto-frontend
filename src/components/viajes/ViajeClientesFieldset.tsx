@@ -152,7 +152,7 @@ interface Props {
    * de país en ninguna fila, solo el buscador de ciudad.
    */
   paisFijo?: Pais | null;
-  /** Si se pasa, agrega "+ Nuevo cliente" al selector de cada fila. */
+  /** Si se pasa, agrega "Nuevo cliente" al selector de cada fila. */
   onNuevoCliente?: (clienteIndex: number) => void;
   opcionesProducto: OpcionProducto[];
   getToken?: () => Promise<string | null>;

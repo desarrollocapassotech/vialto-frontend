@@ -47,8 +47,22 @@ export function TooltipsDelegados({
       }
     });
 
+    /**
+     * Devuelve el `title` que se movió a `data-tooltip` al salir del elemento. Si quedaba
+     * movido y React después sacaba el `title` (ej. un chip que termina de cargar), el texto
+     * viejo seguía en `data-tooltip` y se mostraba para siempre.
+     */
+    function restaurarTitle(el: HTMLElement | null) {
+      if (!el || !el.hasAttribute('data-tooltip-movido')) return;
+      const label = el.getAttribute('data-tooltip');
+      el.removeAttribute('data-tooltip-movido');
+      el.removeAttribute('data-tooltip');
+      if (label !== null && !el.hasAttribute('title')) el.setAttribute('title', label);
+    }
+
     function dejarDeObservar() {
       observer.disconnect();
+      restaurarTitle(observado);
       observado = null;
     }
 
@@ -61,12 +75,14 @@ export function TooltipsDelegados({
     function mostrar(el: HTMLElement) {
       if (observado !== el) {
         observer.disconnect();
+        restaurarTitle(observado);
         observado = el;
         observer.observe(el, { attributes: true, attributeFilter: ['title'] });
       }
       const title = el.getAttribute('title');
       if (title !== null) {
         el.setAttribute('data-tooltip', title);
+        el.setAttribute('data-tooltip-movido', '');
         el.removeAttribute('title');
       }
       const label = el.getAttribute('data-tooltip')?.trim();

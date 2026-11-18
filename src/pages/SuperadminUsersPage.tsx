@@ -337,6 +337,7 @@ export function SuperadminUsersPage() {
                   title="Rol"
                   filterActive={!!filtroRol}
                   filterSignature={filtroRol}
+                  valor={filtroRol ? formatRole(filtroRol) : null}
                   onClear={() => {
                     setFiltroRol("");
                     setPage(1);

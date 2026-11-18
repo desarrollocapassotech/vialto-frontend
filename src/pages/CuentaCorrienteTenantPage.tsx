@@ -1,7 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronDown, FileDown, Plus, Store, Users } from 'lucide-react';
+import { ChevronDown, FileDown, Store, Users } from 'lucide-react';
 import { SelectorOpcionesSheet, selectorTriggerClass } from '@/components/ui/SelectorOpcionesSheet';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { useProveedores } from '@/hooks/useProveedores';
@@ -203,7 +203,6 @@ export function CuentaCorrienteTenantPage({ tenantId, soloLectura = false, modul
               onClick={() => setQuickCreate(tipoContraparte === 'cliente' ? 'cliente' : 'transportista')}
               className="inline-flex h-10 items-center gap-2 px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
             >
-              <Plus className="h-4 w-4" />
               {tipoContraparte === 'cliente' ? 'Nuevo cliente' : 'Nuevo proveedor'}
             </button>
           )}

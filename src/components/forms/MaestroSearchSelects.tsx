@@ -84,7 +84,7 @@ export function ClienteSearchSelect({
       id={id}
       aria-label={ariaLabel}
       onNuevo={onNuevo}
-      onNuevoLabel="+ Nuevo cliente"
+      onNuevoLabel="Nuevo cliente"
     />
   );
 }

@@ -1,7 +1,8 @@
-import { useRef, useState, type ReactNode } from 'react';
+﻿import { useRef, useState, type ReactNode } from 'react';
 import { ListadoFiltrosSheet } from '@/components/listado/ListadoFiltrosSheet';
 import { TablaScrollHorizontal } from '@/components/listado/TablaScrollHorizontal';
 import { CargandoVialto } from '@/components/shared/CargandoVialto';
+import { FiltrosActivosProvider } from '@/components/listado/FiltrosActivosBarra';
 import { AccionesFila } from '@/components/ui/AccionesFila';
 import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import { TooltipsDelegados } from '@/components/ui/TooltipsDelegados';
@@ -229,10 +230,15 @@ export function ListadoDatos<T>({
     <div className="mb-3 border-b border-black/5 p-3 lg:hidden">{mobileToolbar}</div>
   ) : null;
 
+  // Los encabezados con filtro se anotan en el provider; arriba de la grilla va un
+  // badge por filtro aplicado, con su ✕ para quitarlo.
   return (
+    <FiltrosActivosProvider>
+      {(barraFiltros) => (
     <div className={className} ref={contenedorRef}>
       <TooltipsDelegados contenedorRef={contenedorRef} />
       {filterBar}
+      {barraFiltros}
 
       <div className={[listadoDatosWrapperClass].filter(Boolean).join(' ')}>
 
@@ -321,5 +327,7 @@ export function ListadoDatos<T>({
       </TablaScrollHorizontal>
       </div>
     </div>
+      )}
+    </FiltrosActivosProvider>
   );
 }

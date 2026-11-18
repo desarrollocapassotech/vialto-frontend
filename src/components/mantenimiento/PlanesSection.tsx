@@ -193,6 +193,7 @@ export function PlanesSection({
                   title="Plan"
                   filterActive={!!categoria}
                   filterSignature={categoria}
+                  valor={categoria === "documental" ? "Documentales" : categoria === "mecanico" ? "Mecánicos" : null}
                   onClear={() => setCategoria("")}
                 >
                   <select
@@ -216,6 +217,7 @@ export function PlanesSection({
                   title="Estado"
                   filterActive={estado !== "activos"}
                   filterSignature={estado}
+                  valor={estado === "inactivos" ? "Inactivos" : "Todos los estados"}
                   onClear={() => setEstado("activos")}
                 >
                   <select

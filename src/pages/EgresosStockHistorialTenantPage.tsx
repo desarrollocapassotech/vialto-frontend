@@ -263,6 +263,7 @@ export function EgresosStockHistorialTenantPage({
                 title="Cliente"
                 filterActive={!!clienteId}
                 filterSignature={clienteId}
+                valor={clientes.find((x) => x.id === clienteId)?.nombre}
                 onClear={() =>
                   setSearchParams((prev) => {
                     const next = new URLSearchParams(prev);
@@ -309,6 +310,7 @@ export function EgresosStockHistorialTenantPage({
                 title="Depósito"
                 filterActive={!!depositoId}
                 filterSignature={depositoId}
+                valor={depositos.find((x) => x.id === depositoId)?.nombre}
                 onClear={() =>
                   setSearchParams((prev) => {
                     const next = new URLSearchParams(prev);
@@ -374,6 +376,7 @@ export function EgresosStockHistorialTenantPage({
                 title="Productos"
                 filterActive={!!productoId}
                 filterSignature={productoId}
+                valor={productos.find((x) => x.id === productoId)?.nombre}
                 onClear={() =>
                   setSearchParams((prev) => {
                     const next = new URLSearchParams(prev);
