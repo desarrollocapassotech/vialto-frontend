@@ -105,7 +105,7 @@ src/
     CombustiblePage.tsx / CombustibleTenantPage.tsx
     LiquidacionesTenantPage.tsx, ArcaConfigTenantPage.tsx, SuperadminArcaPage.tsx
     FacturacionPage.tsx / *SuperadminPage.tsx / *TenantPage.tsx
-    CuentaCorrienteTenantPage.tsx  # sin *SuperadminPage.tsx todavía — pendiente, a pedido del cliente cuando valide el resto del módulo
+    CuentaCorrientePage.tsx / CuentaCorrienteSuperadminPage.tsx / CuentaCorrienteTenantPage.tsx  # superadmin = SOLO LECTURA (ver "Cuenta corriente")
     SuperadminEmpresasPage.tsx, SuperadminUsersPage.tsx, UsuariosTenantPage.tsx, BaseDeDatosPage.tsx
   types/
     api.ts, ownerDashboard.ts, combustibleDashboard.ts, micCrtDocumento.ts
@@ -655,6 +655,8 @@ Historia: sep 2026 — vencimiento de póliza un día antes (`VehiculoViewModal`
 ## Cuenta corriente: de dónde salen los movimientos (oct 2026)
 
 **La cuenta corriente depende solo de facturas y liquidaciones** (reglas completas en `vialto-backend/CLAUDE.md`, sección `cuenta-corriente`). Lo que importa de este lado (`components/cuenta-corriente/`):
+
+- **Superadmin: solo lectura (nov 2026, a pedido).** `CuentaCorrientePage` manda al superadmin a `CuentaCorrienteSuperadminPage`: selector de empresa (`EmpresaFilterBar`) y `CuentaCorrienteTenantPage tenantId soloLectura modulosEmpresa`. Se ven saldos, movimientos, detalle, adjuntos (URL directa), orden de pago y exportar; **no** se carga, imputa, deshace ni elimina, y no se abren facturas/liquidaciones ni sus PDF de ARCA (van por rutas de la empresa propia). Las lecturas llevan `?tenantId=` vía `setTenantLecturaCc` (`lib/cuentaCorriente.ts`, se fija en el render de la página de superadmin y se limpia al salir); el backend lo acepta solo en sus GET y solo para superadmin. Una lectura nueva de `lib/cuentaCorriente.ts` tiene que pasar por `urlLectura`; una acción nueva de la grilla o del detalle, respetar `soloLectura`. Clientes/proveedores de la empresa elegida salen de `/api/platform/clientes` y `/api/platform/transportistas?tipo=todos`.
 
 - **Viajes no generan movimientos**, salvo los **pagos al transportista** (nov 2026): cada pago cargado en el viaje crea su PAGO en Cuenta corriente (lo hace el backend, ver `vialto-backend/CLAUDE.md`). El front solo tiene que devolver `ccPagoId`/`ccImputacionId`/`comprobante` de cada pago al guardar el viaje (`pagoTransportistaDraftFromApi`/`ToApi`); no agregar nada más en Viajes que cree movimientos.
 - **La pantalla arranca con un listado (`ListadoCuentasCc`)**: cada cliente o proveedor con su saldo por moneda (`GET cuenta-corriente/saldos`), sin sumar monedas, y su próximo vencimiento sin imputar (nov 2026: el más viejo de sus ventas/compras pendientes o parciales, en rojo si ya pasó). Por defecto ordena por ese vencimiento, del más viejo al más nuevo, con las cuentas sin vencimiento al final. Se filtra con el embudo de la columna (select con buscador, `SearchableSelect`), y click en la fila abre la cuenta. Pestaña y cuenta van en la URL (`?tipo=proveedor&id=...`, el mismo link del tablero del dashboard) y el nombre de la cuenta va en el breadcrumb (`useBreadcrumbOverride`), que es el camino de vuelta: no agregar un botón "Volver".

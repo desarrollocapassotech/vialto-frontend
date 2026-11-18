@@ -73,6 +73,8 @@ type Props = {
   onEditarAutomatico: (() => void) | null;
   /** Abre el detalle de un comprobante asociado (el cobro de una venta, la venta de un cobro). */
   onVerMovimiento: (m: MovimientoCc) => void;
+  /** Vista de solo lectura del superadmin: sin Editar, Eliminar ni Deshacer imputación. */
+  soloLectura?: boolean;
 };
 
 const monto = (n: number, moneda: string) => `$ ${formatCurrencyArFromNumber(n)} ${moneda}`;
@@ -197,6 +199,7 @@ export function MovimientoCcDetalleModal({
   onSaved,
   onEditarAutomatico,
   onVerMovimiento,
+  soloLectura = false,
 }: Props) {
   const { getToken } = useAuth();
   const { showToast } = useToast();
@@ -228,10 +231,10 @@ export function MovimientoCcDetalleModal({
         imputacionId: i.imputacionId,
       }));
   const tieneImputaciones = imputaciones.length > 0;
-  const editable = manual && !anulado;
-  const puedeEditar = editable || !!onEditarAutomatico;
+  const editable = !soloLectura && manual && !anulado;
+  const puedeEditar = editable || (!soloLectura && !!onEditarAutomatico);
   // Eliminar aunque esté imputado: el backend deshace sus imputaciones antes.
-  const puedeEliminar = movimientoCcEliminable(m);
+  const puedeEliminar = !soloLectura && movimientoCcEliminable(m);
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
 
   const [editando, setEditando] = useState(false);
@@ -827,16 +830,18 @@ export function MovimientoCcDetalleModal({
                       ) : (
                         <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-sm">{contenido}</div>
                       )}
-                      <DeshacerImputacionButton
-                        imputacionId={imputacionId}
-                        descripcion={`${monto(importe, m.moneda)} ${esCargo ? 'del' : 'a'} ${
-                          otro ? nombreMovimientoCc(otro) : 'comprobante'
-                        } ${otro?.numeroComprobante?.trim() || 'sin comprobante'}`}
-                        onDeshecha={() => {
-                          onSaved();
-                          onClose();
-                        }}
-                      />
+                      {!soloLectura && (
+                        <DeshacerImputacionButton
+                          imputacionId={imputacionId}
+                          descripcion={`${monto(importe, m.moneda)} ${esCargo ? 'del' : 'a'} ${
+                            otro ? nombreMovimientoCc(otro) : 'comprobante'
+                          } ${otro?.numeroComprobante?.trim() || 'sin comprobante'}`}
+                          onDeshecha={() => {
+                            onSaved();
+                            onClose();
+                          }}
+                        />
+                      )}
                     </li>
                   );
                 })}

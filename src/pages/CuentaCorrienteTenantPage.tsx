@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ChevronDown, FileDown, Plus, Store, Users } from 'lucide-react';
 import { SelectorOpcionesSheet, selectorTriggerClass } from '@/components/ui/SelectorOpcionesSheet';
@@ -12,6 +12,8 @@ import { TransportistaModal } from '@/components/viajes/TransportistaModal';
 import { CuentaContraparteView } from '@/components/cuenta-corriente/CuentaContraparteView';
 import { pageTitleClass } from '@/lib/listadoTabla';
 import { friendlyError } from '@/lib/friendlyError';
+import { apiJson } from '@/lib/api';
+import { QUERY_TODOS_LOS_PROVEEDORES } from '@/lib/proveedorTipo';
 import { descargarListadoDeudoresPdf, type TipoContraparte } from '@/lib/cuentaCorriente';
 import type { Cliente, Transportista } from '@/types/api';
 
@@ -22,7 +24,59 @@ const TABS: { id: TipoContraparte; label: string; icon: typeof Users }[] = [
   { id: 'proveedor', label: 'Proveedores', icon: Store },
 ];
 
-export function CuentaCorrienteTenantPage() {
+type Props = {
+  /**
+   * Superadmin (`CuentaCorrienteSuperadminPage`): empresa elegida. Clientes y proveedores
+   * se traen por plataforma; los saldos y movimientos, con `setTenantLecturaCc`.
+   */
+  tenantId?: string;
+  /** Vista de solo lectura del superadmin: sin altas, cargas, imputaciones ni eliminar. */
+  soloLectura?: boolean;
+  /** Módulos de la empresa elegida (superadmin). */
+  modulosEmpresa?: string[];
+};
+
+/** Clientes y proveedores de otra empresa (superadmin), por las rutas de plataforma. */
+function useCuentasEmpresa(tenantId: string | undefined) {
+  const { getToken } = useAuth();
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [proveedores, setProveedores] = useState<Transportista[]>([]);
+  const [loading, setLoading] = useState(Boolean(tenantId));
+
+  useEffect(() => {
+    if (!tenantId) return;
+    let cancelado = false;
+    setLoading(true);
+    const tid = encodeURIComponent(tenantId);
+    Promise.all([
+      apiJson<Cliente[]>(`/api/platform/clientes?tenantId=${tid}`, () => getToken()),
+      apiJson<Transportista[]>(
+        `/api/platform/transportistas?tenantId=${tid}&${QUERY_TODOS_LOS_PROVEEDORES}`,
+        () => getToken(),
+      ),
+    ])
+      .then(([c, p]) => {
+        if (cancelado) return;
+        setClientes(c);
+        setProveedores(p);
+      })
+      .catch(() => {
+        if (cancelado) return;
+        setClientes([]);
+        setProveedores([]);
+      })
+      .finally(() => {
+        if (!cancelado) setLoading(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [tenantId, getToken]);
+
+  return { clientes, proveedores, loading };
+}
+
+export function CuentaCorrienteTenantPage({ tenantId, soloLectura = false, modulosEmpresa }: Props = {}) {
   const { getToken } = useAuth();
   // Pestaña y cuenta abierta en la URL (`?tipo=proveedor&id=...`): el Atrás del navegador vuelve
   // al listado, y es el mismo link que usa el tablero del dashboard.
@@ -35,21 +89,28 @@ export function CuentaCorrienteTenantPage() {
   const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
   const maestro = useMaestroData();
   const proveedoresApi = useProveedores();
-  const maestroLoading = tipoContraparte === 'cliente' ? maestro.loading : proveedoresApi.loading;
+  const otraEmpresa = useCuentasEmpresa(tenantId);
+  const baseClientes = tenantId ? otraEmpresa.clientes : maestro.clientes;
+  const baseProveedores = tenantId ? otraEmpresa.proveedores : proveedoresApi.proveedores;
+  const maestroLoading = tenantId
+    ? otraEmpresa.loading
+    : tipoContraparte === 'cliente'
+      ? maestro.loading
+      : proveedoresApi.loading;
 
   // Se muestran de inmediato tras crearlos desde el select (antes de que termine el
   // refetch de `useMaestroData`), igual que en la creación de un viaje.
   const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
   const clientes = useMemo(() => {
-    const ids = new Set(maestro.clientes.map((c) => c.id));
-    return [...maestro.clientes, ...sessionClientes.filter((c) => !ids.has(c.id))];
-  }, [maestro.clientes, sessionClientes]);
+    const ids = new Set(baseClientes.map((c) => c.id));
+    return [...baseClientes, ...sessionClientes.filter((c) => !ids.has(c.id))];
+  }, [baseClientes, sessionClientes]);
 
   const [sessionTransportistas, setSessionTransportistas] = useState<Transportista[]>([]);
   const transportistas = useMemo(() => {
-    const ids = new Set(proveedoresApi.proveedores.map((t) => t.id));
-    return [...proveedoresApi.proveedores, ...sessionTransportistas.filter((t) => !ids.has(t.id))];
-  }, [proveedoresApi.proveedores, sessionTransportistas]);
+    const ids = new Set(baseProveedores.map((t) => t.id));
+    return [...baseProveedores, ...sessionTransportistas.filter((t) => !ids.has(t.id))];
+  }, [baseProveedores, sessionTransportistas]);
 
   const [quickCreate, setQuickCreate] = useState<QuickCreate>(null);
   const [accionesSlot, setAccionesSlot] = useState<HTMLDivElement | null>(null);
@@ -114,13 +175,14 @@ export function CuentaCorrienteTenantPage() {
     <div className="w-full">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-x-4">
-          <h1 className={pageTitleClass}>Cuenta corriente</h1>
+          {/* Embebida en superadmin, el título lo pone la página de superadmin. */}
+          {!tenantId && <h1 className={pageTitleClass}>Cuenta corriente</h1>}
           {/* Filtro rápido ("Sin imputar") al lado del título, como en Viajes. */}
           <div ref={setFiltrosRapidosSlot} className="flex min-w-0 items-center gap-2 empty:hidden" />
           <div ref={setLimpiarSlot} className="empty:hidden" />
         </div>
         <div className="flex flex-wrap gap-2">
-          {!contraparteId && (
+          {!contraparteId && !soloLectura && (
             <button
               type="button"
               onClick={() => setQuickCreate(tipoContraparte === 'cliente' ? 'cliente' : 'transportista')}
@@ -234,6 +296,8 @@ export function CuentaCorrienteTenantPage() {
             accionesSlot={accionesSlot}
             limpiarFiltrosSlot={limpiarSlot}
             filtrosRapidosSlot={filtrosRapidosSlot}
+            soloLectura={soloLectura}
+            modulosEmpresa={modulosEmpresa}
           />
         ) : (
           <p className="text-vialto-steel">

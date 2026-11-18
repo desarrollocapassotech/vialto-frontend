@@ -183,6 +183,14 @@ type Props = {
   filtrosRapidosSlot?: HTMLElement | null;
   /** Tipo del proveedor (solo lado proveedor): decide si se puede cargar una compra a mano. */
   proveedorTipo?: ProveedorTipo | null;
+  /**
+   * Vista de solo lectura del superadmin sobre otra empresa: sin cargar, imputar, deshacer
+   * ni eliminar, y sin abrir facturas/liquidaciones ni sus PDF de ARCA (van por rutas de la
+   * empresa propia). Se ven saldos, movimientos, detalle, adjuntos, orden de pago y exportar.
+   */
+  soloLectura?: boolean;
+  /** Módulos de la empresa que se está viendo (superadmin); sin esto, los de la empresa propia. */
+  modulosEmpresa?: string[];
 };
 
 export function CuentaContraparteView({
@@ -193,6 +201,8 @@ export function CuentaContraparteView({
   accionesSlot,
   limpiarFiltrosSlot,
   filtrosRapidosSlot,
+  soloLectura = false,
+  modulosEmpresa,
 }: Props) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
@@ -201,16 +211,18 @@ export function CuentaContraparteView({
   // Facturación las ventas salen de las facturas; con Liquidaciones, las compras a
   // transportistas salen de las liquidaciones — a un taller u otro proveedor sí se cargan).
   // Hasta saber los módulos no se ofrece, para no mostrarla de más.
-  const modulos = tenant?.modules ?? [];
+  const modulos = modulosEmpresa ?? tenant?.modules ?? [];
   const permiteCargoManual =
+    !soloLectura &&
     tenant != null &&
     (tipoContraparte === 'cliente'
       ? !ventasNacenDeFacturas(modulos)
       : !comprasNacenDeLiquidaciones(modulos) ||
         (proveedorTipo != null && proveedorTipo !== 'transportista'));
   // "Ver factura/liquidación" solo si la empresa tiene el módulo (si no, no puede abrirla).
-  const puedeVerFacturas = ventasNacenDeFacturas(modulos);
-  const puedeVerLiquidaciones = comprasNacenDeLiquidaciones(modulos);
+  // En solo lectura del superadmin no: se abren por rutas de la empresa propia.
+  const puedeVerFacturas = !soloLectura && ventasNacenDeFacturas(modulos);
+  const puedeVerLiquidaciones = !soloLectura && comprasNacenDeLiquidaciones(modulos);
   const hasArcaLiquidaciones = canAccessEmisionLiquidoProductoArca(modulos);
   const [movimientos, setMovimientos] = useState<MovimientoCc[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -394,14 +406,19 @@ export function CuentaContraparteView({
       const u = url?.trim();
       return u ? () => abrirAdjunto({ url: u }, titulo) : undefined;
     };
-    const pdfLiq = (id: string, kind: 'pdf' | 'pdf-anulacion', titulo: string) => () =>
-      void abrirAdjuntoEnPestana(
-        { apiPath: `/api/integracion-arca/liquidaciones/${encodeURIComponent(id)}/${kind}` },
-        tk,
-        titulo,
-      );
-    const pdfFactura = (id: string, kind: 'factura' | 'nc') => () =>
-      void verPdfFacturaArca(id, kind, tk).catch(() => undefined);
+    // PDF de ARCA / de liquidación: van por rutas de la empresa propia, así que en la vista
+    // de solo lectura del superadmin no se ofrecen (sí los adjuntos y la orden de pago).
+    const pdfLiq = (id: string, kind: 'pdf' | 'pdf-anulacion', titulo: string) =>
+      soloLectura
+        ? undefined
+        : () =>
+            void abrirAdjuntoEnPestana(
+              { apiPath: `/api/integracion-arca/liquidaciones/${encodeURIComponent(id)}/${kind}` },
+              tk,
+              titulo,
+            );
+    const pdfFactura = (id: string, kind: 'factura' | 'nc') =>
+      soloLectura ? undefined : () => void verPdfFacturaArca(id, kind, tk).catch(() => undefined);
 
     if (m.tipo === 'credito' && m.anulaMovimientoId) {
       const anulado = (movimientos ?? []).find((x) => x.id === m.anulaMovimientoId);
@@ -458,7 +475,7 @@ export function CuentaContraparteView({
           ? pdfLiq(m.liquidacionId, 'pdf', 'Liquidación')
           : adjunto(l.comprobanteUrl, 'Comprobante');
       if (abrir) clips.push(<ComprobanteAdjuntoClip key="cbte" onClick={abrir} />);
-      if (!hasArcaLiquidaciones && l.cbteNro == null) {
+      if (!soloLectura && !hasArcaLiquidaciones && l.cbteNro == null) {
         const liqId = m.liquidacionId;
         clips.push(
           <ComprobanteAdjuntoClip
@@ -487,6 +504,8 @@ export function CuentaContraparteView({
         onClick: () => setModal({ kind: 'detalle', movimiento: m }),
       });
     }
+    // Solo lectura (superadmin): solo "Ver …" (y el detalle, sin editar ni eliminar).
+    if (soloLectura) return opciones;
     const puedeImputar =
       m.tipo === 'cargo' &&
       (m.estadoDisponibilidad === 'pendiente' || m.estadoDisponibilidad === 'parcial');
@@ -718,13 +737,15 @@ export function CuentaContraparteView({
           {tipoContraparte === 'cliente' ? 'Nueva venta' : 'Nueva compra'}
         </button>
       )}
-      <button
-        type="button"
-        onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'pago' })}
-        className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-      >
-        {tipoContraparte === 'cliente' ? 'Registrar cobro' : 'Registrar pago'}
-      </button>
+      {!soloLectura && (
+        <button
+          type="button"
+          onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'pago' })}
+          className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+        >
+          {tipoContraparte === 'cliente' ? 'Registrar cobro' : 'Registrar pago'}
+        </button>
+      )}
     </div>
   );
 
@@ -1063,8 +1084,10 @@ export function CuentaContraparteView({
           movimientos={movimientos ?? []}
           onClose={() => setModal(null)}
           onSaved={cargarDatos}
+          soloLectura={soloLectura}
           // Factura/liquidación: su edición de siempre (número y vencimiento).
           onEditarAutomatico={
+            !soloLectura &&
             modal.movimiento.origen !== 'manual' &&
             (modal.movimiento.comprobanteEditable || modal.movimiento.vencimientoEditable)
               ? () => setModal({ kind: 'comprobante', movimiento: modal.movimiento })

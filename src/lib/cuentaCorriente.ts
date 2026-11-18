@@ -157,6 +157,25 @@ export type TableroCcResponse = {
 
 type GetToken = () => Promise<string | null>;
 
+/**
+ * Empresa que consulta el superadmin en su vista de SOLO LECTURA de Cuenta corriente
+ * (`CuentaCorrienteSuperadminPage` la fija al montar y la limpia al salir). Solo las
+ * funciones de lectura la agregan como `?tenantId=`; el backend la acepta únicamente en
+ * sus GET y únicamente para superadmin. Las escrituras siempre van a la empresa del token.
+ */
+let tenantLecturaSuperadmin: string | null = null;
+
+export function setTenantLecturaCc(tenantId: string | null) {
+  tenantLecturaSuperadmin = tenantId?.trim() || null;
+}
+
+/** Agrega `tenantId` a una URL de lectura cuando el superadmin está viendo otra empresa. */
+function urlLectura(url: string): string {
+  if (!tenantLecturaSuperadmin) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}tenantId=${encodeURIComponent(tenantLecturaSuperadmin)}`;
+}
+
 export function fetchTablero(
   getToken: GetToken,
   opts: { diasProximos?: number; desde?: string; hasta?: string } = {},
@@ -166,7 +185,7 @@ export function fetchTablero(
   if (opts.desde) params.set('desde', opts.desde);
   if (opts.hasta) params.set('hasta', opts.hasta);
   return apiJson<TableroCcResponse>(
-    `/api/cuenta-corriente/tablero?${params.toString()}`,
+    urlLectura(`/api/cuenta-corriente/tablero?${params.toString()}`),
     getToken,
   );
 }
@@ -189,7 +208,7 @@ export function fetchMovimientos(
   if (filtros.hasta) params.set('hasta', filtros.hasta);
   const qs = params.toString();
   return apiJson<MovimientoCc[]>(
-    `/api/cuenta-corriente/movimientos${qs ? `?${qs}` : ''}`,
+    urlLectura(`/api/cuenta-corriente/movimientos${qs ? `?${qs}` : ''}`),
     getToken,
   );
 }
@@ -200,7 +219,7 @@ export function fetchMovimientos(
  */
 export function fetchSaldosCuentas(getToken: GetToken, lado: TipoContraparte) {
   return apiJson<{ contraparteId: string; saldos: SaldoPorMoneda[]; proximoVencimiento: string | null }[]>(
-    `/api/cuenta-corriente/saldos?lado=${lado}`,
+    urlLectura(`/api/cuenta-corriente/saldos?lado=${lado}`),
     getToken,
   );
 }
@@ -214,14 +233,14 @@ export function fmtSaldoCc(valor: number): string {
 
 export function fetchSaldoCliente(getToken: GetToken, clienteId: string) {
   return apiJson<SaldoContraparteResponse>(
-    `/api/cuenta-corriente/saldo/cliente/${encodeURIComponent(clienteId)}`,
+    urlLectura(`/api/cuenta-corriente/saldo/cliente/${encodeURIComponent(clienteId)}`),
     getToken,
   );
 }
 
 export function fetchSaldoProveedor(getToken: GetToken, proveedorId: string) {
   return apiJson<SaldoContraparteResponse>(
-    `/api/cuenta-corriente/saldo/proveedor/${encodeURIComponent(proveedorId)}`,
+    urlLectura(`/api/cuenta-corriente/saldo/proveedor/${encodeURIComponent(proveedorId)}`),
     getToken,
   );
 }
@@ -263,7 +282,7 @@ export function fetchExportarMovimientos(
   qs.set('desde', params.desde);
   qs.set('hasta', params.hasta);
   return apiJson<ExportarMovimientosResponse>(
-    `/api/cuenta-corriente/movimientos/exportar?${qs.toString()}`,
+    urlLectura(`/api/cuenta-corriente/movimientos/exportar?${qs.toString()}`),
     getToken,
   );
 }
@@ -297,7 +316,9 @@ export type CreateMovimientoCcInput = {
 
 /** PDF de la orden de pago de un pago a proveedor (lo genera la API al pedirlo). */
 export function apiPathOrdenPago(movimientoId: string): string {
-  return `/api/cuenta-corriente/movimientos/${encodeURIComponent(movimientoId)}/orden-pago/pdf`;
+  return urlLectura(
+    `/api/cuenta-corriente/movimientos/${encodeURIComponent(movimientoId)}/orden-pago/pdf`,
+  );
 }
 
 /** Pago a proveedor cargado a mano: tiene orden de pago. */
@@ -573,7 +594,10 @@ export async function descargarEstadoCuentaPdf(
   if (params.proveedorId) qs.set('proveedorId', params.proveedorId);
   qs.set('desde', params.desde);
   qs.set('hasta', params.hasta);
-  const res = await apiFetch(`/api/cuenta-corriente/estado-cuenta/pdf?${qs.toString()}`, getToken);
+  const res = await apiFetch(
+    urlLectura(`/api/cuenta-corriente/estado-cuenta/pdf?${qs.toString()}`),
+    getToken,
+  );
   await descargarBlobODescartarError(res, 'estado-cuenta.pdf');
 }
 
@@ -581,7 +605,7 @@ export async function descargarEstadoCuentaPdf(
 /** PDF "Pendientes de cobro" (clientes) o "Pendientes de pago" (proveedores). */
 export async function descargarListadoDeudoresPdf(getToken: GetToken, lado: TipoContraparte) {
   const res = await apiFetch(
-    `/api/cuenta-corriente/listado-deudores/pdf?lado=${lado}`,
+    urlLectura(`/api/cuenta-corriente/listado-deudores/pdf?lado=${lado}`),
     getToken,
   );
   await descargarBlobODescartarError(
