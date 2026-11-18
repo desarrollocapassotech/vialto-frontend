@@ -34,6 +34,7 @@ import {
   Wrench,
   LogOut,
   X,
+  LayoutGrid,
   type LucideIcon,
 } from "lucide-react";
 import { Breadcrumbs } from "./shared/Breadcrumbs";
@@ -83,9 +84,40 @@ type NavGroup = {
   subtle?: boolean;
   /** true = en el riel colapsado muestra cada ítem por separado, aunque haya varios. */
   itemsSueltosEnRiel?: boolean;
+  /**
+   * Riel colapsado: al tocar el ícono, además de expandir el menú abre este desplegable
+   * (clave de `gruposAbiertos`), y el ícono se resalta si contiene la pantalla actual.
+   */
+  abreDesplegable?: string;
 };
 
 const HEADER_HEIGHT_CLASS = "h-16";
+
+/** Grupo del superadmin que queda fuera de "Módulos" en su menú agrupado (Empresas). */
+const GRUPO_PLATAFORMA = "Plataforma";
+/** Clave del desplegable "Módulos" en `gruposAbiertos`. */
+const CLAVE_MODULOS = "__modulos";
+
+/** Superadmin: grupos que van dentro de "Módulos" (todo menú salvo Inicio, Empresas y los del fondo). */
+function esGrupoModulo(g: NavGroup): boolean {
+  return g.title !== null && !g.subtle && g.title !== GRUPO_PLATAFORMA;
+}
+
+/** Riel colapsado del superadmin: reemplaza los grupos de módulos por un solo ícono "Módulos". */
+function agruparModulosEnRiel(groups: NavGroup[]): NavGroup[] {
+  const primero = groups.findIndex(esGrupoModulo);
+  if (primero === -1) return groups;
+  const modulos: NavGroup = {
+    title: "Módulos",
+    icon: LayoutGrid,
+    items: groups.filter(esGrupoModulo).flatMap((g) => g.items),
+    abreDesplegable: CLAVE_MODULOS,
+  };
+  const resto = groups.filter((g) => !esGrupoModulo(g));
+  // En el lugar del primer módulo (después de Inicio y Empresas).
+  const antes = groups.slice(0, primero).filter((g) => !esGrupoModulo(g));
+  return [...antes, modulos, ...resto.slice(antes.length)];
+}
 
 /** Preferencia del superadmin: "1" = menú abierto, "0" = cerrado. */
 const MENU_SUPERADMIN_ABIERTO_KEY = "vialto.superadmin.menuAbierto";
@@ -297,7 +329,7 @@ export function AppShell() {
 
     if (superadmin) {
       groups.push({
-        title: "Plataforma",
+        title: GRUPO_PLATAFORMA,
         items: [
           { to: "/superadmin/empresas", label: "Empresas", icon: Building2 },
         ],
@@ -532,9 +564,21 @@ export function AppShell() {
   const neonBranch = import.meta.env.VITE_NEON_BRANCH as string | undefined;
   const clerkEnv = isTestKey ? "Clerk Dev" : "Clerk Prod";
 
-  /** Superadmin con el menú abierto: filas livianas y grupos desplegables. */
-  function renderItemAgrupado(item: NavItem, hijo: boolean) {
+  /**
+   * Superadmin con el menú abierto: filas livianas y grupos desplegables.
+   * `nivel` = cuántos desplegables tiene encima (0 = suelto, 1 = dentro de "Módulos").
+   * Con ícono, el ícono queda alineado con el texto del desplegable padre; sin ícono
+   * (ítem de un grupo como Facturación o Stock), el texto.
+   */
+  function renderItemAgrupado(item: NavItem, nivel: number, conIcono: boolean) {
     const activo = itemActivo(item, location.pathname);
+    const sangria = conIcono
+      ? nivel === 0
+        ? ""
+        : "pl-9"
+      : nivel <= 1
+        ? "pl-10 text-[13px]"
+        : "pl-16 text-[13px]";
     return (
       <NavLink
         key={item.to}
@@ -543,19 +587,58 @@ export function AppShell() {
         onClick={() => setSidebarOpen(false)}
         className={[
           filaMenuAgrupadoClass,
-          hijo ? "pl-10 text-[13px]" : "",
+          sangria,
           activo
             ? "bg-vialto-fire text-white"
             : "text-white/70 hover:bg-white/[0.06] hover:text-white",
         ].join(" ")}
       >
-        {!hijo && <item.icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />}
+        {conIcono && (
+          <item.icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+        )}
         <span className="whitespace-nowrap">{item.label}</span>
       </NavLink>
     );
   }
 
-  function renderGrupoAgrupado(group: NavGroup, gi: number) {
+  /** Cabecera de un desplegable del menú agrupado (Módulos, Facturación, Stock, Ajustes). */
+  function renderCabeceraDesplegable(
+    key: string,
+    titulo: string,
+    Icono: LucideIcon,
+    contieneActivo: boolean,
+    nivel: number,
+  ) {
+    const abierto = gruposAbiertos[key] ?? contieneActivo;
+    return {
+      abierto,
+      cabecera: (
+        <button
+          type="button"
+          aria-expanded={abierto}
+          onClick={() =>
+            setGruposAbiertos((prev) => ({ ...prev, [key]: !abierto }))
+          }
+          className={[
+            filaMenuAgrupadoClass,
+            nivel > 0 ? "pl-9" : "",
+            contieneActivo && !abierto ? "text-white" : "text-white/70",
+            "hover:bg-white/[0.06] hover:text-white",
+          ].join(" ")}
+        >
+          <Icono className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+          <span className="flex-1 whitespace-nowrap text-left">{titulo}</span>
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 transition-transform ${abierto ? "" : "-rotate-90"}`}
+            strokeWidth={2}
+            aria-hidden
+          />
+        </button>
+      ),
+    };
+  }
+
+  function renderGrupoAgrupado(group: NavGroup, gi: number, nivel = 0) {
     // Los grupos secundarios (Ajustes, Base de datos) van juntos al fondo, con una línea arriba.
     const primerSecundario = group.subtle && !navGroups[gi - 1]?.subtle;
     const wrapperClass = `flex flex-col gap-0.5 ${
@@ -566,51 +649,79 @@ export function AppShell() {
     if (group.title === null || group.items.length <= 1) {
       return (
         <div key={key} className={wrapperClass}>
-          {group.items.map((item) => renderItemAgrupado(item, false))}
+          {group.items.map((item) => renderItemAgrupado(item, nivel, true))}
         </div>
       );
     }
 
-    const contieneActivo = group.items.some((i) =>
-      itemActivo(i, location.pathname),
+    const { abierto, cabecera } = renderCabeceraDesplegable(
+      key,
+      group.title,
+      group.icon ?? group.items[0]?.icon ?? House,
+      group.items.some((i) => itemActivo(i, location.pathname)),
+      nivel,
     );
-    const abierto = gruposAbiertos[key] ?? contieneActivo;
-    const Icono = group.icon ?? group.items[0]?.icon ?? House;
     return (
       <div key={key} className={wrapperClass}>
-        <button
-          type="button"
-          aria-expanded={abierto}
-          onClick={() =>
-            setGruposAbiertos((prev) => ({ ...prev, [key]: !abierto }))
-          }
-          className={[
-            filaMenuAgrupadoClass,
-            contieneActivo && !abierto ? "text-white" : "text-white/70",
-            "hover:bg-white/[0.06] hover:text-white",
-          ].join(" ")}
-        >
-          <Icono className="h-4 w-4 shrink-0" strokeWidth={1.75} />
-          <span className="flex-1 whitespace-nowrap text-left">
-            {group.title}
-          </span>
-          <ChevronDown
-            className={`h-4 w-4 shrink-0 transition-transform ${abierto ? "" : "-rotate-90"}`}
-            strokeWidth={2}
-            aria-hidden
-          />
-        </button>
+        {cabecera}
         {abierto && (
           <div className="flex flex-col gap-0.5">
-            {group.items.map((item) => renderItemAgrupado(item, true))}
+            {group.items.map((item) =>
+              renderItemAgrupado(item, nivel + 1, false),
+            )}
           </div>
         )}
       </div>
     );
   }
 
+  /**
+   * Menú agrupado del superadmin: Inicio y Empresas sueltos; los módulos (Viajes,
+   * Facturación, Cuenta corriente, Stock, Combustible…) dentro del desplegable "Módulos";
+   * Ajustes y Base de datos al fondo.
+   */
+  function renderMenuAgrupado() {
+    const esModulo = esGrupoModulo;
+    const indexados = navGroups.map((group, gi) => ({ group, gi }));
+    const modulos = indexados.filter(({ group }) => esModulo(group));
+    const { abierto, cabecera } = renderCabeceraDesplegable(
+      CLAVE_MODULOS,
+      "Módulos",
+      LayoutGrid,
+      modulos.some(({ group }) =>
+        group.items.some((i) => itemActivo(i, location.pathname)),
+      ),
+      0,
+    );
+    return (
+      <>
+        {indexados
+          .filter(({ group }) => !esModulo(group) && !group.subtle)
+          .map(({ group, gi }) => renderGrupoAgrupado(group, gi))}
+        {modulos.length > 0 && (
+          <div className="flex flex-col gap-0.5">
+            {cabecera}
+            {abierto && (
+              <div className="flex flex-col gap-0.5">
+                {modulos.map(({ group, gi }) =>
+                  renderGrupoAgrupado(group, gi, 1),
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {indexados
+          .filter(({ group }) => group.subtle)
+          .map(({ group, gi }) => renderGrupoAgrupado(group, gi))}
+      </>
+    );
+  }
+
   function renderSidebar(showCloseButton: boolean, collapsed: boolean) {
     const menuAgrupado = superadmin && !collapsed;
+    // Riel colapsado del superadmin: todos los módulos en un solo ícono "Módulos".
+    const gruposRiel: NavGroup[] =
+      superadmin && collapsed ? agruparModulosEnRiel(navGroups) : navGroups;
     return (
       <>
         {showCloseButton && (
@@ -643,9 +754,9 @@ export function AppShell() {
               ))}
             </div>
           ) : menuAgrupado ? (
-            navGroups.map((group, gi) => renderGrupoAgrupado(group, gi))
+            renderMenuAgrupado()
           ) : (
-            navGroups.map((group, gi) => {
+            gruposRiel.map((group, gi) => {
               const isCollapsibleGroup =
                 collapsed &&
                 sidebarUsesAccordion &&
@@ -657,7 +768,7 @@ export function AppShell() {
                   key={group.title ?? `g-${gi}`}
                   // Solo el primer grupo secundario lleva `mt-auto`: empuja a todos los
                   // secundarios juntos al fondo del menú.
-                  className={`flex flex-col gap-0.5 ${collapsed ? "items-center" : ""} ${group.subtle && !navGroups[gi - 1]?.subtle ? "mt-auto pt-4" : ""}`}
+                  className={`flex flex-col gap-0.5 ${collapsed ? "items-center" : ""} ${group.subtle && !gruposRiel[gi - 1]?.subtle ? "mt-auto pt-4" : ""}`}
                 >
                   {gi > 0 && !group.subtle && (
                     <div
@@ -672,11 +783,25 @@ export function AppShell() {
                           group.icon ?? group.items[0]?.icon ?? House;
                         const groupTooltip =
                           group.tooltip ?? (group.title as string);
+                        // "Módulos" del superadmin: se resalta si estás en un módulo y al
+                        // expandir el menú abre su desplegable.
+                        const resaltado =
+                          !!group.abreDesplegable &&
+                          group.items.some((i) =>
+                            itemActivo(i, location.pathname),
+                          );
                         return (
                           <button
                             type="button"
                             aria-label={groupTooltip}
                             onClick={() => {
+                              const clave = group.abreDesplegable;
+                              if (clave) {
+                                setGruposAbiertos((prev) => ({
+                                  ...prev,
+                                  [clave]: true,
+                                }));
+                              }
                               setSidebarCollapsed(false);
                               setNavTooltip(null);
                             }}
@@ -691,9 +816,11 @@ export function AppShell() {
                             }}
                             onMouseLeave={() => setNavTooltip(null)}
                             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md border transition-colors hover:text-white ${
-                              group.subtle
-                                ? "border-white/[0.06] text-white/60 hover:border-white/15 hover:bg-white/[0.06]"
-                                : "border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08]"
+                              resaltado
+                                ? "border-vialto-fire bg-vialto-fire text-white shadow-sm"
+                                : group.subtle
+                                  ? "border-white/[0.06] text-white/60 hover:border-white/15 hover:bg-white/[0.06]"
+                                  : "border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08]"
                             }`}
                           >
                             <GroupIcon
