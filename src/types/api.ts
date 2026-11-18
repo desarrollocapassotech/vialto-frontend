@@ -441,6 +441,8 @@ export interface Tenant {
   tipoFlotaDefault?: "propia" | "externa" | null;
   /** false = sin dashboard; el inicio es el primer módulo contratado (`lib/tenantHome.ts`). Default true; solo lo cambia superadmin. */
   dashboardHabilitado?: boolean;
+  /** Bloques del dashboard en orden ([] = set recomendado por módulos). Leer con `bloquesEfectivos` (`lib/dashboardBloques.ts`). */
+  dashboardBloques?: string[];
   /** Default true. false = origen/destino de Viajes en texto libre, sin buscador de ciudades ni validación en el import. */
   recomendacionCiudadesHabilitada?: boolean;
   /** Default false (se oculta "Marcar como cobrada" en Facturas). true = habilitada; solo lo cambia superadmin. */

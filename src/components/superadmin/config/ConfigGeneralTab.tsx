@@ -34,18 +34,7 @@ export function ConfigGeneralTab({ orgId, config }: Props) {
 
   return (
     <>
-      <ConfigSeccion titulo="Inicio y accesos">
-        <ConfigFila
-          label="Dashboard (pantalla de inicio)"
-          ayuda="Apagado: la empresa entra directo al primer módulo del menú."
-        >
-          <Switch
-            config={config}
-            campo="dashboardHabilitado"
-            valorDefault
-            label="dashboard"
-          />
-        </ConfigFila>
+      <ConfigSeccion titulo="Accesos">
         <ConfigFila
           label="Importación masiva de Excel"
           ayuda="Muestra la pantalla de importar Excel al admin de la empresa. El superadmin la ve siempre."

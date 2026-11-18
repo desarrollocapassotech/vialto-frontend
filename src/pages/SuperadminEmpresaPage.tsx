@@ -6,6 +6,7 @@ import {
   Calculator,
   Car,
   FileSpreadsheet,
+  LayoutDashboard,
   LayoutGrid,
   Settings2,
   SlidersHorizontal,
@@ -23,6 +24,7 @@ import {
   CamposVisiblesSeccion,
   type Catalogo,
 } from "@/components/superadmin/config/CamposVisiblesSeccion";
+import { ConfigDashboardTab } from "@/components/superadmin/config/ConfigDashboardTab";
 import { ConfigDatosTab } from "@/components/superadmin/config/ConfigDatosTab";
 import { ConfigGeneralTab } from "@/components/superadmin/config/ConfigGeneralTab";
 import { ConfigLiquidacionesSecciones } from "@/components/superadmin/config/ConfigLiquidacionesSecciones";
@@ -58,11 +60,13 @@ const MODULO_GATE: Record<string, (modules: string[]) => boolean> = {
 const SECCION_DATOS = "datos";
 const SECCION_GENERAL = "general";
 const SECCION_MODULOS = "modulos";
+const SECCION_DASHBOARD = "dashboard";
 const SECCION_TEMPLATES = "templates";
 const SECCIONES_FIJAS: Record<string, string> = {
   [SECCION_DATOS]: "Datos de la empresa",
   [SECCION_GENERAL]: "General",
   [SECCION_MODULOS]: "Módulos contratados",
+  [SECCION_DASHBOARD]: "Dashboard",
   [SECCION_TEMPLATES]: "Templates de importación",
 };
 
@@ -177,6 +181,11 @@ export function SuperadminEmpresaPage() {
           label: SECCIONES_FIJAS[SECCION_MODULOS],
           icon: LayoutGrid,
         },
+        {
+          id: SECCION_DASHBOARD,
+          label: SECCIONES_FIJAS[SECCION_DASHBOARD],
+          icon: LayoutDashboard,
+        },
       ],
     },
     {
@@ -276,6 +285,9 @@ export function SuperadminEmpresaPage() {
                       )}
                       {seccion === SECCION_MODULOS && (
                         <ConfigModulosTab config={configConTenant} />
+                      )}
+                      {seccion === SECCION_DASHBOARD && (
+                        <ConfigDashboardTab config={configConTenant} />
                       )}
                       {seccion === "viajes" && (
                         <ConfigViajesSecciones

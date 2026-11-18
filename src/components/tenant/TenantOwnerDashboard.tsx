@@ -1,1097 +1,158 @@
-import { fechaDiaYmd } from "@/lib/fmtDateUtc";
-import type {
-  MetricCompare,
-  OwnerDashboardResponse,
-} from "@/types/ownerDashboard";
+﻿import { Fragment, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import type { useTenantOwnerDashboard } from "@/hooks/useTenantOwnerDashboard";
-import {
-  canAccessFacturacion,
-  canAccessEmisionFacturasArca,
-  canAccessViajes,
-  canAccessStock,
-  canAccessCombustible,
-  canAccessCuentaCorriente,
-  canAccessEmisionLiquidoProductoArca,
-  canAccessMantenimiento,
-  planesMantenimientoHabilitados,
-} from "@/lib/tenantModules";
-import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { useMantenimientoDashboard } from "@/hooks/useMantenimientoDashboard";
-import { ProximosVencimientosLista } from "@/components/mantenimiento/ProximosVencimientosLista";
-import { useEffect, useId, useState } from "react";
-import { Link } from "react-router-dom";
 import {
-  ChevronDown,
-  Wallet,
-  Warehouse,
-  Fuel,
-  HandCoins,
-  TriangleAlert,
-  Wrench,
-  type LucideIcon,
-} from "lucide-react";
-import { useLockBodyScroll } from "@/hooks/useLockBodyScroll";
-import { modalOverlayClass } from "@/lib/modalLayers";
+  useCombustibleDashboard,
+  useFinancieroDashboard,
+  useTableroCuentaCorriente,
+} from "@/hooks/useDashboardFuentes";
 import {
-  SelectorOpcionesSheet,
-  selectorTriggerClass,
-} from "@/components/ui/SelectorOpcionesSheet";
-import { CombustibleDashboardSection } from "@/components/combustible/CombustibleDashboardSection";
-import { FinancieroDashboardSection } from "@/components/financiero/FinancieroDashboardSection";
-import { CuentaCorrienteDashboardSection } from "@/components/cuenta-corriente/CuentaCorrienteDashboardSection";
-import { soloCiudadDesdeEtiquetaUbicacion } from "@/lib/ciudades/soloCiudadDesdeEtiqueta";
+  bloqueAnchoCompleto,
+  bloqueDashboard,
+  bloquesEfectivos,
+  fuentesDeBloques,
+  tarjetaDosMonedas,
+  tarjetasPorFila,
+} from "@/lib/dashboardBloques";
+import { periodoAFechas } from "@/lib/dashboardPeriodo";
+import type { Tenant } from "@/types/api";
+import { DashboardPeriodoSelector } from "./DashboardPeriodoSelector";
+import { DashboardBloque, type DashboardDatos } from "./DashboardBloque";
 
-function formatMoney(n: number) {
-  return `$ ${n.toLocaleString("es-AR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
-}
+/**
+ * Links que abrían una pestaña del viejo dashboard (hoy los usan las notificaciones).
+ * Si la empresa no tiene ese bloque elegido, se muestra igual mientras se mira.
+ */
+const DEEP_LINKS: Record<string, { valor: string; bloque: string }> = {
+  combustibleTab: { valor: "alertas", bloque: "pendientes-combustible" },
+  financieroTab: { valor: "alertas", bloque: "pendientes-margen-bajo" },
+};
 
-function formatMoneyUSD(n: number) {
-  return `USD ${n.toLocaleString("es-AR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
-}
+/** Ancho de cada tarjeta en desktop según cuántas van por fila (`tarjetasPorFila`). */
+const BASIS_DESKTOP: Record<number, string> = {
+  1: "lg:basis-full",
+  2: "lg:basis-[calc(50%-0.25rem)]",
+  3: "lg:basis-[calc(33.333%-0.34rem)]",
+  4: "lg:basis-[calc(25%-0.375rem)]",
+};
 
-function fmtFechaCorta(iso: string | null | undefined): string | null {
-  const ymd = fechaDiaYmd(iso);
-  if (!ymd) return null;
-  const [y, m, d] = ymd.split("-");
-  return `${d}/${m}/${y.slice(2)}`;
-}
-
-function MetricCard({
-  title,
-  caption,
-  tooltip,
-  metric,
-  loading,
-  formatValue = formatMoney,
-  valueTone,
-  linkTo,
-  alwaysLink,
-  simpleCount,
-  className = "",
-}: {
-  title: string;
-  caption?: string;
-  tooltip?: string;
-  metric?: MetricCompare;
-  loading: boolean;
-  formatValue?: (n: number) => string;
-  valueTone?: "default" | "positiveCash" | "payable" | "warn";
-  linkTo?: string;
-  alwaysLink?: boolean;
-  /** Muestra un conteo simple en lugar de la métrica comparativa. */
-  simpleCount?: number;
-  className?: string;
-}) {
-  const m = metric ?? {
-    current: 0,
-    previous: 0,
-    changePct: 0,
-    sentiment: "neutral" as const,
-  };
-  const dual = m.currencies != null;
-  const arsAmount = m.currencies?.ARS ?? 0;
-  const usdAmount = m.currencies?.USD ?? 0;
-  const primaryAmount = dual
-    ? arsAmount + usdAmount
-    : (simpleCount ?? m.current);
-
-  const valueColorClass =
-    !loading && primaryAmount > 0
-      ? valueTone === "positiveCash"
-        ? "text-emerald-400"
-        : valueTone === "payable"
-          ? "text-rose-400"
-          : valueTone === "warn"
-            ? "text-amber-400"
-            : "text-white"
-      : "text-white";
-
-  const effectiveCount = simpleCount !== undefined ? simpleCount : m.current;
-  const showLink = !!linkTo && !loading && (alwaysLink || effectiveCount > 0);
-  const spanClass = dual ? "col-span-2 lg:col-span-1" : "";
-  const cardClass = [
-    "group bg-vialto-charcoal",
-    "flex flex-row items-center gap-2.5 p-3",
-    "lg:flex-col lg:items-stretch lg:justify-between lg:gap-0 lg:p-5 lg:min-h-[120px]",
-    showLink ? "hover:bg-vialto-graphite transition-colors cursor-pointer" : "",
-    spanClass,
-    className,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  const valueBlock = loading ? (
-    <span className="font-[family-name:var(--font-display)] text-2xl tracking-wide text-white lg:text-4xl">
-      —
-    </span>
-  ) : simpleCount !== undefined ? (
-    <span
-      className={`font-[family-name:var(--font-display)] text-2xl tracking-wide lg:text-4xl ${valueColorClass}`}
-    >
-      {String(Math.round(simpleCount))}
-    </span>
-  ) : dual ? (
-    <div className="flex flex-col items-end gap-0.5 text-right lg:items-stretch lg:text-left lg:gap-1.5">
-      <div>
-        <span className="mb-0.5 block font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.18em] text-white/40 lg:text-[10px]">
-          ARS
-        </span>
-        <span
-          className={`block font-[family-name:var(--font-display)] text-lg leading-tight tracking-wide lg:text-3xl ${valueColorClass}`}
-        >
-          {arsAmount === 0 ? "—" : formatMoney(arsAmount)}
-        </span>
-      </div>
-      <div>
-        <span className="mb-0.5 block font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.18em] text-white/40 lg:text-[10px]">
-          USD
-        </span>
-        <span
-          className={`block font-[family-name:var(--font-display)] text-base leading-tight tracking-wide lg:text-2xl ${valueColorClass}`}
-        >
-          {usdAmount === 0 ? "—" : formatMoneyUSD(usdAmount)}
-        </span>
-      </div>
-    </div>
-  ) : (
-    <span
-      className={`font-[family-name:var(--font-display)] text-xl tracking-wide lg:text-4xl ${valueColorClass}`}
-    >
-      {formatValue(m.current)}
-    </span>
-  );
-
-  const inner = (
-    <>
-      <div className="min-w-0 flex-1 lg:flex-none">
-        <div className="flex items-start gap-1">
-          <span className="line-clamp-2 font-[family-name:var(--font-ui)] text-[11px] uppercase leading-snug tracking-wide text-white/80 lg:line-clamp-none lg:text-sm">
-            {title}
-          </span>
-          {tooltip && (
-            <span
-              title={tooltip}
-              className="mt-0.5 shrink-0 cursor-help select-none text-[10px] leading-none text-white/25 transition-colors hover:text-white/50 lg:text-[11px]"
-            >
-              ⓘ
-            </span>
-          )}
-        </div>
-        {caption ? (
-          <p className="mt-1.5 hidden text-[11px] leading-snug tracking-normal text-white/30 normal-case lg:block">
-            {caption}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="flex shrink-0 flex-col items-end gap-0.5 lg:mt-auto lg:items-stretch">
-        {valueBlock}
-        {showLink && (
-          <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] text-white/40 transition-colors group-hover:text-white/80 lg:flex lg:justify-end lg:text-[10px]">
-            Ver →
-          </span>
-        )}
-      </div>
-    </>
-  );
-
-  if (showLink) {
-    return (
-      <Link to={linkTo!} className={cardClass}>
-        {inner}
-      </Link>
-    );
-  }
-  return <div className={cardClass}>{inner}</div>;
-}
-
-function AlertTriangleIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden
-    >
-      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-      <path d="M12 9v4M12 17h.01" />
-    </svg>
-  );
-}
-
-function montosPorMonedaCompat(bloque: {
-  montoTotal: number;
-  montosPorMoneda?: { ARS: number; USD: number };
-}): { ARS: number; USD: number } {
-  const m = bloque.montosPorMoneda;
-  if (m != null && typeof m.ARS === "number" && typeof m.USD === "number") {
-    return m;
-  }
-  return { ARS: bloque.montoTotal, USD: 0 };
-}
-
-export function AlertsPanel({
-  alertas,
-  onViewFactura,
-  loadingFacturaId,
-  onViewViaje,
-  loadingViajeId,
-  shouldClose,
-}: {
-  alertas: NonNullable<OwnerDashboardResponse["alertas"]>;
-  onViewFactura?: (id: string) => void;
-  loadingFacturaId?: string | null;
-  onViewViaje?: (id: string) => void;
-  loadingViajeId?: string | null;
-  shouldClose?: boolean;
-}) {
-  const [abierto, setAbierto] = useState(false);
-
-  useEffect(() => {
-    if (shouldClose) setAbierto(false);
-  }, [shouldClose]);
-
-  useLockBodyScroll(abierto);
-
-  useEffect(() => {
-    if (!abierto) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setAbierto(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [abierto]);
-
-  const headingId = useId();
-  const panelId = `${headingId}-panel`;
-  const vencMon = montosPorMonedaCompat(alertas.facturasVencidas);
-  const sinFacturaMon = montosPorMonedaCompat(alertas.viajesSinFactura);
-  const itemsFacturasVencidas = alertas.facturasVencidas.items ?? [];
-  const itemsViajesSinFactura = alertas.viajesSinFactura.items ?? [];
-  const cargasSospechosas = alertas.cargasSospechosas ?? {
-    cantidad: 0,
-    montoTotal: 0,
-  };
-  const margenBajo = alertas.margenBajo ?? { cantidad: 0, montoTotal: 0 };
-  const erroresChofer = alertas.erroresChofer?.cantidad ?? 0;
-  const mantenimiento = alertas.mantenimiento ?? { cantidad: 0, vencidos: 0, proximos: 0 };
-  // Sin contador a propósito: la campana del menú superior es el único lugar con número
-  // de avisos (ver NotificationBell). Este panel es solo el detalle de lo que sigue abierto.
-  const resumenMobile = "Situaciones abiertas del período";
-
-  function closePanel() {
-    setAbierto(false);
-  }
-
-  function renderAlertActions(
-    tone: "rose" | "amber",
-    items: Array<{ id: string; numero: string }>,
-    fallbackTo: string,
-    fallbackLabel: string,
-    itemPrefix: string,
-    onView?: (id: string) => void,
-    loadingId?: string | null,
-  ) {
-    const linkClass =
-      tone === "rose"
-        ? "inline-flex min-h-11 w-full items-center justify-center rounded border border-rose-400/40 bg-rose-950/40 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-rose-100 hover:bg-rose-900/55 hover:border-rose-300/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 transition-colors"
-        : "inline-flex min-h-11 w-full items-center justify-center rounded border border-amber-400/40 bg-amber-950/30 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-amber-100 hover:bg-amber-900/40 hover:border-amber-300/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors";
-    const spinnerClass =
-      tone === "rose"
-        ? "inline-block h-3 w-3 animate-spin rounded-full border-2 border-rose-300 border-t-transparent"
-        : "inline-block h-3 w-3 animate-spin rounded-full border-2 border-amber-300 border-t-transparent";
-
-    return (
-      <div className="mt-3 flex flex-col gap-2">
-        {items.length > 0 ? (
-          items.map((it) =>
-            onView ? (
-              <button
-                key={it.id}
-                type="button"
-                disabled={loadingId === it.id}
-                className={`${linkClass} disabled:opacity-60 disabled:cursor-wait`}
-                onClick={() => onView(it.id)}
-              >
-                {loadingId === it.id ? (
-                  <span className="flex items-center gap-1.5">
-                    <span className={spinnerClass} />
-                    Cargando…
-                  </span>
-                ) : (
-                  <>
-                    {itemPrefix} {it.numero.trim() || it.id.slice(0, 8)} →
-                  </>
-                )}
-              </button>
-            ) : (
-              <Link
-                key={it.id}
-                to={
-                  tone === "rose"
-                    ? `/facturacion?factura=${encodeURIComponent(it.id)}`
-                    : `/viajes?viaje=${encodeURIComponent(it.id)}`
-                }
-                className={linkClass}
-                onClick={closePanel}
-              >
-                {itemPrefix} {it.numero.trim() || it.id.slice(0, 8)} →
-              </Link>
-            ),
-          )
-        ) : (
-          <Link to={fallbackTo} className={linkClass} onClick={closePanel}>
-            {fallbackLabel}
-          </Link>
-        )}
-      </div>
-    );
-  }
-
-  function renderViajesSinFacturaActions() {
-    const linkClass =
-      "flex w-full flex-col gap-0.5 rounded border border-amber-400/40 bg-amber-950/30 px-2 py-1.5 text-left hover:bg-amber-900/40 hover:border-amber-300/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors disabled:cursor-wait disabled:opacity-60";
-    const spinnerClass =
-      "inline-block h-3 w-3 animate-spin rounded-full border-2 border-amber-300 border-t-transparent";
-
-    if (itemsViajesSinFactura.length === 0) {
-      return (
-        <div className="mt-3 flex flex-col gap-2">
-          <Link
-            to="/viajes"
-            className="inline-flex min-h-11 w-full items-center justify-center rounded border border-amber-400/40 bg-amber-950/30 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-amber-100 hover:bg-amber-900/40 hover:border-amber-300/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors"
-            onClick={closePanel}
-          >
-            Ir a viajes →
-          </Link>
-        </div>
-      );
-    }
-
-    return (
-      <div className="mt-3 flex flex-col gap-1.5">
-        {itemsViajesSinFactura.map((it) => {
-          const fecha = fmtFechaCorta(it.fecha);
-          const ruta =
-            it.origen || it.destino
-              ? `${soloCiudadDesdeEtiquetaUbicacion(it.origen)} → ${soloCiudadDesdeEtiquetaUbicacion(it.destino)}`
-              : null;
-          const cargando = loadingViajeId === it.id;
-          const contenido = (
-            <>
-              <span className="flex items-center justify-between gap-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.1em] text-amber-100">
-                <span className="truncate">
-                  {fecha ?? "—"} · {it.clienteNombre ?? "Cliente"}
-                </span>
-                {!cargando && <span className="shrink-0">→</span>}
-              </span>
-              {cargando ? (
-                <span className="flex items-center gap-1.5 text-[10px] text-amber-200/70">
-                  <span className={spinnerClass} />
-                  Cargando…
-                </span>
-              ) : (
-                ruta && (
-                  <span className="truncate text-[10px] text-amber-200/70">
-                    {ruta}
-                  </span>
-                )
-              )}
-            </>
-          );
-          return onViewViaje ? (
-            <button
-              key={it.id}
-              type="button"
-              disabled={cargando}
-              onClick={() => onViewViaje(it.id)}
-              className={linkClass}
-            >
-              {contenido}
-            </button>
-          ) : (
-            <Link
-              key={it.id}
-              to={`/viajes?viaje=${encodeURIComponent(it.id)}`}
-              className={linkClass}
-              onClick={closePanel}
-            >
-              {contenido}
-            </Link>
-          );
-        })}
-      </div>
-    );
-  }
-
-  function renderAlertList() {
-    return (
-      <div className="flex flex-col gap-3">
-        {alertas.facturasVencidas.cantidad > 0 && (
-          <div className="flex gap-3 rounded-md border-2 border-rose-500/70 bg-rose-950/35 px-3 py-3">
-            <AlertTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-rose-400" />
-            <div className="min-w-0 flex-1">
-              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-rose-200/80">
-                {alertas.facturasVencidas.cantidad === 1
-                  ? "Factura vencida sin cobrar"
-                  : "Facturas vencidas sin cobrar"}
-              </p>
-              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
-                {alertas.facturasVencidas.cantidad}{" "}
-                <span className="font-body text-base text-white/70">
-                  {alertas.facturasVencidas.cantidad === 1
-                    ? "factura"
-                    : "facturas"}
-                </span>
-              </p>
-              <div className="mt-1 space-y-0.5 text-xs text-rose-100/90">
-                {vencMon.ARS !== 0 && (
-                  <p>
-                    <span className="mr-1.5 text-[10px] uppercase tracking-wider text-rose-200/70">
-                      ARS
-                    </span>
-                    {formatMoney(vencMon.ARS)}
-                  </p>
-                )}
-                {vencMon.USD !== 0 && (
-                  <p>
-                    <span className="mr-1.5 text-[10px] uppercase tracking-wider text-rose-200/70">
-                      USD
-                    </span>
-                    {formatMoneyUSD(vencMon.USD)}
-                  </p>
-                )}
-              </div>
-              {renderAlertActions(
-                "rose",
-                itemsFacturasVencidas,
-                "/facturacion",
-                "Ir a facturación →",
-                "Factura",
-                onViewFactura,
-                loadingFacturaId,
-              )}
-            </div>
-          </div>
-        )}
-
-        {alertas.viajesSinFactura.cantidad > 0 && (
-          <div className="flex gap-3 rounded-md border-2 border-amber-500/70 bg-amber-950/30 px-3 py-3">
-            <AlertTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
-            <div className="min-w-0 flex-1">
-              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-amber-200/80">
-                {alertas.viajesSinFactura.cantidad === 1
-                  ? "Viaje finalizado sin factura"
-                  : "Viajes finalizados sin factura"}
-              </p>
-              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
-                {alertas.viajesSinFactura.cantidad}{" "}
-                <span className="font-body text-base text-white/70">
-                  {alertas.viajesSinFactura.cantidad === 1 ? "viaje" : "viajes"}
-                </span>
-              </p>
-              <div className="mt-1 space-y-0.5 text-xs text-amber-100/90">
-                {sinFacturaMon.ARS !== 0 && (
-                  <p>
-                    <span className="mr-1.5 text-[10px] uppercase tracking-wider text-amber-200/70">
-                      ARS
-                    </span>
-                    {formatMoney(sinFacturaMon.ARS)}
-                  </p>
-                )}
-                {sinFacturaMon.USD !== 0 && (
-                  <p>
-                    <span className="mr-1.5 text-[10px] uppercase tracking-wider text-amber-200/70">
-                      USD
-                    </span>
-                    {formatMoneyUSD(sinFacturaMon.USD)}
-                  </p>
-                )}
-              </div>
-              {renderViajesSinFacturaActions()}
-            </div>
-          </div>
-        )}
-
-        {cargasSospechosas.cantidad > 0 && (
-          <div className="flex gap-3 rounded-md border-2 border-amber-500/70 bg-amber-950/30 px-3 py-3">
-            <AlertTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
-            <div className="min-w-0 flex-1">
-              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-amber-200/80">
-                {cargasSospechosas.cantidad === 1
-                  ? "Carga de combustible sospechosa en el período"
-                  : "Cargas de combustible sospechosas en el período"}
-              </p>
-              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
-                {cargasSospechosas.cantidad}{" "}
-                <span className="font-body text-base text-white/70">
-                  {cargasSospechosas.cantidad === 1 ? "carga" : "cargas"}
-                </span>
-              </p>
-              <p className="mt-1 text-xs text-amber-100/90">
-                {cargasSospechosas.montoTotal === 0
-                  ? "—"
-                  : formatMoney(cargasSospechosas.montoTotal)}
-              </p>
-              <div className="mt-3 flex flex-col gap-2">
-                <Link
-                  to="/?combustibleTab=alertas"
-                  className="inline-flex min-h-11 w-full items-center justify-center rounded border border-amber-400/40 bg-amber-950/30 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-amber-100 hover:bg-amber-900/40 hover:border-amber-300/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors"
-                  onClick={closePanel}
-                >
-                  Ir a alertas de combustible →
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {erroresChofer > 0 && (
-          <div className="flex gap-3 rounded-md border-2 border-rose-500/70 bg-rose-950/30 px-3 py-3">
-            <AlertTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-rose-400" />
-            <div className="min-w-0 flex-1">
-              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-rose-200/80">
-                {erroresChofer === 1
-                  ? "Carga de chofer sin registrar"
-                  : "Cargas de choferes sin registrar"}
-              </p>
-              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
-                {erroresChofer}{" "}
-                <span className="font-body text-base text-white/70">
-                  {erroresChofer === 1 ? "carga" : "cargas"}
-                </span>
-              </p>
-              <p className="mt-1 text-xs text-rose-100/90">
-                Rechazadas al sincronizar: siguen en el celular del chofer hasta que se corrijan.
-              </p>
-              <div className="mt-3 flex flex-col gap-2">
-                <Link
-                  to="/?combustibleTab=alertas"
-                  className="inline-flex min-h-11 w-full items-center justify-center rounded border border-rose-400/40 bg-rose-950/40 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-rose-100 hover:bg-rose-900/55 hover:border-rose-300/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 transition-colors"
-                  onClick={closePanel}
-                >
-                  Ir a alertas de combustible →
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {margenBajo.cantidad > 0 && (
-          <div className="flex gap-3 rounded-md border-2 border-amber-500/70 bg-amber-950/30 px-3 py-3">
-            <AlertTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
-            <div className="min-w-0 flex-1">
-              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-amber-200/80">
-                {margenBajo.cantidad === 1
-                  ? "Viaje con margen bajo o negativo en el período"
-                  : "Viajes con margen bajo o negativo en el período"}
-              </p>
-              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
-                {margenBajo.cantidad}{" "}
-                <span className="font-body text-base text-white/70">
-                  {margenBajo.cantidad === 1 ? "viaje" : "viajes"}
-                </span>
-              </p>
-              <p className="mt-1 text-xs text-amber-100/90">
-                {margenBajo.montoTotal === 0
-                  ? "—"
-                  : formatMoney(margenBajo.montoTotal)}
-              </p>
-              <div className="mt-3 flex flex-col gap-2">
-                <Link
-                  to="/?financieroTab=alertas"
-                  className="inline-flex min-h-11 w-full items-center justify-center rounded border border-amber-400/40 bg-amber-950/30 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-amber-100 hover:bg-amber-900/40 hover:border-amber-300/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors"
-                  onClick={closePanel}
-                >
-                  Ir a alertas de margen →
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {mantenimiento.cantidad > 0 && (
-          // Rojo si hay algo vencido; ámbar si solo hay próximos.
-          <div
-            className={`flex gap-3 rounded-md border-2 px-3 py-3 ${
-              mantenimiento.vencidos > 0 ? "border-rose-500/70 bg-rose-950/30" : "border-amber-500/70 bg-amber-950/30"
-            }`}
-          >
-            <AlertTriangleIcon
-              className={`mt-0.5 h-5 w-5 shrink-0 ${mantenimiento.vencidos > 0 ? "text-rose-400" : "text-amber-400"}`}
-            />
-            <div className="min-w-0 flex-1">
-              <p
-                className={`font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] ${
-                  mantenimiento.vencidos > 0 ? "text-rose-200/80" : "text-amber-200/80"
-                }`}
-              >
-                Mantenimiento vencido o por vencer
-              </p>
-              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
-                {mantenimiento.cantidad}{" "}
-                <span className="font-body text-base text-white/70">
-                  {mantenimiento.cantidad === 1 ? "plan" : "planes"}
-                </span>
-              </p>
-              <p className={`mt-1 text-xs ${mantenimiento.vencidos > 0 ? "text-rose-100/90" : "text-amber-100/90"}`}>
-                {[
-                  mantenimiento.vencidos > 0
-                    ? `${mantenimiento.vencidos} ${mantenimiento.vencidos === 1 ? "vencido" : "vencidos"}`
-                    : null,
-                  mantenimiento.proximos > 0
-                    ? `${mantenimiento.proximos} ${mantenimiento.proximos === 1 ? "próximo" : "próximos"}`
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-              <div className="mt-3 flex flex-col gap-2">
-                <Link
-                  to="/mantenimiento?tab=vencimientos"
-                  className={
-                    mantenimiento.vencidos > 0
-                      ? "inline-flex min-h-11 w-full items-center justify-center rounded border border-rose-400/40 bg-rose-950/40 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-rose-100 hover:bg-rose-900/55 hover:border-rose-300/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 transition-colors"
-                      : "inline-flex min-h-11 w-full items-center justify-center rounded border border-amber-400/40 bg-amber-950/30 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-amber-100 hover:bg-amber-900/40 hover:border-amber-300/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors"
-                  }
-                  onClick={closePanel}
-                >
-                  Ir a mantenimiento →
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className="w-full lg:hidden">
-        <button
-          type="button"
-          onClick={() => setAbierto(true)}
-          aria-haspopup="dialog"
-          aria-expanded={abierto}
-          aria-label="Resumen de alertas: ver situaciones abiertas"
-          className="group flex min-h-11 w-full items-center gap-3 rounded-lg border-2 border-vialto-fire bg-gradient-to-br from-vialto-charcoal to-vialto-graphite px-4 py-3 text-left shadow-md ring-1 ring-vialto-fire/35 transition-[border-color,box-shadow] hover:border-vialto-bright hover:ring-vialto-fire/60"
-        >
-          <span className="inline-flex shrink-0 text-vialto-fire" aria-hidden>
-            <TriangleAlert className="h-5 w-5" strokeWidth={2} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.2em] text-white group-hover:text-vialto-bright transition-colors">
-              Resumen de alertas
-            </span>
-            <span className="block text-xs text-white/60">{resumenMobile}</span>
-          </span>
-          <ChevronDown
-            className="h-4 w-4 shrink-0 text-white/50"
-            strokeWidth={2}
-          />
-        </button>
-      </div>
-
-      {abierto && (
-        <div
-          className={`${modalOverlayClass} lg:hidden`}
-          role="presentation"
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={`${headingId}-mobile-title`}
-            className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-xl border-2 border-vialto-fire/50 bg-gradient-to-br from-vialto-charcoal to-vialto-graphite shadow-lg ring-1 ring-vialto-fire/20 sm:max-w-md sm:rounded-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-4">
-              <div className="flex min-w-0 items-center gap-2">
-                <span
-                  className="inline-flex shrink-0 text-vialto-fire"
-                  aria-hidden
-                >
-                  <TriangleAlert className="h-5 w-5" strokeWidth={2} />
-                </span>
-                <div className="min-w-0">
-                  <h2
-                    id={`${headingId}-mobile-title`}
-                    className="font-[family-name:var(--font-display)] text-lg tracking-wide text-white"
-                  >
-                    Resumen de alertas
-                  </h2>
-                  <p className="mt-0.5 text-xs text-white/50">
-                    {resumenMobile}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={closePanel}
-                aria-label="Cerrar"
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-white/70 hover:bg-white/10 hover:text-white"
-              >
-                ×
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              {renderAlertList()}
-            </div>
-            <div className="shrink-0 border-t border-white/10 p-4">
-              <button
-                type="button"
-                onClick={closePanel}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded border border-white/20 bg-white/5 px-4 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-white hover:bg-white/10"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="hidden shrink-0 self-start lg:block">
-        {!abierto ? (
-          <button
-            type="button"
-            onClick={() => setAbierto(true)}
-            aria-expanded="false"
-            aria-controls={panelId}
-            aria-label="Resumen de alertas: ver situaciones abiertas"
-            className="group flex items-center gap-2.5 rounded-lg border-2 border-vialto-fire bg-gradient-to-br from-vialto-charcoal to-vialto-graphite px-4 py-2.5 text-left shadow-md ring-1 ring-vialto-fire/35 hover:border-vialto-bright hover:ring-vialto-fire/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-vialto-fire focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-vialto-mist)] active:scale-[0.98] transition-[border-color,box-shadow,transform] cursor-pointer"
-          >
-            <span className="inline-flex text-vialto-fire" aria-hidden>
-              <TriangleAlert className="w-6 h-6" strokeWidth={2} />
-            </span>
-            <span className="inline-flex items-center gap-2.5 pl-1">
-              <span
-                id={headingId}
-                className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.2em] text-white group-hover:text-vialto-bright transition-colors"
-              >
-                Resumen de alertas
-              </span>
-            </span>
-          </button>
-        ) : (
-          <aside
-            id={panelId}
-            role="region"
-            aria-labelledby={headingId}
-            className="fixed right-6 top-[5.5rem] z-40 max-h-[calc(100dvh-7rem)] w-80 overflow-y-auto rounded-lg border-2 border-vialto-fire/50 bg-gradient-to-br from-vialto-charcoal to-vialto-graphite p-4 shadow-2xl ring-1 ring-vialto-fire/20"
-          >
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <span
-                  className="inline-flex shrink-0 text-vialto-fire"
-                  aria-hidden
-                >
-                  <TriangleAlert className="h-5 w-5" strokeWidth={2} />
-                </span>
-                <h2
-                  id={headingId}
-                  className="inline-flex min-w-0 items-center gap-2.5 pl-1 font-[family-name:var(--font-display)] text-lg tracking-wide text-white"
-                >
-                  <span className="max-w-[14rem] truncate">Resumen de alertas</span>
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={closePanel}
-                aria-expanded="true"
-                aria-controls={panelId}
-                className="shrink-0 rounded border border-white/20 bg-white/5 px-2.5 py-1 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider text-white/80 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-vialto-fire transition-colors"
-              >
-                Minimizar
-              </button>
-            </div>
-            {renderAlertList()}
-          </aside>
-        )}
-      </div>
-    </>
-  );
+/**
+ * Pendientes/análisis van de a dos por fila. Ocupa la fila entera si es ancho, o si
+ * queda sin compañero (el anterior lo dejó solo y el siguiente es ancho o no hay).
+ */
+function ocupaFilaEntera(ids: string[], i: number): boolean {
+  if (bloqueAnchoCompleto(ids[i])) return true;
+  // Posición dentro de la tanda de bloques angostos seguidos.
+  let inicio = i;
+  while (inicio > 0 && !bloqueAnchoCompleto(ids[inicio - 1])) inicio--;
+  let fin = i;
+  while (fin < ids.length - 1 && !bloqueAnchoCompleto(ids[fin + 1])) fin++;
+  const tanda = fin - inicio + 1;
+  return tanda % 2 === 1 && i === fin;
 }
 
 interface TenantOwnerDashboardProps {
+  /** Título de la página ("Panel de …"); va a la izquierda del filtro de período. */
+  titulo: string;
   tenantId: string;
-  modules: string[];
+  tenant: Tenant;
   dash: ReturnType<typeof useTenantOwnerDashboard>;
   onViewViaje?: (id: string) => void;
   loadingViajeId?: string | null;
+  onViewFactura?: (id: string) => void;
+  loadingFacturaId?: string | null;
 }
 
-type ModuloDashboardTab = "financiero" | "stock" | "combustible" | "cuenta-corriente" | "mantenimiento";
-
+/**
+ * Dashboard de inicio de la empresa: una sola página con los bloques que eligió el
+ * superadmin (`Tenant.dashboardBloques`, ver `lib/dashboardBloques.ts`), sin pestañas.
+ * Cada fuente de datos se pide solo si algún bloque la usa.
+ */
 export function TenantOwnerDashboard({
+  titulo,
   tenantId,
-  modules,
+  tenant,
   dash,
   onViewViaje,
   loadingViajeId,
+  onViewFactura,
+  loadingFacturaId,
 }: TenantOwnerDashboardProps) {
-  const showViajes = canAccessViajes(modules);
-  const showFacturacionModulo =
-    canAccessFacturacion(modules) || canAccessEmisionFacturasArca(modules);
-  const showStock = canAccessStock(modules);
-  const showCombustible = canAccessCombustible(modules);
-  const showCuentaCorriente = canAccessCuentaCorriente(modules);
-  const showIntegracionArca = canAccessEmisionLiquidoProductoArca(modules);
-  // Con los planes apagados (switch de superadmin) no hay vencimientos que mostrar.
-  const { tenant } = useCurrentTenant();
-  const showMantenimiento = canAccessMantenimiento(modules) && planesMantenimientoHabilitados(tenant);
-  const showFinanciero = showViajes || showFacturacionModulo;
-  const [periodModalOpen, setPeriodModalOpen] = useState(false);
-  const [moduloSheetOpen, setModuloSheetOpen] = useState(false);
-
-  const moduloTabs: {
-    id: ModuloDashboardTab;
-    label: string;
-    icon: LucideIcon;
-  }[] = [
-    ...(showFinanciero
-      ? [{ id: "financiero" as const, label: "Financiero", icon: Wallet }]
-      : []),
-    ...(showStock
-      ? [{ id: "stock" as const, label: "Stock", icon: Warehouse }]
-      : []),
-    ...(showCombustible
-      ? [{ id: "combustible" as const, label: "Combustible", icon: Fuel }]
-      : []),
-    ...(showCuentaCorriente
-      ? [{ id: "cuenta-corriente" as const, label: "Cuenta corriente", icon: HandCoins }]
-      : []),
-    ...(showMantenimiento
-      ? [{ id: "mantenimiento" as const, label: "Mantenimiento", icon: Wrench }]
-      : []),
-  ];
-  const [moduloTab, setModuloTab] = useState<ModuloDashboardTab | null>(null);
-  const moduloActivo = moduloTab ?? moduloTabs[0]?.id ?? "financiero";
-  // Solo se pide cuando la pestaña está abierta.
-  const mant = useMantenimientoDashboard(moduloActivo === "mantenimiento" && showMantenimiento);
-  const moduloActivoDef = moduloTabs.find((t) => t.id === moduloActivo);
-  const ModuloActivoIcon = moduloActivoDef?.icon;
-
-  const periodTabs: { id: typeof dash.period; label: string }[] = [
-    { id: "week", label: "Esta semana" },
-    { id: "month", label: "Este mes" },
-    { id: "3months", label: "Últimos 3 meses" },
-    { id: "custom", label: "Personalizado" },
-  ];
-
-  const activePeriodLabel =
-    periodTabs.find((t) => t.id === dash.period)?.label ?? "Período";
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [forzado, setForzado] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!periodModalOpen) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setPeriodModalOpen(false);
+    for (const [param, { valor, bloque }] of Object.entries(DEEP_LINKS)) {
+      if (searchParams.get(param) !== valor) continue;
+      if (bloqueDashboard(bloque)?.disponible(tenant)) setForzado(bloque);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete(param);
+          return next;
+        },
+        { replace: true },
+      );
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [periodModalOpen]);
+  }, [searchParams, setSearchParams, tenant]);
 
-  useLockBodyScroll(periodModalOpen);
+  const ids = useMemo(() => {
+    const base = bloquesEfectivos(tenant);
+    return forzado && !base.includes(forzado) ? [...base, forzado] : base;
+  }, [tenant, forzado]);
 
-  function selectPeriod(id: typeof dash.period) {
-    dash.setPeriod(id);
-    if (id !== "custom") setPeriodModalOpen(false);
+  useEffect(() => {
+    if (!forzado) return;
+    document
+      .getElementById(`bloque-${forzado}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [forzado]);
+
+  const fuentes = fuentesDeBloques(ids);
+  const rango = periodoAFechas(dash.period, dash.customFrom, dash.customTo);
+  const datos: DashboardDatos = {
+    tenantId,
+    dash,
+    rango,
+    financiero: useFinancieroDashboard(fuentes.has("financiero"), rango),
+    combustible: useCombustibleDashboard(
+      fuentes.has("combustible"),
+      rango,
+      ids.includes("pendientes-combustible"),
+    ),
+    cuentaCorriente: useTableroCuentaCorriente(fuentes.has("cuentaCorriente"), rango),
+    mantenimiento: useMantenimientoDashboard(fuentes.has("mantenimiento")),
+    onViewViaje,
+    loadingViajeId,
+    onViewFactura,
+    loadingFacturaId,
+  };
+
+  // Tarjetas seguidas van en una grilla de tarjetas; el resto, de a dos (o a todo el ancho).
+  const grupos: { tarjetas: boolean; ids: string[] }[] = [];
+  for (const id of ids) {
+    const tarjetas = bloqueDashboard(id)?.tipo === "tarjeta";
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && ultimo.tarjetas === tarjetas) ultimo.ids.push(id);
+    else grupos.push({ tarjetas, ids: [id] });
   }
 
+  // Cambio de período: spinner en el filtro + bloques atenuados hasta que llegan los datos.
+  const cargando =
+    dash.loading ||
+    datos.financiero.loading ||
+    datos.combustible.loading ||
+    datos.cuentaCorriente.loading;
+
   return (
-    <div className="mt-6 space-y-6 lg:mt-8 lg:space-y-10">
-      <div className="flex flex-col gap-4">
-        <div className="lg:hidden">
-          <button
-            type="button"
-            onClick={() => setPeriodModalOpen(true)}
-            aria-haspopup="dialog"
-            aria-expanded={periodModalOpen}
-            className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-black/10 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-vialto-fire/40"
-          >
-            <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-              Período
-            </span>
-            <span className="flex min-w-0 flex-1 items-center justify-end gap-2">
-              <span className="truncate font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-vialto-charcoal">
-                {activePeriodLabel}
-              </span>
-              <ChevronDown
-                className="h-4 w-4 shrink-0 text-vialto-steel"
-                strokeWidth={2}
-              />
-            </span>
-          </button>
-        </div>
-
-        {periodModalOpen && (
-          <div
-            className={modalOverlayClass}
-            role="presentation"
-          >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="dashboard-period-title"
-              className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-xl border border-black/10 bg-white shadow-lg sm:max-w-md sm:rounded-lg"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-black/10 px-4 py-4">
-                <h2
-                  id="dashboard-period-title"
-                  className="font-[family-name:var(--font-display)] text-lg tracking-wide text-vialto-charcoal"
-                >
-                  Elegir período
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setPeriodModalOpen(false)}
-                  aria-label="Cerrar"
-                  className="inline-flex h-11 w-11 items-center justify-center text-vialto-steel hover:bg-vialto-mist"
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="min-h-0 flex-1 overflow-y-auto p-2">
-                {periodTabs.map((t) => {
-                  const active = dash.period === t.id;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => selectPeriod(t.id)}
-                      className={[
-                        "flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 py-3 text-left transition-colors",
-                        active
-                          ? "bg-vialto-mist text-vialto-charcoal"
-                          : "text-vialto-charcoal hover:bg-vialto-mist/70",
-                      ].join(" ")}
-                    >
-                      <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider">
-                        {t.label}
-                      </span>
-                      {active && (
-                        <span
-                          className="text-vialto-fire text-sm font-semibold"
-                          aria-hidden
-                        >
-                          ✓
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-
-                {dash.period === "custom" && (
-                  <div className="mt-2 space-y-3 border-t border-black/10 px-3 py-4">
-                    <label className="flex flex-col gap-1.5 text-xs text-vialto-steel">
-                      Desde
-                      <input
-                        type="date"
-                        className="min-h-11 w-full rounded border border-vialto-steel/40 bg-white px-3 py-2 text-sm text-vialto-charcoal"
-                        value={dash.customFrom}
-                        onChange={(e) => dash.setCustomFrom(e.target.value)}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1.5 text-xs text-vialto-steel">
-                      Hasta
-                      <input
-                        type="date"
-                        className="min-h-11 w-full rounded border border-vialto-steel/40 bg-white px-3 py-2 text-sm text-vialto-charcoal"
-                        value={dash.customTo}
-                        min={dash.customFrom || undefined}
-                        onChange={(e) => dash.setCustomTo(e.target.value)}
-                      />
-                    </label>
-                    {(!dash.customFrom || !dash.customTo) && (
-                      <p className="text-xs text-vialto-steel">
-                        Elegí fecha desde y hasta para ver los indicadores.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="shrink-0 border-t border-black/10 p-4">
-                <button
-                  type="button"
-                  onClick={() => setPeriodModalOpen(false)}
-                  disabled={
-                    dash.period === "custom" &&
-                    (!dash.customFrom || !dash.customTo)
-                  }
-                  className="inline-flex min-h-11 w-full items-center justify-center bg-vialto-charcoal px-4 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-white transition-colors hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {dash.period === "custom" ? "Aplicar" : "Listo"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div
-          className="hidden flex-wrap gap-2 lg:flex"
-          role="tablist"
-          aria-label="Período del panel"
-        >
-          {periodTabs.map((t) => {
-            const active = dash.period === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => dash.setPeriod(t.id)}
-                className={`rounded border px-4 py-2 text-sm font-[family-name:var(--font-ui)] uppercase tracking-wider transition-colors ${
-                  active
-                    ? "border-vialto-fire bg-vialto-charcoal text-vialto-fire"
-                    : "border-vialto-steel/40 bg-white text-vialto-steel hover:border-vialto-fire/50"
-                }`}
-              >
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {dash.period === "custom" && (
-          <div className="hidden flex-col gap-3 lg:flex lg:flex-row lg:flex-wrap lg:items-end lg:gap-3">
-            <label className="flex w-full flex-col gap-1.5 text-xs text-vialto-steel lg:w-auto">
-              Desde
-              <input
-                type="date"
-                className="min-h-11 w-full rounded border border-vialto-steel/40 bg-white px-3 py-2 text-sm text-vialto-charcoal lg:min-h-0 lg:w-auto"
-                value={dash.customFrom}
-                onChange={(e) => dash.setCustomFrom(e.target.value)}
-              />
-            </label>
-            <label className="flex w-full flex-col gap-1.5 text-xs text-vialto-steel lg:w-auto">
-              Hasta
-              <input
-                type="date"
-                className="min-h-11 w-full rounded border border-vialto-steel/40 bg-white px-3 py-2 text-sm text-vialto-charcoal lg:min-h-0 lg:w-auto"
-                value={dash.customTo}
-                onChange={(e) => dash.setCustomTo(e.target.value)}
-              />
-            </label>
-            {(!dash.customFrom || !dash.customTo) && (
-              <p className="text-xs text-vialto-steel lg:self-center">
-                Elegí fecha desde y hasta para ver los indicadores.
-              </p>
-            )}
-          </div>
-        )}
+    <div className="space-y-6 lg:space-y-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
+        <h1 className="font-[family-name:var(--font-display)] text-3xl tracking-wide text-vialto-charcoal sm:text-4xl md:text-5xl">
+          {titulo}
+        </h1>
+        <DashboardPeriodoSelector dash={dash} cargando={cargando} />
       </div>
 
       {dash.error && (
@@ -1103,197 +164,62 @@ export function TenantOwnerDashboard({
         </div>
       )}
 
-      {moduloTabs.length > 1 && (
-        <div className="border-b border-black/15">
-          <div className="pb-3 lg:hidden">
-            <button
-              type="button"
-              onClick={() => setModuloSheetOpen(true)}
-              aria-haspopup="dialog"
-              aria-expanded={moduloSheetOpen}
-              className={selectorTriggerClass}
-            >
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Módulo
-              </span>
-              <span className="flex min-w-0 flex-1 items-center justify-end gap-2">
-                {ModuloActivoIcon && (
-                  <ModuloActivoIcon
-                    className="h-4 w-4 shrink-0 text-vialto-steel"
-                    strokeWidth={1.75}
-                    aria-hidden
-                  />
-                )}
-                <span className="truncate font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-vialto-charcoal">
-                  {moduloActivoDef?.label ?? ""}
-                </span>
-                <ChevronDown
-                  className="h-4 w-4 shrink-0 text-vialto-steel"
-                  strokeWidth={2}
-                  aria-hidden
-                />
-              </span>
-            </button>
-            <SelectorOpcionesSheet
-              open={moduloSheetOpen}
-              onClose={() => setModuloSheetOpen(false)}
-              title="Elegir módulo"
-              options={moduloTabs.map((t) => ({ id: t.id, label: t.label }))}
-              activeId={moduloActivo}
-              onSelect={(id) => {
-                setModuloTab(id as ModuloDashboardTab);
-                setModuloSheetOpen(false);
-              }}
-            />
-          </div>
+      {ids.length === 0 && (
+        <p className="text-sm text-vialto-steel">
+          Todavía no hay indicadores para los módulos de tu empresa.
+        </p>
+      )}
 
-          <nav
-            className="-mb-px hidden gap-1 overflow-x-auto lg:flex"
-            aria-label="Módulos del dashboard"
-          >
-            {moduloTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setModuloTab(tab.id)}
-                className={[
-                  "flex shrink-0 whitespace-nowrap items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
-                  moduloActivo === tab.id
-                    ? "border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal"
-                    : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
-                ].join(" ")}
-              >
-                <tab.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
-                {tab.label}
-              </button>
-            ))}
-          </nav>
+      <div className="relative" aria-busy={cargando}>
+        {cargando && (
+          <div className="pointer-events-none sticky top-4 z-20 flex h-0 justify-center">
+            <span className="inline-flex h-fit items-center gap-2 rounded-full bg-vialto-charcoal px-4 py-2 text-sm font-medium text-white shadow-lg">
+              <Loader2 className="h-4 w-4 animate-spin text-vialto-fire" aria-hidden />
+              Actualizando datos…
+            </span>
+          </div>
+        )}
+        <div
+          className={`space-y-6 transition-opacity duration-200 lg:space-y-8 ${
+            cargando ? "pointer-events-none opacity-50" : ""
+          }`}
+        >
+          {grupos.map((g, i) => (
+            <Fragment key={`${i}-${g.ids[0]}`}>
+              {g.tarjetas ? (
+                // Flex con crecimiento: cada fila se completa siempre (una tarjeta sola
+                // en la última fila se estira en vez de dejar hueco).
+                <div className="flex flex-wrap gap-2">
+                  {g.ids.map((id) => (
+                    <div
+                      key={id}
+                      className={`min-w-0 grow ${
+                        tarjetaDosMonedas(id) ? "basis-full" : "basis-[calc(50%-0.25rem)]"
+                      } ${BASIS_DESKTOP[tarjetasPorFila(g.ids.length)]}`}
+                    >
+                      <DashboardBloque id={id} datos={datos} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {g.ids.map((id, j) => (
+                    <div
+                      key={id}
+                      id={`bloque-${id}`}
+                      className={`min-w-0 scroll-mt-24 ${
+                        ocupaFilaEntera(g.ids, j) ? "lg:col-span-2" : ""
+                      }`}
+                    >
+                      <DashboardBloque id={id} datos={datos} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Fragment>
+          ))}
         </div>
-      )}
-
-      {moduloActivo === "financiero" && (
-        <FinancieroDashboardSection
-          dash={dash}
-          showViajes={showViajes}
-          showFacturacion={showFacturacionModulo}
-          showIntegracionArca={showIntegracionArca}
-          onViewViaje={onViewViaje}
-          loadingViajeId={loadingViajeId}
-        />
-      )}
-
-      {moduloActivo === "stock" && showStock && (
-        <section aria-labelledby="stock-heading">
-          <h2
-            id="stock-heading"
-            className="mb-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel lg:mb-3"
-          >
-            Stock
-          </h2>
-          {dash.loading && (
-            <p className="mb-2 flex items-center gap-1.5 text-xs text-vialto-steel">
-              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-vialto-steel border-t-transparent" />
-              Actualizando…
-            </p>
-          )}
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-            <MetricCard
-              title="Productos en catálogo"
-              tooltip="Productos activos registrados en el catálogo"
-              simpleCount={dash.data?.stock?.totalProductos ?? 0}
-              loading={dash.loading}
-              linkTo="/base-de-datos?tab=productos"
-              alwaysLink
-            />
-            <MetricCard
-              title="Clientes"
-              tooltip="Clientes registrados"
-              simpleCount={dash.data?.stock?.totalClientes ?? 0}
-              loading={dash.loading}
-              linkTo="/base-de-datos?tab=clientes"
-              alwaysLink
-            />
-            <MetricCard
-              title="Ingresos"
-              tooltip="Ingresos de mercadería registrados en el período seleccionado"
-              simpleCount={dash.data?.stock?.ingresosHoy ?? 0}
-              loading={dash.loading}
-              valueTone="positiveCash"
-              linkTo="/stock/ingresos/historial"
-            />
-            <MetricCard
-              title="Egresos"
-              tooltip="Egresos / despachos registrados en el período seleccionado"
-              simpleCount={dash.data?.stock?.egresosHoy ?? 0}
-              loading={dash.loading}
-              valueTone="payable"
-              linkTo="/stock/egresos/historial"
-            />
-          </div>
-        </section>
-      )}
-
-      {moduloActivo === "combustible" && showCombustible && (
-        <CombustibleDashboardSection
-          tenantId={tenantId}
-          dash={dash}
-          showViajes={showViajes}
-        />
-      )}
-
-      {moduloActivo === "cuenta-corriente" && showCuentaCorriente && (
-        <CuentaCorrienteDashboardSection dash={dash} />
-      )}
-
-      {moduloActivo === "mantenimiento" && showMantenimiento && (
-        <section aria-labelledby="mantenimiento-heading" className="space-y-4">
-          <h2
-            id="mantenimiento-heading"
-            className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel"
-          >
-            Vencimientos{" "}
-            <span className="normal-case tracking-normal text-vialto-steel/70">· hoy, no depende del período</span>
-          </h2>
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-            <MetricCard
-              title="Vencidos"
-              tooltip="Planes asignados que ya pasaron su km o su fecha"
-              simpleCount={mant.contadores.vencido}
-              loading={mant.loading}
-              valueTone="payable"
-              linkTo="/mantenimiento?tab=vencimientos"
-            />
-            <MetricCard
-              title="Próximos"
-              tooltip="Planes dentro del aviso anticipado (km o días)"
-              simpleCount={mant.contadores.proximo}
-              loading={mant.loading}
-              valueTone="warn"
-              linkTo="/mantenimiento?tab=vencimientos"
-            />
-            <MetricCard
-              title="Sin datos"
-              tooltip="Planes sin último service o sin km actual: todavía no se puede calcular"
-              simpleCount={mant.contadores.sin_datos}
-              loading={mant.loading}
-              linkTo="/mantenimiento?tab=vencimientos"
-            />
-            <MetricCard
-              title="Al día"
-              tooltip="Planes que todavía no requieren atención"
-              simpleCount={mant.contadores.ok}
-              loading={mant.loading}
-              valueTone="positiveCash"
-              linkTo="/mantenimiento?tab=vencimientos"
-            />
-          </div>
-          {mant.error ? (
-            <p className="text-sm text-vialto-steel">No se pudieron cargar los vencimientos.</p>
-          ) : (
-            !mant.loading && <ProximosVencimientosLista filas={mant.proximos} hayPlanes={(mant.filas?.length ?? 0) > 0} />
-          )}
-        </section>
-      )}
+      </div>
     </div>
   );
 }

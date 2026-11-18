@@ -1,4 +1,4 @@
-## Multi-tenant (obligatorio antes de tocar llamadas a la API)
+﻿## Multi-tenant (obligatorio antes de tocar llamadas a la API)
 
 Antes de crear o modificar llamadas a la API o manejar datos de empresa, seguí las reglas
 de higiene multi-tenant. **No las dupliques acá**: la fuente de verdad es un solo archivo.
@@ -79,8 +79,8 @@ src/
   components/
     ui/                      # componentes shadcn/base
     superadmin/
-    tenant/                  # TenantOwnerDashboard.tsx — dashboard real del tenant, montado en TenantHomePage
-    combustible/             # CombustibleDashboardSection.tsx, CombustibleDashboardPanels.tsx
+    tenant/                  # TenantOwnerDashboard.tsx + DashboardBloque.tsx — dashboard real del tenant, montado en TenantHomePage
+    combustible/             # CombustibleDashboardPanels.tsx (paneles que usan los bloques del dashboard)
     stock/, viajes/, facturacion/, liquidaciones/, choferes/, clientes/,
     transportistas/, vehiculos/, destinatarios/, direcciones-entrega/, cuenta-corriente/
     crud/                    # CrudFieldLabel, CrudInput, CrudSelect, CrudFieldError, CrudFormErrorAlert
@@ -318,7 +318,7 @@ El modelo de datos completo (por qué `estado` de Factura no incluye `cobrado`, 
 - En la grilla de Viajes, los badges de facturación/liquidación (`ViajeFacturacionIndicador`/`ViajeLiquidacionIndicador`) son **de lectura únicamente**: el click, si ya hay factura/liquidación vinculada, abre directo su vista completa (`FacturaViewModal`/`LiquidacionViewModal`, fetch on click, sin modal intermedio); si no hay nada vinculado, muestra un modal de detalle liviano (`ViajeFacturacionDetalleModal`/`ViajeLiquidacionDetalleModal`) que informa el estado y, si el host pasa `onFacturar`/`onLiquidar` (oct 2026, la grilla de Viajes lo hace), ofrece **Facturar**/**Liquidar** para arrancar el comprobante de ese viaje — el mismo flujo que la acción de la fila (`facturarViaje`/`liquidarViaje`), con las mismas condiciones (no cancelado, pendiente de comprobante). Fuera de eso, no agregar ahí acciones sobre un comprobante existente (marcar como cobrada, emitir, anular) — esas viven únicamente en las pantallas de Facturas/Liquidaciones.
 - **Grilla de Viajes embebida en superadmin: gatear por módulo con las variables `*Resuelto` (oct 2026).** En `ViajesTenantPage`, `hasLiquidaciones`/`hasLiquidoProductoArca` salen de `useCurrentTenant()` y con `platform` dan siempre `false` (es la org del superadmin, no la empresa elegida). Para decidir si se muestra una acción o un indicador usar `hasLiquidacionesResuelto`/`hasLiquidoProductoArcaResuelto`, que con `platform` leen `tenantModules` de la empresa elegida. Los modales que crean algo para esa empresa (ej. `CrearLiquidacionManualModal`) reciben `tenantId={platform ? tid : undefined}` + `rutasPlataforma={platform}`; sin esto crean el registro en la org del superadmin. Bug real (LSF Cargas): "Liquidar" no aparecía en el menú de acciones desde superadmin. Del mismo caso: un viaje con transportista y `liquidacionEstado = null` tampoco ofrece "Liquidar" en ninguna vista (`viajePendienteComprobanteTransportista` exige estado no nulo). Si vuelve a pasar, revisar los datos antes que el código.
 - **"Marcar como cobrada" apagable por empresa (oct 2026)**: `Tenant.marcarCobradaHabilitada` (default `false`, switch en "Configuración por empresa" → General). Con `false`, `FacturacionTenantPage` no pasa `onMarcarCobrada` a `FacturaAccionesMenu`/`FacturaViewModal`, así que la acción se oculta (no se muestra deshabilitada). En `FacturaViewModal` el badge VENCIDA queda como badge fijo en vez de botón. También se ocultan el filtro rápido "Sin cobrar" y la opción COBRADA del filtro Estado.
-- **Planes de Mantenimiento apagables por empresa (oct 2026)**: `Tenant.mantenimientoPlanesHabilitados` (default `true`, switch en "Configuración por empresa" → General, visible solo si la empresa tiene Mantenimiento). Leer siempre con `planesMantenimientoHabilitados(tenant)` (`lib/tenantModules.ts`). Con `false`, Mantenimiento queda solo con Órdenes de trabajo (sin barra de pestañas, sin asistente inicial, sin Vencimientos ni Planes), la OT no muestra "Planes que cumple" (una OT vieja que ya tenía planes los sigue mostrando y conservando) y el panel de inicio no tiene la pestaña Mantenimiento. Historial del vehículo y "Editar km" siguen igual.
+- **Planes de Mantenimiento apagables por empresa (oct 2026)**: `Tenant.mantenimientoPlanesHabilitados` (default `true`, switch en "Configuración por empresa" → General, visible solo si la empresa tiene Mantenimiento). Leer siempre con `planesMantenimientoHabilitados(tenant)` (`lib/tenantModules.ts`). Con `false`, Mantenimiento queda solo con Órdenes de trabajo (sin barra de pestañas, sin asistente inicial, sin Vencimientos ni Planes), la OT no muestra "Planes que cumple" (una OT vieja que ya tenía planes los sigue mostrando y conservando) y los bloques de Mantenimiento del dashboard no están disponibles. Historial del vehículo y "Editar km" siguen igual.
 - Para "ver" el PDF de un comprobante generado on-demand (CVLP y su Nota de Crédito/Débito de anulación, que no tienen URL persistida como sí tiene `Factura.comprobanteUrl`/`notaCreditoUrl`), el patrón es abrir una pestaña en blanco de forma **síncrona** en el click (`window.open('', '_blank')`) y recién después, cuando llega el blob, setear `location.href` — evita que el bloqueador de pop-ups del navegador corte la apertura por venir de un `await`. Ver `verPdf`/`verPdfAnulacion` en `LiquidacionesTenantPage.tsx` y su equivalente en `ViajeLiquidacionIndicador.tsx`.
 - **Factura emitida en ARCA y su nota de crédito: siempre el PDF generado en el momento (oct 2026)**, con `verPdfFacturaArca` (`lib/facturaPdfArca.ts`), no `comprobanteUrl`/`notaCreditoUrl`. Esos archivos se guardan al emitir/anular, cada uno con el diseño vigente en ese momento, y la factura y su NC podían verse distintas. Lo usan `FacturaViewModal`, la grilla de Facturas (`verComprobante`/`verNotaCredito`), el detalle de viaje y `AnularFacturaModal`. Las facturas manuales (sin CAE) siguen abriendo el adjunto.
 - **"Descargar" al lado de cada "Ver" de un comprobante de ARCA (oct 2026, pedido NyM)**: "Ver" abre una URL `blob:` y el visor del navegador la descarga con un nombre al azar (el UUID del blob). Para bajarlo con su nombre ("Factura B 00002-00001532.pdf", "Nota de Crédito A …", "Nota de Débito B …", "Liquido Producto A …"), `descargarPdfFacturaArca` (`lib/facturaPdfArca.ts`) y `descargarPdfLiquidacionArca` (`lib/liquidacionPdfArca.ts`) leen el `Content-Disposition` del backend (`descargarRespuesta`/`filenameFromContentDisposition` de `lib/downloadFilename.ts`, que prefiere `filename*` por los acentos). El nombre lo arma solo el backend (`shared/util/nombre-archivo-comprobante.util.ts`): no armarlo en el front. En la grilla es una acción del desplegable ("Descargar comprobante" / "Descargar Nota de Crédito" / "Descargar anulación"); en `FacturaViewModal`/`LiquidacionViewModal`, `BotonDescargarPdf` (ícono) al lado de su "Ver". Un comprobante nuevo de ARCA que se pueda ver lleva también su "Descargar".
@@ -518,28 +518,27 @@ Todo formulario que cargue el CUIT de un Cliente o Transportista (hoy: `ClienteC
 
 ---
 
-## Panel del tenant: pestañas por módulo en el dashboard
+## Dashboard del tenant: bloques configurables desde superadmin (nov 2026)
 
-**Regla global para toda sección nueva del dashboard de tenant (`src/components/tenant/TenantOwnerDashboard.tsx`).**
+**El inicio de la empresa es una sola página, sin pestañas por módulo.** Reemplaza al esquema anterior (una pestaña por módulo y sub-pestañas en Financiero/Combustible). Muestra los bloques que eligió el superadmin, en ese orden: `Tenant.dashboardBloques` (`String[]`, `[]` = set recomendado), editable en la ficha de la empresa → sección **Dashboard** (`ConfigDashboardTab`), que también tiene el switch `dashboardHabilitado`.
 
-Cuando el tenant tiene contratado más de un módulo con contenido propio en el dashboard (hoy: Financiero, Stock, Combustible, Cuenta corriente, Mantenimiento), esas secciones **no se apilan una debajo de la otra**. Se organizan con una barra de pestañas de subrayado, ubicada debajo del selector de período, con el mismo estilo visual que usa `BaseDeDatosPage.tsx` para Clientes/Transportistas/Choferes/etc.
-
-- Si el tenant solo tiene **un** módulo con sección de dashboard, no se muestra la barra de pestañas: esa sección se renderiza directo (sin tab nav de por medio).
-- Si tiene **más de uno**, se arma `moduloTabs: { id, label, icon }[]` agregando una entrada por módulo, condicionada por su respectivo `canAccessX(modules)` de `lib/tenantModules.ts`.
-- Desktop: `<nav>` con botones `border-t-2 border-t-vialto-fire bg-vialto-mist text-vialto-charcoal` para el activo, `border-transparent text-vialto-steel` para el resto (icono `lucide-react` + label, mismas clases que `BaseDeDatosPage.tsx`).
-- Mobile: botón `selectorTriggerClass` + `<SelectorOpcionesSheet>` (ambos de `@/components/ui/SelectorOpcionesSheet`), igual que en Base de Datos.
-- El contenido de cada módulo se gatea con `moduloActivo === 'x' && showX` (nunca solo `moduloActivo === 'x'`, para no romper el caso de un solo tab donde `moduloActivo` cae por default en el primero de la lista).
+- **Catálogo único**: `lib/dashboardBloques.ts` (`DASHBOARD_BLOQUES`), espejo de `DASHBOARD_BLOQUES` del backend (`update-tenant.dto.ts`, valida el PATCH). Cada bloque tiene `tipo` (`tarjeta` · `pendientes` · `analisis`), `fuente` (de qué endpoint salen sus datos), `disponible(tenant)` (módulo que lo alimenta) y `recomendado(tenant)`.
+- **Qué ve la empresa**: siempre con `bloquesEfectivos(tenant)`: los guardados que siguen disponibles, en su orden; sin configuración guardada (o si ninguno sigue disponible) el set recomendado (tarjetas + pendientes de sus módulos; los de análisis nunca son recomendados). Un bloque de un módulo dado de baja no se muestra pero queda guardado (vuelve si se recontrata).
+- **Layout** (`TenantOwnerDashboard`): selector de período arriba; tarjetas seguidas van en una misma grilla; pendientes de a dos por fila; análisis (y las alertas de combustible) a todo el ancho (`bloqueAnchoCompleto`).
+- **Datos**: cada fuente se pide solo si algún bloque elegido la usa (`fuentesDeBloques`): `resumen` (`useTenantOwnerDashboard`, siempre), `financiero`/`combustible`/`cuentaCorriente` (`hooks/useDashboardFuentes.ts`), `mantenimiento` (`useMantenimientoDashboard`). Rango del período: `periodoAFechas` (`lib/dashboardPeriodo.ts`), no volver a copiarlo por componente.
+- **Dibujo**: un `case` por bloque en `components/tenant/DashboardBloque.tsx`. Tarjetas con `MetricCard`; pendientes con `DashboardPendientes` (máx. 6 filas + "Ver todo →", acciones de fila estándar); análisis reusan los paneles de `FinancieroDashboardPanels`/`CombustibleDashboardPanels`/`TableroCuentaCorriente`.
+- **Sin "Resumen de alertas"** (nov 2026, a pedido): el botón/panel del encabezado se sacó; lo pendiente se ve en los bloques de Pendientes y en la campana.
+- **Links viejos** `/?combustibleTab=alertas` y `/?financieroTab=alertas` (notificaciones del backend): muestran y scrollean al bloque `pendientes-combustible` / `pendientes-margen-bajo` aunque la empresa no lo tenga elegido.
 
 ### Dashboard deshabilitable por empresa (oct 2026)
 
-`Tenant.dashboardHabilitado` (default `true`) se apaga desde superadmin ("Configuración por empresa" → General). Con `false`, `HomePage.tsx` redirige `/` a `primeraRutaModulo()` de `lib/tenantHome.ts` (primer módulo contratado en el **mismo orden que el menú lateral**, según rol) y `AppShell.tsx` oculta el ítem "Inicio". **Si se agrega un módulo nuevo al menú lateral, sumarlo también a `primeraRutaModulo` en la misma posición.**
+`Tenant.dashboardHabilitado` (default `true`) se apaga desde superadmin (ficha de la empresa → Dashboard). Con `false`, `HomePage.tsx` redirige `/` a `primeraRutaModulo()` de `lib/tenantHome.ts` (primer módulo contratado en el **mismo orden que el menú lateral**, según rol) y `AppShell.tsx` oculta el ítem "Inicio". **Si se agrega un módulo nuevo al menú lateral, sumarlo también a `primeraRutaModulo` en la misma posición.**
 
-### Al agregar el dashboard de un módulo nuevo
+### Al sumar un bloque nuevo al dashboard
 
-1. Crear su sección propia en `src/components/<modulo>/<Modulo>DashboardSection.tsx` (fetch propio a su endpoint, pestañas internas si corresponde — ver Combustible/Financiero como referencia).
-2. En `TenantOwnerDashboard.tsx`: agregar un ítem a `moduloTabs` (id, label, ícono de `lucide-react`) condicionado por su `canAccessX(modules)`.
-3. Agregar el bloque `{moduloActivo === '<id>' && showX && <ModuloDashboardSection ... />}` al final del render, respetando el orden de `moduloTabs`.
-4. No agregar heading `<h2>` propio de nivel superior para el módulo — el label ya vive en la pestaña; el `<h2>` interno de la sección (si lo tiene) queda para sus propias sub-pestañas.
+1. Agregarlo a `DASHBOARD_BLOQUES` en `lib/dashboardBloques.ts` (label, `ayuda` corta para el "?" de superadmin, tipo, fuente, `disponible` y, si corresponde, `recomendado`) y al `DASHBOARD_BLOQUES` del backend con el mismo id.
+2. Dibujarlo en el `switch` de `DashboardBloque.tsx`. Si necesita un endpoint nuevo, sumar una `fuente` y su hook en `useDashboardFuentes.ts` (que se pida solo cuando se usa).
+3. Un bloque nuevo no aparece solo en las empresas con configuración propia: el superadmin lo agrega. Si es recomendado, sí aparece en las que usan el set recomendado.
 
 ---
 
@@ -767,7 +766,7 @@ Pendientes conocidos (no hechos a propósito): Facturas/Liquidaciones no guardan
 - **Campos obligatorios con asterisco rojo; campos opcionales sin ningún indicador.**
 - **Obligatorios vacíos al enviar: borde rojo (`conBordeError`) + "Falta completar" (`FaltaCampo`) + un solo aviso que zumba en el pie (`ErrorPieModal`)**, con la misma regla de obligatorios que el backend — ver "Campos obligatorios que faltan".
 - **Si el modal carga datos**, usar `useConfirmarDescarte` (× / Cancelar / Escape piden confirmación, click afuera no cierra) — ver "Modales con formulario: confirmar antes de descartar".
-- **Si el módulo agrega una sección al dashboard del tenant**, sumarla a `moduloTabs` en `TenantOwnerDashboard.tsx` en vez de apilarla — ver "Panel del tenant: pestañas por módulo en el dashboard".
+- **Si el módulo suma algo al dashboard del tenant**, agregarlo como bloque del catálogo (`lib/dashboardBloques.ts` + backend) y dibujarlo en `DashboardBloque.tsx` — ver "Dashboard del tenant: bloques configurables desde superadmin".
 - **Si la pantalla muestra estado de un comprobante o viaje (Facturas/Liquidaciones/Viajes)**, los ejes independientes (cobro, ambiente de prueba) van en badges aditivos, nunca reemplazando al badge de ciclo de vida — ver "Badges de estado: ejes aditivos, nunca se reemplazan".
 - **Si se toca el flujo de importación masiva**, extender `ImportWizard.tsx`/`useImportWizard.ts` (compartidos entre tenant-admin y superadmin) en vez de crear un modal o una copia por rol — ver "Importación masiva desde Excel".
 - **Si la pantalla abre una foto o un adjunto**, usar `useAbrirAdjunto` / `VisorFotos` (fotos en el visor, documentos en pestaña nueva) — ver "'Ver comprobante' / adjuntos: fotos en el visor, documentos en pestaña nueva".
