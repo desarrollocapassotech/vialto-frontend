@@ -3,6 +3,7 @@ import { BotonCopiar } from '@/components/ui/BotonCopiar';
 import {
   Banknote,
   Calculator,
+  Copy,
   Download,
   Eye,
   FilePen,
@@ -45,6 +46,7 @@ interface Props {
   hasLiquidoProductoArca?: boolean;
   hasExportacionActiva?: boolean;
   onVer: () => void;
+  onCopiar?: () => void;
   onAgregarGasto: () => void;
   onRegistrarPago: () => void;
   /** Factura al cliente. Sin pasar = el tenant no factura desde Vialto. */
@@ -76,6 +78,7 @@ export function ViajeAccionesMenu({
   hasLiquidoProductoArca = false,
   hasExportacionActiva = false,
   onVer,
+  onCopiar,
   onAgregarGasto,
   onRegistrarPago,
   onFacturar,
@@ -128,6 +131,10 @@ export function ViajeAccionesMenu({
 
   const options = useMemo(() => {
     const items: AccionOpcion[] = [{ id: 'ver', label: 'Ver viaje', icon: Eye, onClick: onVer }];
+
+    if (onCopiar) {
+      items.push({ id: 'copiar', label: 'Copiar', icon: Copy, onClick: onCopiar });
+    }
 
     if (onReintentarFactura) {
       items.push({
@@ -220,6 +227,7 @@ export function ViajeAccionesMenu({
   }, [
     viaje,
     onVer,
+    onCopiar,
     onVerFactura,
     onVerLiquidacion,
     onReintentarFactura,

@@ -7,7 +7,7 @@ import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
 import { verPdfLiquidacion } from "@/lib/liquidacionContratoPdf";
 import { verPdfFacturaArca } from "@/lib/facturaPdfArca";
 import { ComprobanteAdjuntoClip } from "@/components/shared/ComprobanteAdjuntoClip";
-import { Banknote, Receipt } from "lucide-react";
+import { Banknote, Copy, Receipt } from "lucide-react";
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -156,6 +156,7 @@ export function ViajeViewModal({
   viaje,
   onClose,
   onEditar,
+  onCopiar,
   tenantId,
   hasLiquidoProductoArca = false,
   editando = false,
@@ -182,6 +183,8 @@ export function ViajeViewModal({
   modulos?: string[] | null;
   onClose: () => void;
   onEditar: () => void;
+  /** Si se pasa, muestra un botón "Copiar" junto a "Editar". */
+  onCopiar?: () => void;
   onVerFactura?: () => void;
   /** Clerk org id para resolver nombres en vista superadmin. */
   tenantId?: string;
@@ -958,6 +961,23 @@ export function ViajeViewModal({
                   Liquidar
                 </span>
               )}
+            </button>
+          )}
+          {onCopiar && (
+            <button
+              type="button"
+              onClick={onCopiar}
+              disabled={bloqueado}
+              className={`${viewModalBtnGhost} disabled:cursor-wait disabled:opacity-50`}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Copy
+                  className="h-3.5 w-3.5"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                Copiar
+              </span>
             </button>
           )}
           <span className="group relative inline-block">
