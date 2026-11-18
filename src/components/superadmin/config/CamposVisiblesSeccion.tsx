@@ -6,7 +6,12 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
 import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
-import { ConfigFila, ConfigSeccion, ToggleSwitch, configSelectClass } from "./ConfigUi";
+import {
+  ConfigFila,
+  ConfigSeccion,
+  ToggleSwitch,
+  configSelectClass,
+} from "./ConfigUi";
 
 export type CampoCatalogo = {
   campo: string;
@@ -113,7 +118,9 @@ export function CamposVisiblesSeccion({
         },
       );
       setCampos((prev) =>
-        prev ? prev.map((x) => (x.campo === c.campo ? { ...x, visible } : x)) : prev,
+        prev
+          ? prev.map((x) => (x.campo === c.campo ? { ...x, visible } : x))
+          : prev,
       );
       showToast("Cambios guardados", "success");
     } catch (e) {
@@ -125,7 +132,9 @@ export function CamposVisiblesSeccion({
 
   // Los obligatorios del sistema no se pueden ocultar: no se listan.
   const configurables =
-    campos?.filter((c) => !c.obligatorioSistema && !ocultarCampos?.has(c.campo)) ?? null;
+    campos?.filter(
+      (c) => !c.obligatorioSistema && !ocultarCampos?.has(c.campo),
+    ) ?? null;
 
   return (
     <>
@@ -152,13 +161,14 @@ export function CamposVisiblesSeccion({
                   onChange={(e) => setFormulario(e.target.value)}
                   className={`${configSelectClass} w-56`}
                 >
-                  {ordenarAlfabetico(formularios, (f) => catalogoModulo.formularios[f].label).map(
-                    (f) => (
-                      <option key={f} value={f}>
-                        {catalogoModulo.formularios[f].label}
-                      </option>
-                    ),
-                  )}
+                  {ordenarAlfabetico(
+                    formularios,
+                    (f) => catalogoModulo.formularios[f].label,
+                  ).map((f) => (
+                    <option key={f} value={f}>
+                      {catalogoModulo.formularios[f].label}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="flex items-center gap-2 text-sm text-vialto-steel">
@@ -173,7 +183,11 @@ export function CamposVisiblesSeccion({
           ) : undefined
         }
       >
-        {error && <p className="col-span-full px-4 py-3 text-sm text-red-700">{error}</p>}
+        {error && (
+          <p className="col-span-full px-4 py-3 text-sm text-red-700">
+            {error}
+          </p>
+        )}
         {!configurables && loading && (
           <p className="col-span-full px-4 py-6 text-center text-sm text-vialto-steel">
             Cargando…
@@ -201,7 +215,9 @@ export function CamposVisiblesSeccion({
           orgId={orgId}
           modulo={modulo}
           formulario={formulario}
-          formularioLabel={catalogoModulo.formularios[formulario]?.label ?? formulario}
+          formularioLabel={
+            catalogoModulo.formularios[formulario]?.label ?? formulario
+          }
           onClose={() => setHistorialAbierto(false)}
         />
       )}
@@ -255,7 +271,9 @@ function HistorialCamposModal({
       try {
         const base = `/api/platform/field-config/${encodeURIComponent(orgId)}/audit`;
         const url =
-          filtro === "formulario" ? `${base}?modulo=${modulo}&formulario=${formulario}` : base;
+          filtro === "formulario"
+            ? `${base}?modulo=${modulo}&formulario=${formulario}`
+            : base;
         const data = await apiJson<AuditLog[]>(url, () => getToken());
         if (!cancelled) setLogs(data);
       } catch (e) {
@@ -342,14 +360,18 @@ function HistorialCamposModal({
                 <td className="px-4 py-3 text-center">
                   <span
                     className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${
-                      log.estadoNuevo ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                      log.estadoNuevo
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
                     }`}
                   >
                     {log.estadoAnterior ? "Visible" : "Oculto"} →{" "}
                     {log.estadoNuevo ? "Visible" : "Oculto"}
                   </span>
                 </td>
-                <td className="py-3 pl-4 text-xs text-vialto-steel">{log.userName}</td>
+                <td className="py-3 pl-4 text-xs text-vialto-steel">
+                  {log.userName}
+                </td>
               </tr>
             ))
           )}

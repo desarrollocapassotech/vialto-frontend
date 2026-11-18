@@ -246,11 +246,6 @@ export function AppShell() {
         title: "Plataforma",
         items: [
           { to: "/superadmin/empresas", label: "Empresas", icon: Building2 },
-          {
-            to: "/superadmin/campos-empresa",
-            label: "Configuración por empresa",
-            icon: SlidersHorizontal,
-          },
         ],
       });
     }

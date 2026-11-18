@@ -17,7 +17,11 @@ import { HomePage } from "@/pages/HomePage";
 import { ViajesPage } from "@/pages/ViajesPage";
 import { BaseDeDatosPage } from "@/pages/BaseDeDatosPage";
 import { SuperadminTenantCreatePage } from "@/pages/SuperadminTenantCreatePage";
-import { SuperadminTenantEditPage } from "@/pages/SuperadminTenantEditPage";
+import {
+  RedirectConfiguracionEmpresa,
+  RedirectEditarEmpresa,
+  SuperadminEmpresaPage,
+} from "@/pages/SuperadminEmpresaPage";
 import { ClienteCreatePage } from "@/pages/ClienteCreatePage";
 import { ClienteEditPage } from "@/pages/ClienteEditPage";
 import { TransportistaCreatePage } from "@/pages/TransportistaCreatePage";
@@ -58,7 +62,6 @@ import { PasswordSignInPage } from "@/pages/PasswordSignInPage";
 import { PasswordSignUpPage } from "@/pages/PasswordSignUpPage";
 import { TaskSetupMFAPage } from "@/pages/TaskSetupMFAPage";
 import { TaskChooseOrganizationPage } from "@/pages/TaskChooseOrganizationPage";
-import { CamposEmpresaPage } from "@/pages/CamposEmpresaPage";
 import { CombustibleSuperadminPage } from "@/pages/CombustibleSuperadimPage";
 import { ConceptosConfigTenantPage } from "@/pages/ConceptosConfigTenatPage";
 import { ConfiguracionNotificacionesTenantPage } from "@/pages/ConfiguracionNotificacionesTenantPage";
@@ -320,7 +323,10 @@ export default function App() {
             />
             <Route path="facturacion" element={<FacturacionPage />} />
             <Route path="liquidaciones" element={<LiquidacionesTenantPage />} />
-            <Route path="cuenta-corriente" element={<CuentaCorrienteTenantPage />} />
+            <Route
+              path="cuenta-corriente"
+              element={<CuentaCorrienteTenantPage />}
+            />
           </Route>
           {/* rutas legacy → redirigen al tab correspondiente en /base-de-datos */}
           <Route
@@ -476,7 +482,7 @@ export default function App() {
           <Route path="superadmin/arca" element={<SuperadminArcaPage />} />
           <Route
             path="superadmin/campos-empresa"
-            element={<CamposEmpresaPage />}
+            element={<RedirectConfiguracionEmpresa />}
           />
           <Route
             path="superadmin/notificaciones"
@@ -500,7 +506,11 @@ export default function App() {
           />
           <Route
             path="superadmin/empresas/:orgId/editar"
-            element={<SuperadminTenantEditPage />}
+            element={<RedirectEditarEmpresa />}
+          />
+          <Route
+            path="superadmin/empresas/:orgId"
+            element={<SuperadminEmpresaPage />}
           />
           <Route
             path="superadmin/empresas/:orgId/importar"

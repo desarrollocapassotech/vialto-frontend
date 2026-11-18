@@ -59,7 +59,7 @@ const SHEET_DEFAULT: Record<string, string> = {
  * Configuración de templates de importación (mapeo de columnas por módulo) —
  * compartido entre la pantalla standalone (`SuperadminImportTemplatesPage`,
  * llegada desde el wizard de import o el link "Configurar templates") y una
- * sección embebida en "Configuración por empresa" (`CamposEmpresaPage`),
+ * sección embebida en "Configuración por empresa" (`SuperadminEmpresaPage`),
  * mismo patrón que `ArcaConfigTenantPage`/`ConfiguracionNotificacionesTenantPage`
  * — un solo componente, controlado por props, sin duplicar la lógica.
  */

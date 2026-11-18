@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { CircleHelp, Search } from "lucide-react";
+import { useToast } from "@/lib/toast";
 
 /**
  * Piezas visuales de "Configuración por empresa" (superadmin). Todas las pestañas
@@ -73,11 +74,7 @@ export function AyudaIcono({ texto }: { texto: string }) {
 // --- Búsqueda -------------------------------------------------------------
 
 function normalizar(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .trim();
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
 const BusquedaContext = createContext("");
@@ -245,6 +242,8 @@ export function ConfigTextoInput({
   disabled,
   maxLength,
   ariaLabel,
+  type = "text",
+  validar,
 }: {
   valor: string;
   onGuardar: (v: string) => void;
@@ -252,15 +251,28 @@ export function ConfigTextoInput({
   disabled?: boolean;
   maxLength?: number;
   ariaLabel: string;
+  type?: "text" | "number";
+  /** Devuelve un mensaje si el valor no sirve: se avisa y se vuelve al guardado. */
+  validar?: (v: string) => string | null;
 }) {
   const [draft, setDraft] = useState(valor);
+  const { showToast } = useToast();
   useEffect(() => setDraft(valor), [valor]);
   return (
     <input
+      type={type}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
-        if (draft.trim() !== valor) onGuardar(draft.trim());
+        const v = draft.trim();
+        if (v === valor) return;
+        const error = validar?.(v);
+        if (error) {
+          showToast(error, "error");
+          setDraft(valor);
+          return;
+        }
+        onGuardar(v);
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();

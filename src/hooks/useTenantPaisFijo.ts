@@ -19,7 +19,7 @@ export type TenantPaisFijoResult = {
  * Código de país fijo del tenant (`Tenant.paisOrigenDestinoOculto` +
  * `paisOrigenDestinoFijoCodigo`, resuelto por el backend) — mismo flag que
  * oculta/fija el país en Viajes, reusado acá para Cliente y Transportista
- * (ver `CamposEmpresaPage.tsx`, pestaña Viajes → "Ocultar país de
+ * (ver `SuperadminEmpresaPage.tsx`, pestaña Viajes → "Ocultar país de
  * origen/destino"). Devuelve `paisFijo: null` si el toggle está apagado o no
  * se eligió país fijo — en ese caso el selector de país sigue mostrándose
  * normal. Devuelve además `loading`, que hay que respetar en el cálculo de

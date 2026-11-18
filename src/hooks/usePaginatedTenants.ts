@@ -33,6 +33,8 @@ export function usePaginatedTenants() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [statusUpdatingByOrgId, setStatusUpdatingByOrgId] = useState<Record<string, boolean>>({});
+  // Recargar tras habilitar/deshabilitar: el backend manda las deshabilitadas al final.
+  const [recarga, setRecarga] = useState(0);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -74,7 +76,7 @@ export function usePaginatedTenants() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn, page, pageSize, search]);
+  }, [getToken, isLoaded, isSignedIn, page, pageSize, search, recarga]);
 
   const stats = useMemo<TenantsPageStats>(() => {
     const enPrueba = items.filter(
@@ -126,6 +128,7 @@ export function usePaginatedTenants() {
         method: 'PATCH',
         body: JSON.stringify({ billingStatus: nextStatus }),
       });
+      setRecarga((n) => n + 1);
     } catch (e) {
       setItems(previous);
       setError(friendlyError(e, 'plataforma'));

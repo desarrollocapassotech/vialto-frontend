@@ -11,7 +11,7 @@ import type { Tenant } from "@/types/api";
  * Pantalla standalone de configuración de templates — llegada desde el
  * wizard de import (link "Configurar templates" / error de "columnas
  * faltantes") o desde la sección embebida en "Configuración por empresa"
- * (`CamposEmpresaPage`, que abre esta misma ruta con el tenant ya elegido).
+ * (`SuperadminEmpresaPage`, que abre esta misma ruta con el tenant ya elegido).
  * La lógica real vive en `ImportTemplatesConfig` — este componente solo
  * resuelve el tenant a partir de `:orgId`.
  */

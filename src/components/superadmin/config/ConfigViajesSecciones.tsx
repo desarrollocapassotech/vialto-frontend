@@ -12,7 +12,10 @@ import {
   configSelectClass,
 } from "./ConfigUi";
 
-type Props = { orgId: string; config: TenantConfigEmpresa & { tenant: Tenant } };
+type Props = {
+  orgId: string;
+  config: TenantConfigEmpresa & { tenant: Tenant };
+};
 
 /** Pestaña Viajes: lo que va arriba de "Campos visibles". */
 export function ConfigViajesSecciones({ orgId, config }: Props) {
@@ -20,7 +23,8 @@ export function ConfigViajesSecciones({ orgId, config }: Props) {
   const idSistema = tenant.idSistemaHabilitado ?? true;
   const idPropio1 = tenant.idPropio1Habilitado ?? true;
   const idPropio2 = tenant.idPropio2Habilitado ?? false;
-  const productosPlural = tenant.productoLabelPlural || tenant.productoLabel || "productos";
+  const productosPlural =
+    tenant.productoLabelPlural || tenant.productoLabel || "productos";
 
   // Flags que definen qué columnas de Viajes ve la empresa.
   const flagsColumnas = useMemo(
@@ -48,19 +52,31 @@ export function ConfigViajesSecciones({ orgId, config }: Props) {
         {/* ID Sistema e ID Propio 1 nunca pueden quedar apagados a la vez. */}
         <ConfigFila
           label="ID Sistema"
-          aviso={idSistema && !idPropio1 ? "No se puede apagar: ID Propio 1 está apagado." : null}
+          aviso={
+            idSistema && !idPropio1
+              ? "No se puede apagar: ID Propio 1 está apagado."
+              : null
+          }
         >
           <ToggleSwitch
             checked={idSistema}
-            disabled={estaGuardando("idSistemaHabilitado") || (idSistema && !idPropio1)}
+            disabled={
+              estaGuardando("idSistemaHabilitado") || (idSistema && !idPropio1)
+            }
             onChange={() => void guardar({ idSistemaHabilitado: !idSistema })}
-            label={idSistema ? "Deshabilitar ID Sistema" : "Habilitar ID Sistema"}
+            label={
+              idSistema ? "Deshabilitar ID Sistema" : "Habilitar ID Sistema"
+            }
           />
         </ConfigFila>
         <ConfigFila
           label="ID Propio 1"
           ayuda="Escribí cómo lo llama la empresa (ej. “Nro de CTG”)."
-          aviso={idPropio1 && !idSistema ? "No se puede apagar: ID Sistema está apagado." : null}
+          aviso={
+            idPropio1 && !idSistema
+              ? "No se puede apagar: ID Sistema está apagado."
+              : null
+          }
         >
           <ConfigControl>
             <ConfigTextoInput
@@ -78,7 +94,9 @@ export function ConfigViajesSecciones({ orgId, config }: Props) {
           </ConfigControl>
           <ToggleSwitch
             checked={idPropio1}
-            disabled={estaGuardando("idPropio1Habilitado") || (idPropio1 && !idSistema)}
+            disabled={
+              estaGuardando("idPropio1Habilitado") || (idPropio1 && !idSistema)
+            }
             // Apagarlo apaga también ID Propio 2 (cascada del backend).
             onChange={() =>
               void guardar(
@@ -86,19 +104,28 @@ export function ConfigViajesSecciones({ orgId, config }: Props) {
                 { desdeRespuesta: ["idPropio2Habilitado"] },
               )
             }
-            label={idPropio1 ? "Deshabilitar ID Propio 1" : "Habilitar ID Propio 1"}
+            label={
+              idPropio1 ? "Deshabilitar ID Propio 1" : "Habilitar ID Propio 1"
+            }
           />
         </ConfigFila>
         <ConfigFila
           label="ID Propio 2"
           ayuda="Texto libre, no único (ej. “CPE”, “Referencia cliente”)."
-          aviso={!idPropio2 && !idPropio1 ? "Para prenderlo, primero prendé ID Propio 1." : null}
+          aviso={
+            !idPropio2 && !idPropio1
+              ? "Para prenderlo, primero prendé ID Propio 1."
+              : null
+          }
         >
           <ConfigControl>
             <ConfigTextoInput
               valor={tenant.idPropio2Label ?? ""}
               onGuardar={(v) =>
-                void guardar({ idPropio2Label: v || null }, { mensaje: "Nombre actualizado" })
+                void guardar(
+                  { idPropio2Label: v || null },
+                  { mensaje: "Nombre actualizado" },
+                )
               }
               disabled={estaGuardando("idPropio2Label")}
               placeholder="ID Propio 2"
@@ -107,9 +134,13 @@ export function ConfigViajesSecciones({ orgId, config }: Props) {
           </ConfigControl>
           <ToggleSwitch
             checked={idPropio2}
-            disabled={estaGuardando("idPropio2Habilitado") || (!idPropio2 && !idPropio1)}
+            disabled={
+              estaGuardando("idPropio2Habilitado") || (!idPropio2 && !idPropio1)
+            }
             onChange={() => void guardar({ idPropio2Habilitado: !idPropio2 })}
-            label={idPropio2 ? "Deshabilitar ID Propio 2" : "Habilitar ID Propio 2"}
+            label={
+              idPropio2 ? "Deshabilitar ID Propio 2" : "Habilitar ID Propio 2"
+            }
           />
         </ConfigFila>
       </ConfigSeccion>
@@ -124,7 +155,9 @@ export function ConfigViajesSecciones({ orgId, config }: Props) {
             <select
               value={tenant.unidadCantidadViajes === "UD" ? "UD" : "TN"}
               disabled={estaGuardando("unidadCantidadViajes")}
-              onChange={(e) => void guardar({ unidadCantidadViajes: e.target.value })}
+              onChange={(e) =>
+                void guardar({ unidadCantidadViajes: e.target.value })
+              }
               className={configSelectClass}
             >
               <option value="TN">Toneladas (TN)</option>
@@ -160,7 +193,9 @@ export function ConfigViajesSecciones({ orgId, config }: Props) {
               idPropio2: tenant.idPropio2Label ?? "",
               productos: tenant.productoLabel ? productosPlural : undefined,
             }}
-            onGuardado={(viajesColumnasOrden) => actualizarLocal({ viajesColumnasOrden })}
+            onGuardado={(viajesColumnasOrden) =>
+              actualizarLocal({ viajesColumnasOrden })
+            }
           />
         </ConfigFila>
         <ConfigFila

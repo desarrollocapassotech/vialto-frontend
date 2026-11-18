@@ -26,7 +26,9 @@ const AYUDA_ANULACION = LIQUIDACION_ANULACION_METODO_OPCIONES.map(
 export function ConfigLiquidacionesSecciones({ config }: Props) {
   const { tenant, guardar, estaGuardando } = config;
   const metodo: LiquidacionAnulacionMetodo =
-    tenant.liquidacionAnulacionMetodo === "manual" ? "manual" : "nota_credito_debito";
+    tenant.liquidacionAnulacionMetodo === "manual"
+      ? "manual"
+      : "nota_credito_debito";
 
   return (
     <>
@@ -134,7 +136,11 @@ function ProveedoresContratoFila({ config }: Props) {
                   disabled={saving}
                   onClick={() =>
                     void guardar(
-                      { opcionesProveedorLiquidacion: opciones.filter((o) => o !== opcion) },
+                      {
+                        opcionesProveedorLiquidacion: opciones.filter(
+                          (o) => o !== opcion,
+                        ),
+                      },
                       { mensaje },
                     )
                   }

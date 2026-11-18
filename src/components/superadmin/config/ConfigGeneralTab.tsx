@@ -22,7 +22,10 @@ import {
   configSelectClass,
 } from "./ConfigUi";
 
-type Props = { orgId: string; config: TenantConfigEmpresa & { tenant: Tenant } };
+type Props = {
+  orgId: string;
+  config: TenantConfigEmpresa & { tenant: Tenant };
+};
 
 export function ConfigGeneralTab({ orgId, config }: Props) {
   const { tenant, guardar, estaGuardando } = config;
@@ -51,7 +54,9 @@ export function ConfigGeneralTab({ orgId, config }: Props) {
             checked={!tenant.importacionesOcultas}
             disabled={estaGuardando("importacionesOcultas")}
             onChange={() =>
-              void guardar({ importacionesOcultas: !tenant.importacionesOcultas })
+              void guardar({
+                importacionesOcultas: !tenant.importacionesOcultas,
+              })
             }
             label={
               tenant.importacionesOcultas
@@ -73,7 +78,9 @@ export function ConfigGeneralTab({ orgId, config }: Props) {
             <select
               value={tipoFlota}
               disabled={estaGuardando("tipoFlota")}
-              onChange={(e) => void guardar({ tipoFlota: e.target.value as TipoFlota })}
+              onChange={(e) =>
+                void guardar({ tipoFlota: e.target.value as TipoFlota })
+              }
               className={configSelectClass}
             >
               <option value="mixta">Propia y transportistas externos</option>
@@ -94,9 +101,7 @@ export function ConfigGeneralTab({ orgId, config }: Props) {
                 onChange={(e) =>
                   void guardar({
                     tipoFlotaDefault: (e.target.value || null) as
-                      | "propia"
-                      | "externa"
-                      | null,
+                      "propia" | "externa" | null,
                   })
                 }
                 className={configSelectClass}
@@ -139,8 +144,14 @@ export function ConfigGeneralTab({ orgId, config }: Props) {
           <ToggleSwitch
             checked={!paisOculto}
             disabled={estaGuardando("paisOrigenDestinoOculto")}
-            onChange={() => void guardar({ paisOrigenDestinoOculto: !paisOculto })}
-            label={paisOculto ? "Mostrar selector de país" : "Ocultar selector de país"}
+            onChange={() =>
+              void guardar({ paisOrigenDestinoOculto: !paisOculto })
+            }
+            label={
+              paisOculto
+                ? "Mostrar selector de país"
+                : "Ocultar selector de país"
+            }
           />
         </ConfigFila>
         {paisOculto && <PaisFijoFila orgId={orgId} config={config} />}
@@ -255,7 +266,10 @@ function LabelSingularPlural({
         <ConfigTextoInput
           valor={plural}
           onGuardar={(v) =>
-            void guardar({ [campoPlural]: v || null }, { mensaje: "Nombre actualizado" })
+            void guardar(
+              { [campoPlural]: v || null },
+              { mensaje: "Nombre actualizado" },
+            )
           }
           disabled={saving || !singular}
           maxLength={40}
@@ -321,7 +335,9 @@ function PaisFijoFila({
           <select
             value={tenant.paisOrigenDestinoFijoId ?? ""}
             disabled={estaGuardando("paisOrigenDestinoFijoId")}
-            onChange={(e) => void guardar({ paisOrigenDestinoFijoId: e.target.value || null })}
+            onChange={(e) =>
+              void guardar({ paisOrigenDestinoFijoId: e.target.value || null })
+            }
             className={configSelectClass}
           >
             <option value="">Sin elegir…</option>
@@ -353,7 +369,9 @@ function EntidadesViajesSeccion({ orgId }: { orgId: string }) {
   const { getToken } = useAuth();
   const { showToast } = useToast();
   // campo → visible
-  const [visibles, setVisibles] = useState<Record<string, boolean> | null>(null);
+  const [visibles, setVisibles] = useState<Record<string, boolean> | null>(
+    null,
+  );
   const [guardando, setGuardando] = useState<string | null>(null);
 
   useEffect(() => {

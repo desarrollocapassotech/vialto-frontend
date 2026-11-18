@@ -1,10 +1,11 @@
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { CrudFieldLabel, CrudInput, CrudSelect } from '@/components/crud/CrudFields';
+import { CrudFieldLabel, CrudInput } from '@/components/crud/CrudFields';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { labelModulo } from '@/lib/platformLabels';
 import { AVAILABLE_MODULES } from '@/lib/moduleCatalog';
 
+/** Alta de empresa. La edici�n vive en la ficha de la empresa (SuperadminEmpresaPage). */
 export interface TenantFormValues {
   name: string;
   clerkOrgId: string;
@@ -21,14 +22,7 @@ interface TenantFormProps {
   onSubmit: () => void;
   submitLabel: string;
   loading: boolean;
-  includeAdvancedFields?: boolean;
-  disableOrgId?: boolean;
   showOrgIdInput?: boolean;
-  /**
-   * Solo en el alta. En la edición los módulos se cambian desde "Configuración por
-   * empresa" → Módulos contratados (guardado inmediato).
-   */
-  showModules?: boolean;
   fieldErrors?: Record<string, string>;
   formError?: string | null;
 }
@@ -62,10 +56,7 @@ export function TenantForm({
   onSubmit,
   submitLabel,
   loading,
-  includeAdvancedFields = false,
-  disableOrgId = false,
   showOrgIdInput = true,
-  showModules = true,
   fieldErrors = {},
   formError,
 }: TenantFormProps) {
@@ -104,8 +95,6 @@ export function TenantForm({
                 onChange={(e) =>
                   onChange({ ...values, clerkOrgId: e.target.value })
                 }
-                disabled={disableOrgId}
-                className="disabled:bg-black/5"
                 error={fieldErrors.clerkOrgId}
               />
               <CrudFieldError message={fieldErrors.clerkOrgId} />
@@ -124,7 +113,6 @@ export function TenantForm({
         </div>
       </SectionCard>
 
-      {showModules && (
       <SectionCard
         title="Módulos contratados"
         description="Define qué secciones ve la empresa en el menú y qué endpoints puede usar."
@@ -153,54 +141,6 @@ export function TenantForm({
           })}
         </div>
       </SectionCard>
-      )}
-
-      {includeAdvancedFields && (
-        <SectionCard title="Suscripción">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <label className="flex flex-col gap-1.5">
-              <CrudFieldLabel>Estado</CrudFieldLabel>
-              <CrudSelect
-                value={values.billingStatus ?? 'trial'}
-                onChange={(e) =>
-                  onChange({
-                    ...values,
-                    billingStatus: e.target.value as NonNullable<
-                      TenantFormValues['billingStatus']
-                    >,
-                  })
-                }
-              >
-                <option value="trial">En prueba</option>
-                <option value="active">Al día</option>
-                <option value="suspended">Suspendido</option>
-                <option value="expired">Vencido</option>
-              </CrudSelect>
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <CrudFieldLabel>Máx. usuarios</CrudFieldLabel>
-              <CrudInput
-                type="number"
-                min={1}
-                value={values.maxUsers ?? ''}
-                onChange={(e) =>
-                  onChange({ ...values, maxUsers: e.target.value })
-                }
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <CrudFieldLabel>Renovación</CrudFieldLabel>
-              <CrudInput
-                type="date"
-                value={values.billingRenewsAt ?? ''}
-                onChange={(e) =>
-                  onChange({ ...values, billingRenewsAt: e.target.value })
-                }
-              />
-            </label>
-          </div>
-        </SectionCard>
-      )}
 
       <CrudFormErrorAlert message={formError} />
       <CrudSubmitButton loading={loading} label={submitLabel} />

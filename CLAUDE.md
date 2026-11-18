@@ -543,9 +543,11 @@ Cuando el tenant tiene contratado más de un módulo con contenido propio en el 
 
 ---
 
-## Superadmin "Configuración por empresa": cómo sumar una opción (nov 2026)
+## Superadmin: ficha de la empresa y cómo sumar una opción (nov 2026)
 
-`pages/CamposEmpresaPage.tsx` es solo el orquestador (empresa + pestañas + buscador). Cada pestaña se arma con las piezas de `components/superadmin/config/ConfigUi.tsx`, y no se escribe una tabla ni un switch a mano:
+**Empresas y "Configuración por empresa" son una sola sección**: `/superadmin/empresas` es el listado y `/superadmin/empresas/:orgId` (`pages/SuperadminEmpresaPage.tsx`) es la ficha, con menú lateral (mismo estilo que Base de datos, `ConfigSeccionesNav`) y la sección en `?seccion=`: Datos y suscripción · General · Módulos contratados · una por módulo (Viajes, Clientes, Liquidaciones…) · Templates de importación. Las referencias a "Configuración por empresa → General / pestaña X" en este archivo y en el backend apuntan a esas secciones. "Editar empresa" ya no existe: datos, suscripción, módulos y eliminar viven en la ficha, y el alta (`SuperadminTenantCreatePage` + `TenantForm`) sigue aparte. Las rutas viejas (`/superadmin/campos-empresa?tenantId=`, `/superadmin/empresas/:orgId/editar`) redirigen a la ficha. **Excepción a "VER → modal read-only" (a pedido, nov 2026)**: en el listado de Empresas, "Ver empresa" navega directo a la ficha, sin modal intermedio (se borró `TenantViewModal`).
+
+La página es solo el orquestador (empresa + secciones + buscador). Cada sección se arma con las piezas de `components/superadmin/config/ConfigUi.tsx`, y no se escribe una tabla ni un switch a mano:
 
 - **`ConfigSeccion titulo=…`**: bloque con título corto ("Flota", "Nombres", "Grilla de viajes"). **`ConfigFila label ayuda aviso`**: nombre a la izquierda, control a la derecha.
 - **La explicación va en `ayuda`** (tooltip del ícono "?", vía `TooltipsDelegados`), **nunca como texto debajo del nombre**. `aviso` solo para un mensaje que depende del estado (ej. "No se puede apagar: ID Propio 1 está apagado"). Label corto y positivo ("Selector de país", no "Mostrar selector de país (Viajes, Clientes y Transportistas)").

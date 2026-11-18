@@ -200,7 +200,7 @@ export function BaseDeDatosPage() {
       case "direcciones-entrega":
         return hasStock;
       case "paises":
-        // Si el superadmin fijó el país (ver CamposEmpresaPage → "Ocultar país"),
+        // Si el superadmin fijó el país (ver SuperadminEmpresaPage → "Ocultar país"),
         // el tenant no elige país en ningún lado — no tiene sentido dejarle
         // administrar su propio catálogo de países.
         return hasViajes && !tenant?.paisOrigenDestinoOculto;

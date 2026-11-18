@@ -109,7 +109,7 @@ export function SuperadminHomePage() {
                     <li key={tenant.id} className="flex items-center justify-between gap-2">
                       <span className="text-sm text-vialto-charcoal">{tenant.name}</span>
                       <Link
-                        to={`/superadmin/empresas/${encodeURIComponent(tenant.clerkOrgId)}/editar`}
+                        to={`/superadmin/empresas/${encodeURIComponent(tenant.clerkOrgId)}`}
                         className="text-xs uppercase tracking-wider px-2 py-1 border border-black/15 hover:bg-vialto-mist"
                       >
                         Ver empresa
@@ -138,7 +138,7 @@ export function SuperadminHomePage() {
                     <li key={tenant.id} className="flex items-center justify-between gap-2">
                       <span className="text-sm text-vialto-charcoal">{tenant.name}</span>
                       <Link
-                        to={`/superadmin/empresas/${encodeURIComponent(tenant.clerkOrgId)}/editar`}
+                        to={`/superadmin/empresas/${encodeURIComponent(tenant.clerkOrgId)}`}
                         className="text-xs uppercase tracking-wider px-2 py-1 border border-black/15 hover:bg-vialto-mist"
                       >
                         Ver empresa
@@ -167,7 +167,7 @@ export function SuperadminHomePage() {
                     <li key={tenant.id} className="flex items-center justify-between gap-2">
                       <span className="text-sm text-vialto-charcoal">{tenant.name}</span>
                       <Link
-                        to={`/superadmin/empresas/${encodeURIComponent(tenant.clerkOrgId)}/editar`}
+                        to={`/superadmin/empresas/${encodeURIComponent(tenant.clerkOrgId)}`}
                         className="text-xs uppercase tracking-wider px-2 py-1 border border-black/15 hover:bg-vialto-mist"
                       >
                         Ver empresa
@@ -203,7 +203,7 @@ export function SuperadminHomePage() {
                         </p>
                       </div>
                       <Link
-                        to={`/superadmin/empresas/${encodeURIComponent(tenant.clerkOrgId)}/editar`}
+                        to={`/superadmin/empresas/${encodeURIComponent(tenant.clerkOrgId)}`}
                         className="text-xs uppercase tracking-wider px-2 py-1 border border-black/15 hover:bg-vialto-mist"
                       >
                         Ver empresa

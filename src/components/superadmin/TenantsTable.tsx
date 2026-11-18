@@ -4,14 +4,16 @@ import { Eye, Power, RotateCcw, Upload } from "lucide-react";
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import {
-  listadoTablaAccionesTdClass, listadoTablaTdClass,
+  listadoTablaAccionesTdClass,
+  listadoTablaTdClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { labelBillingStatus, labelModulo } from "@/lib/platformLabels";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import type { Tenant } from "@/types/api";
-import { TenantViewModal } from "./TenantViewModal";
 import { compararAlfabetico } from "@/lib/ordenAlfabetico";
 
 interface TenantsTableProps {
@@ -23,18 +25,6 @@ interface TenantsTableProps {
   limpiarFiltrosSlot?: HTMLElement | null;
 }
 
-function formatDate(iso: string) {
-  try {
-    return new Intl.DateTimeFormat("es-AR", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }).format(new Date(iso));
-  } catch {
-    return "—";
-  }
-}
-
 export function TenantsTable({
   loading,
   items,
@@ -43,7 +33,6 @@ export function TenantsTable({
   limpiarFiltrosSlot,
 }: TenantsTableProps) {
   const navigate = useNavigate();
-  const [viewingTenant, setViewingTenant] = useState<Tenant | null>(null);
 
   // Estados de los filtros de columna
   const [filtroNombre, setFiltroNombre] = useState("");
@@ -60,13 +49,14 @@ export function TenantsTable({
   const anyFiltroActivo = !!filtroNombre || !!filtroSuscripcion;
 
   // Extracción de opciones únicas para los selectores
+  // SearchableSelect ya ordena A→Z.
   const opcionesNombre = useMemo(
     () =>
       Array.from(
         new Set(
           (items || []).map((t) => t.name).filter((v): v is string => !!v),
         ),
-      ).sort(compararAlfabetico),
+      ).map((name) => ({ value: name, label: name })),
     [items],
   );
   const opcionesSuscripcion = useMemo(
@@ -93,13 +83,6 @@ export function TenantsTable({
 
   return (
     <>
-      {viewingTenant && (
-        <TenantViewModal
-          tenant={viewingTenant}
-          onClose={() => setViewingTenant(null)}
-        />
-      )}
-
       <LimpiarFiltrosPortal
         slot={limpiarFiltrosSlot}
         visible={anyFiltroActivo}
@@ -119,21 +102,15 @@ export function TenantsTable({
                 filterSignature={filtroNombre}
                 onClear={() => setFiltroNombre("")}
               >
-                <select
+                <SearchableSelect
                   value={filtroNombre}
-                  onChange={(e) => setFiltroNombre(e.target.value)}
-                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    filtroNombre ? "text-vialto-fire" : "text-vialto-charcoal"
-                  }`}
-                  aria-label="Filtrar por Empresa"
-                >
-                  <option value="">Todas</option>
-                  {opcionesNombre.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFiltroNombre}
+                  options={opcionesNombre}
+                  placeholder="Todas"
+                  searchPlaceholder="Buscar empresa…"
+                  triggerClassName={filtroNombre ? "text-vialto-fire" : ""}
+                  ariaLabel="Filtrar por empresa"
+                />
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -178,7 +155,16 @@ export function TenantsTable({
             id: "empresa",
             header: "Empresa",
             primary: true,
-            cell: (tenant) => tenant.name,
+            // Deshabilitada (suspendida o vencida): nombre tachado y en gris; el backend
+            // ya las manda al final del listado.
+            cell: (tenant) =>
+              isDisabledStatus(tenant.billingStatus) ? (
+                <span className="text-vialto-steel line-through">
+                  {tenant.name}
+                </span>
+              ) : (
+                tenant.name
+              ),
             tdClassName: `${listadoTablaTdClass} font-medium`,
           },
           {
@@ -194,32 +180,24 @@ export function TenantsTable({
           {
             id: "funciones",
             header: "Funciones",
+            // Solo la cantidad; el detalle va en el tooltip (y en la ficha de la empresa).
             cell: (tenant) =>
               tenant.modules.length === 0 ? (
-                <span className="text-vialto-steel">Ninguna</span>
+                <span className="text-vialto-steel">0</span>
               ) : (
-                <span className="flex flex-wrap gap-1">
-                  {tenant.modules.slice(0, 4).map((m) => (
-                    <span
-                      key={m}
-                      className="inline-block text-[11px] px-2 py-0.5 bg-vialto-mist text-vialto-charcoal rounded"
-                    >
-                      {labelModulo(m)}
-                    </span>
-                  ))}
-                  {tenant.modules.length > 4 ? (
-                    <span className="text-xs text-vialto-steel self-center">
-                      +{tenant.modules.length - 4}
-                    </span>
-                  ) : null}
+                <span
+                  title={tenant.modules.map(labelModulo).join("\n")}
+                  className="cursor-default tabular-nums"
+                >
+                  {tenant.modules.length}
                 </span>
               ),
-            tdClassName: `${listadoTablaTdClass} max-w-[240px]`,
+            tdClassName: `${listadoTablaTdClass} whitespace-nowrap`,
           },
           {
             id: "alta",
             header: "Alta",
-            cell: (tenant) => formatDate(tenant.createdAt),
+            cell: (tenant) => fmtDateUtc(tenant.createdAt),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
           },
         ]}
@@ -237,16 +215,28 @@ export function TenantsTable({
         rowActions={(tenant) => {
           const deshabilitada = isDisabledStatus(tenant.billingStatus);
           return [
-            { id: "ver", label: "Ver empresa", icon: Eye, onClick: () => setViewingTenant(tenant) },
+            // Sin modal intermedio: "Ver empresa" abre la ficha (datos + configuración).
+            {
+              id: "ver",
+              label: "Ver empresa",
+              icon: Eye,
+              onClick: () =>
+                navigate(
+                  `/superadmin/empresas/${encodeURIComponent(tenant.clerkOrgId)}`,
+                ),
+            },
             {
               id: "importar",
               label: "Importar",
               icon: Upload,
-              onClick: () => navigate(`/superadmin/empresas/${tenant.clerkOrgId}/importar`),
+              onClick: () =>
+                navigate(`/superadmin/empresas/${tenant.clerkOrgId}/importar`),
             },
             {
               id: deshabilitada ? "habilitar" : "deshabilitar",
-              label: deshabilitada ? "Habilitar empresa" : "Deshabilitar empresa",
+              label: deshabilitada
+                ? "Habilitar empresa"
+                : "Deshabilitar empresa",
               icon: deshabilitada ? RotateCcw : Power,
               danger: !deshabilitada,
               disabled: Boolean(statusUpdatingByOrgId[tenant.clerkOrgId]),
