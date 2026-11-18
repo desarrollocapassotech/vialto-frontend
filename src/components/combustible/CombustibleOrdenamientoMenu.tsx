@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowDown, ArrowUp, ArrowUpDown, Check } from "lucide-react";
 import {
@@ -79,7 +79,6 @@ export function CombustiblesOrdenamientoMenu({
     setAbierto(false);
   }
 
-  const DirIcon = sortDir === "desc" ? ArrowDown : ArrowUp;
 
   const trigger = (
     <button
@@ -89,13 +88,10 @@ export function CombustiblesOrdenamientoMenu({
       aria-haspopup="listbox"
       aria-expanded={abierto}
       aria-label={`Ordenar por: ${etiquetaCombustibleOrdenamiento(sortBy, sortDir)}`}
-      className="inline-flex h-10 items-center gap-2 border border-black/15 bg-white px-3 text-sm text-vialto-charcoal hover:bg-vialto-mist/80 disabled:opacity-50 disabled:pointer-events-none"
+      title={`Ordenar por: ${etiquetaCombustibleOrdenamiento(sortBy, sortDir)}`}
+      className="inline-flex h-10 w-10 items-center justify-center border border-black/15 bg-white text-vialto-steel hover:bg-vialto-mist/80 hover:text-vialto-charcoal disabled:opacity-50 disabled:pointer-events-none"
     >
-      <ArrowUpDown className="h-4 w-4 shrink-0 text-vialto-steel" aria-hidden />
-      <span className="hidden max-w-[14rem] truncate sm:inline">
-        {COMBUSTIBLE_SORT_LABELS[sortBy]}
-      </span>
-      <DirIcon className="h-4 w-4 shrink-0 text-vialto-fire" aria-hidden />
+      <ArrowUpDown className="h-4 w-4 shrink-0" aria-hidden />
     </button>
   );
 

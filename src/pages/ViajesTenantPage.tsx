@@ -85,6 +85,7 @@ import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { ViajeAccionesMenu } from "@/components/viajes/ViajeAccionesMenu";
 import { TruncarInicio } from "@/components/ui/TruncarInicio";
 import { ViajesResumenFiltros } from "@/components/viajes/ViajesResumenFiltros";
+import { ImportarExportarMenu } from "@/components/listado/ImportarExportarMenu";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner } from "@/components/ui/Spinner";
 import { otroGastoDraftFromApi } from "@/components/viajes/OtrosGastosFieldset";
@@ -172,7 +173,7 @@ import {
   VIAJES_FILTROS_VACIOS,
 } from "@/lib/viajesListadoPersistido";
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
-import { Columns3, CornerDownRight, Download, Upload, X } from "lucide-react";
+import { Columns3, CornerDownRight, X } from "lucide-react";
 import { mutate } from "swr";
 import { ViajesColumnasOrdenModal } from "@/components/viajes/ViajesColumnasOrdenModal";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
@@ -3367,30 +3368,12 @@ export function ViajesTenantPage({
         {!filtroRapidoPortalTarget && filtroRapidoContent}
 
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          {puedeImportar && (
-            <Link
-              to="/importar?volverA=/viajes"
-              className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
-            >
-              <Upload className="h-4 w-4" aria-hidden />
-              Importar
-            </Link>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setExportModalOpen(true)}
-            disabled={
-              listadoRefetching ||
-              !meta?.total ||
-              meta.total === 0 ||
-              exportandoExcel
-            }
-            className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
-          >
-            <Download className="h-4 w-4" aria-hidden />
-            {exportandoExcel ? "Generando..." : "Exportar"}
-          </button>
+          <ImportarExportarMenu
+            importarTo={puedeImportar ? "/importar?volverA=/viajes" : undefined}
+            onExportar={() => setExportModalOpen(true)}
+            exportarDisabled={listadoRefetching || !meta?.total || meta.total === 0}
+            exportando={exportandoExcel}
+          />
 
           <ViajesOrdenamientoMenu
             sortBy={sortBy}
