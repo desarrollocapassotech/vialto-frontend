@@ -594,7 +594,9 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       })),
     });
 
-    if (draft.estado === "finalizado") {
+    const pasandoAFinalizado =
+      viajeSnapshot?.etapa !== "finalizado" && draft.estado === "finalizado";
+    if (pasandoAFinalizado) {
       if (!valorizacion.valorizado) {
         if (valorizacion.faltaCliente && valorizacion.faltaTransportista) {
           setError(
