@@ -661,16 +661,13 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     const liquidado = viajeSnapshot
       ? !liquidacionPermiteVincular(viajeSnapshot.liquidacionEstado)
       : false;
-      
-    let clienteBloqueado = false;
-    let transporteBloqueado = false;
-    if (configRef.current.hasFacturasArca) {
-      clienteBloqueado = facturado || liquidado;
-      transporteBloqueado = facturado || liquidado;
-    } else {
-      clienteBloqueado = facturado;
-      transporteBloqueado = liquidado;
-    }
+    // Lock por lado, con o sin ARCA (mismo criterio que ViajesService.update y que
+    // `datosClienteBloqueados`/`datosTransporteBloqueados` de ViajeEditModal): la factura
+    // bloquea solo el lado cliente y la liquidación solo el lado transportista. Antes, con
+    // ARCA, cualquiera de los dos bloqueaba ambos y los cambios del transportista en un
+    // viaje facturado se descartaban del PATCH sin aviso (pedido NyM, 36,6 tn vs 31,16 tn).
+    const clienteBloqueado = facturado;
+    const transporteBloqueado = liquidado;
 
     // precioTransportistaIvaIncluidoPct se bloquea solo por liquidación vigente (no por
     // facturación al cliente, eje independiente) — mismo criterio que el backend, para

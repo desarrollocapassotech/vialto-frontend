@@ -735,8 +735,8 @@ export function ViajeEditModal({
                   {datosClienteBloqueados && datosTransporteBloqueados
                     ? "Este viaje tiene comprobantes emitidos (factura y liquidación). Los campos de cliente, transportista y montos están bloqueados para evitar discrepancias. Si necesitás modificarlos, primero deberás anular los comprobantes."
                     : datosClienteBloqueados
-                      ? "Este viaje tiene una factura emitida. Los datos del cliente y los montos a cobrar están bloqueados para evitar discrepancias. Si necesitás modificarlos, primero deberás anular la factura."
-                      : "Este viaje tiene una liquidación emitida. Los datos del transportista y los montos a pagar están bloqueados para evitar discrepancias. Si necesitás modificarlos, primero deberás anular la liquidación."}
+                      ? "Este viaje tiene una factura emitida. Los datos del cliente y los montos a cobrar están bloqueados para que no queden distintos de la factura; para modificarlos, primero anulá la factura. Los datos del transportista (cantidad, precio y pagos) se pueden seguir editando hasta liquidarlo."
+                      : "Este viaje tiene una liquidación emitida. Los datos del transportista y los montos a pagar están bloqueados para que no queden distintos de la liquidación; para modificarlos, primero anulá la liquidación. Los datos del cliente y el monto a facturar se pueden seguir editando hasta facturarlo."}
                 </p>
               </div>
             )}
@@ -1053,7 +1053,7 @@ export function ViajeEditModal({
                             type="text"
                             inputMode="decimal"
                             autoComplete="off"
-                            disabled={datosTransporteBloqueados}
+                            disabled={datosClienteBloqueados}
                             value={draft.monto}
                             onChange={(e) =>
                               setDraft((p) =>
@@ -1073,7 +1073,7 @@ export function ViajeEditModal({
                           />
                           <MonedaSelect
                             value={draft.monedaMonto}
-                            disabled={datosTransporteBloqueados}
+                            disabled={datosClienteBloqueados}
                             onChange={(m: ViajeMonedaCodigo) =>
                               setDraft((p) =>
                                 p
@@ -1797,7 +1797,11 @@ export function ViajeEditModal({
                       setDraft((p) => (p ? { ...p, otrosGastos: rows } : p))
                     }
                     tenantId={tenantId}
+                    disabled={datosTransporteBloqueados}
                   />
+                  {/* Con liquidación vigente los gastos quedan fijos (el backend los
+                      rechaza: están en CAMPOS_FISCALES_TRANSPORTE). */}
+                  {!datosTransporteBloqueados && (
                   <button
                     type="button"
                     onClick={() =>
@@ -1817,6 +1821,7 @@ export function ViajeEditModal({
                   >
                     + Agregar gasto
                   </button>
+                  )}
                 </div>
               )}
 

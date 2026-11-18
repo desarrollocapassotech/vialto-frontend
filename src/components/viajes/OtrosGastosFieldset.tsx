@@ -160,8 +160,10 @@ export function emptyOtroGasto(autor?: OtroGastoAutor): OtroGastoDraft {
 
 const fieldLabelClass =
   'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
-const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
-const smallInputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
+const disabledClass =
+  'disabled:cursor-not-allowed disabled:bg-vialto-mist/40 disabled:text-vialto-steel/80';
+const inputClass = `h-9 w-full border border-black/15 bg-white px-2 text-sm ${disabledClass}`;
+const smallInputClass = `h-9 w-full border border-black/15 bg-white px-2 text-sm ${disabledClass}`;
 const gastoRowGridClassCompact =
   'grid grid-cols-1 gap-4 mb-6 border-b border-black/10 pb-4 last:mb-4 last:border-0 last:pb-0 lg:mb-2 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_minmax(7rem,11rem)_auto] lg:items-end lg:gap-2 lg:border-0 lg:pb-0';
 
@@ -211,6 +213,12 @@ interface Props {
   mostrarCargadoPor?: boolean;
   /** Marca los gastos con obligatorios vacíos: borde rojo + "Falta completar" (ver `faltantesOtroGasto`). */
   marcarIncompletos?: boolean;
+  /**
+   * Solo lectura: inputs deshabilitados y sin botón de eliminar. Lo usa la edición del
+   * viaje con liquidación vigente (`otrosGastos` está en CAMPOS_FISCALES_TRANSPORTE del
+   * backend; editarlos se descartaría al guardar).
+   */
+  disabled?: boolean;
 }
 
 export function OtrosGastosFieldset({
@@ -221,6 +229,7 @@ export function OtrosGastosFieldset({
   stacked = false,
   mostrarCargadoPor = true,
   marcarIncompletos = false,
+  disabled = false,
 }: Props) {
   const userLabelMap = useOrgUserLabels(tenantId);
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
@@ -255,7 +264,7 @@ export function OtrosGastosFieldset({
             key={i}
             title={row.descripcion.trim() || `Gasto ${i + 1}`}
             summary={formatGastoSummary(row)}
-            removable
+            removable={!disabled}
             onRemove={() => setRemoveIndex(i)}
           >
             <div className="flex flex-col gap-3">
@@ -265,6 +274,7 @@ export function OtrosGastosFieldset({
                 </span>
                 <input
                   type="text"
+                  disabled={disabled}
                   value={row.descripcion}
                   onChange={(e) => update(i, { descripcion: e.target.value })}
                   placeholder="Ej. Peaje, estadía…"
@@ -281,6 +291,7 @@ export function OtrosGastosFieldset({
                   <input
                     type="text"
                     inputMode="decimal"
+                    disabled={disabled}
                     value={row.montoStr}
                     onChange={(e) => update(i, { montoStr: maskCurrencyForMoneda(e.target.value, row.moneda) })}
                     placeholder="0.00"
@@ -292,6 +303,7 @@ export function OtrosGastosFieldset({
                 <div className="flex flex-col gap-1">
                   <span className={fieldLabelClass}>Moneda</span>
                   <select
+                    disabled={disabled}
                     value={row.moneda}
                     onChange={(e) => {
                       const m = e.target.value as ViajeMonedaCodigo;
@@ -311,6 +323,7 @@ export function OtrosGastosFieldset({
                   <span className={fieldLabelClass}>Fecha</span>
                   <input
                     type="date"
+                    disabled={disabled}
                     value={row.fecha}
                     onChange={(e) => update(i, { fecha: e.target.value })}
                     className={smallInputClass}
@@ -338,6 +351,7 @@ export function OtrosGastosFieldset({
               {gastoFieldLabel('Descripción', i, true)}
               <input
                 type="text"
+                disabled={disabled}
                 value={row.descripcion}
                 onChange={(e) => update(i, { descripcion: e.target.value })}
                 placeholder="Ej. Peaje, estadía…"
@@ -353,6 +367,7 @@ export function OtrosGastosFieldset({
               <input
                 type="text"
                 inputMode="decimal"
+                disabled={disabled}
                 value={row.montoStr}
                 onChange={(e) => update(i, { montoStr: maskCurrencyForMoneda(e.target.value, row.moneda) })}
                 placeholder="0.00"
@@ -366,6 +381,7 @@ export function OtrosGastosFieldset({
             <div className="flex flex-col gap-1 lg:w-20">
               {gastoFieldLabel('Moneda', i)}
               <select
+                disabled={disabled}
                 value={row.moneda}
                 onChange={(e) => {
                   const m = e.target.value as ViajeMonedaCodigo;
@@ -387,6 +403,7 @@ export function OtrosGastosFieldset({
               {gastoFieldLabel('Fecha', i)}
               <input
                 type="date"
+                disabled={disabled}
                 value={row.fecha}
                 onChange={(e) => update(i, { fecha: e.target.value })}
                 className={`${smallInputClass} lg:w-36`}
@@ -408,6 +425,7 @@ export function OtrosGastosFieldset({
             )}
 
             {/* Eliminar */}
+            {!disabled && (
             <div className="flex flex-col gap-1">
               {i === 0 ? (
                 <span className={`${fieldLabelClass} hidden lg:block`}>&nbsp;</span>
@@ -423,6 +441,7 @@ export function OtrosGastosFieldset({
                 ✕
               </button>
             </div>
+            )}
           </div>
         );
       })}
