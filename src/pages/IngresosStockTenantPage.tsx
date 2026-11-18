@@ -1,4 +1,4 @@
-import { useAuth, useUser } from '@clerk/clerk-react';
+﻿import { useAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '@/lib/toast';
 import { Link } from 'react-router-dom';
@@ -45,7 +45,7 @@ function StepIndicator({ step }: { step: WizardStep }) {
           <div key={n} className="flex items-center gap-2">
             <div className="flex flex-col items-center gap-0.5">
               <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
+                className={`w-7 h-7 rounded-none flex items-center justify-center text-xs font-bold border-2 transition-colors ${
                   active
                     ? 'border-vialto-fire bg-vialto-fire text-white'
                     : done

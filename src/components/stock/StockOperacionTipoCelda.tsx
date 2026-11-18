@@ -1,4 +1,4 @@
-import { PackageMinus, PackagePlus, Split } from 'lucide-react';
+﻿import { PackageMinus, PackagePlus, Split } from 'lucide-react';
 import {
   movimientoStockTipoBadgeClass,
   movimientoStockTipoLabel,
@@ -30,7 +30,7 @@ export function StockOperacionTipoCelda({
   if (soloIcono) {
     return (
       <span
-        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${TIPO_ICON_WRAP[tipo]}`}
+        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-none ${TIPO_ICON_WRAP[tipo]}`}
         title={movimientoStockTipoLabel(tipo)}
         aria-label={movimientoStockTipoLabel(tipo)}
       >
@@ -42,7 +42,7 @@ export function StockOperacionTipoCelda({
   return (
     <span className="inline-flex items-center gap-2">
       <span
-        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${TIPO_ICON_WRAP[tipo]}`}
+        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-none ${TIPO_ICON_WRAP[tipo]}`}
         aria-hidden
       >
         <Icon className="h-3.5 w-3.5" strokeWidth={2} />

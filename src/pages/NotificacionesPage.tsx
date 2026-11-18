@@ -239,7 +239,7 @@ function GrupoAcordeon({
         <Icono className="h-5 w-5 shrink-0 text-vialto-steel" strokeWidth={1.75} aria-hidden />
         <span className="flex-1 text-sm font-medium text-vialto-charcoal">{nombre}</span>
         {grupo.noLeidas > 0 && (
-          <span className="rounded-full bg-vialto-fire px-2 py-0.5 text-[11px] font-semibold text-white">
+          <span className="rounded-none bg-vialto-fire px-2 py-0.5 text-[11px] font-semibold text-white">
             {grupo.noLeidas} {grupo.noLeidas === 1 ? "nueva" : "nuevas"}
           </span>
         )}

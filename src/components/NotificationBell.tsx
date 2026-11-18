@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Bell, BellOff, ChevronRight, Settings } from "lucide-react";
@@ -93,7 +93,7 @@ export function NotificationBell() {
       >
         <Bell className="h-4.5 w-4.5" strokeWidth={1.75} />
         {noLeidas > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-4.5 min-w-[1.125rem] items-center justify-center rounded-full bg-vialto-fire px-1 text-[10px] font-semibold leading-none text-white">
+          <span className="absolute -right-1 -top-1 flex h-4.5 min-w-[1.125rem] items-center justify-center rounded-none bg-vialto-fire px-1 text-[10px] font-semibold leading-none text-white">
             {noLeidas > 9 ? "9+" : noLeidas}
           </span>
         )}
@@ -163,7 +163,7 @@ export function NotificationBell() {
                       <Icono className="h-4 w-4 shrink-0 text-vialto-steel" strokeWidth={1.75} aria-hidden />
                       <span className="min-w-0 flex-1 truncate text-sm">{nombre}</span>
                       {g.noLeidas > 0 && (
-                        <span className="shrink-0 rounded-full bg-vialto-fire px-2 py-0.5 text-[11px] font-semibold text-white">
+                        <span className="shrink-0 rounded-none bg-vialto-fire px-2 py-0.5 text-[11px] font-semibold text-white">
                           {g.noLeidas} {g.noLeidas === 1 ? "nueva" : "nuevas"}
                         </span>
                       )}

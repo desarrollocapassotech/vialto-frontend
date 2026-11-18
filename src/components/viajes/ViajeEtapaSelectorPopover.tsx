@@ -1,4 +1,4 @@
-import {
+﻿import {
   useEffect,
   useLayoutEffect,
   useRef,
@@ -308,12 +308,12 @@ export function ViajeEtapaSelectorPopover({
                         </span>
                       </div>
                       {esActual ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-100/80 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                        <span className="inline-flex items-center gap-1 rounded-none border border-blue-200 bg-blue-100/80 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
                           <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                           Actual
                         </span>
                       ) : esSeleccionada ? (
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-vialto-fire text-white">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-none bg-vialto-fire text-white">
                           <Check className="h-2.5 w-2.5" strokeWidth={3} />
                         </span>
                       ) : null}

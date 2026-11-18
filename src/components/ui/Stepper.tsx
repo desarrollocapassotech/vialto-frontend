@@ -1,4 +1,4 @@
-export interface StepperStep {
+﻿export interface StepperStep {
   label: string;
 }
 
@@ -20,7 +20,7 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
             <div className="flex flex-col items-center gap-0.5">
               <div
                 aria-current={active ? 'step' : undefined}
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
+                className={`w-7 h-7 rounded-none flex items-center justify-center text-xs font-bold border-2 transition-colors ${
                   active
                     ? 'border-vialto-fire bg-vialto-fire text-white'
                     : done

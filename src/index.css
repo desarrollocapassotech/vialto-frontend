@@ -14,6 +14,23 @@
   --color-vialto-mist: #f5f3f0;
   --color-vialto-white: #ffffff;
 
+  /*
+   * Esquinas rectas en todo el sistema (nov 2026): aspecto más duro, de transporte y
+   * logística. Todas las clases `rounded`, `rounded-sm` … `rounded-4xl` (y sus variantes
+   * por lado) quedan en 0. `rounded-full` se conserva SOLO para lo que tiene que ser un
+   * círculo (spinners, puntos de estado, foto de perfil); no usarlo en botones, badges,
+   * contadores ni switches.
+   */
+  --radius: 0;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
+
   --font-display: "Bebas Neue", ui-sans-serif, system-ui, sans-serif;
   --font-body: Barlow, ui-sans-serif, system-ui, sans-serif;
   --font-ui: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
@@ -87,7 +104,7 @@
 
 .sidebar-scrollbar::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
-  border-radius: 999px;
+  border-radius: 0;
   background: rgb(255 255 255 / 0.28);
   background-clip: padding-box;
 }

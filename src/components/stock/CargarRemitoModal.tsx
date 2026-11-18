@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+﻿import { useEffect } from 'react';
 import { Camera, FolderOpen } from 'lucide-react';
 
 const OPCION =
@@ -54,7 +54,7 @@ export function CargarRemitoModal({
             onClick={onBuscarArchivo}
             className={OPCION}
           >
-            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-vialto-mist text-vialto-charcoal group-hover:bg-white group-hover:text-vialto-fire transition-colors">
+            <span className="flex h-20 w-20 items-center justify-center rounded-none bg-vialto-mist text-vialto-charcoal group-hover:bg-white group-hover:text-vialto-fire transition-colors">
               <FolderOpen className="h-10 w-10" strokeWidth={1.5} aria-hidden />
             </span>
             <span>
@@ -73,7 +73,7 @@ export function CargarRemitoModal({
             onClick={onTomarFoto}
             className={OPCION}
           >
-            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-vialto-mist text-vialto-charcoal group-hover:bg-white group-hover:text-vialto-fire transition-colors">
+            <span className="flex h-20 w-20 items-center justify-center rounded-none bg-vialto-mist text-vialto-charcoal group-hover:bg-white group-hover:text-vialto-fire transition-colors">
               <Camera className="h-10 w-10" strokeWidth={1.5} aria-hidden />
             </span>
             <span>

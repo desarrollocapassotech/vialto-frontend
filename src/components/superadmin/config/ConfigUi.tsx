@@ -1,4 +1,4 @@
-import {
+﻿import {
   createContext,
   useContext,
   useEffect,
@@ -44,13 +44,13 @@ export function ToggleSwitch({
       aria-checked={checked}
       aria-label={label}
       className={[
-        "inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50",
+        "inline-flex h-6 w-11 shrink-0 items-center rounded-none transition-colors disabled:opacity-50",
         checked ? "bg-vialto-charcoal" : "bg-black/15",
       ].join(" ")}
     >
       <span
         className={[
-          "h-5 w-5 rounded-full bg-white shadow transition-transform",
+          "h-5 w-5 rounded-none bg-white shadow transition-transform",
           checked ? "translate-x-5" : "translate-x-0.5",
         ].join(" ")}
       />

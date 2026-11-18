@@ -152,7 +152,7 @@ export function PasoElegirPlanes({
         onClick={() => setCreando(true)}
         className="group flex items-center gap-4 border-2 border-dashed border-vialto-fire/50 bg-white p-4 text-left transition-colors hover:border-vialto-fire hover:bg-orange-50/60"
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-vialto-fire text-white transition-transform group-hover:scale-105">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-none bg-vialto-fire text-white transition-transform group-hover:scale-105">
           <Plus className="h-5 w-5" strokeWidth={2.5} aria-hidden />
         </span>
         <span className="min-w-0">

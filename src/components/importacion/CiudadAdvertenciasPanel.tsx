@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { Check, Copy, X } from "lucide-react";
 import { CiudadCombobox } from "@/components/forms/CiudadCombobox";
 import {
@@ -127,7 +127,7 @@ export function CiudadAdvertenciasPanel({
                     </button>
                   </div>
                 </div>
-                <span className="shrink-0 rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                <span className="shrink-0 rounded-none border border-amber-300 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
                   {filasUnicas.length} fila{filasUnicas.length > 1 ? "s" : ""}
                 </span>
               </div>

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+﻿import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { etiquetaDirOrden, type TipoOrden } from '@/lib/ordenListado';
@@ -285,7 +285,7 @@ export function ViajesListadoHeaderFiltro({
           </button>
           {mostrarContador ? (
             <span
-              className="pointer-events-none absolute -right-1 -top-1 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-vialto-fire font-[family-name:var(--font-ui)] text-[9px] font-bold leading-none text-white shadow-sm ring-2 ring-white"
+              className="pointer-events-none absolute -right-1 -top-1 flex h-[14px] min-w-[14px] items-center justify-center rounded-none bg-vialto-fire font-[family-name:var(--font-ui)] text-[9px] font-bold leading-none text-white shadow-sm ring-2 ring-white"
               aria-hidden
             >
               <span className="translate-x-[1.5px] leading-none">1</span>

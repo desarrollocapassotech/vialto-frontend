@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, ExternalLink, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
@@ -142,7 +142,7 @@ export function VisorFotos({
   if (!foto) return null;
 
   const botonClass =
-    "inline-flex h-10 w-10 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none";
+    "inline-flex h-10 w-10 items-center justify-center rounded-none text-white/80 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none";
 
   const visor = (
     <div
@@ -264,7 +264,7 @@ export function VisorFotos({
               }}
               onPointerDown={(e) => e.stopPropagation()}
               onDoubleClick={(e) => e.stopPropagation()}
-              className="absolute left-3 top-1/2 -translate-y-1/2 inline-flex h-12 w-12 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+              className="absolute left-3 top-1/2 -translate-y-1/2 inline-flex h-12 w-12 items-center justify-center rounded-none bg-black/50 text-white hover:bg-black/70 transition-colors"
               aria-label="Foto anterior"
               title="Anterior (←)"
             >
@@ -278,7 +278,7 @@ export function VisorFotos({
               }}
               onPointerDown={(e) => e.stopPropagation()}
               onDoubleClick={(e) => e.stopPropagation()}
-              className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-12 w-12 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-12 w-12 items-center justify-center rounded-none bg-black/50 text-white hover:bg-black/70 transition-colors"
               aria-label="Foto siguiente"
               title="Siguiente (→)"
             >

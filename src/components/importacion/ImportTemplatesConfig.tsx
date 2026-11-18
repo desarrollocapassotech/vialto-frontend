@@ -545,7 +545,7 @@ export function ImportTemplatesConfig({
                           <td className="px-3 py-2.5 text-center">
                             {c.systemRequired ? (
                               <span
-                                className="inline-flex items-center rounded-full bg-vialto-charcoal px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white"
+                                className="inline-flex items-center rounded-none bg-vialto-charcoal px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white"
                                 title="El sistema siempre necesita este campo"
                               >
                                 Sí

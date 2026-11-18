@@ -1,4 +1,4 @@
-const MOTIVO_LABELS: Record<string, string> = {
+﻿const MOTIVO_LABELS: Record<string, string> = {
   litros_extremo:
     "Cantidad de litros fuera de lo normal. Revisá que esté bien cargada.",
   importe_invalido:
@@ -63,7 +63,7 @@ export function SospechaBadge({
 }) {
   const label = motivoSospechaLabel(motivo);
   const className =
-    "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold leading-none text-amber-700";
+    "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-none bg-amber-100 text-[10px] font-bold leading-none text-amber-700";
 
   if (onClick) {
     return (

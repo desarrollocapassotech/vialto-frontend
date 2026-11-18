@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+﻿import { useMemo, useState, type ReactNode } from "react";
 import { CalendarDays, Filter, Search, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { numeroVisibleViaje } from "@/lib/viajesFlota";
@@ -256,13 +256,13 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar…"
             aria-label="Buscar viajes"
-            className={`h-8 w-full rounded-full border bg-white pl-8 pr-3 text-xs text-vialto-charcoal placeholder:text-vialto-steel/80 focus:outline-none focus:ring-1 focus:ring-vialto-charcoal/30 ${
+            className={`h-8 w-full rounded-none border bg-white pl-8 pr-3 text-xs text-vialto-charcoal placeholder:text-vialto-steel/80 focus:outline-none focus:ring-1 focus:ring-vialto-charcoal/30 ${
               busqueda.trim() ? "border-vialto-charcoal/40" : "border-black/10"
             }`}
           />
         </div>
         <div
-          className={`flex h-8 items-center gap-1.5 rounded-full border bg-white pl-2.5 pr-1 text-xs ${
+          className={`flex h-8 items-center gap-1.5 rounded-none border bg-white pl-2.5 pr-1 text-xs ${
             fechaDesde || fechaHasta ? "border-vialto-charcoal/40" : "border-black/10"
           }`}
         >
@@ -299,7 +299,7 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                 setFechaDesde("");
                 setFechaHasta("");
               }}
-              className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[10px] uppercase tracking-wider text-vialto-steel hover:bg-white hover:text-vialto-charcoal"
+              className="inline-flex h-7 shrink-0 items-center gap-1 rounded-none px-2 text-[10px] uppercase tracking-wider text-vialto-steel hover:bg-white hover:text-vialto-charcoal"
             >
               <X className="h-3.5 w-3.5" aria-hidden />
               Limpiar

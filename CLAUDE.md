@@ -156,6 +156,7 @@ Este patrón evita condicionales gigantes y mejora reutilización.
 - Colores y tipografías del manual de marca definidos en `src/index.css`.
 - Usar tokens (`vialto-*`) en lugar de colores hardcodeados.
 - Mantener consistencia visual entre vistas tenant y superadmin.
+- **Esquinas rectas en todo el sistema (nov 2026)**: aspecto duro, de transporte y logística. En `index.css` (`@theme`) los radios de Tailwind (`--radius`, `--radius-sm` … `--radius-4xl`) están en 0, así que `rounded`, `rounded-lg`, `rounded-xl`, etc. no redondean nada. **`rounded-full` solo para lo que tiene que ser un círculo**: spinners (`animate-spin`), pulsos (`animate-ping`), puntitos de estado y la foto de perfil. Botones, badges, contadores, chips, switches, inputs y tarjetas: rectos (`rounded-none` si hace falta pisar un `rounded-full`). No agregar `rounded-[…]` ni `border-radius` a mano.
 
 ### Loader único: `CargandoVialto` (nov 2026)
 

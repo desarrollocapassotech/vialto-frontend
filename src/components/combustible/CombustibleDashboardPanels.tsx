@@ -1,4 +1,4 @@
-import { fmtDateUtc } from "@/lib/fmtDateUtc";
+﻿import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import {
   useLayoutEffect,
   useRef,
@@ -319,7 +319,7 @@ export function VehiculoRankingTable({
                       {fmtTipoVehiculo(v.tipo)}
                     </span>
                     {v.esOutlier && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-800">
+                      <span className="rounded-none bg-amber-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-800">
                         Consume más que su categoría
                       </span>
                     )}

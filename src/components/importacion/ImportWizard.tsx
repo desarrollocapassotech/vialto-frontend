@@ -488,7 +488,7 @@ export function ImportWizard({
                             </td>
                             {!hasLiquidoProductoArca && (
                               <td className={td}>
-                                <span className="inline-flex items-center rounded-full bg-vialto-mist border border-black/10 px-2 py-0.5 text-[11px] font-semibold text-vialto-charcoal">
+                                <span className="inline-flex items-center rounded-none bg-vialto-mist border border-black/10 px-2 py-0.5 text-[11px] font-semibold text-vialto-charcoal">
                                   {g.moneda || "ARS"}
                                 </span>
                               </td>
@@ -591,7 +591,7 @@ export function ImportWizard({
                               <td className={td}>{g.cantidadViajes}</td>
                               {!hasFacturasArca && (
                                 <td className={td}>
-                                  <span className="inline-flex items-center rounded-full bg-vialto-mist border border-black/10 px-2 py-0.5 text-[11px] font-semibold text-vialto-charcoal">
+                                  <span className="inline-flex items-center rounded-none bg-vialto-mist border border-black/10 px-2 py-0.5 text-[11px] font-semibold text-vialto-charcoal">
                                     {g.moneda || "ARS"}
                                   </span>
                                 </td>
@@ -1031,7 +1031,7 @@ function WizardStepper({
             )}
             <span
               className={[
-                "relative flex shrink-0 items-center justify-center rounded-full font-[family-name:var(--font-ui)] font-semibold",
+                "relative flex shrink-0 items-center justify-center rounded-none font-[family-name:var(--font-ui)] font-semibold",
                 esActual ? "h-8 w-8 text-sm" : "h-6 w-6 text-[11px]",
                 p.estado === "done" ? "bg-vialto-charcoal text-white" : "",
                 esActual ? "bg-vialto-fire text-white" : "",

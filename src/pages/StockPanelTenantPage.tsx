@@ -550,7 +550,7 @@ export function StockPanelTenantPage({
       id: dep.id,
       label: dep.nombre,
       trailing: (
-        <span className="rounded-full bg-black/8 px-1.5 py-0.5 text-xs font-semibold leading-none text-vialto-steel">
+        <span className="rounded-none bg-black/8 px-1.5 py-0.5 text-xs font-semibold leading-none text-vialto-steel">
           {count}
         </span>
       ),
@@ -800,7 +800,7 @@ export function StockPanelTenantPage({
                       <span className="truncate font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-vialto-charcoal">
                         {depositoActivo?.nombre ?? "Depósito"}
                       </span>
-                      <span className="shrink-0 rounded-full bg-vialto-fire/15 px-1.5 py-0.5 text-xs font-semibold leading-none text-vialto-fire">
+                      <span className="shrink-0 rounded-none bg-vialto-fire/15 px-1.5 py-0.5 text-xs font-semibold leading-none text-vialto-fire">
                         {depositoActivoCount}
                       </span>
                       <ChevronDown
@@ -847,7 +847,7 @@ export function StockPanelTenantPage({
                         {dep.nombre}
                         <span
                           className={[
-                            "rounded-full px-1.5 py-0.5 text-xs font-semibold leading-none",
+                            "rounded-none px-1.5 py-0.5 text-xs font-semibold leading-none",
                             activo
                               ? "bg-vialto-fire/15 text-vialto-fire"
                               : "bg-black/8 text-vialto-steel",
@@ -879,7 +879,7 @@ export function StockPanelTenantPage({
                             productoNombre: resumenProducto.nombre,
                           })
                         }
-                        className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
+                        className="rounded-none border border-black/15 bg-white px-3 py-1.5 text-xs uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
                       >
                         Ver detalle
                       </button>

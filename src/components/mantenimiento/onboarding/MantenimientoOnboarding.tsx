@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Check } from "lucide-react";
 import type { PlanMantenimiento } from "@/types/mantenimiento";
 import { PasoElegirPlanes } from "./PasoElegirPlanes";
@@ -41,7 +41,7 @@ export function MantenimientoOnboarding({
             return (
               <li key={label} className="hidden flex-1 items-center gap-2 sm:flex">
                 <span
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-none text-xs font-semibold ${
                     hecho ? "bg-emerald-600 text-white" : actual ? "bg-vialto-fire text-white" : "border border-black/20 text-vialto-steel"
                   }`}
                 >

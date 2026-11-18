@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+﻿import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { PaisSearchSelect } from '@/components/forms/PaisSearchSelect';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
@@ -105,7 +105,7 @@ export function ClienteCard({
             ▸
           </span>
           {numero != null && (
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-vialto-fire text-xs font-semibold text-white">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-none bg-vialto-fire text-xs font-semibold text-white">
               {numero}
             </span>
           )}

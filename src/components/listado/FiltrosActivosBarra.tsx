@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+﻿import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { FiltrosActivosContext, setSlotLimpiarFiltros, type FiltroActivo } from "./filtrosActivos";
 
@@ -55,7 +55,7 @@ export function FiltrosActivosProvider({
         {filtros.map((f) => (
           <span
             key={f.id}
-            className="inline-flex max-w-full items-center gap-1 rounded-full border border-vialto-fire/30 bg-vialto-fire/[0.06] py-1 pl-3 pr-1 text-xs text-vialto-charcoal"
+            className="inline-flex max-w-full items-center gap-1 rounded-none border border-vialto-fire/30 bg-vialto-fire/[0.06] py-1 pl-3 pr-1 text-xs text-vialto-charcoal"
           >
             {/* Solo lo aplicado ("Sin facturar"); el nombre del filtro va en el tooltip. */}
             <span className="truncate font-medium" title={f.titulo}>
@@ -66,7 +66,7 @@ export function FiltrosActivosProvider({
               onClick={() => quitadores.current.get(f.id)?.()}
               aria-label={`Quitar filtro: ${f.valor ?? f.titulo}`}
               title="Quitar filtro"
-              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-vialto-steel transition-colors hover:bg-vialto-fire hover:text-white"
+              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-none text-vialto-steel transition-colors hover:bg-vialto-fire hover:text-white"
             >
               <X className="h-3 w-3" strokeWidth={2.5} aria-hidden />
             </button>

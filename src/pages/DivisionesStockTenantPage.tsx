@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Minus, Plus } from "lucide-react";
@@ -581,7 +581,7 @@ export function DivisionesStockTenantPage({
                     type="button"
                     onClick={() => setBultos((n) => Math.max(1, n - 1))}
                     disabled={bultos <= 1}
-                    className="h-10 w-10 flex items-center justify-center rounded-full border border-black/20 bg-white hover:bg-vialto-mist/60 disabled:opacity-30 transition-colors"
+                    className="h-10 w-10 flex items-center justify-center rounded-none border border-black/20 bg-white hover:bg-vialto-mist/60 disabled:opacity-30 transition-colors"
                   >
                     <Minus className="h-4 w-4 text-vialto-charcoal" />
                   </button>
@@ -604,7 +604,7 @@ export function DivisionesStockTenantPage({
                     disabled={
                       bultosDisponibles > 0 && bultos >= bultosDisponibles
                     }
-                    className="h-10 w-10 flex items-center justify-center rounded-full border border-black/20 bg-white hover:bg-vialto-mist/60 disabled:opacity-30 transition-colors"
+                    className="h-10 w-10 flex items-center justify-center rounded-none border border-black/20 bg-white hover:bg-vialto-mist/60 disabled:opacity-30 transition-colors"
                   >
                     <Plus className="h-4 w-4 text-vialto-charcoal" />
                   </button>

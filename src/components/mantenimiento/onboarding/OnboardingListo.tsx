@@ -1,4 +1,4 @@
-import { Bell, CircleCheck, ClipboardList, Gauge } from "lucide-react";
+﻿import { Bell, CircleCheck, ClipboardList, Gauge } from "lucide-react";
 import { BTN_CONTINUAR } from "./onboardingEstilos";
 
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
@@ -36,7 +36,7 @@ export function OnboardingListo({
       <ul className="w-full max-w-xl divide-y divide-black/10 border border-black/10 bg-white text-left">
         {proximos.map((p) => (
           <li key={p.texto} className="flex items-center gap-3 px-4 py-3 text-sm text-vialto-charcoal">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-50">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-none bg-orange-50">
               <p.icon className="h-4 w-4 text-vialto-fire" strokeWidth={1.75} aria-hidden />
             </span>
             {p.texto}

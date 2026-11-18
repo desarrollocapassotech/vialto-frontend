@@ -1,4 +1,4 @@
-import { ChevronDown, Filter, type LucideIcon } from "lucide-react";
+﻿import { ChevronDown, Filter, type LucideIcon } from "lucide-react";
 import { useRef, type ReactNode } from "react";
 import { TooltipsDelegados } from "@/components/ui/TooltipsDelegados";
 
@@ -115,7 +115,7 @@ export function FiltroRapidoChip({
       {label}
       {mostrarCount && (
         <span
-          className={`inline-flex h-5 min-w-[1.5rem] items-center justify-center rounded-full px-1.5 text-xs font-semibold tabular-nums leading-none ${
+          className={`inline-flex h-5 min-w-[1.5rem] items-center justify-center rounded-none px-1.5 text-xs font-semibold tabular-nums leading-none ${
             active ? "bg-vialto-fire text-white" : "bg-vialto-fire/10 text-vialto-fire"
           }`}
           aria-label={`${count} registros`}
@@ -124,11 +124,11 @@ export function FiltroRapidoChip({
         </span>
       )}
       {contando && (
-        <span className="inline-block h-5 w-6 animate-pulse rounded-full bg-black/[0.07]" aria-label="Contando registros" />
+        <span className="inline-block h-5 w-6 animate-pulse rounded-none bg-black/[0.07]" aria-label="Contando registros" />
       )}
       {sinRegistros && (
         <span
-          className={`inline-flex h-5 min-w-[1.5rem] items-center justify-center rounded-full px-1.5 text-xs font-semibold tabular-nums leading-none ${
+          className={`inline-flex h-5 min-w-[1.5rem] items-center justify-center rounded-none px-1.5 text-xs font-semibold tabular-nums leading-none ${
             active ? "bg-emerald-500 text-white" : "bg-emerald-50 text-emerald-600"
           }`}
           aria-label="Sin registros"
