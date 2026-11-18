@@ -502,6 +502,7 @@ function LiquidacionesTab({
           },
         ]}
         rows={items ?? []}
+        cargando={loading}
         rowKey={(liq) => liq.id}
         emptyMessage="No hay liquidaciones para esta empresa."
         rowActions={accionesLiquidacion}
@@ -743,6 +744,7 @@ function LogsTab({ tenantId }: { tenantId: string }) {
         },
       ]}
       rows={logs ?? []}
+      cargando={loading}
       rowKey={(log) => log.id}
       emptyMessage="No hay logs registrados para esta empresa."
       renderMobileCard={(log) => (

@@ -354,7 +354,8 @@ export function TransportistasTenantPage() {
             tdClassName: listadoTablaTdClass,
           },
         ]}
-        rows={error ? [] : (rows ?? [])}
+        rows={error ? [] : rows}
+          cargando={!error && listadoRefetching}
         rowKey={(t) => t.id}
         emptyMessage={
           error

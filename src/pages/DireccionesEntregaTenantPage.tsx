@@ -219,6 +219,7 @@ export function DireccionesEntregaTenantPage() {
           },
         ]}
         rows={error ? [] : rowsFiltradas}
+        cargando={loading}
         rowKey={(d) => d.id}
         emptyMessage={
           error

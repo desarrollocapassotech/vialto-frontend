@@ -314,6 +314,7 @@ export function ChoferesSuperadminPage() {
           },
         ]}
         rows={!filtroEmpresa || error ? [] : rows}
+        cargando={loading}
         rowKey={(c) => c.id}
         emptyMessage={
           !filtroEmpresa

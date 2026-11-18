@@ -910,6 +910,7 @@ export function StockPanelTenantPage({
                 loadingMessage="Cargando stock…"
                 columns={[]}
                 rows={paginatedItems}
+                cargando={loading}
                 rowKey={(item) => item.id}
                 emptyMessage={stockEmptyMessage}
                 tableColSpan={colSpan}

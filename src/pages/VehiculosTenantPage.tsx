@@ -39,6 +39,8 @@ export function VehiculosTenantPage() {
   const navigate = useNavigate();
   const { isVisible } = useFieldConfig("vehiculos");
   const [rows, setRows] = useState<Vehiculo[] | null>(null);
+  /** Pedido de la lista en curso (filtros, página): muestra el loader en la grilla. */
+  const [cargandoLista, setCargandoLista] = useState(false);
   const [serverMeta, setServerMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -92,7 +94,10 @@ export function VehiculosTenantPage() {
     let cancelled = false;
     (async () => {
       try {
-        await load();
+        setCargandoLista(true);
+        await load().finally(() => {
+          if (!cancelled) setCargandoLista(false);
+        });
         if (!cancelled) setError(null);
       } catch (e) {
         if (!cancelled) {
@@ -362,7 +367,8 @@ export function VehiculosTenantPage() {
             tdClassName: listadoTablaTdClass,
           } : null,
         ].filter(Boolean) as any}
-        rows={error ? [] : rows || []}
+        rows={error ? [] : rows}
+        cargando={!error && cargandoLista}
         rowKey={(v) => v.id}
         emptyMessage={
           error

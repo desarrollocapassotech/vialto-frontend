@@ -319,6 +319,7 @@ export function VehiculosSuperadminPage() {
           },
         ]}
         rows={!filtroEmpresa || error ? [] : rows}
+        cargando={loading}
         rowKey={(v) => v.id}
         emptyMessage={
           !filtroEmpresa

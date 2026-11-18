@@ -398,6 +398,7 @@ export function SuperadminUsersPage() {
             },
           ]}
           rows={!filtroEmpresa || error ? [] : rowsFiltradas}
+          cargando={loading}
           rowKey={(u) => u.userId ?? u.email ?? `${u.firstName}-${u.lastName}`}
           emptyMessage={
             !filtroEmpresa

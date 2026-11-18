@@ -1525,6 +1525,7 @@ export function FacturacionTenantPage({
         className="mt-6"
         columns={[]}
         rows={error ? [] : filasListado}
+        cargando={!error && listadoRefetching}
         rowKey={(f) => f.id}
         emptyMessage={
           error ? "No se pudieron cargar las facturas." : facturasEmptyMessage

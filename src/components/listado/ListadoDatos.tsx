@@ -47,6 +47,12 @@ export type ListadoDatosProps<T> = {
   emptyMessage: string;
   /** Qué se está cargando, para el loader de Vialto (ej. "Cargando viajes…"). */
   loadingMessage?: string;
+  /**
+   * Fuerza el loader aunque haya filas (ej. se cambió un filtro y se está pidiendo de
+   * nuevo al servidor): así nunca se ven las filas viejas ni "no hay datos" mientras carga.
+   * Sin esto, el loader sale solo con `rows` en null.
+   */
+  cargando?: boolean;
   className?: string;
   /** Thead personalizado (p. ej. columnas especiales). Solo desktop. */
   tableHead?: ReactNode;
@@ -110,6 +116,7 @@ export function ListadoDatos<T>({
   rowKey,
   emptyMessage,
   loadingMessage = 'Cargando datos…',
+  cargando = false,
   className = '',
   tableHead,
   mobileToolbar,
@@ -166,7 +173,7 @@ export function ListadoDatos<T>({
     ? (row: T) => renderAccionesFila(row, true)
     : renderActionsProp;
 
-  const loading = rows == null;
+  const loading = cargando || rows == null;
   const isEmpty = !loading && rows.length === 0;
   const colSpan = tableColSpan ?? columns.length + (renderActions ? 1 : 0);
   const primaryCol = columns.find((c) => c.primary) ?? columns[0];

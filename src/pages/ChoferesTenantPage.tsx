@@ -31,6 +31,8 @@ export function ChoferesTenantPage() {
   const maestro = useMaestroData();
   const hasCombustible = canAccessCombustible(maestro.tenant?.modules ?? []);
   const [rows, setRows] = useState<Chofer[] | null>(null);
+  /** Pedido de la lista en curso (filtros, página): muestra el loader en la grilla. */
+  const [cargandoLista, setCargandoLista] = useState(false);
   const [serverMeta, setServerMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -85,7 +87,10 @@ export function ChoferesTenantPage() {
     let cancelled = false;
     (async () => {
       try {
-        await load();
+        setCargandoLista(true);
+        await load().finally(() => {
+          if (!cancelled) setCargandoLista(false);
+        });
         if (!cancelled) setError(null);
       } catch (e) {
         if (!cancelled) {
@@ -263,7 +268,8 @@ export function ChoferesTenantPage() {
             tdClassName: listadoTablaTdClass,
           },
         ]}
-        rows={error ? [] : (rows ?? [])}
+        rows={error ? [] : rows}
+        cargando={!error && cargandoLista}
         rowKey={(c) => c.id}
         emptyMessage={
           error

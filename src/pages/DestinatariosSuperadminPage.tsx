@@ -304,6 +304,7 @@ export function DestinatariosSuperadminPage() {
           },
         ]}
         rows={filtroEmpresa ? (error ? [] : rowsFiltradas) : []}
+        cargando={loading}
         rowKey={(d) => d.id}
         emptyMessage={
           !filtroEmpresa

@@ -380,6 +380,7 @@ export function ClientesSuperadminPage() {
           }] : []),
         ]}
         rows={!filtroEmpresa || error ? [] : rowsPagina}
+        cargando={loading}
         rowKey={(c) => c.id}
         emptyMessage={
           !filtroEmpresa

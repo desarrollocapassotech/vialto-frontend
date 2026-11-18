@@ -164,7 +164,7 @@ Este patrón evita condicionales gigantes y mejora reutilización.
 - `variante="bloque"` (default): centrado donde va el contenido (página, sección, cuerpo de un modal). `chico` en modales y secciones angostas.
 - `variante="modal"`: capa sobre todo el panel del modal que bloquea (panel `relative`). Es lo que usa `BloqueoModal`.
 - `variante="pantalla"`: capa fija sobre toda la pantalla con difuminado blanco, dejando ver los skeletons detrás (cambio de período del dashboard).
-- **Grillas**: `ListadoDatos` ya lo dibuja mientras `rows` es `null`; pasar `loadingMessage="Cargando <entidad>…"`.
+- **Grillas**: `ListadoDatos` ya lo dibuja mientras `rows` es `null`; pasar `loadingMessage="Cargando <entidad>…"`. **Al cambiar un filtro, la página o el orden que se piden al servidor, el loader tiene que aparecer** (como en Viajes): o se pone `rows` en `null` antes del pedido, o se pasa `cargando={…}` con el estado del pedido en curso. Nunca `rows ?? []` (con `null` muestra "no hay datos" en vez del loader). Los filtros que se aplican en el navegador son instantáneos y no lo necesitan.
 - **Quedan con texto chico, sin camión** (no se distingue a ese tamaño): textos de botones ("Cargando datos…", "Guardando…"), opciones/placeholder de selects y valores de una celda o campo suelto.
 
 ---
