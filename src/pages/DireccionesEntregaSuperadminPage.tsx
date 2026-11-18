@@ -216,6 +216,7 @@ export function DireccionesEntregaSuperadminPage() {
         </p>
       )}
 
+      {filtroEmpresa && (
       <ListadoDatos
         className={`mt-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}
         tableColSpan={3}
@@ -329,6 +330,7 @@ export function DireccionesEntregaSuperadminPage() {
           },
         ]}
       />
+      )}
 
       {/* COMPONENTE DE PAGINACIÓN */}
       {meta && (rowsFiltradas?.length ?? 0) > 0 && (

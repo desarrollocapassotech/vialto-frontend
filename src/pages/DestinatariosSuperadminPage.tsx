@@ -215,6 +215,7 @@ export function DestinatariosSuperadminPage() {
         </p>
       )}
 
+      {filtroEmpresa && (
       <ListadoDatos
         className={`mt-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}
         tableColSpan={3}
@@ -326,6 +327,7 @@ export function DestinatariosSuperadminPage() {
           },
         ]}
       />
+      )}
 
       {meta && rows && rows.length > 0 && (
         <ListadoPagination

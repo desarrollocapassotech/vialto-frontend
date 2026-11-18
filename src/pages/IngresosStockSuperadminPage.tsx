@@ -74,9 +74,7 @@ export function IngresosStockSuperadminPage() {
 
       <EmpresaFilterBar tenants={tenants} value={tenantId} onChange={handleTenantChange} />
 
-      {!tenantId ? (
-        <p className="text-sm text-vialto-steel">Seleccioná una empresa para registrar ingresos.</p>
-      ) : (
+      {tenantId && (
         <IngresosStockTenantPage
           tenantId={tenantId}
           clientesExternos={clientes}

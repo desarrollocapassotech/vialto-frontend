@@ -178,12 +178,6 @@ export function DivisionesStockHistorialTenantPage({
         </div>
       )}
 
-      {/* Estado vacío minimalista igual al de facturación y depósitos */}
-      {isPlatform && !activeTenantId && (
-        <p className="mt-10 text-sm text-vialto-steel">
-          Seleccioná una empresa para ver su historial de divisiones.
-        </p>
-      )}
 
       {/* Solo renderizamos el contenido si estamos en modo normal o si ya se seleccionó una empresa */}
       {(!isPlatform || activeTenantId) && (

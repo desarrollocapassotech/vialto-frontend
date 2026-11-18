@@ -133,6 +133,7 @@ export function PaisesSuperadminPage() {
         </p>
       )}
 
+      {filtroEmpresa && (
       <ListadoDatos
         className="mt-6"
         tableColSpan={3}
@@ -194,6 +195,7 @@ export function PaisesSuperadminPage() {
               ]),
         ]}
       />
+      )}
 
       {viewingPais && (
         <PaisViewModal

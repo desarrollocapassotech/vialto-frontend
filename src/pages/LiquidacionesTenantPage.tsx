@@ -1324,6 +1324,7 @@ export function LiquidacionesTenantPage() {
         </div>
       )}
 
+      {(!isSuperAdmin || activeTenantId) && (
       <ListadoDatos
         className="mt-6"
         tableColSpan={(hasArca ? 10 : 9) - (mostrarPeriodo ? 0 : 1)}
@@ -1653,9 +1654,7 @@ export function LiquidacionesTenantPage() {
         rowKey={(liq) => liq.id}
         emptyMessage={
           !activeTenantId
-            ? isSuperAdmin
-              ? "Seleccioná una empresa para ver las liquidaciones."
-              : "Cargando datos de empresa..."
+            ? "Cargando datos de empresa..."
             : error
               ? "No se pudieron cargar las liquidaciones."
               : anyFiltroActivo
@@ -1728,6 +1727,7 @@ export function LiquidacionesTenantPage() {
           />
         )}
       />
+      )}
 
       {activeTenantId &&
         (!error || !isSuperAdmin) &&

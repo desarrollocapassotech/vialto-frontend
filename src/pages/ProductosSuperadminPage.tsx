@@ -478,13 +478,7 @@ export function ProductosSuperadminPage() {
         </>
       )}
 
-      {!filtroEmpresa && (
-        <p className="mt-8 text-vialto-steel">
-          Seleccioná una empresa para ver y gestionar su catálogo de productos.
-        </p>
-      )}
-
-      {modal.mode === "view" && filtroEmpresa && (
+            {modal.mode === "view" && filtroEmpresa && (
         <ProductoModal
           labels={labels}
           modo="view"

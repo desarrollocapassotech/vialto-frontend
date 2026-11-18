@@ -41,11 +41,7 @@ export function IngresosStockHistorialSuperadminPage() {
         onChange={handleTenantChange}
       />
 
-      {!tenantId ? (
-        <p className="text-sm text-vialto-steel">
-          Seleccioná una empresa para ver el historial.
-        </p>
-      ) : (
+      {tenantId && (
         <IngresosStockHistorialTenantPage
           tenantId={tenantId}
           embeddedInSuperadmin

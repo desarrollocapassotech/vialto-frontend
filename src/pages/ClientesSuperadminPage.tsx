@@ -212,6 +212,7 @@ export function ClientesSuperadminPage() {
         </p>
       )}
 
+      {filtroEmpresa && (
       <ListadoDatos
         className="mt-6"
         tableColSpan={6}
@@ -394,6 +395,7 @@ export function ClientesSuperadminPage() {
           { id: "ver", label: "Ver cliente", icon: Eye, onClick: () => setViewingCliente(c) },
         ]}
       />
+      )}
 
       {filtroEmpresa && !error && meta && meta.total > 0 && (
         <ListadoPagination

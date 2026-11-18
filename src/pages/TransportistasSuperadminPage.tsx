@@ -215,6 +215,7 @@ export function TransportistasSuperadminPage() {
         </p>
       )}
 
+      {filtroEmpresa && (
       <ListadoDatos
         className="mt-6"
         tableColSpan={3 + (idFiscalVisible ? 1 : 0) + (paisVisible ? 1 : 0) + (contactoVisible ? 1 : 0) + (pautVisible ? 1 : 0)}
@@ -415,6 +416,7 @@ export function TransportistasSuperadminPage() {
           { id: "ver", label: "Ver proveedor", icon: Eye, onClick: () => setViewingTransportista(t) },
         ]}
       />
+      )}
 
       {metaListado.total > 0 && filtroEmpresa && !error && (
         <ListadoPagination

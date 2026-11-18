@@ -812,13 +812,7 @@ export function SuperadminArcaPage() {
           />
         </div>
 
-        {!tenantId && (
-          <p className="mt-6 text-sm text-vialto-steel">
-            Seleccioná una empresa para gestionar su configuración ARCA.
-          </p>
-        )}
-
-        {tenantId && (
+                {tenantId && (
           <>
             <div className="mt-8 flex gap-0.5 border-b border-black/10">
               {TABS.map((t) => (

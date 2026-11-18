@@ -212,6 +212,7 @@ export function ChoferesSuperadminPage() {
         </p>
       )}
 
+      {filtroEmpresa && (
       <ListadoDatos
         className="mt-6"
         tableColSpan={4}
@@ -346,6 +347,7 @@ export function ChoferesSuperadminPage() {
           },
         ]}
       />
+      )}
 
       {filtroEmpresa && !error && meta && meta.total > 0 && (
         <ListadoPagination

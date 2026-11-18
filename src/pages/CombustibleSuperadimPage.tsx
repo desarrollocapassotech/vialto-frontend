@@ -21,13 +21,7 @@ export function CombustibleSuperadminPage() {
         />
       </div>
 
-      {!filtroEmpresa && (
-        <p className="mt-10 text-vialto-steel text-sm">
-          Seleccioná una empresa para ver sus cargas de combustible.
-        </p>
-      )}
-
-      {filtroEmpresa ? (
+            {filtroEmpresa ? (
         <div className="mt-8">
           <CombustibleTenantPage
             tenantId={filtroEmpresa}

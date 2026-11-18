@@ -342,12 +342,6 @@ export function DepositosPage({
         </div>
       )}
 
-      {/* Estado vacío minimalista igual al de facturación */}
-      {isPlatform && !activeTenantId && (
-        <p className="mt-10 text-sm text-vialto-steel">
-          Seleccioná una empresa para ver sus depósitos.
-        </p>
-      )}
 
       {/* Contenido operativo (se oculta si falta empresa en modo plataforma) */}
       {(!isPlatform || activeTenantId) && (

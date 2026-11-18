@@ -29,13 +29,7 @@ export function ViajesSuperadminPage() {
         />
       </div>
 
-      {!filtroEmpresa && (
-        <p className="mt-10 text-vialto-steel text-sm">
-          Seleccioná una empresa para ver los viajes.
-        </p>
-      )}
-
-      {filtroEmpresa ? (
+            {filtroEmpresa ? (
         <div className="mt-8">
           {/* key: al cambiar de empresa arranca con sus propios filtros guardados. */}
           <ViajesTenantPage

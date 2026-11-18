@@ -763,12 +763,6 @@ export function StockPanelTenantPage({
         </div>
       )}
 
-      {/* Estado vacío minimalista igual al de facturación */}
-      {isPlatform && !activeTenantId && (
-        <p className="mt-10 text-sm text-vialto-steel">
-          Seleccioná una empresa para ver su inventario.
-        </p>
-      )}
 
       {/* Solo renderizamos el contenido si estamos en modo normal o si ya se seleccionó una empresa */}
       {(!isPlatform || activeTenantId) && (

@@ -21,13 +21,7 @@ export function SuperadminNotificacionesPage() {
         />
       </div>
 
-      {!filtroEmpresa && (
-        <p className="mt-10 text-vialto-steel text-sm">
-          Seleccioná una empresa para ver sus notificaciones.
-        </p>
-      )}
-
-      {filtroEmpresa ? (
+            {filtroEmpresa ? (
         <div className="mt-8">
           <ConfiguracionNotificacionesTenantPage
             tenantId={filtroEmpresa}
