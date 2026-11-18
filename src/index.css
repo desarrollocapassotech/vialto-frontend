@@ -97,26 +97,8 @@
   background-clip: padding-box;
 }
 
-@keyframes sidebar-expand-hint {
-  0%,
-  100% {
-    transform: translateX(0);
-    box-shadow: 0 4px 14px rgb(0 0 0 / 0.24);
-  }
-  50% {
-    transform: translateX(5px);
-    box-shadow:
-      0 0 0 5px rgb(232 71 10 / 0.2),
-      4px 4px 26px rgb(232 71 10 / 0.9);
-  }
-}
-
-.sidebar-control-zone:hover .sidebar-expand-button {
-  animation: sidebar-expand-hint 1.2s ease-in-out infinite;
-}
-
-/* Flecha de "hay más columnas" en tablas con scroll horizontal: mismo pulso que la
-   flecha del menú lateral. `--hint-dir` = 1 (derecha) / -1 (izquierda). */
+/* Flecha de "hay más columnas" en tablas con scroll horizontal (pulso lateral).
+   `--hint-dir` = 1 (derecha) / -1 (izquierda). */
 @keyframes tabla-scroll-hint {
   0%,
   100% {
