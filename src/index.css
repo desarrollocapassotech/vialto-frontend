@@ -172,3 +172,10 @@
     font-size: 16px;
   }
 }
+
+/* Aparición suave (capa de carga del dashboard). */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+

@@ -1,6 +1,7 @@
 ﻿import { Fragment, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { VialtoTruckLoader } from "@/components/shared/VialtoTruckLoader";
 import type { useTenantOwnerDashboard } from "@/hooks/useTenantOwnerDashboard";
 import { useMantenimientoDashboard } from "@/hooks/useMantenimientoDashboard";
 import {
@@ -170,20 +171,23 @@ export function TenantOwnerDashboard({
         </p>
       )}
 
-      <div className="relative" aria-busy={cargando}>
-        {cargando && (
-          <div className="pointer-events-none sticky top-4 z-20 flex h-0 justify-center">
-            <span className="inline-flex h-fit items-center gap-2 rounded-full bg-vialto-charcoal px-4 py-2 text-sm font-medium text-white shadow-lg">
-              <Loader2 className="h-4 w-4 animate-spin text-vialto-fire" aria-hidden />
-              Actualizando datos…
-            </span>
-          </div>
+      {/* Cambio de período: toda la pantalla queda bloqueada bajo un difuminado blanco,
+          dejando ver detrás los skeletons de las tarjetas, con el camión en el centro. */}
+      {cargando &&
+        createPortal(
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed inset-0 z-[60] flex animate-[fadeIn_150ms_ease-out] flex-col items-center justify-center gap-2 bg-white/55 backdrop-blur-[3px]"
+          >
+            <VialtoTruckLoader className="h-48 w-auto drop-shadow-sm" label="Actualizando datos" />
+            <span className="text-sm font-medium text-vialto-steel">Actualizando datos…</span>
+          </div>,
+          document.body,
         )}
-        <div
-          className={`space-y-6 transition-opacity duration-200 lg:space-y-8 ${
-            cargando ? "pointer-events-none opacity-50" : ""
-          }`}
-        >
+
+      <div aria-busy={cargando}>
+        <div className="space-y-6 lg:space-y-8">
           {grupos.map((g, i) => (
             <Fragment key={`${i}-${g.ids[0]}`}>
               {g.tarjetas ? (
