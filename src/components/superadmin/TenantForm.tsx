@@ -4,10 +4,6 @@ import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { labelModulo } from '@/lib/platformLabels';
 import { AVAILABLE_MODULES } from '@/lib/moduleCatalog';
-import {
-  LiquidacionAnulacionMetodoRadios,
-  type LiquidacionAnulacionMetodo,
-} from '@/components/superadmin/LiquidacionAnulacionMetodoFields';
 
 export interface TenantFormValues {
   name: string;
@@ -17,8 +13,6 @@ export interface TenantFormValues {
   billingStatus?: 'trial' | 'active' | 'suspended' | 'expired';
   maxUsers?: string;
   billingRenewsAt?: string;
-  /** Método de anulación del CVLP (060). Default 'nota_credito_debito' para tenants nuevos. */
-  liquidacionAnulacionMetodo?: 'nota_credito_debito' | 'manual';
 }
 
 interface TenantFormProps {
@@ -30,6 +24,11 @@ interface TenantFormProps {
   includeAdvancedFields?: boolean;
   disableOrgId?: boolean;
   showOrgIdInput?: boolean;
+  /**
+   * Solo en el alta. En la edición los módulos se cambian desde "Configuración por
+   * empresa" → Módulos contratados (guardado inmediato).
+   */
+  showModules?: boolean;
   fieldErrors?: Record<string, string>;
   formError?: string | null;
 }
@@ -66,6 +65,7 @@ export function TenantForm({
   includeAdvancedFields = false,
   disableOrgId = false,
   showOrgIdInput = true,
+  showModules = true,
   fieldErrors = {},
   formError,
 }: TenantFormProps) {
@@ -124,6 +124,7 @@ export function TenantForm({
         </div>
       </SectionCard>
 
+      {showModules && (
       <SectionCard
         title="Módulos contratados"
         description="Define qué secciones ve la empresa en el menú y qué endpoints puede usar."
@@ -152,22 +153,6 @@ export function TenantForm({
           })}
         </div>
       </SectionCard>
-
-      {includeAdvancedFields && values.modules.includes('emision-liquido-producto-arca') && (
-        <SectionCard
-          title="Anulación de liquidaciones (CVLP 060)"
-          description="Cómo se anula un comprobante 060 ya emitido para este tenant."
-        >
-          <LiquidacionAnulacionMetodoRadios
-            value={
-              (values.liquidacionAnulacionMetodo as LiquidacionAnulacionMetodo) ??
-              'nota_credito_debito'
-            }
-            onChange={(liquidacionAnulacionMetodo) =>
-              onChange({ ...values, liquidacionAnulacionMetodo })
-            }
-          />
-        </SectionCard>
       )}
 
       {includeAdvancedFields && (

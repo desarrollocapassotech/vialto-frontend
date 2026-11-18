@@ -171,6 +171,18 @@
   }
 }
 
+/* Configuración por empresa (superadmin): buscador. Con búsqueda activa se ocultan
+   las secciones sin filas que coincidan, y si no queda ninguna se avisa. */
+.config-sin-resultados {
+  display: none;
+}
+.config-buscando .config-seccion:not(:has([data-config-fila])) {
+  display: none;
+}
+.config-buscando:not(:has([data-config-fila])) .config-sin-resultados {
+  display: block;
+}
+
 @media screen and (max-width: 768px) {
   input,
   textarea,

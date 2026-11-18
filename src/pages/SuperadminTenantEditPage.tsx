@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 import {
   TenantForm,
   type TenantFormValues,
@@ -21,9 +22,6 @@ function mapTenantToForm(t: Tenant): TenantFormValues {
       (t.billingStatus as TenantFormValues["billingStatus"]) ?? "trial",
     maxUsers: String(t.maxUsers),
     billingRenewsAt: t.billingRenewsAt?.slice(0, 10) ?? "",
-    liquidacionAnulacionMetodo:
-      (t.liquidacionAnulacionMetodo as TenantFormValues["liquidacionAnulacionMetodo"]) ??
-      "nota_credito_debito",
   };
 }
 
@@ -85,18 +83,14 @@ export function SuperadminTenantEditPage() {
         () => getToken(),
         {
           method: "PATCH",
+          // Sin `modules`: se cambian desde "Configuración por empresa" (si se
+          // mandaran, pisarían lo que se haya cambiado ahí con esta pantalla abierta).
           body: JSON.stringify({
             name: values.name.trim() || undefined,
             idFiscal: values.idFiscal.trim() || null,
-            modules: values.modules,
             billingStatus: values.billingStatus,
             maxUsers: values.maxUsers ? Number(values.maxUsers) : undefined,
             billingRenewsAt: values.billingRenewsAt || null,
-            liquidacionAnulacionMetodo: values.modules.includes(
-              "emision-liquido-producto-arca",
-            )
-              ? (values.liquidacionAnulacionMetodo ?? "nota_credito_debito")
-              : undefined,
           }),
         },
       );
@@ -146,7 +140,26 @@ export function SuperadminTenantEditPage() {
 
         {!initialLoading && values && (
           <>
+            {orgId && (
+              <Link
+                to={`/superadmin/campos-empresa?tenantId=${encodeURIComponent(orgId)}&seccion=modulos`}
+                className="mt-6 flex items-center justify-between gap-3 rounded border border-black/10 bg-white px-5 py-4 text-sm text-vialto-charcoal hover:bg-vialto-mist"
+              >
+                <span>
+                  Los módulos contratados se cambian en{" "}
+                  <strong className="font-semibold">
+                    Configuración por empresa
+                  </strong>
+                  .
+                </span>
+                <ArrowRight
+                  className="h-4 w-4 shrink-0 text-vialto-steel"
+                  aria-hidden
+                />
+              </Link>
+            )}
             <TenantForm
+              showModules={false}
               values={values}
               onChange={setValues}
               onSubmit={onSubmit}
