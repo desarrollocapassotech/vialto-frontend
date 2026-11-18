@@ -196,3 +196,10 @@
   to { opacity: 1; }
 }
 
+
+/* Línea punteada de la ruta del login que avanza (período = 28 + 26 del dasharray). */
+@keyframes ruta-avance {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -54; }
+}
+
