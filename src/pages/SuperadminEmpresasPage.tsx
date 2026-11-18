@@ -6,17 +6,8 @@ import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 
 export function SuperadminEmpresasPage() {
-  const {
-    items,
-    meta,
-    loading,
-    error,
-    pageSize,
-    onChangePageSize,
-    statusUpdatingByOrgId,
-    toggleTenantEnabled,
-    nextPage,
-  } = usePaginatedTenants();
+  const { items, meta, loading, error, pageSize, onChangePageSize, nextPage } =
+    usePaginatedTenants();
   const [limpiarFiltrosSlot, setLimpiarFiltrosSlot] =
     useState<HTMLDivElement | null>(null);
 
@@ -54,8 +45,6 @@ export function SuperadminEmpresasPage() {
         <TenantsTable
           loading={loading}
           items={items}
-          statusUpdatingByOrgId={statusUpdatingByOrgId}
-          onToggleEnabled={toggleTenantEnabled}
           limpiarFiltrosSlot={limpiarFiltrosSlot}
         />
 

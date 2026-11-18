@@ -42,7 +42,6 @@ import { useTenantConfigEmpresa } from "@/hooks/useTenantConfigEmpresa";
 import { apiJson } from "@/lib/api";
 import { CAMPOS_SWITCH_ENTIDAD } from "@/lib/configEntidadesViajes";
 import { friendlyError } from "@/lib/friendlyError";
-import { labelBillingStatus } from "@/lib/platformLabels";
 import { canAccessStock, canAccessViajes } from "@/lib/tenantModules";
 import type { Tenant } from "@/types/api";
 
@@ -61,7 +60,7 @@ const SECCION_GENERAL = "general";
 const SECCION_MODULOS = "modulos";
 const SECCION_TEMPLATES = "templates";
 const SECCIONES_FIJAS: Record<string, string> = {
-  [SECCION_DATOS]: "Datos y suscripción",
+  [SECCION_DATOS]: "Datos de la empresa",
   [SECCION_GENERAL]: "General",
   [SECCION_MODULOS]: "Módulos contratados",
   [SECCION_TEMPLATES]: "Templates de importación",
@@ -89,7 +88,7 @@ function modulosDisponibles(
 }
 
 /**
- * Ficha de una empresa (superadmin): datos, suscripción, módulos contratados y toda
+ * Ficha de una empresa (superadmin): datos, módulos contratados y toda
  * la configuración por empresa (antes eran "Editar empresa" y "Configuración por
  * empresa", dos pantallas separadas). La sección activa va en `?seccion=`.
  */
@@ -213,11 +212,6 @@ export function SuperadminEmpresaPage() {
           <h1 className="min-w-0 font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal md:text-5xl">
             {tenant?.name ?? "Empresa"}
           </h1>
-          {tenant && (
-            <span className="rounded border border-black/10 bg-white px-2 py-0.5 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.14em] text-vialto-steel">
-              {labelBillingStatus(tenant.billingStatus)}
-            </span>
-          )}
           <div className="ml-auto">
             <Link
               to={`/superadmin/empresas/${encodeURIComponent(orgId)}/importar`}

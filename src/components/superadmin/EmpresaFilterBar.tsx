@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { Tenant } from '@/types/api';
+import { useEffect, useMemo, useState } from "react";
+import type { Tenant } from "@/types/api";
 
 type EmpresaFilterBarProps = {
   tenants: Tenant[] | null;
@@ -13,21 +13,22 @@ const MIN_SEARCH_CHARS = 3;
 
 function normalizeSearch(value: string) {
   return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');
+    .replace(/[^a-z0-9]/g, "");
 }
 
 export function EmpresaFilterBar({
   tenants,
   value,
   onChange,
-  className = '',
+  className = "",
 }: EmpresaFilterBarProps) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const sorted = useMemo(
-    () => [...(tenants ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'es')),
+    () =>
+      [...(tenants ?? [])].sort((a, b) => a.name.localeCompare(b.name, "es")),
     [tenants],
   );
   const selected = sorted.find((t) => t.clerkOrgId === value) ?? null;
@@ -41,13 +42,13 @@ export function EmpresaFilterBar({
   }, [hasMinChars, normalizedQuery, sorted]);
 
   useEffect(() => {
-    setQuery(selected?.name ?? '');
+    setQuery(selected?.name ?? "");
   }, [selected?.name]);
 
   function handleQueryChange(nextValue: string) {
     setQuery(nextValue);
     if (value) {
-      onChange('');
+      onChange("");
     }
   }
 
@@ -59,13 +60,16 @@ export function EmpresaFilterBar({
   function handleEnterSelection() {
     if (!hasMinChars || matches.length === 0) return;
     const exactMatch =
-      matches.find((tenant) => normalizeSearch(tenant.name) === normalizedQuery) ??
-      matches[0];
+      matches.find(
+        (tenant) => normalizeSearch(tenant.name) === normalizedQuery,
+      ) ?? matches[0];
     handleSelectTenant(exactMatch);
   }
 
   return (
-    <div className={`flex flex-col gap-1.5 min-w-[min(100%,280px)] max-w-md ${className}`}>
+    <div
+      className={`flex flex-col gap-1.5 min-w-[min(100%,280px)] max-w-md ${className}`}
+    >
       <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
         Empresa
       </span>
@@ -74,7 +78,7 @@ export function EmpresaFilterBar({
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === "Enter") {
               e.preventDefault();
               handleEnterSelection();
             }
@@ -86,8 +90,8 @@ export function EmpresaFilterBar({
           <button
             type="button"
             onClick={() => {
-              onChange('');
-              setQuery('');
+              onChange("");
+              setQuery("");
             }}
             className="shrink-0 text-xs uppercase tracking-wider text-vialto-fire hover:text-vialto-bright"
           >
@@ -100,12 +104,17 @@ export function EmpresaFilterBar({
           {matches.length > 0 ? (
             <ul>
               {matches.map((tenant) => (
-                <li key={tenant.clerkOrgId} className="border-b last:border-b-0 border-black/5">
+                <li
+                  key={tenant.clerkOrgId}
+                  className="border-b last:border-b-0 border-black/5"
+                >
                   <button
                     type="button"
                     onClick={() => handleSelectTenant(tenant)}
                     className={`w-full px-3 py-2 text-left text-sm hover:bg-vialto-mist ${
-                      value === tenant.clerkOrgId ? 'bg-vialto-mist font-medium' : ''
+                      value === tenant.clerkOrgId
+                        ? "bg-vialto-mist font-medium"
+                        : ""
                     }`}
                   >
                     {tenant.name}

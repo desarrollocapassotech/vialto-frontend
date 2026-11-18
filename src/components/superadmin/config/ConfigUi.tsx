@@ -242,7 +242,6 @@ export function ConfigTextoInput({
   disabled,
   maxLength,
   ariaLabel,
-  type = "text",
   validar,
 }: {
   valor: string;
@@ -251,7 +250,6 @@ export function ConfigTextoInput({
   disabled?: boolean;
   maxLength?: number;
   ariaLabel: string;
-  type?: "text" | "number";
   /** Devuelve un mensaje si el valor no sirve: se avisa y se vuelve al guardado. */
   validar?: (v: string) => string | null;
 }) {
@@ -260,7 +258,6 @@ export function ConfigTextoInput({
   useEffect(() => setDraft(valor), [valor]);
   return (
     <input
-      type={type}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {

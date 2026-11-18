@@ -11,7 +11,11 @@ import {
 import type { Tenant } from "@/types/api";
 
 /** Mismo orden de precedencia que `useFieldConfig("viajes").isVisible`. */
-const FORMULARIOS_VIAJES = ["alta_viaje", "edicion_viaje", "detalle_viaje"] as const;
+const FORMULARIOS_VIAJES = [
+  "alta_viaje",
+  "edicion_viaje",
+  "detalle_viaje",
+] as const;
 
 type Props = {
   tenantId: string;
@@ -49,7 +53,9 @@ export function ViajesColumnasOrdenConfig(props: Props) {
         <Columns3 className="h-3.5 w-3.5" aria-hidden />
         Ordenar columnas
       </button>
-      {abierto && <ModalSuperadmin {...props} onClose={() => setAbierto(false)} />}
+      {abierto && (
+        <ModalSuperadmin {...props} onClose={() => setAbierto(false)} />
+      )}
     </>
   );
 }
@@ -63,7 +69,9 @@ function ModalSuperadmin({
   onClose,
 }: Props & { onClose: () => void }) {
   const { getToken } = useAuth();
-  const [habilitadas, setHabilitadas] = useState<Set<ViajeColumnaId> | null>(null);
+  const [habilitadas, setHabilitadas] = useState<Set<ViajeColumnaId> | null>(
+    null,
+  );
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
   // Chofer, Etapa y Productos dependen de la config de campos de Viajes de la empresa.
@@ -86,7 +94,8 @@ function ModalSuperadmin({
           }
           return true;
         };
-        if (!cancelled) setHabilitadas(columnasViajesHabilitadas(tenant, campoVisible));
+        if (!cancelled)
+          setHabilitadas(columnasViajesHabilitadas(tenant, campoVisible));
       } catch (e) {
         if (!cancelled) setErrorCarga(friendlyError(e, "camposEmpresa"));
       }
@@ -104,10 +113,14 @@ function ModalSuperadmin({
       labels={labels}
       onClose={onClose}
       guardar={async (viajesColumnasOrden) => {
-        await apiJson(`/api/tenants/${encodeURIComponent(tenantId)}`, () => getToken(), {
-          method: "PATCH",
-          body: JSON.stringify({ viajesColumnasOrden }),
-        });
+        await apiJson(
+          `/api/tenants/${encodeURIComponent(tenantId)}`,
+          () => getToken(),
+          {
+            method: "PATCH",
+            body: JSON.stringify({ viajesColumnasOrden }),
+          },
+        );
         onGuardado?.(viajesColumnasOrden);
       }}
     />

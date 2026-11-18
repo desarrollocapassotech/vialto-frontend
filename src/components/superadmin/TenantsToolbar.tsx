@@ -20,7 +20,7 @@ export function TenantsToolbar({
           value={searchInput}
           onChange={(e) => onSearchInputChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') onSearch();
+            if (e.key === "Enter") onSearch();
           }}
           placeholder="Buscar por empresa, CUIT u orgId"
           className="w-full h-10 rounded border border-black/15 bg-white px-3 text-sm text-vialto-charcoal placeholder:text-vialto-steel/70 focus:outline-none focus:ring-2 focus:ring-vialto-bright/40"

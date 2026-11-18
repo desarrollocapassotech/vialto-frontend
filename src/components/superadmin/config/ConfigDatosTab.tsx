@@ -13,7 +13,6 @@ import {
   ConfigSeccion,
   ConfigTextoInput,
   configInputClass,
-  configSelectClass,
 } from "./ConfigUi";
 
 type Props = {
@@ -21,14 +20,10 @@ type Props = {
   config: TenantConfigEmpresa & { tenant: Tenant };
 };
 
-const ESTADOS = [
-  { value: "trial", label: "En prueba" },
-  { value: "active", label: "Al día" },
-  { value: "suspended", label: "Suspendido" },
-  { value: "expired", label: "Vencido" },
-] as const;
-
-/** Datos de la empresa y suscripción (antes "Editar empresa"). Guarda al tocar. */
+/**
+ * Datos de la empresa (antes "Editar empresa"). Guarda al tocar. La suscripción no
+ * está acá: se maneja en otro sistema.
+ */
 export function ConfigDatosTab({ orgId, config }: Props) {
   const { tenant, guardar, estaGuardando } = config;
 
@@ -66,57 +61,6 @@ export function ConfigDatosTab({ orgId, config }: Props) {
             {tenant.clerkOrgId}
             <BotonCopiar texto={tenant.clerkOrgId} label="Copiar Org ID" />
           </span>
-        </ConfigFila>
-      </ConfigSeccion>
-
-      <ConfigSeccion titulo="Suscripción">
-        <ConfigFila
-          label="Estado"
-          palabrasClave="billing prueba suspendido vencido"
-        >
-          <ConfigControl>
-            <select
-              value={tenant.billingStatus.toLowerCase()}
-              disabled={estaGuardando("billingStatus")}
-              onChange={(e) => void guardar({ billingStatus: e.target.value })}
-              className={configSelectClass}
-            >
-              {ESTADOS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </ConfigControl>
-        </ConfigFila>
-        <ConfigFila label="Máximo de usuarios">
-          <ConfigControl>
-            <ConfigTextoInput
-              type="number"
-              valor={String(tenant.maxUsers)}
-              onGuardar={(v) => void guardar({ maxUsers: Number(v) })}
-              validar={(v) =>
-                Number.isInteger(Number(v)) && Number(v) >= 1
-                  ? null
-                  : "El máximo de usuarios tiene que ser un número entero mayor a 0."
-              }
-              disabled={estaGuardando("maxUsers")}
-              ariaLabel="Máximo de usuarios"
-            />
-          </ConfigControl>
-        </ConfigFila>
-        <ConfigFila label="Renovación" palabrasClave="vencimiento fecha">
-          <ConfigControl>
-            <input
-              type="date"
-              value={tenant.billingRenewsAt?.slice(0, 10) ?? ""}
-              disabled={estaGuardando("billingRenewsAt")}
-              onChange={(e) =>
-                void guardar({ billingRenewsAt: e.target.value || null })
-              }
-              className={configInputClass}
-            />
-          </ConfigControl>
         </ConfigFila>
       </ConfigSeccion>
 

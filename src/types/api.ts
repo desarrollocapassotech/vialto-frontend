@@ -404,9 +404,6 @@ export interface Tenant {
   name: string;
   idFiscal: string | null;
   modules: string[];
-  maxUsers: number;
-  billingStatus: string;
-  billingRenewsAt: string | null;
   /** Label del campo "ID propio" en el módulo de viajes, personalizable por tenant (ej. "Nro de CTG"). */
   labelIdentificacionPersonalizadaViajes: string | null;
   /** true = muestra la columna/campo dedicado "ID Sistema" en Viajes. Default true. */

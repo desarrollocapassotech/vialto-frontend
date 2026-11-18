@@ -1,9 +1,9 @@
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { CrudFieldLabel, CrudInput } from '@/components/crud/CrudFields';
-import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
-import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
-import { labelModulo } from '@/lib/platformLabels';
-import { AVAILABLE_MODULES } from '@/lib/moduleCatalog';
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { CrudFieldLabel, CrudInput } from "@/components/crud/CrudFields";
+import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
+import { labelModulo } from "@/lib/platformLabels";
+import { AVAILABLE_MODULES } from "@/lib/moduleCatalog";
 
 /** Alta de empresa. La edici�n vive en la ficha de la empresa (SuperadminEmpresaPage). */
 export interface TenantFormValues {
@@ -11,9 +11,6 @@ export interface TenantFormValues {
   clerkOrgId: string;
   idFiscal: string;
   modules: string[];
-  billingStatus?: 'trial' | 'active' | 'suspended' | 'expired';
-  maxUsers?: string;
-  billingRenewsAt?: string;
 }
 
 interface TenantFormProps {
