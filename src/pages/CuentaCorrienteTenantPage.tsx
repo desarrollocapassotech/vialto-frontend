@@ -182,16 +182,6 @@ export function CuentaCorrienteTenantPage({ tenantId, soloLectura = false, modul
           <div ref={setLimpiarSlot} className="empty:hidden" />
         </div>
         <div className="flex flex-wrap gap-2">
-          {!contraparteId && !soloLectura && (
-            <button
-              type="button"
-              onClick={() => setQuickCreate(tipoContraparte === 'cliente' ? 'cliente' : 'transportista')}
-              className="inline-flex h-10 items-center gap-2 px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-            >
-              <Plus className="h-4 w-4" />
-              {tipoContraparte === 'cliente' ? 'Nuevo cliente' : 'Nuevo proveedor'}
-            </button>
-          )}
           {/* PDF del lado de la pestaña: pendientes de cobro (clientes) o de pago (proveedores). */}
           <button
             type="button"
@@ -206,6 +196,17 @@ export function CuentaCorrienteTenantPage({ tenantId, soloLectura = false, modul
                 ? 'Pendientes de cobro'
                 : 'Pendientes de pago'}
           </button>
+          {/* Acción principal, negra y última a la derecha (como "Crear viaje"). */}
+          {!contraparteId && !soloLectura && (
+            <button
+              type="button"
+              onClick={() => setQuickCreate(tipoContraparte === 'cliente' ? 'cliente' : 'transportista')}
+              className="inline-flex h-10 items-center gap-2 px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            >
+              <Plus className="h-4 w-4" />
+              {tipoContraparte === 'cliente' ? 'Nuevo cliente' : 'Nuevo proveedor'}
+            </button>
+          )}
         </div>
       </div>
 

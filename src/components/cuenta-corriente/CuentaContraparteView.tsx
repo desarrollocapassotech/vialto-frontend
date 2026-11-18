@@ -744,7 +744,7 @@ export function CuentaContraparteView({
         <button
           type="button"
           onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'pago' })}
-          className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+          className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
         >
           {tipoContraparte === 'cliente' ? 'Registrar cobro' : 'Registrar pago'}
         </button>
