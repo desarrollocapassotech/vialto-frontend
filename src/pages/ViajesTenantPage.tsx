@@ -73,6 +73,7 @@ import {
   transportistaEfectivoIdDesdeViaje,
   viajeFacturableParaCliente,
   viajesFiltradosParaFactura,
+  armarNavegacionCopiarViaje,
   type MaestroListasViaje,
 } from "@/lib/viajesFlota";
 import {
@@ -2169,6 +2170,13 @@ export function ViajesTenantPage({
     }
   }
 
+  function handleCopiarViaje(v: Viaje) {
+    const nav = armarNavegacionCopiarViaje(v, {
+      tenantId: platform && tid ? tid : undefined,
+    });
+    navigate(nav.to, { state: nav.state });
+  }
+
   /**
    * "Facturar" y "Liquidar" son acciones separadas (grilla y modal de edición), sin
    * selector intermedio. Facturar se ofrece si el tenant factura desde Vialto — o si no
@@ -3836,6 +3844,7 @@ export function ViajesTenantPage({
                     setAccionesAbiertoViajeId(o ? v.id : null)
                   }
                   onVer={() => setViewingViaje(v)}
+                  onCopiar={() => handleCopiarViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
                   onFacturar={
@@ -4116,6 +4125,7 @@ export function ViajesTenantPage({
                     setAccionesAbiertoViajeId(o ? v.id : null)
                   }
                   onVer={() => setViewingViaje(v)}
+                  onCopiar={() => handleCopiarViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
                   onFacturar={
@@ -4217,6 +4227,11 @@ export function ViajesTenantPage({
           hasLiquidoProductoArca={hasLiquidoProductoArcaResuelto}
           editando={abriendoEditorViaje}
           onClose={() => setViewingViaje(null)}
+          onCopiar={() => {
+            const v = viewingViaje;
+            setViewingViaje(null);
+            handleCopiarViaje(v);
+          }}
           onEditar={() => {
             const v = viewingViaje;
             void (async () => {

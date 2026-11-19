@@ -1,7 +1,7 @@
 ﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/lib/toast";
 import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
 import { Stepper } from "@/components/ui/Stepper";
@@ -123,8 +123,54 @@ export function ViajeCreatePage() {
   const { user } = useUser();
   const gastoAutor = useMemo(() => otroGastoAutorFromClerk(user), [user]);
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
+
+  const stateData = (
+    location.state as {
+      copiarDe?: {
+        clienteIds?: string[];
+        transportistaId?: string | null;
+        modo?: ViajeOperacionModo;
+      };
+    } | null
+  )?.copiarDe;
+
+  const initialClienteParam = searchParams.get("clienteId")?.trim();
+  const initialClienteIdsParam = searchParams.get("clienteIds")?.trim();
+  const initialTransportistaParam = searchParams.get("transportistaId")?.trim();
+  const initialModoParam = searchParams.get("modo")?.trim();
+
+  const initialClienteIds = useMemo(() => {
+    if (stateData?.clienteIds && stateData.clienteIds.length > 0) {
+      return stateData.clienteIds.filter(Boolean);
+    }
+    if (initialClienteIdsParam) {
+      return initialClienteIdsParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+    if (initialClienteParam) {
+      return [initialClienteParam];
+    }
+    return [];
+  }, [stateData, initialClienteIdsParam, initialClienteParam]);
+
+  const initialTransportistaId =
+    stateData?.transportistaId !== undefined
+      ? (stateData.transportistaId ?? "")
+      : (initialTransportistaParam ?? "");
+
+  const initialModo: ViajeOperacionModo | null =
+    stateData?.modo ??
+    (initialModoParam === "propio"
+      ? "propio"
+      : initialTransportistaId
+        ? "externo"
+        : null);
+
   const maestro = useMaestroData();
   const { isVisible } = useFieldConfig("viajes");
   const {
@@ -156,17 +202,27 @@ export function ViajeCreatePage() {
   // Los viajes se crean siempre en estado "pendiente" (sin selector en el alta); el cambio de etapa se hace desde edición.
   const estado: (typeof VIAJE_ETAPAS_ALTA)[number] = "pendiente";
   const [choferId, setChoferId] = useState("");
-  const [transportistaId, setTransportistaId] = useState("");
+  const [transportistaId, setTransportistaId] = useState(
+    () => initialTransportistaId,
+  );
   const [realizaFlete, setRealizaFlete] = useState(true);
   const [transportistaEfectivoId, setTransportistaEfectivoId] = useState("");
   const [transportistaEfectivoError, setTransportistaEfectivoError] = useState<
     string | null
   >(null);
-  const [modoOperacion, setModoOperacion] =
-    useState<ViajeOperacionModo>("externo");
+  const [modoOperacion, setModoOperacion] = useState<ViajeOperacionModo>(() => {
+    if (initialModo === "propio") return "propio";
+    if (initialModo === "externo" || initialTransportistaId) return "externo";
+    return "externo";
+  });
 
   const [vehiculosRows, setVehiculosRows] = useState<ViajeVehiculoRowDraft[]>(
-    [],
+    () => {
+      if (initialModo === "propio") {
+        return [{ tipo: "tractor", vehiculoId: "" }];
+      }
+      return [];
+    },
   );
   const [vehiculosExternosRows, setVehiculosExternosRows] = useState<
     ViajeVehiculoRowDraft[]
@@ -213,9 +269,15 @@ export function ViajeCreatePage() {
   >([]);
 
   /** Todos los clientes del viaje: la fila 0 no es removible (equivalente al ex "cliente principal"). */
-  const [clientesRows, setClientesRows] = useState<ViajeClienteDraft[]>([
-    emptyClienteRow(),
-  ]);
+  const [clientesRows, setClientesRows] = useState<ViajeClienteDraft[]>(() => {
+    if (initialClienteIds.length > 0) {
+      return initialClienteIds.map((cId) => ({
+        ...emptyClienteRow(),
+        clienteId: cId,
+      }));
+    }
+    return [emptyClienteRow()];
+  });
   const [clientesRowErrors, setClientesRowErrors] = useState<
     Record<number, string>
   >({});
@@ -524,7 +586,9 @@ export function ViajeCreatePage() {
 
   // Flota mixta con default de creación configurado (Tenant.tipoFlotaDefault):
   // se aplica una sola vez, cuando carga el tenant, para no pisar lo que elija el usuario.
-  const defaultFlotaAplicado = useRef(false);
+  const defaultFlotaAplicado = useRef(
+    Boolean(initialModo || initialTransportistaId),
+  );
   useEffect(() => {
     if (defaultFlotaAplicado.current || !tenantFlotaCargado) return;
     defaultFlotaAplicado.current = true;

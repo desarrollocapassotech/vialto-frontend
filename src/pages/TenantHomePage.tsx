@@ -25,6 +25,7 @@ import {
   idPropio2Habilitado,
   idPropio2Label,
   labelIdentificacionPersonalizadaViajes,
+  armarNavegacionCopiarViaje,
 } from "@/lib/viajesFlota";
 import { useToast } from "@/lib/toast";
 import { apiJson } from "@/lib/api";
@@ -215,6 +216,12 @@ export function TenantHomePage() {
           editando={abriendoEditorViaje}
           facturando={abriendoFacturar}
           onClose={() => setViewingViaje(null)}
+          onCopiar={() => {
+            const v = viewingViaje;
+            setViewingViaje(null);
+            const nav = armarNavegacionCopiarViaje(v);
+            navigate(nav.to, { state: nav.state });
+          }}
           onEditar={() => {
             const v = viewingViaje;
             void (async () => {
