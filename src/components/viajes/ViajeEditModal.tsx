@@ -948,9 +948,7 @@ export function ViajeEditModal({
                     {desgloseActivo ? (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div className="flex flex-col gap-1">
-                          <span className={labelClass}>
-                            Cantidad <span className="text-red-500">*</span>
-                          </span>
+                          <span className={labelClass}>Cantidad</span>
                           <input
                             type="text"
                             inputMode="decimal"
@@ -970,9 +968,7 @@ export function ViajeEditModal({
                           <FaltaCampo show={marcaP("cantidad")} />
                         </div>
                         <div className="flex flex-col gap-1">
-                          <span className={labelClass}>
-                            Tarifa <span className="text-red-500">*</span>
-                          </span>
+                          <span className={labelClass}>Tarifa</span>
                           <div className="flex min-w-0 gap-2">
                             <input
                               type="text"
