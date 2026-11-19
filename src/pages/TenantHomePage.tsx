@@ -1,5 +1,7 @@
-import { useAuth, useOrganization } from "@clerk/clerk-react";
+import { useAuth, useOrganization, useUser } from "@clerk/clerk-react";
 import { useState } from "react";
+import { mutate } from "swr";
+import { isOrgAdmin } from "@/lib/roleLabels";
 import { useNavigate } from "react-router-dom";
 import { TenantOwnerDashboard } from "@/components/tenant/TenantOwnerDashboard";
 import { CargandoVialto } from "@/components/shared/CargandoVialto";
@@ -45,7 +47,8 @@ import {
 import type { Factura, Producto, Viaje } from "@/types/api";
 
 export function TenantHomePage() {
-  const { getToken } = useAuth();
+  const { getToken, orgRole } = useAuth();
+  const { user } = useUser();
   const { organization } = useOrganization();
   const navigate = useNavigate();
   const { tenant, loading, error } = useCurrentTenant();
@@ -177,6 +180,16 @@ export function TenantHomePage() {
           loadingViajeId={loadingViajeId}
           onViewFactura={(id) => void handleViewFactura(id)}
           loadingFacturaId={loadingFacturaId}
+          puedeEditar={isOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata })}
+          onGuardarBloques={async (dashboardBloques) => {
+            const url = `/api/tenants/${encodeURIComponent(organization.id)}`;
+            await apiJson(`${url}/dashboard-bloques`, () => getToken(), {
+              method: "PATCH",
+              body: JSON.stringify({ dashboardBloques }),
+            });
+            // Misma key que useCurrentTenant: el panel se redibuja con lo guardado.
+            await mutate(url);
+          }}
         />
       )}
 

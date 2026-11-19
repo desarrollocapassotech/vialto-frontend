@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import type { useTenantOwnerDashboard } from "@/hooks/useTenantOwnerDashboard";
@@ -8,17 +8,22 @@ import {
   useFinancieroDashboard,
   useTableroCuentaCorriente,
 } from "@/hooks/useDashboardFuentes";
+import { LayoutDashboard } from "lucide-react";
 import {
   bloqueDashboard,
   bloquesEfectivos,
+  bloquesParaGuardar,
+  clasesCeldaDashboard,
   filasDashboard,
   fuentesDeBloques,
-  tarjetaDosMonedas,
+  ordenVisualDashboard,
 } from "@/lib/dashboardBloques";
 import { frasePeriodo, periodoAFechas } from "@/lib/dashboardPeriodo";
+import { useToast } from "@/lib/toast";
 import type { Tenant } from "@/types/api";
 import { DashboardPeriodoSelector } from "./DashboardPeriodoSelector";
 import { DashboardBloque, type DashboardDatos } from "./DashboardBloque";
+import { DashboardEditor } from "./DashboardEditor";
 
 /**
  * Links que abrían una pestaña del viejo dashboard (hoy los usan las notificaciones).
@@ -27,14 +32,6 @@ import { DashboardBloque, type DashboardDatos } from "./DashboardBloque";
 const DEEP_LINKS: Record<string, { valor: string; bloque: string }> = {
   combustibleTab: { valor: "alertas", bloque: "pendientes-combustible" },
   financieroTab: { valor: "alertas", bloque: "pendientes-margen-bajo" },
-};
-
-/** Columnas que ocupa cada bloque en desktop (de las 4 de la grilla), según `filasDashboard`. */
-const SPAN_DESKTOP: Record<number, string> = {
-  1: "lg:col-span-1",
-  2: "lg:col-span-2",
-  3: "lg:col-span-3",
-  4: "lg:col-span-4",
 };
 
 interface TenantOwnerDashboardProps {
@@ -47,11 +44,17 @@ interface TenantOwnerDashboardProps {
   loadingViajeId?: string | null;
   onViewFactura?: (id: string) => void;
   loadingFacturaId?: string | null;
+  /** Admin de la empresa: muestra "Personalizar panel" (editor visual de bloques). */
+  puedeEditar?: boolean;
+  /** Guarda `Tenant.dashboardBloques` y refresca el tenant (resuelve cuando ya está al día). */
+  onGuardarBloques?: (dashboardBloques: string[]) => Promise<void>;
 }
 
 /**
- * Dashboard de inicio de la empresa: una sola página con los bloques que eligió el
- * superadmin (`Tenant.dashboardBloques`, ver `lib/dashboardBloques.ts`), sin pestañas.
+ * Dashboard de inicio de la empresa: una sola página con los bloques elegidos
+ * (`Tenant.dashboardBloques`, ver `lib/dashboardBloques.ts`), sin pestañas. El admin de
+ * la empresa lo arma desde acá con "Personalizar panel" (`DashboardEditor`); el
+ * superadmin, con el mismo editor en la ficha de la empresa.
  * Cada fuente de datos se pide solo si algún bloque la usa.
  */
 export function TenantOwnerDashboard({
@@ -63,9 +66,15 @@ export function TenantOwnerDashboard({
   loadingViajeId,
   onViewFactura,
   loadingFacturaId,
+  puedeEditar = false,
+  onGuardarBloques,
 }: TenantOwnerDashboardProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [forzado, setForzado] = useState<string | null>(null);
+  /** Orden en edición (null = mirando). Vive acá para pedir los datos de lo que se agrega. */
+  const [edicion, setEdicion] = useState<string[] | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const { showToast } = useToast();
 
   useEffect(() => {
     for (const [param, { valor, bloque }] of Object.entries(DEEP_LINKS)) {
@@ -82,10 +91,33 @@ export function TenantOwnerDashboard({
     }
   }, [searchParams, setSearchParams, tenant]);
 
+  const guardados = useMemo(() => ordenVisualDashboard(bloquesEfectivos(tenant)), [tenant]);
   const ids = useMemo(() => {
-    const base = bloquesEfectivos(tenant);
-    return forzado && !base.includes(forzado) ? [...base, forzado] : base;
-  }, [tenant, forzado]);
+    if (edicion) return edicion;
+    return forzado && !guardados.includes(forzado) ? [...guardados, forzado] : guardados;
+  }, [guardados, forzado, edicion]);
+  const hayCambios =
+    edicion != null &&
+    (edicion.length !== guardados.length || edicion.some((id, i) => id !== guardados[i]));
+
+  function cancelarEdicion() {
+    if (hayCambios && !window.confirm("¿Descartar los cambios del panel?")) return;
+    setEdicion(null);
+  }
+
+  async function guardarEdicion() {
+    if (!edicion || !onGuardarBloques) return;
+    setGuardando(true);
+    try {
+      await onGuardarBloques(bloquesParaGuardar(tenant, edicion));
+      setEdicion(null);
+      showToast("Panel guardado. Lo ven así todos los usuarios de la empresa.");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo guardar el panel.", "error");
+    } finally {
+      setGuardando(false);
+    }
+  }
 
   useEffect(() => {
     if (!forzado) return;
@@ -127,7 +159,20 @@ export function TenantOwnerDashboard({
         <h1 className="font-[family-name:var(--font-display)] text-3xl tracking-wide text-vialto-charcoal sm:text-4xl md:text-5xl">
           {titulo}
         </h1>
-        <DashboardPeriodoSelector dash={dash} cargando={cargando} />
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          <DashboardPeriodoSelector dash={dash} cargando={cargando} />
+          {puedeEditar && onGuardarBloques && !edicion && (
+            <button
+              type="button"
+              onClick={() => setEdicion(guardados)}
+              title="Elegí qué bloques ver y ordenalos arrastrando (aplica a toda la empresa)"
+              className="inline-flex h-10 items-center gap-2 border border-black/15 bg-white px-3 text-sm font-medium text-vialto-charcoal shadow-sm transition-colors hover:border-vialto-fire hover:text-vialto-fire"
+            >
+              <LayoutDashboard className="h-4 w-4" aria-hidden />
+              Personalizar panel
+            </button>
+          )}
+        </div>
       </div>
 
       {dash.error && (
@@ -139,7 +184,7 @@ export function TenantOwnerDashboard({
         </div>
       )}
 
-      {ids.length === 0 && (
+      {ids.length === 0 && !edicion && (
         <p className="text-sm text-vialto-steel">
           Todavía no hay indicadores para los módulos de tu empresa.
         </p>
@@ -157,24 +202,33 @@ export function TenantOwnerDashboard({
       {/* Una sola grilla: en desktop, filas de 4 columnas armadas por `filasDashboard`
           (tarjeta 1, pendientes 2, tablas anchas 4, sin huecos). En mobile, 2 columnas:
           tarjetas de a dos (las de pesos + dólares a todo el ancho) y el resto entero. */}
-      <div aria-busy={cargando} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {filasDashboard(ids)
-          .flat()
-          .map(({ id, span }) => {
-            const tarjeta = bloqueDashboard(id)?.tipo === "tarjeta";
-            const mobile = tarjeta && !tarjetaDosMonedas(id) ? "col-span-1" : "col-span-2";
-            return (
+      {edicion ? (
+        <DashboardEditor
+          tenant={tenant}
+          orden={edicion}
+          onOrden={setEdicion}
+          renderBloque={(id) => <DashboardBloque id={id} datos={datos} />}
+          onGuardar={() => void guardarEdicion()}
+          onCancelar={cancelarEdicion}
+          guardando={guardando}
+          hayCambios={hayCambios}
+        />
+      ) : (
+        <div aria-busy={cargando} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {filasDashboard(ids)
+            .flat()
+            .map(({ id, span }) => (
               // `[&>*]:h-full`: el bloque se estira al alto de su fila (tarjeta y pendiente parejos).
               <div
                 key={id}
                 id={`bloque-${id}`}
-                className={`min-w-0 scroll-mt-24 [&>*]:h-full ${mobile} ${SPAN_DESKTOP[span]}`}
+                className={`min-w-0 scroll-mt-24 [&>*]:h-full ${clasesCeldaDashboard(id, span)}`}
               >
                 <DashboardBloque id={id} datos={datos} />
               </div>
-            );
-          })}
-      </div>
+            ))}
+        </div>
+      )}
     </div>
   );
 }

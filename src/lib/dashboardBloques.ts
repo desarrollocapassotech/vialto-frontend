@@ -1,12 +1,15 @@
 import {
   Banknote,
   Calculator,
+  ChartColumn,
   CalendarClock,
   Droplet,
   FileClock,
   FileExclamationPoint,
   Fuel,
+  Gauge,
   HandCoins,
+  ListChecks,
   PackageCheck,
   PackageMinus,
   PackagePlus,
@@ -529,6 +532,40 @@ export function bloqueAnchoCompleto(id: string): boolean {
   return POR_ID.get(id)?.tipo === "analisis" || id === "pendientes-combustible";
 }
 
+/** El orden tal como se ve (después de acomodar las filas): lo que se edita y se guarda. */
+export function ordenVisualDashboard(ids: readonly string[]): string[] {
+  return filasDashboard(ids)
+    .flat()
+    .map((b) => b.id);
+}
+
+/** Columnas que ocupa un bloque en desktop (antes de estirar el último de la fila). */
+export function anchoBloqueDashboard(id: string): number {
+  return anchoBloque(id);
+}
+
+/** Cuánto ocupa un bloque, en palabras (para el panel "Agregar bloques"). */
+export function tamanoBloqueLabel(id: string): string {
+  const ancho = anchoBloque(id);
+  return ancho === COLUMNAS_DASHBOARD ? "Fila completa" : ancho === 1 ? "Chico" : "Mediano";
+}
+
+/**
+ * Qué guardar en `Tenant.dashboardBloques` para un orden editado: [] si quedó igual al
+ * recomendado (así sigue al recomendado si cambian los módulos); si no, el orden más los
+ * guardados de módulos que la empresa ya no tiene (vuelven si se recontrata el módulo).
+ */
+export function bloquesParaGuardar(tenant: TenantDashboard, orden: readonly string[]): string[] {
+  const recomendados = ordenVisualDashboard(bloquesRecomendados(tenant));
+  const igual =
+    orden.length === recomendados.length && orden.every((id, i) => id === recomendados[i]);
+  if (igual) return [];
+  const ocultos = (tenant.dashboardBloques ?? []).filter(
+    (id) => !POR_ID.get(id)?.disponible(tenant),
+  );
+  return [...orden, ...ocultos];
+}
+
 export function fuentesDeBloques(ids: readonly string[]): Set<DashboardFuente> {
   const out = new Set<DashboardFuente>();
   for (const id of ids) {
@@ -536,4 +573,34 @@ export function fuentesDeBloques(ids: readonly string[]): Set<DashboardFuente> {
     if (b) out.add(b.fuente);
   }
   return out;
+}
+
+/** Columnas que ocupa cada bloque en desktop (de las 4 de la grilla), según `filasDashboard`. */
+const SPAN_DESKTOP: Record<number, string> = {
+  1: "lg:col-span-1",
+  2: "lg:col-span-2",
+  3: "lg:col-span-3",
+  4: "lg:col-span-4",
+};
+
+/**
+ * Clases de la celda de un bloque en la grilla del dashboard. Mobile: 2 columnas, tarjetas
+ * de a dos (las de pesos + dólares a todo el ancho) y el resto entero.
+ */
+export function clasesCeldaDashboard(id: string, span: number): string {
+  const tarjeta = POR_ID.get(id)?.tipo === "tarjeta";
+  const mobile = tarjeta && !tarjetaDosMonedas(id) ? "col-span-1" : "col-span-2";
+  return `${mobile} ${SPAN_DESKTOP[span]}`;
+}
+
+/** Ícono por defecto de los bloques que no tienen uno propio (los de análisis). */
+const ICONO_TIPO: Record<DashboardBloqueTipo, LucideIcon> = {
+  tarjeta: Gauge,
+  pendientes: ListChecks,
+  analisis: ChartColumn,
+};
+
+export function iconoBloque(id: string): LucideIcon {
+  const def = POR_ID.get(id);
+  return def?.icono ?? ICONO_TIPO[def?.tipo ?? "tarjeta"];
 }
