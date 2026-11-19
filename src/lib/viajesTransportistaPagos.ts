@@ -224,9 +224,10 @@ export function estadoPagoTransportistaExterno(
 
 export function viajeCoincideFiltroPagoTransportista(
   v: Viaje,
-  filtro: "pagado",
+  filtro: "pagado" | "pendiente",
 ): boolean {
-  return estadoPagoTransportistaExterno(v) === filtro;
+  // "pendiente" = tiene precio acordado y saldo sin pagar al transportista.
+  return estadoPagoTransportistaExterno(v) === (filtro === "pendiente" ? "sin_pago" : filtro);
 }
 
 export function calcularSaldoTransportista(

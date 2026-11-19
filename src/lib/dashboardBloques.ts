@@ -1,8 +1,10 @@
-﻿import {
+import {
   Banknote,
+  Calculator,
   CalendarClock,
   Droplet,
   FileClock,
+  FileExclamationPoint,
   Fuel,
   HandCoins,
   PackageCheck,
@@ -10,6 +12,7 @@
   PackagePlus,
   Receipt,
   Route,
+  TrendingDown,
   TrendingUp,
   Truck,
   Wallet,
@@ -73,7 +76,7 @@ export type DashboardBloqueDef = {
   fuente: DashboardFuente;
   /** Módulo que lo alimenta, para mostrarlo en la configuración. */
   modulo: string;
-  /** Solo tarjetas: ícono del tema (camión, surtidor, llave…). */
+  /** Tarjetas y pendientes: ícono del tema (camión, surtidor, llave…). */
   icono?: LucideIcon;
   /** Solo tarjetas: mensaje amigable cuando el valor es cero. */
   textoCero?: string;
@@ -255,6 +258,7 @@ export const DASHBOARD_BLOQUES: readonly DashboardBloqueDef[] = [
   // ── Pendientes ────────────────────────────────────────────────────────
   {
     id: "pendientes-facturas-vencidas",
+    icono: FileExclamationPoint,
     label: "Facturas vencidas sin cobrar",
     ayuda: "Lista de facturas vencidas con saldo pendiente.",
     tipo: "pendientes",
@@ -265,6 +269,7 @@ export const DASHBOARD_BLOQUES: readonly DashboardBloqueDef[] = [
   },
   {
     id: "pendientes-viajes-sin-facturar",
+    icono: FileClock,
     label: "Viajes finalizados sin facturar",
     ayuda: "Lista de viajes terminados que todavía no tienen factura.",
     tipo: "pendientes",
@@ -275,6 +280,7 @@ export const DASHBOARD_BLOQUES: readonly DashboardBloqueDef[] = [
   },
   {
     id: "pendientes-viajes-sin-liquidar",
+    icono: Calculator,
     label: "Viajes sin liquidar",
     ayuda: "Lista de viajes terminados que todavía no se liquidaron al transportista.",
     tipo: "pendientes",
@@ -284,6 +290,7 @@ export const DASHBOARD_BLOQUES: readonly DashboardBloqueDef[] = [
   },
   {
     id: "pendientes-cuenta-corriente",
+    icono: CalendarClock,
     label: "Vencimientos de cuenta corriente",
     ayuda: "Comprobantes vencidos y por vencer, a cobrar y a pagar.",
     tipo: "pendientes",
@@ -294,6 +301,7 @@ export const DASHBOARD_BLOQUES: readonly DashboardBloqueDef[] = [
   },
   {
     id: "pendientes-mantenimiento",
+    icono: Wrench,
     label: "Próximos vencimientos de mantenimiento",
     ayuda: "Los cinco planes vencidos o más próximos a vencer.",
     tipo: "pendientes",
@@ -304,6 +312,7 @@ export const DASHBOARD_BLOQUES: readonly DashboardBloqueDef[] = [
   },
   {
     id: "pendientes-combustible",
+    icono: Fuel,
     label: "Alertas de combustible",
     ayuda: "Cargas sospechosas y cargas de choferes que no se pudieron registrar.",
     tipo: "pendientes",
@@ -314,6 +323,7 @@ export const DASHBOARD_BLOQUES: readonly DashboardBloqueDef[] = [
   },
   {
     id: "pendientes-margen-bajo",
+    icono: TrendingDown,
     label: "Viajes con margen bajo",
     ayuda: "Viajes del período con margen bajo o negativo.",
     tipo: "pendientes",

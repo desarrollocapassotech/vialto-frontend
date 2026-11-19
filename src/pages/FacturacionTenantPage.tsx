@@ -312,15 +312,49 @@ export function FacturacionTenantPage({
   const [numFiltro, setNumFiltro] = useState("");
   const [numFiltroInput, setNumFiltroInput] = useState("");
   const [clienteIdFiltro, setClienteIdFiltro] = useState("");
-  const [emisionDesdeFiltro, setEmisionDesdeFiltro] = useState("");
-  const [emisionHastaFiltro, setEmisionHastaFiltro] = useState("");
+  // Un link puede llegar con filtros (ej. desde una tarjeta del dashboard):
+  // ?estado=facturado|vencida|cobrado|anulado|borrador, ?cobro=sin_cobrar|vencida y
+  // ?desde=/?hasta= (fecha de emisión, AAAA-MM-DD). Se aplican al abrir y se sacan de la URL.
+  const [filtrosDesdeUrl] = useState(() => {
+    const leer = (k: string) => searchParams.get(k)?.trim() ?? "";
+    const estado = leer("estado");
+    const cobro = leer("cobro");
+    const fecha = (s: string) => (/^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "");
+    return {
+      estado: ["facturado", "vencida", "cobrado", "anulado", "borrador"].includes(estado)
+        ? estado
+        : "",
+      cobro: (cobro === "sin_cobrar" || cobro === "vencida" ? cobro : "") as
+        | ""
+        | "sin_cobrar"
+        | "vencida",
+      desde: fecha(leer("desde")),
+      hasta: fecha(leer("hasta")),
+    };
+  });
+  const [emisionDesdeFiltro, setEmisionDesdeFiltro] = useState(filtrosDesdeUrl.desde);
+  const [emisionHastaFiltro, setEmisionHastaFiltro] = useState(filtrosDesdeUrl.hasta);
   const [vencimientoDesdeFiltro, setVencimientoDesdeFiltro] = useState("");
   const [vencimientoHastaFiltro, setVencimientoHastaFiltro] = useState("");
-  const [estadoFiltro, setEstadoFiltro] = useState("");
+  const [estadoFiltro, setEstadoFiltro] = useState(filtrosDesdeUrl.estado);
   /** Filtro rápido (ícono al lado del título): eje de cobro, combinable con Estado. */
   const [cobroFiltro, setCobroFiltro] = useState<"" | "sin_cobrar" | "vencida">(
-    "",
+    filtrosDesdeUrl.cobro,
   );
+  useEffect(() => {
+    const claves = ["estado", "cobro", "desde", "hasta"];
+    if (!claves.some((k) => searchParams.has(k))) return;
+    setSearchParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        claves.forEach((k) => next.delete(k));
+        return next;
+      },
+      { replace: true },
+    );
+    // Solo al montar: los filtros ya quedaron en el estado inicial.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Conteos de los chips de filtro rápido (sin cobrar / vencidas), sobre todas las facturas. */
   const [resumenCobroApi, setResumenCobroApi] = useState<{

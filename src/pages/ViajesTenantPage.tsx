@@ -1,4 +1,4 @@
-﻿import {
+import {
   AdjuntarComprobanteClip,
   ComprobanteAdjuntoClip,
 } from "@/components/shared/ComprobanteAdjuntoClip";
@@ -1009,7 +1009,7 @@ export function ViajesTenantPage({
     if (f.estado?.trim()) p.set("etapa", f.estado.trim());
     if (f.facturacionEstado?.trim()) p.set("facturacionEstado", f.facturacionEstado.trim());
     if (f.liquidacionEstado?.trim()) p.set("liquidacionEstado", f.liquidacionEstado.trim());
-    if (f.pagoTransportista === "pagado") p.set("pagoTransportista", "pagado");
+    if (f.pagoTransportista) p.set("pagoTransportista", f.pagoTransportista);
     if ((f.tipoFecha === "carga" || f.tipoFecha === "descarga") && (f.fechaDesde?.trim() || f.fechaHasta?.trim())) {
       p.set("tipoFecha", f.tipoFecha);
       if (f.fechaDesde?.trim()) p.set("fechaDesde", f.fechaDesde.trim());
@@ -1131,7 +1131,7 @@ export function ViajesTenantPage({
         if (estF.trim()) filtros.set("etapa", estF.trim());
         if (facEstF.trim()) filtros.set("facturacionEstado", facEstF.trim());
         if (liqEstF.trim()) filtros.set("liquidacionEstado", liqEstF.trim());
-        if (pagoTranspF === "pagado") {
+        if (pagoTranspF) {
           filtros.set("pagoTransportista", pagoTranspF);
         }
         if ((tf === "carga" || tf === "descarga") && (fd.trim() || fh.trim())) {
@@ -1167,7 +1167,7 @@ export function ViajesTenantPage({
         // Traemos de a muchos si es búsqueda local para garantizar encontrarlo
         const pageSizeApi = isLocalSearch ? 1000 : pageSizeApiValido(pageSize);
 
-        const pagoFiltroActivo = pagoTranspF === "pagado" ? pagoTranspF : null;
+        const pagoFiltroActivo = pagoTranspF || null;
 
         let items: Viaje[];
         let meta: PaginatedMeta;
@@ -1466,10 +1466,12 @@ export function ViajesTenantPage({
       estado: "",
       facturacionEstado: "",
       liquidacionEstado: "",
+      pagoTransportista: "",
     };
     setEstadoFiltro("");
     setFacturacionFiltro("");
     setLiquidacionFiltro("");
+    setPagoTransportistaFiltro("");
     setListadoRefetching(true);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
@@ -1947,7 +1949,7 @@ export function ViajesTenantPage({
       if (estF.trim()) filtros.set("etapa", estF.trim());
       if (facEstF.trim()) filtros.set("facturacionEstado", facEstF.trim());
       if (liqEstF.trim()) filtros.set("liquidacionEstado", liqEstF.trim());
-      if (pagoTranspF === "pagado") {
+      if (pagoTranspF) {
         filtros.set("pagoTransportista", pagoTranspF);
       }
       if ((tf === "carga" || tf === "descarga") && (fd.trim() || fh.trim())) {
@@ -1978,7 +1980,7 @@ export function ViajesTenantPage({
       const pageSizeApi = 5000; // Un lote grande para traer la tabla entera
       let itemsExport: Viaje[] = [];
       const sortFetch = ordenamientoAplicadoRef.current;
-      const pagoFiltroActivo = pagoTranspF === "pagado" ? pagoTranspF : null;
+      const pagoFiltroActivo = pagoTranspF || null;
 
       // Hacemos el pedido sin paginar
       if (pagoFiltroActivo) {
@@ -2575,6 +2577,11 @@ export function ViajesTenantPage({
       liquidacionFiltro.trim()
         ? etiquetaOpcion(opcionesFiltroLiquidacion, liquidacionFiltro, "Liquidación")
         : null,
+      pagoTransportistaFiltro === "pagado"
+        ? "Pagado al transportista"
+        : pagoTransportistaFiltro === "pendiente"
+          ? "Pendiente de pago al transportista"
+          : null,
     ]
       .filter(Boolean)
       .join(" · ") || null;
@@ -2828,9 +2835,10 @@ export function ViajesTenantPage({
           filterActive={
             !!estadoFiltro.trim() ||
             !!facturacionFiltro.trim() ||
-            !!liquidacionFiltro.trim()
+            !!liquidacionFiltro.trim() ||
+            !!pagoTransportistaFiltro
           }
-          filterSignature={`${estadoFiltro}|${facturacionFiltro}|${liquidacionFiltro}`}
+          filterSignature={`${estadoFiltro}|${facturacionFiltro}|${liquidacionFiltro}|${pagoTransportistaFiltro}`}
           valor={valorFiltroEtapa}
           onClear={quitarFiltroEtapa}
           minWidthClass="min-w-0"

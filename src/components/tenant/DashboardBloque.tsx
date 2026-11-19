@@ -1,4 +1,4 @@
-﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
+import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useNavigate } from "react-router-dom";
 import { Eye, FileText, HandCoins } from "lucide-react";
 import type { ReactNode } from "react";
@@ -56,14 +56,6 @@ export type DashboardDatos = {
   loadingFacturaId?: string | null;
 };
 
-function montosLinea(m: { ARS: number; USD: number } | undefined): string | null {
-  if (!m) return null;
-  const partes: string[] = [];
-  if (m.ARS) partes.push(formatMoney(m.ARS));
-  if (m.USD) partes.push(formatMoneyUSD(m.USD));
-  return partes.length > 0 ? partes.join(" · ") : null;
-}
-
 /** Totales de Cuenta corriente ({ moneda, total }[]) como métrica de tarjeta ARS/USD. */
 function metricaDeTotales(totales: { moneda: string; total: number }[] | undefined): MetricCompare {
   const ARS = totales?.find((t) => t.moneda === "ARS")?.total ?? 0;
@@ -115,6 +107,10 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
   const linkCombustible = datos.rango
     ? `/combustible?${new URLSearchParams({ from: datos.rango.from, to: datos.rango.to }).toString()}`
     : "/combustible";
+  // Facturas emitidas en el período del panel (todas, cobradas o no).
+  const linkFacturado = datos.rango
+    ? `/facturacion?${new URLSearchParams({ desde: datos.rango.from, hasta: datos.rango.to }).toString()}`
+    : "/facturacion";
 
   const verViaje = (viajeId: string): AccionOpcion[] => {
     const cargando = datos.loadingViajeId === viajeId;
@@ -136,11 +132,11 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
     // ── Tarjetas ────────────────────────────────────────────────────────
     case "facturado":
       return (
-        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={fin?.facturado} loading={dash.loading} linkTo="/facturacion" />
+        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={fin?.facturado} loading={dash.loading} linkTo={linkFacturado} />
       );
     case "cobrado":
       return (
-        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={fin?.cobrado} loading={dash.loading} valueTone="positiveCash" linkTo="/facturacion" />
+        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={fin?.cobrado} loading={dash.loading} valueTone="positiveCash" linkTo="/facturacion?estado=cobrado" />
       );
     case "sin-facturar":
       return (
@@ -148,7 +144,7 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
       );
     case "a-pagar-transportistas":
       return (
-        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={fin?.aPagarTransportistas} loading={dash.loading} valueTone="payable" linkTo="/viajes" />
+        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={fin?.aPagarTransportistas} loading={dash.loading} valueTone="payable" linkTo="/viajes?pagoTransportista=pendiente" />
       );
     case "margen":
       return <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={fin?.margen} loading={dash.loading} linkTo="/viajes" />;
@@ -200,8 +196,11 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
         <DashboardPendientes
           titulo={def.label}
           cantidad={bloque?.cantidad ?? 0}
-          resumen={montosLinea(bloque?.montosPorMoneda)}
-          verTodoTo="/facturacion"
+          icono={def.icono}
+          tono="alerta"
+          montos={bloque?.montosPorMoneda}
+          etiquetaMontos="Saldo vencido sin cobrar"
+          verTodoTo="/facturacion?cobro=vencida"
           columnas={[{ titulo: "Factura" }]}
           loading={dash.loading && !dash.data}
           vacio="No hay facturas vencidas sin cobrar."
@@ -234,7 +233,9 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
         <DashboardPendientes
           titulo={def.label}
           cantidad={bloque?.cantidad ?? 0}
-          resumen={montosLinea(bloque?.montosPorMoneda)}
+          icono={def.icono}
+          montos={bloque?.montosPorMoneda}
+          etiquetaMontos="Monto a facturar"
           verTodoTo="/viajes?etapa=finalizado"
           columnas={[{ titulo: "Fecha", tipo: "fecha" }, { titulo: "Cliente" }, { titulo: "Ruta" }]}
           loading={dash.loading && !dash.data}
@@ -260,7 +261,9 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
         <DashboardPendientes
           titulo={def.label}
           cantidad={bloque?.cantidad ?? 0}
-          resumen={montosLinea(bloque?.montoPendiente)}
+          icono={def.icono}
+          montos={bloque?.montoPendiente}
+          etiquetaMontos="Monto a liquidar"
           verTodoTo="/viajes?etapa=finalizado"
           columnas={[{ titulo: "Viaje" }, { titulo: "Transportista" }]}
           loading={financiero.esperando}
@@ -279,6 +282,8 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
       return (
         <DashboardPendientes
           titulo={def.label}
+          icono={def.icono}
+          tono="alerta"
           cantidad={alertas.length}
           columnas={[{ titulo: "Viaje" }, { titulo: "Cliente" }, { titulo: "Margen", tipo: "numero" }]}
           loading={financiero.esperando}
@@ -312,6 +317,7 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
       return (
         <DashboardPendientes
           titulo={def.label}
+          icono={def.icono}
           cantidad={items.length}
           verTodoTo="/cuenta-corriente"
           columnas={[{ titulo: "Cuenta" }, { titulo: "Vence", tipo: "fecha" }, { titulo: "Pendiente", tipo: "numero" }]}
@@ -349,15 +355,23 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
     }
     case "pendientes-mantenimiento":
       return mant.error ? (
-        <DashboardPendientesMarco titulo={def.label}>
+        <DashboardPendientesMarco titulo={def.label} icono={def.icono}>
           <p className="px-4 py-6 text-sm text-vialto-steel">No se pudieron cargar los vencimientos.</p>
         </DashboardPendientesMarco>
       ) : mant.loading ? (
-        <DashboardPendientesMarco titulo={def.label}>
+        <DashboardPendientesMarco titulo={def.label} icono={def.icono}>
           <CargandoVialto mensaje="Cargando vencimientos…" chico />
         </DashboardPendientesMarco>
       ) : (
-        <ProximosVencimientosLista filas={mant.proximos} hayPlanes={(mant.filas?.length ?? 0) > 0} />
+        <DashboardPendientesMarco
+          titulo={def.label}
+          icono={def.icono}
+          tono={mant.proximos.some((f) => f.estado === "vencido") ? "alerta" : "aviso"}
+          cantidad={mant.proximos.length}
+          verTodoTo={(mant.filas?.length ?? 0) > 0 ? "/mantenimiento?tab=vencimientos" : undefined}
+        >
+          <ProximosVencimientosLista filas={mant.proximos} hayPlanes={(mant.filas?.length ?? 0) > 0} sinMarco />
+        </DashboardPendientesMarco>
       );
     case "pendientes-combustible":
       return (
