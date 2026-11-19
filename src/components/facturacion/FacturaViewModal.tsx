@@ -219,6 +219,7 @@ export function FacturaViewModal({
   const source = detail;
   const ivaN = source.ivaPct ?? 0;
   const tramos = source.tramos ?? [];
+  const conceptos = source.conceptos ?? [];
   const porTramo = Boolean(factura.facturarPorTramo) && tramos.length > 0;
   const tieneRestoSinTramo = (() => {
     if (!porTramo) return false;
@@ -239,6 +240,11 @@ export function FacturaViewModal({
     return roundMoney2(factura.importe - sumaTramos) > 0.005;
   })();
 
+  const tieneIvaMixto = conceptos.some(
+    (c) => Number(c.ivaPct ?? ivaN) !== ivaN,
+  );
+  const labelIva = tieneIvaMixto ? "IVA" : `IVA ${ivaN}%`;
+
   let muestraIva = false;
   let totalConIva = factura.importe;
   if (porTramo) {
@@ -248,8 +254,25 @@ export function FacturaViewModal({
         : importeTotalConIvaPorTramo(factura.importe, tramos, ivaN, source.viajes);
     muestraIva = true;
   } else {
-    muestraIva = ivaN > 0 && factura.importe > 0;
-    const ivaMonto = roundMoney2((factura.importe * ivaN) / 100);
+    const ivaPersistido =
+      source.ivaMonto != null && Number.isFinite(source.ivaMonto)
+        ? source.ivaMonto
+        : factura.ivaMonto != null && Number.isFinite(factura.ivaMonto)
+          ? factura.ivaMonto
+          : null;
+    let ivaMonto = 0;
+    if (ivaPersistido != null) {
+      ivaMonto = ivaPersistido;
+    } else {
+      const netoConceptos = roundMoney2(conceptos.reduce((s, c) => s + c.importe, 0));
+      const importeViajes = roundMoney2(factura.importe - netoConceptos);
+      const ivaConceptos = roundMoney2(
+        conceptos.reduce((s, c) => s + roundMoney2((c.importe * (c.ivaPct ?? ivaN)) / 100), 0),
+      );
+      const ivaViajes = ivaN > 0 ? roundMoney2((importeViajes * ivaN) / 100) : 0;
+      ivaMonto = roundMoney2(ivaViajes + ivaConceptos);
+    }
+    muestraIva = ivaMonto > 0 || (ivaN > 0 && factura.importe > 0);
     totalConIva = roundMoney2(factura.importe + ivaMonto);
   }
   const cobroEsTotalConIva =
@@ -299,6 +322,15 @@ export function FacturaViewModal({
   const ivaTotal = roundMoney2(totalConIva - factura.importe);
   const viajesFactura = source.viajes ?? [];
   const cantViajes = viajesFactura.length || source.viajeIds.length;
+  const cantConceptos = conceptos.length;
+  const partesResumenNeto: string[] = [];
+  if (cantViajes > 0) {
+    partesResumenNeto.push(`${cantViajes} viaje${cantViajes === 1 ? '' : 's'}`);
+  }
+  if (cantConceptos > 0) {
+    partesResumenNeto.push(`${cantConceptos} concepto${cantConceptos === 1 ? '' : 's'}`);
+  }
+  const resumenNeto = partesResumenNeto.length > 0 ? partesResumenNeto.join(' + ') : undefined;
   // Viajes que componen el neto: se ven al desplegar la fila "Neto" del detalle.
   const viajesDetalle = (
     <ViajesDetalleLista
@@ -627,9 +659,7 @@ export function FacturaViewModal({
         <DetalleMontosCard loading={loadingDetail}>
           <FilaMontoDesplegable
             label="Neto"
-            resumen={
-              cantViajes > 0 ? `${cantViajes} viaje${cantViajes === 1 ? '' : 's'}` : undefined
-            }
+            resumen={resumenNeto}
             value={fmt2(factura.importe)}
           >
             {viajesDetalle}
@@ -646,7 +676,7 @@ export function FacturaViewModal({
             </FilaMontoDesplegable>
           ) : (
             muestraIva && (
-              <FilaMonto label={`IVA ${ivaN}%`} value={`+ ${fmt2(ivaTotal)}`} muted />
+              <FilaMonto label={labelIva} value={`+ ${fmt2(ivaTotal)}`} muted />
             )
           )}
           <FilaMonto
