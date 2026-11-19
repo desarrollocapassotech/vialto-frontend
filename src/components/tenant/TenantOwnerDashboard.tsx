@@ -1,4 +1,4 @@
-﻿import { Fragment, useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import type { useTenantOwnerDashboard } from "@/hooks/useTenantOwnerDashboard";
@@ -9,12 +9,11 @@ import {
   useTableroCuentaCorriente,
 } from "@/hooks/useDashboardFuentes";
 import {
-  bloqueAnchoCompleto,
   bloqueDashboard,
   bloquesEfectivos,
+  filasDashboard,
   fuentesDeBloques,
   tarjetaDosMonedas,
-  tarjetasPorFila,
 } from "@/lib/dashboardBloques";
 import { frasePeriodo, periodoAFechas } from "@/lib/dashboardPeriodo";
 import type { Tenant } from "@/types/api";
@@ -30,28 +29,13 @@ const DEEP_LINKS: Record<string, { valor: string; bloque: string }> = {
   financieroTab: { valor: "alertas", bloque: "pendientes-margen-bajo" },
 };
 
-/** Ancho de cada tarjeta en desktop según cuántas van por fila (`tarjetasPorFila`). */
-const BASIS_DESKTOP: Record<number, string> = {
-  1: "lg:basis-full",
-  2: "lg:basis-[calc(50%-0.25rem)]",
-  3: "lg:basis-[calc(33.333%-0.34rem)]",
-  4: "lg:basis-[calc(25%-0.375rem)]",
+/** Columnas que ocupa cada bloque en desktop (de las 4 de la grilla), según `filasDashboard`. */
+const SPAN_DESKTOP: Record<number, string> = {
+  1: "lg:col-span-1",
+  2: "lg:col-span-2",
+  3: "lg:col-span-3",
+  4: "lg:col-span-4",
 };
-
-/**
- * Pendientes/análisis van de a dos por fila. Ocupa la fila entera si es ancho, o si
- * queda sin compañero (el anterior lo dejó solo y el siguiente es ancho o no hay).
- */
-function ocupaFilaEntera(ids: string[], i: number): boolean {
-  if (bloqueAnchoCompleto(ids[i])) return true;
-  // Posición dentro de la tanda de bloques angostos seguidos.
-  let inicio = i;
-  while (inicio > 0 && !bloqueAnchoCompleto(ids[inicio - 1])) inicio--;
-  let fin = i;
-  while (fin < ids.length - 1 && !bloqueAnchoCompleto(ids[fin + 1])) fin++;
-  const tanda = fin - inicio + 1;
-  return tanda % 2 === 1 && i === fin;
-}
 
 interface TenantOwnerDashboardProps {
   /** Título de la página ("Panel de …"); va a la izquierda del filtro de período. */
@@ -130,15 +114,6 @@ export function TenantOwnerDashboard({
     loadingFacturaId,
   };
 
-  // Tarjetas seguidas van en una grilla de tarjetas; el resto, de a dos (o a todo el ancho).
-  const grupos: { tarjetas: boolean; ids: string[] }[] = [];
-  for (const id of ids) {
-    const tarjetas = bloqueDashboard(id)?.tipo === "tarjeta";
-    const ultimo = grupos[grupos.length - 1];
-    if (ultimo && ultimo.tarjetas === tarjetas) ultimo.ids.push(id);
-    else grupos.push({ tarjetas, ids: [id] });
-  }
-
   // Cambio de período: spinner en el filtro + bloques atenuados hasta que llegan los datos.
   const cargando =
     dash.loading ||
@@ -179,43 +154,26 @@ export function TenantOwnerDashboard({
         />
       )}
 
-      <div aria-busy={cargando}>
-        <div className="space-y-6 lg:space-y-8">
-          {grupos.map((g, i) => (
-            <Fragment key={`${i}-${g.ids[0]}`}>
-              {g.tarjetas ? (
-                // Flex con crecimiento: cada fila se completa siempre (una tarjeta sola
-                // en la última fila se estira en vez de dejar hueco).
-                <div className="flex flex-wrap gap-2">
-                  {g.ids.map((id) => (
-                    <div
-                      key={id}
-                      className={`min-w-0 grow ${
-                        tarjetaDosMonedas(id) ? "basis-full" : "basis-[calc(50%-0.25rem)]"
-                      } ${BASIS_DESKTOP[tarjetasPorFila(g.ids.length)]}`}
-                    >
-                      <DashboardBloque id={id} datos={datos} />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid gap-4 lg:grid-cols-2">
-                  {g.ids.map((id, j) => (
-                    <div
-                      key={id}
-                      id={`bloque-${id}`}
-                      className={`min-w-0 scroll-mt-24 ${
-                        ocupaFilaEntera(g.ids, j) ? "lg:col-span-2" : ""
-                      }`}
-                    >
-                      <DashboardBloque id={id} datos={datos} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Fragment>
-          ))}
-        </div>
+      {/* Una sola grilla: en desktop, filas de 4 columnas armadas por `filasDashboard`
+          (tarjeta 1, pendientes 2, tablas anchas 4, sin huecos). En mobile, 2 columnas:
+          tarjetas de a dos (las de pesos + dólares a todo el ancho) y el resto entero. */}
+      <div aria-busy={cargando} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {filasDashboard(ids)
+          .flat()
+          .map(({ id, span }) => {
+            const tarjeta = bloqueDashboard(id)?.tipo === "tarjeta";
+            const mobile = tarjeta && !tarjetaDosMonedas(id) ? "col-span-1" : "col-span-2";
+            return (
+              // `[&>*]:h-full`: el bloque se estira al alto de su fila (tarjeta y pendiente parejos).
+              <div
+                key={id}
+                id={`bloque-${id}`}
+                className={`min-w-0 scroll-mt-24 [&>*]:h-full ${mobile} ${SPAN_DESKTOP[span]}`}
+              >
+                <DashboardBloque id={id} datos={datos} />
+              </div>
+            );
+          })}
       </div>
     </div>
   );

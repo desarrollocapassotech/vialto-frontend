@@ -111,6 +111,10 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
   if (!def) return null;
   const { dash, financiero, combustible, cuentaCorriente: cc, mantenimiento: mant } = datos;
   const fin = dash.data?.financiero;
+  // Las cargas del mismo período que se está viendo en el panel.
+  const linkCombustible = datos.rango
+    ? `/combustible?${new URLSearchParams({ from: datos.rango.from, to: datos.rango.to }).toString()}`
+    : "/combustible";
 
   const verViaje = (viajeId: string): AccionOpcion[] => {
     const cargando = datos.loadingViajeId === viajeId;
@@ -132,7 +136,7 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
     // ── Tarjetas ────────────────────────────────────────────────────────
     case "facturado":
       return (
-        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={fin?.facturado} loading={dash.loading} linkTo="/facturacion" alwaysLink />
+        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={fin?.facturado} loading={dash.loading} linkTo="/facturacion" />
       );
     case "cobrado":
       return (
@@ -140,14 +144,14 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
       );
     case "sin-facturar":
       return (
-        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={fin?.sinFacturarPeriodo} loading={dash.loading} valueTone="warn" linkTo="/viajes?etapa=finalizado" />
+        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={fin?.sinFacturarPeriodo} loading={dash.loading} valueTone="warn" linkTo="/viajes?facturacion=sin_facturar" />
       );
     case "a-pagar-transportistas":
       return (
         <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={fin?.aPagarTransportistas} loading={dash.loading} valueTone="payable" linkTo="/viajes" />
       );
     case "margen":
-      return <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={fin?.margen} loading={dash.loading} />;
+      return <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={fin?.margen} loading={dash.loading} linkTo="/viajes" />;
     case "viajes-en-curso":
       return (
         <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} simpleCount={dash.data?.viajes?.enCurso.current ?? 0} loading={dash.loading} linkTo="/viajes?etapa=en_curso" />
@@ -158,19 +162,19 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
       );
     case "por-cobrar":
       return (
-        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={metricaDeTotales(cc.data?.totales.porCobrarPendiente)} loading={cc.esperando} valueTone="positiveCash" linkTo="/cuenta-corriente" alwaysLink />
+        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={metricaDeTotales(cc.data?.totales.porCobrarPendiente)} loading={cc.esperando} valueTone="positiveCash" linkTo="/cuenta-corriente" />
       );
     case "por-pagar":
       return (
-        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={metricaDeTotales(cc.data?.totales.porPagarPendiente)} loading={cc.esperando} valueTone="payable" linkTo="/cuenta-corriente?tipo=proveedor" alwaysLink />
+        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={metricaDeTotales(cc.data?.totales.porPagarPendiente)} loading={cc.esperando} valueTone="payable" linkTo="/cuenta-corriente?tipo=proveedor" />
       );
     case "combustible-gasto":
       return (
-        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={metricaGastoCombustible(combustible.data)} loading={combustible.esperando} linkTo="/combustible" alwaysLink />
+        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={metricaGastoCombustible(combustible.data)} loading={combustible.esperando} linkTo={linkCombustible} />
       );
     case "combustible-precio-litro":
       return (
-        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={metricaSimple(combustible.data?.precioPorLitro)} loading={combustible.esperando} />
+        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} metric={metricaSimple(combustible.data?.precioPorLitro)} loading={combustible.esperando} linkTo={linkCombustible} />
       );
     case "stock-ingresos":
       return (
@@ -182,11 +186,11 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
       );
     case "mantenimiento-vencidos":
       return (
-        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} simpleCount={mant.contadores.vencido} loading={mant.loading} valueTone="payable" linkTo="/mantenimiento?tab=vencimientos" />
+        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} simpleCount={mant.contadores.vencido} loading={mant.loading} valueTone="payable" linkTo="/mantenimiento?tab=vencimientos&estado=vencido" />
       );
     case "mantenimiento-proximos":
       return (
-        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} simpleCount={mant.contadores.proximo} loading={mant.loading} valueTone="warn" linkTo="/mantenimiento?tab=vencimientos" />
+        <MetricCard title={def.label} tooltip={def.ayuda} icon={def.icono} textoCero={def.textoCero} simpleCount={mant.contadores.proximo} loading={mant.loading} valueTone="warn" linkTo="/mantenimiento?tab=vencimientos&estado=proximo" />
       );
 
     // ── Pendientes ──────────────────────────────────────────────────────
@@ -198,7 +202,7 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
           cantidad={bloque?.cantidad ?? 0}
           resumen={montosLinea(bloque?.montosPorMoneda)}
           verTodoTo="/facturacion"
-          columnas={["Factura"]}
+          columnas={[{ titulo: "Factura" }]}
           loading={dash.loading && !dash.data}
           vacio="No hay facturas vencidas sin cobrar."
           filas={(bloque?.items ?? []).map((f) => {
@@ -206,6 +210,7 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
             return {
               id: f.id,
               celdas: [f.numero.trim() || f.id.slice(0, 8)],
+              orden: [f.numero.trim() || f.id],
               acciones: [
                 {
                   id: "ver",
@@ -231,7 +236,7 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
           cantidad={bloque?.cantidad ?? 0}
           resumen={montosLinea(bloque?.montosPorMoneda)}
           verTodoTo="/viajes?etapa=finalizado"
-          columnas={["Fecha", "Cliente", "Ruta"]}
+          columnas={[{ titulo: "Fecha", tipo: "fecha" }, { titulo: "Cliente" }, { titulo: "Ruta" }]}
           loading={dash.loading && !dash.data}
           vacio="No hay viajes finalizados sin facturar."
           filas={(bloque?.items ?? []).map((v) => ({
@@ -243,6 +248,7 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
                 ? `${soloCiudadDesdeEtiquetaUbicacion(v.origen)} → ${soloCiudadDesdeEtiquetaUbicacion(v.destino)}`
                 : "—",
             ],
+            orden: [v.fecha, v.clienteNombre, v.origen ?? v.destino],
             acciones: verViaje(v.id),
           }))}
         />
@@ -256,12 +262,13 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
           cantidad={bloque?.cantidad ?? 0}
           resumen={montosLinea(bloque?.montoPendiente)}
           verTodoTo="/viajes?etapa=finalizado"
-          columnas={["Viaje", "Transportista"]}
+          columnas={[{ titulo: "Viaje" }, { titulo: "Transportista" }]}
           loading={financiero.esperando}
           vacio="No hay viajes pendientes de liquidar."
           filas={(bloque?.items ?? []).map((v) => ({
             id: v.id,
             celdas: [v.numero || v.id.slice(0, 8), v.transportistaNombre ?? "—"],
+            orden: [v.numero || v.id, v.transportistaNombre],
             acciones: verViaje(v.id),
           }))}
         />
@@ -273,7 +280,7 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
         <DashboardPendientes
           titulo={def.label}
           cantidad={alertas.length}
-          columnas={["Viaje", "Cliente", "Margen"]}
+          columnas={[{ titulo: "Viaje" }, { titulo: "Cliente" }, { titulo: "Margen", tipo: "numero" }]}
           loading={financiero.esperando}
           vacio="No hay viajes con margen bajo en el período."
           filas={alertas.map((a) => ({
@@ -285,6 +292,7 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
                 {a.moneda === "USD" ? formatMoneyUSD(a.margen) : formatMoney(a.margen)}
               </span>,
             ],
+            orden: [a.numero || a.viajeId, a.clienteNombre, a.margen],
             acciones: verViaje(a.viajeId),
           }))}
         />
@@ -306,7 +314,7 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
           titulo={def.label}
           cantidad={items.length}
           verTodoTo="/cuenta-corriente"
-          columnas={["Cuenta", "Vence", "Pendiente"]}
+          columnas={[{ titulo: "Cuenta" }, { titulo: "Vence", tipo: "fecha" }, { titulo: "Pendiente", tipo: "numero" }]}
           loading={cc.esperando}
           vacio="No hay comprobantes vencidos ni por vencer."
           filas={items.map(({ it, lado, vencido }) => ({
@@ -323,6 +331,7 @@ export function DashboardBloque({ id, datos }: { id: string; datos: DashboardDat
                 {formatCurrencyArFromNumber(it.pendiente)} {it.moneda}
               </span>,
             ],
+            orden: [it.contraparteNombre, it.fechaVencimiento, it.pendiente],
             acciones: [
               {
                 id: "ver",

@@ -4,15 +4,24 @@ import type { ReactNode } from "react";
 import { CeldaAccionesFila } from "@/components/ui/AccionesFila";
 import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { clickFilaAcciones } from "@/lib/accionesFila";
-
-/** Filas que se muestran en un bloque de pendientes; el resto, con "Ver todo →". */
-export const PENDIENTES_MAX_FILAS = 6;
+import { useTablaDashboard, type ColumnaOrdenable } from "@/hooks/useTablaDashboard";
+import { PaginacionCompacta } from "@/components/listado/PaginacionCompacta";
+import { TituloOrdenable } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import type { TipoOrden, ValorOrden } from "@/lib/ordenListado";
 
 export type PendienteFila = {
   id: string;
   celdas: ReactNode[];
+  /**
+   * Valor por el que ordena cada columna, en el mismo orden que `columnas` (lo que se ve,
+   * sin formato: la fecha ISO, el monto como número). Sin esto la columna no ordena.
+   */
+  orden?: ValorOrden[];
   acciones: AccionOpcion[];
 };
+
+/** Título de la columna; `tipo` define el tooltip del orden (A a Z / menor a mayor / fecha). */
+export type PendienteColumna = string | { titulo: string; tipo?: TipoOrden };
 
 /**
  * Bloque de "Pendientes" del dashboard: título, cantidad, "Ver todo →" y una tabla
@@ -34,12 +43,20 @@ export function DashboardPendientes({
   /** Línea chica debajo del título (ej. montos por moneda). */
   resumen?: string | null;
   verTodoTo?: string;
-  columnas: string[];
+  columnas: PendienteColumna[];
   filas: PendienteFila[];
   vacio: string;
   loading?: boolean;
 }) {
-  const visibles = filas.slice(0, PENDIENTES_MAX_FILAS);
+  // Orden con click en el título (columnas con valor de orden) + de a 5 por página.
+  const cols = columnas.map((c) => (typeof c === "string" ? { titulo: c } : c));
+  const ordenables = Object.fromEntries(
+    cols.map((c, i) => [String(i), { tipo: c.tipo, valor: (f: PendienteFila) => f.orden?.[i] }]),
+  ) as Record<string, ColumnaOrdenable<PendienteFila>>;
+  const tabla = useTablaDashboard(filas, ordenables);
+  const paginacion = tabla.paginacion;
+  const visibles = tabla.visibles;
+  const columnaOrdena = (i: number) => filas.some((f) => f.orden?.[i] != null);
   return (
     <DashboardPendientesMarco
       titulo={titulo}
@@ -56,12 +73,16 @@ export function DashboardPendientes({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-black/10">
-                {columnas.map((c) => (
+                {cols.map((c, i) => (
                   <th
-                    key={c}
+                    key={c.titulo}
                     className="py-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel"
                   >
-                    {c}
+                    {columnaOrdena(i) ? (
+                      <TituloOrdenable title={c.titulo} orden={tabla.ordenColumna(String(i))} />
+                    ) : (
+                      c.titulo
+                    )}
                   </th>
                 ))}
                 <th className="py-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
@@ -86,6 +107,9 @@ export function DashboardPendientes({
               ))}
             </tbody>
           </table>
+          <div className="pb-1">
+            <PaginacionCompacta paginacion={paginacion} />
+          </div>
         </div>
       )}
     </DashboardPendientesMarco>

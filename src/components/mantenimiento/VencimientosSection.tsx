@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSearchParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, CalendarClock, CircleAlert, FileText, Gauge, History, Wrench } from "lucide-react";
 import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -62,7 +63,12 @@ export function VencimientosSection({
   const maestro = useMaestroData();
   const [filas, setFilas] = useState<FilaVencimiento[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [estado, setEstado] = useState<EstadoVencimiento | "">("");
+  // `?estado=vencido|proximo` (ej. desde una tarjeta del panel) arranca con ese filtro.
+  const [searchParams] = useSearchParams();
+  const [estado, setEstado] = useState<EstadoVencimiento | "">(() => {
+    const e = searchParams.get("estado");
+    return e === "vencido" || e === "proximo" ? e : "";
+  });
   const [vehiculoId, setVehiculoId] = useState("");
   const [categoria, setCategoria] = useState("");
   const [ordenFecha, setOrdenFecha] = useState<"asc" | "desc">("asc");

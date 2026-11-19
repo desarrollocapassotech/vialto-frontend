@@ -568,15 +568,27 @@ export function ViajesTenantPage({
     sortDir: ViajeSortDir;
   }>(sortInicial);
 
-  // Un link con ?etapa= o ?pagoTransportista= (ej. desde el panel) manda sobre lo guardado.
+  // Un link con ?etapa=, ?facturacion=, ?liquidacion= o ?pagoTransportista= (ej. desde
+  // una tarjeta del panel) manda sobre lo guardado: arranca solo con ese filtro, así la
+  // grilla coincide con el número que mostraba la tarjeta.
   const initialEstadoFromUrl = searchParams.get("etapa")?.trim() ?? "";
+  const initialFacturacionFromUrl = searchParams.get("facturacion")?.trim() ?? "";
+  const initialLiquidacionFromUrl = searchParams.get("liquidacion")?.trim() ?? "";
   const initialPagoTransportistaFromUrl = (() => {
     const p = searchParams.get(VIAJE_PAGO_TRANSPORTISTA_QUERY)?.trim() ?? "";
     return esFiltroPagoTransportistaValido(p) ? p : "";
   })();
   const filtrosIniciales = (() => {
-    const f = { ...(guardado?.filtros ?? VIAJES_FILTROS_VACIOS) };
+    const vieneDeLink = !!(
+      initialEstadoFromUrl ||
+      initialFacturacionFromUrl ||
+      initialLiquidacionFromUrl ||
+      initialPagoTransportistaFromUrl
+    );
+    const f = { ...(vieneDeLink ? VIAJES_FILTROS_VACIOS : (guardado?.filtros ?? VIAJES_FILTROS_VACIOS)) };
     if (initialEstadoFromUrl) f.estado = initialEstadoFromUrl;
+    if (initialFacturacionFromUrl) f.facturacionEstado = initialFacturacionFromUrl;
+    if (initialLiquidacionFromUrl) f.liquidacionEstado = initialLiquidacionFromUrl;
     if (initialPagoTransportistaFromUrl) {
       f.pagoTransportista = initialPagoTransportistaFromUrl as ViajePagoTransportistaFiltro;
     }
@@ -2061,6 +2073,8 @@ export function ViajesTenantPage({
   useEffect(() => {
     if (
       !searchParams.has("etapa") &&
+      !searchParams.has("facturacion") &&
+      !searchParams.has("liquidacion") &&
       !searchParams.has(VIAJE_PAGO_TRANSPORTISTA_QUERY)
     )
       return;
@@ -2068,6 +2082,8 @@ export function ViajesTenantPage({
       (p) => {
         const n = new URLSearchParams(p);
         n.delete("etapa");
+        n.delete("facturacion");
+        n.delete("liquidacion");
         n.delete(VIAJE_PAGO_TRANSPORTISTA_QUERY);
         return n;
       },

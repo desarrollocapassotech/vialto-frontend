@@ -476,13 +476,42 @@ export function tarjetaDosMonedas(id: string): boolean {
   return TARJETAS_DOS_MONEDAS.has(id);
 }
 
+/** Columnas de la grilla del dashboard en desktop. */
+export const COLUMNAS_DASHBOARD = 4;
+
+/** Columnas que ocupa un bloque en desktop: tarjeta 1, pendientes 2, tablas anchas todas. */
+function anchoBloque(id: string): number {
+  if (bloqueAnchoCompleto(id)) return COLUMNAS_DASHBOARD;
+  return POR_ID.get(id)?.tipo === "tarjeta" ? 1 : 2;
+}
+
 /**
- * Tarjetas por fila en desktop para `n` tarjetas seguidas: hasta 4 por fila,
- * repartidas parejo (5 → 3+2, 7 → 4+3, 9 → 3+3+3) para no dejar una sola en la última.
+ * Reparte los bloques en filas de `COLUMNAS_DASHBOARD` columnas sin dejar huecos: cada
+ * fila se completa con los primeros bloques (en el orden elegido) que todavía entran,
+ * aunque estén más adelante; si igual sobra lugar, el último de la fila se estira. Así
+ * una tarjeta sola queda al lado de un pendiente en vez de ocupar una fila entera, y se
+ * evita scroll vertical.
  */
-export function tarjetasPorFila(n: number): number {
-  if (n <= 4) return Math.max(n, 1);
-  return Math.ceil(n / Math.ceil(n / 4));
+export function filasDashboard(ids: readonly string[]): { id: string; span: number }[][] {
+  const pendientes = [...ids];
+  const filas: { id: string; span: number }[][] = [];
+  while (pendientes.length > 0) {
+    const fila: { id: string; span: number }[] = [];
+    let libre = COLUMNAS_DASHBOARD;
+    for (let i = 0; i < pendientes.length && libre > 0; ) {
+      const ancho = anchoBloque(pendientes[i]);
+      if (ancho <= libre) {
+        fila.push({ id: pendientes[i], span: ancho });
+        libre -= ancho;
+        pendientes.splice(i, 1);
+      } else {
+        i++;
+      }
+    }
+    if (libre > 0 && fila.length > 0) fila[fila.length - 1].span += libre;
+    filas.push(fila);
+  }
+  return filas;
 }
 
 /** Bloques que ocupan todo el ancho (tablas anchas); el resto de los no-tarjeta va de a dos. */

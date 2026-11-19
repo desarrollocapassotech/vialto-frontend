@@ -27,7 +27,6 @@ export function MetricCard({
   formatValue = formatMoney,
   valueTone = "default",
   linkTo,
-  alwaysLink,
   textoCero,
 }: {
   title: string;
@@ -40,8 +39,6 @@ export function MetricCard({
   formatValue?: (n: number) => string;
   valueTone?: MetricTone;
   linkTo?: string;
-  /** Link aunque el valor sea cero (por defecto, solo con algo que ver). */
-  alwaysLink?: boolean;
   /** Mensaje amigable cuando el valor es cero (ej. "Todo al día"). */
   textoCero?: string;
 }) {
@@ -50,7 +47,8 @@ export function MetricCard({
   const usd = metric?.currencies?.USD ?? 0;
   const valor = esConteo ? simpleCount : ars + usd;
   const enCero = !loading && valor === 0;
-  const conLink = !!linkTo && !loading && (alwaysLink || valor > 0);
+  // Toda tarjeta con destino es clickeable, también en 0 (lleva a la pantalla igual).
+  const conLink = !!linkTo && !loading;
 
   const principal = esConteo
     ? String(Math.round(simpleCount))
