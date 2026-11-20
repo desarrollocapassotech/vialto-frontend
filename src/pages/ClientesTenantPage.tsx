@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { formatIdFiscal } from "@/lib/ciudades/paises";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -30,6 +30,8 @@ type ClientesPaginatedResponse = {
 export function ClientesTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [rows, setRows] = useState<Cliente[] | null>(null);
+  /** Pedido de la lista en curso (filtros, página): muestra el loader en la grilla. */
+  const [cargandoLista, setCargandoLista] = useState(false);
   const [serverMeta, setServerMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -72,6 +74,7 @@ export function ClientesTenantPage() {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
     (async () => {
+      setCargandoLista(true);
       try {
         const params = new URLSearchParams({
           page: String(page),
@@ -96,6 +99,8 @@ export function ClientesTenantPage() {
           setServerMeta(null);
           setError(friendlyError(e, "clientes"));
         }
+      } finally {
+        if (!cancelled) setCargandoLista(false);
       }
     })();
     return () => {
@@ -274,7 +279,8 @@ export function ClientesTenantPage() {
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           }] : []),
         ]}
-        rows={error ? [] : (rows ?? [])}
+        rows={error ? [] : rows}
+        cargando={!error && cargandoLista}
         rowKey={(c) => c.id}
         emptyMessage={
           error
@@ -283,7 +289,7 @@ export function ClientesTenantPage() {
               ? "No hay clientes que coincidan con los filtros aplicados."
               : "Todavía no tenés clientes cargados."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando clientes…"
         rowActions={(c) => [
           { id: "ver", label: "Ver cliente", icon: Eye, onClick: () => setViewingCliente(c) },
         ]}

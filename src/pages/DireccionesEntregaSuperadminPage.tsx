@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { DireccionEntregaViewModal } from "@/components/direcciones-entrega/DireccionEntregaViewModal";
@@ -216,6 +216,7 @@ export function DireccionesEntregaSuperadminPage() {
         </p>
       )}
 
+      {filtroEmpresa && (
       <ListadoDatos
         className={`mt-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}
         tableColSpan={3}
@@ -306,6 +307,7 @@ export function DireccionesEntregaSuperadminPage() {
           },
         ]}
         rows={filtroEmpresa ? (error ? [] : rowsFiltradas) : []}
+        cargando={loading}
         rowKey={(d) => d.id}
         emptyMessage={
           !filtroEmpresa
@@ -316,7 +318,7 @@ export function DireccionesEntregaSuperadminPage() {
                 ? "No hay direcciones que coincidan con los filtros aplicados."
                 : "No hay direcciones para esta empresa."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando direcciones de entrega…"
         rowActions={(d) => [
           {
             id: "ver",
@@ -329,6 +331,7 @@ export function DireccionesEntregaSuperadminPage() {
           },
         ]}
       />
+      )}
 
       {/* COMPONENTE DE PAGINACIÓN */}
       {meta && (rowsFiltradas?.length ?? 0) > 0 && (

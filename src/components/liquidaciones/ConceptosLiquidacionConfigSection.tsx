@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useCallback, useEffect, useState } from 'react';
 import { Pencil, Power, Trash2 } from 'lucide-react';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
@@ -307,7 +308,7 @@ export function ConceptosLiquidacionConfigSection({
                 <CrudFieldLabel required>IVA (%)</CrudFieldLabel>
                 <div className="group relative -mt-0.5 flex cursor-help items-center text-vialto-steel hover:text-vialto-charcoal">
                   <span
-                    className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-current text-[9px] font-bold"
+                    className="flex h-3.5 w-3.5 items-center justify-center rounded-none border border-current text-[9px] font-bold"
                     aria-hidden="true"
                   >
                     ?
@@ -436,7 +437,7 @@ export function ConceptosLiquidacionConfigSection({
       )}
 
       {loading ? (
-        <p className="text-sm text-vialto-steel">Cargando conceptos…</p>
+        <CargandoVialto mensaje="Cargando conceptos de liquidación…" chico />
       ) : items.length === 0 ? (
         <p className="text-sm text-vialto-steel">No hay conceptos configurados.</p>
       ) : (

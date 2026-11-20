@@ -1,4 +1,4 @@
-import type { LucideIcon } from 'lucide-react';
+﻿import type { LucideIcon } from 'lucide-react';
 import {
   AlertTriangle,
   Check,
@@ -52,7 +52,7 @@ export function EstadoIcono({ icon: Icon, glifo = null, colorClass, title, onCli
       {Glifo && (
         <span
           aria-hidden
-          className="absolute -right-1 -bottom-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-current bg-white"
+          className="absolute -right-1 -bottom-1 flex h-3.5 w-3.5 items-center justify-center rounded-none border border-current bg-white"
         >
           <Glifo className="h-2.5 w-2.5" strokeWidth={2.5} />
         </span>

@@ -59,6 +59,8 @@ export function useFacturaCreator(config: UseFacturaCreatorConfig) {
       clienteId: v.clienteId ?? "",
       viajeIds: [v.id],
       letraComprobante: letraComprobante ?? null,
+      // Sin conceptos: el modal precarga los gastos del viaje al abrir.
+      conceptos: undefined,
     });
   }
 

@@ -1,3 +1,4 @@
+import { AlertTriangle } from "lucide-react";
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -6,6 +7,7 @@ import {
 import {
   viajePendienteComprobanteTransportista,
   viajeRequiereComprobanteDual,
+  viajeTieneMontoTransportista,
 } from "@/lib/viajesComprobantes";
 import {
   liquidacionEstadoBadgeClass,
@@ -41,11 +43,26 @@ export function ViajeLiquidacionDetalleModal({
   onLiquidar?: () => void;
 }) {
   const estado = viaje.liquidacionEstado as LiquidacionEstado | null;
-  const puedeLiquidar =
-    Boolean(onLiquidar) &&
-    viaje.etapa?.toLowerCase() !== "cancelado" &&
-    viajeRequiereComprobanteDual(viaje) &&
-    viajePendienteComprobanteTransportista(viaje);
+  const tienePermisoLiquidar =
+    Boolean(onLiquidar) && viajeRequiereComprobanteDual(viaje);
+  const esCancelado = viaje.etapa?.toLowerCase() === "cancelado";
+  const tieneMontoTransportista = viajeTieneMontoTransportista(viaje);
+  const pendienteLiquidacion = viajePendienteComprobanteTransportista(viaje);
+
+  let motivoBloqueo: string | null = null;
+  if (esCancelado) {
+    motivoBloqueo = "No se puede liquidar porque el viaje está cancelado.";
+  } else if (!tieneMontoTransportista) {
+    motivoBloqueo =
+      "No se puede liquidar el viaje: falta cargar el monto del transportista.";
+  }
+
+  const listoParaLiquidar =
+    tienePermisoLiquidar &&
+    !esCancelado &&
+    tieneMontoTransportista &&
+    pendienteLiquidacion;
+
   const { isVisible } = useFieldConfig("viajes");
 
   return (
@@ -57,14 +74,17 @@ export function ViajeLiquidacionDetalleModal({
           <button type="button" onClick={onClose} className={viewModalBtnGhost}>
             Cerrar
           </button>
-          {puedeLiquidar && (
+          {tienePermisoLiquidar && (
             <button
               type="button"
+              disabled={!listoParaLiquidar}
+              title={motivoBloqueo ?? undefined}
               onClick={() => {
+                if (!listoParaLiquidar) return;
                 onClose();
                 onLiquidar?.();
               }}
-              className={viewModalBtnPrimary}
+              className={`${viewModalBtnPrimary} disabled:cursor-not-allowed`}
             >
               Liquidar
             </button>
@@ -83,6 +103,12 @@ export function ViajeLiquidacionDetalleModal({
             <p className="text-sm text-vialto-steel/70">
               Todavía no hay ninguna liquidación vinculada a este viaje.
             </p>
+            {motivoBloqueo && tienePermisoLiquidar && (
+              <div className="flex items-start gap-2 rounded border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <span>{motivoBloqueo}</span>
+              </div>
+            )}
           </>
         ) : (
           <>

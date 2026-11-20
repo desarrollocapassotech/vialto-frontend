@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -104,7 +105,7 @@ export function PasoAsignarVehiculos({
     </div>
   );
 
-  if (maestro.loading) return <p className="text-sm text-vialto-steel">Cargando vehículos…</p>;
+  if (maestro.loading) return <CargandoVialto mensaje="Cargando vehículos…" chico />;
 
   if (vehiculos.length === 0) {
     return (

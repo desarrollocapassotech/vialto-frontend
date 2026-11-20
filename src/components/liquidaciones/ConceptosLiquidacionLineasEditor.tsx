@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { CrudFieldLabel } from "@/components/crud/CrudFields";
@@ -469,7 +469,7 @@ export function ConceptosLiquidacionLineasEditor({
                 <CrudFieldLabel required>IVA (%)</CrudFieldLabel>
                 <div className="group relative -mt-0.5 flex cursor-help items-center text-vialto-steel hover:text-vialto-charcoal">
                   <span
-                    className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-current text-[9px] font-bold"
+                    className="flex h-3.5 w-3.5 items-center justify-center rounded-none border border-current text-[9px] font-bold"
                     aria-hidden="true"
                   >
                     ?

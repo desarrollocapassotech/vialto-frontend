@@ -4,6 +4,7 @@ import {
   type ViajeMonedaCodigo,
 } from "@/lib/currencyMask";
 import { signedMontoConIvaConcepto } from "@/lib/liquidacionConceptosIva";
+import { engrosarConIva } from "@/lib/viajeTramosTransportista";
 import type { PagoTransportista, Viaje } from "@/types/api";
 
 export type PagoTransportistaMontoDraft = {
@@ -49,6 +50,7 @@ export type ViajeSaldoTransportistaInput = Pick<
   | "precioTransportistaExterno"
   | "monedaPrecioTransportistaExterno"
   | "precioTransportistaIvaIncluidoPct"
+  | "tramosTransportista"
 > & {
   liquidacionesViaje?: Array<{
     subtotal?: number | null;
@@ -84,16 +86,11 @@ export type EstadoPagoTransportistaExterno =
   | "pagado";
 
 /**
- * Suma el IVA a un precio cargado sin IVA. `precioTransportistaExterno` siempre es
- * neto — `precioTransportistaIvaIncluidoPct` es el % que hay que sumarle para saber
- * cuánto se le paga en efectivo al transportista. Espejo exacto de `engrosarConIva`
- * en `viaje-ganancia-bruta.util.ts` (backend). No toca el cálculo de Liquidación/CVLP,
- * que usa el precio neto tal cual (con su propio IVA, configurado aparte).
+ * Neto + IVA del transportista (un % general o por tramo). La fórmula vive en
+ * `lib/viajeTramosTransportista.ts`, espejo del backend; se re-exporta acá porque es
+ * el import histórico.
  */
-export function engrosarConIva(precioNeto: number, pct: number): number {
-  if (!pct || pct <= 0) return precioNeto;
-  return Math.round(precioNeto * (1 + pct / 100) * 100) / 100;
-}
+export { engrosarConIva };
 
 /**
  * Calcula el impacto neto de los conceptos de una liquidación sobre UN viaje en particular.
@@ -155,6 +152,7 @@ function totalPagadoTransportistaEnMonedaAcordada(
   let totalAcordado = engrosarConIva(
     Number(v.precioTransportistaExterno) || 0,
     Number(v.precioTransportistaIvaIncluidoPct) || 0,
+    v.tramosTransportista,
   );
 
   // 2. Si el viaje tiene liquidaciones emitidas, sobreescribimos con el monto real
@@ -226,9 +224,10 @@ export function estadoPagoTransportistaExterno(
 
 export function viajeCoincideFiltroPagoTransportista(
   v: Viaje,
-  filtro: "pagado",
+  filtro: "pagado" | "pendiente",
 ): boolean {
-  return estadoPagoTransportistaExterno(v) === filtro;
+  // "pendiente" = tiene precio acordado y saldo sin pagar al transportista.
+  return estadoPagoTransportistaExterno(v) === (filtro === "pendiente" ? "sin_pago" : filtro);
 }
 
 export function calcularSaldoTransportista(

@@ -661,6 +661,24 @@ export function FacturaViewModal({
         </DetalleMontosCard>
       </div>
 
+      {(factura.conceptos?.length ?? 0) > 0 && (
+        <div className="mt-4 border border-black/10 px-4 py-3">
+          <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Conceptos</p>
+          <ul className="mt-1 space-y-0.5 text-sm text-vialto-charcoal">
+            {factura.conceptos!.map((c, i) => (
+              <li key={i} className="flex flex-wrap justify-between gap-x-4">
+                <span>{c.descripcion}</span>
+                <span className="tabular-nums text-vialto-steel">
+                  {(c.cantidad ?? 1).toLocaleString('es-AR')} ×{' '}
+                  {fmtImporte(factura.moneda, c.precioUnitario ?? c.importe, 2)} ={' '}
+                  {fmtImporte(factura.moneda, c.importe, 2)} + IVA {c.ivaPct}%
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {(factura.observaciones?.length ?? 0) > 0 && (
         <div className="mt-4 border border-black/10 px-4 py-3">
           <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">

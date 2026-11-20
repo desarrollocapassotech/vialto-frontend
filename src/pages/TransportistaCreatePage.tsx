@@ -28,6 +28,9 @@ import { isValidPhoneNumber } from "libphonenumber-js";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useArcaPadron } from "@/hooks/useArcaPadron";
 import { ArcaPadronStatus } from "@/components/shared/ArcaPadronStatus";
+import { ProveedorTipoSelect } from "@/components/transportistas/ProveedorTipoSelect";
+import { AvisoSinDatosFiscales } from "@/components/transportistas/AvisoSinDatosFiscales";
+import type { TipoProveedorElegido } from "@/lib/proveedorTipo";
 
 export function TransportistaCreatePage() {
   const { getToken } = useAuth();
@@ -36,6 +39,13 @@ export function TransportistaCreatePage() {
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
   const { showToast } = useToast();
+  const tipoInicial = searchParams.get("tipo");
+  const [tipoElegido, setTipoElegido] = useState<TipoProveedorElegido>({
+    tipo: tipoInicial === "taller" || tipoInicial === "otro" ? tipoInicial : "transportista",
+    categoria: "",
+  });
+  const tipo = tipoElegido.tipo;
+  const esTransportista = tipo === "transportista";
   const [nombre, setNombre] = useState("");
   const [pais, setPais] = useState<PaisCodigo | "">("");
   const [idFiscal, setIdFiscal] = useState("");
@@ -48,8 +58,7 @@ export function TransportistaCreatePage() {
   const [permisoInternacional, setPermisoInternacional] = useState("");
   const [fechaVencimientoPermiso, setFechaVencimientoPermiso] = useState("");
   const [confirmarSinDatosFiscales, setConfirmarSinDatosFiscales] =
-    useState(false);
-  const [loading, setLoading] = useState(false);
+    useState(false);  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -61,9 +70,12 @@ export function TransportistaCreatePage() {
   const domicilioVisible = isVisible("alta_transportista", "domicilio");
   const emailVisible = isVisible("alta_transportista", "email");
   const telefonoVisible = isVisible("alta_transportista", "telefono");
-  const pautVisible = isVisible("alta_transportista", "paut");
-  const permisoInternacionalVisible = isVisible("alta_transportista", "permisoInternacional");
-  const fechaVencimientoPermisoVisible = isVisible("alta_transportista", "fechaVencimientoPermiso");
+  // Datos para Nómina: solo de un transportista.
+  const pautVisible = esTransportista && isVisible("alta_transportista", "paut");
+  const permisoInternacionalVisible =
+    esTransportista && isVisible("alta_transportista", "permisoInternacional");
+  const fechaVencimientoPermisoVisible =
+    esTransportista && isVisible("alta_transportista", "fechaVencimientoPermiso");
 
   const faltanPais = paisVisible && !pais;
   const faltanIdFiscal = idFiscalVisible && !idFiscal.trim();
@@ -94,7 +106,10 @@ export function TransportistaCreatePage() {
 
   async function onSubmit() {
     const errs: Record<string, string> = {};
-    if (!nombre.trim()) errs.nombre = "Ingresá el nombre del transportista.";
+    if (!nombre.trim()) errs.nombre = "Ingresá el nombre del proveedor.";
+    if (tipo === "otro" && !tipoElegido.categoria.trim()) {
+      errs.categoria = "Escribí qué tipo de proveedor es.";
+    }
     if (telefono.trim() && !isValidPhoneNumber(telefono)) {
       errs.telefono = "Ingresá un teléfono válido para el país seleccionado.";
     }
@@ -109,6 +124,8 @@ export function TransportistaCreatePage() {
       setFieldErrors({ idFiscal: errorFiscal });
       return;
     }
+    // Falta país/CUIT: hay que confirmar en el aviso de abajo antes de guardar.
+    if (faltanDatosFiscales && !confirmarSinDatosFiscales) return;
     // No aplica cuando se crea para otro tenant desde superadmin: maestro.transportistas
     // refleja la organización activa de Clerk, no el tenant elegido por query param.
     if (!tenantId && idFiscal.trim()) {
@@ -117,7 +134,7 @@ export function TransportistaCreatePage() {
       );
       if (yaExiste) {
         setFieldErrors({
-          idFiscal: `Ya existe un transportista con ese ${idFiscalPorPais(pais).label}.`,
+          idFiscal: `Ya existe un proveedor con ese ${idFiscalPorPais(pais).label}.`,
         });
         return;
       }
@@ -132,6 +149,8 @@ export function TransportistaCreatePage() {
       await apiJson(path, () => getToken(), {
         method: "POST",
         body: JSON.stringify({
+          tipo,
+          categoria: tipo === "otro" ? tipoElegido.categoria.trim() : undefined,
           nombre: nombre.trim(),
           pais: pais || undefined,
           idFiscal: idFiscal.trim() || undefined,
@@ -141,23 +160,23 @@ export function TransportistaCreatePage() {
           condicionIva: pais === "AR" ? (condicionIva ?? undefined) : undefined,
           condicionTributaria:
             pais !== "AR" ? condicionTributaria.trim() || undefined : undefined,
-          paut: paut.trim() || undefined,
-          permisoInternacional: permisoInternacional.trim() || undefined,
-          fechaVencimientoPermiso: fechaVencimientoPermiso || undefined,
+          paut: (esTransportista && paut.trim()) || undefined,
+          permisoInternacional: (esTransportista && permisoInternacional.trim()) || undefined,
+          fechaVencimientoPermiso: (esTransportista && fechaVencimientoPermiso) || undefined,
           confirmarSinDatosFiscales: faltanDatosFiscales
             ? confirmarSinDatosFiscales
             : undefined,
         }),
       });
-      if (!tenantId) void maestro.refreshTransportistas();
-      showToast("Transportista creado exitosamente", "success");
+      if (!tenantId && esTransportista) void maestro.refreshTransportistas();
+      showToast("Proveedor creado exitosamente", "success");
       navigate(
         `/base-de-datos?tab=transportistas${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
         { replace: true },
       );
     } catch (e) {
       setError(friendlyError(e, "transportistas"));
-      showToast("No se pudo crear el transportista", "error");
+      showToast("No se pudo crear el proveedor", "error");
     } finally {
       setLoading(false);
     }
@@ -179,7 +198,7 @@ export function TransportistaCreatePage() {
 
   if (paisFijoLoading) {
     return (
-      <CrudPageLayout title="Crear transportista">
+      <CrudPageLayout title="Crear proveedor">
         <div className="mt-6 h-64 animate-pulse rounded bg-vialto-mist/60" />
       </CrudPageLayout>
     );
@@ -187,7 +206,7 @@ export function TransportistaCreatePage() {
 
   return (
     <CrudPageLayout
-      title="Crear transportista"
+      title="Crear proveedor"
     >
       <form
         className="mt-6 grid gap-4"
@@ -196,6 +215,16 @@ export function TransportistaCreatePage() {
           onSubmit();
         }}
       >
+        <label className="grid gap-1.5">
+          <CrudFieldLabel required>Tipo</CrudFieldLabel>
+          <ProveedorTipoSelect
+            value={tipoElegido}
+            onChange={setTipoElegido}
+            tenantId={tenantId || undefined}
+            error={!!fieldErrors.categoria}
+          />
+          <CrudFieldError message={fieldErrors.categoria} />
+        </label>
         <label className="grid gap-1.5">
           <CrudFieldLabel required>Nombre</CrudFieldLabel>
           <CrudInput
@@ -265,26 +294,6 @@ export function TransportistaCreatePage() {
           </div>
         )}
         <ArcaPadronStatus {...arca} />
-        {faltanDatosFiscales && (
-          <div className="space-y-2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <p>
-              Estás guardando el transportista sin {warningText} — esto puede
-              afectar la facturación/liquidaciones más adelante si no se
-              completa.
-            </p>
-            <label className="flex items-center gap-2 font-medium">
-              <input
-                type="checkbox"
-                checked={confirmarSinDatosFiscales}
-                onChange={(e) =>
-                  setConfirmarSinDatosFiscales(e.target.checked)
-                }
-                className="h-4 w-4 accent-vialto-charcoal"
-              />
-              Entiendo, guardar igual
-            </label>
-          </div>
-        )}
         {domicilioVisible && (
           <label className="grid gap-1.5">
             <span className={labelClass}>Domicilio</span>
@@ -357,14 +366,20 @@ export function TransportistaCreatePage() {
           </div>
         )}
 
+        {/* Al final del formulario, mientras falten país o CUIT. */}
+        {faltanDatosFiscales && (
+          <AvisoSinDatosFiscales
+            faltante={warningText}
+            confirmado={confirmarSinDatosFiscales}
+            onConfirmadoChange={setConfirmarSinDatosFiscales}
+          />
+        )}
         <CrudFormErrorAlert message={error} />
         <CrudSubmitButton
           loading={loading}
-          label="Crear transportista"
-          disabled={
-            !!errorFiscal ||
-            (faltanDatosFiscales && !confirmarSinDatosFiscales)
-          }
+          label="Crear proveedor"
+          // Faltando país o CUIT, hasta tildar "Entiendo, guardar igual".
+          disabled={!!errorFiscal || (faltanDatosFiscales && !confirmarSinDatosFiscales)}
         />
       </form>
     </CrudPageLayout>

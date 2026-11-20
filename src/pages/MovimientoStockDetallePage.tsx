@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
@@ -95,7 +96,7 @@ export function MovimientoStockDetallePage() {
   }
 
   if (!row) {
-    return <p className="text-vialto-steel py-8 text-center">Cargando…</p>;
+    return <CargandoVialto mensaje="Cargando el movimiento de stock…" />;
   }
 
   return (

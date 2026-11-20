@@ -1,6 +1,8 @@
-import { useRef, useState, type ReactNode } from 'react';
+﻿import { useRef, useState, type ReactNode } from 'react';
 import { ListadoFiltrosSheet } from '@/components/listado/ListadoFiltrosSheet';
 import { TablaScrollHorizontal } from '@/components/listado/TablaScrollHorizontal';
+import { CargandoVialto } from '@/components/shared/CargandoVialto';
+import { FiltrosActivosProvider } from '@/components/listado/FiltrosActivosBarra';
 import { AccionesFila } from '@/components/ui/AccionesFila';
 import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import { TooltipsDelegados } from '@/components/ui/TooltipsDelegados';
@@ -44,7 +46,14 @@ export type ListadoDatosProps<T> = {
   rows: T[] | null | undefined;
   rowKey: (row: T) => string;
   emptyMessage: string;
+  /** Qué se está cargando, para el loader de Vialto (ej. "Cargando viajes…"). */
   loadingMessage?: string;
+  /**
+   * Fuerza el loader aunque haya filas (ej. se cambió un filtro y se está pidiendo de
+   * nuevo al servidor): así nunca se ven las filas viejas ni "no hay datos" mientras carga.
+   * Sin esto, el loader sale solo con `rows` en null.
+   */
+  cargando?: boolean;
   className?: string;
   /** Thead personalizado (p. ej. columnas especiales). Solo desktop. */
   tableHead?: ReactNode;
@@ -107,7 +116,8 @@ export function ListadoDatos<T>({
   rows,
   rowKey,
   emptyMessage,
-  loadingMessage = 'Cargando…',
+  loadingMessage = 'Cargando datos…',
+  cargando = false,
   className = '',
   tableHead,
   mobileToolbar,
@@ -164,7 +174,7 @@ export function ListadoDatos<T>({
     ? (row: T) => renderAccionesFila(row, true)
     : renderActionsProp;
 
-  const loading = rows == null;
+  const loading = cargando || rows == null;
   const isEmpty = !loading && rows.length === 0;
   const colSpan = tableColSpan ?? columns.length + (renderActions ? 1 : 0);
   const primaryCol = columns.find((c) => c.primary) ?? columns[0];
@@ -220,17 +230,20 @@ export function ListadoDatos<T>({
     <div className="mb-3 border-b border-black/5 p-3 lg:hidden">{mobileToolbar}</div>
   ) : null;
 
+  // Los encabezados con filtro se anotan en el provider; arriba de la grilla va un
+  // badge por filtro aplicado, con su ✕ para quitarlo.
   return (
+    <FiltrosActivosProvider>
+      {(barraFiltros) => (
     <div className={className} ref={contenedorRef}>
       <TooltipsDelegados contenedorRef={contenedorRef} />
       {filterBar}
+      {barraFiltros}
 
       <div className={[listadoDatosWrapperClass].filter(Boolean).join(' ')}>
 
       <div className={listadoCardListClass}>
-        {loading && (
-          <p className="px-1 py-6 text-center text-sm text-vialto-steel">{loadingMessage}</p>
-        )}
+        {loading && <CargandoVialto mensaje={loadingMessage} chico />}
         {isEmpty && (
           <p className="px-1 py-6 text-center text-sm text-vialto-steel">{emptyMessage}</p>
         )}
@@ -271,8 +284,8 @@ export function ListadoDatos<T>({
           <tbody className={listadoTablaTbodyClass}>
             {loading && (
               <tr>
-                <td colSpan={colSpan} className={listadoTablaEmptyCellClass}>
-                  {loadingMessage}
+                <td colSpan={colSpan}>
+                  <CargandoVialto mensaje={loadingMessage} />
                 </td>
               </tr>
             )}
@@ -314,5 +327,7 @@ export function ListadoDatos<T>({
       </TablaScrollHorizontal>
       </div>
     </div>
+      )}
+    </FiltrosActivosProvider>
   );
 }

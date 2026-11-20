@@ -24,6 +24,8 @@ export interface OtroGastoDraft {
   fecha: string;
   createdBy?: string;
   createdByLabel?: string | null;
+  /** Viene de una compra de Cuenta corriente: se muestra de solo lectura y no se manda al guardar. */
+  ccCompraId?: string;
 }
 
 export function otroGastoAutorFromClerk(
@@ -102,12 +104,18 @@ export function otroGastoDraftFromApi(g: OtroGasto): OtroGastoDraft {
     fecha: g.fecha ? (fechaDiaYmd(g.fecha) ?? '') : '',
     createdBy: g.createdBy,
     createdByLabel: g.createdByLabel,
+    ...(g.ccCompraId ? { ccCompraId: g.ccCompraId } : {}),
   };
 }
 
+/**
+ * Gasto para mandar al guardar el viaje. Los que vienen de compras de Cuenta corriente
+ * no se mandan: el backend conserva los que ya tiene (`mergeGastosConCompras`).
+ */
 export function otroGastoDraftToApi(
   d: OtroGastoDraft,
 ): OtroGasto | null {
+  if (d.ccCompraId) return null;
   const monto = parseCurrencyForMoneda(d.montoStr, d.moneda);
   if (!d.descripcion.trim() || monto == null || monto < 0) return null;
   const out: OtroGasto = {
@@ -132,6 +140,7 @@ export function faltantesOtroGasto(d: OtroGastoDraft): { descripcion: boolean; m
 /** true = algún gasto tiene obligatorios vacíos (no se agrega otro ni se crea el viaje). */
 export function otrosGastosIncompletos(rows: OtroGastoDraft[]): boolean {
   return rows.some((r) => {
+    if (r.ccCompraId) return false;
     const f = faltantesOtroGasto(r);
     return f.descripcion || f.monto;
   });
@@ -151,8 +160,10 @@ export function emptyOtroGasto(autor?: OtroGastoAutor): OtroGastoDraft {
 
 const fieldLabelClass =
   'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
-const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
-const smallInputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
+const disabledClass =
+  'disabled:cursor-not-allowed disabled:bg-vialto-mist/40 disabled:text-vialto-steel/80';
+const inputClass = `h-9 w-full border border-black/15 bg-white px-2 text-sm ${disabledClass}`;
+const smallInputClass = `h-9 w-full border border-black/15 bg-white px-2 text-sm ${disabledClass}`;
 const gastoRowGridClassCompact =
   'grid grid-cols-1 gap-4 mb-6 border-b border-black/10 pb-4 last:mb-4 last:border-0 last:pb-0 lg:mb-2 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_minmax(7rem,11rem)_auto] lg:items-end lg:gap-2 lg:border-0 lg:pb-0';
 
@@ -171,6 +182,24 @@ function formatGastoSummary(row: OtroGastoDraft): string {
   return `${row.moneda} ${monto.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** Gasto que viene de una compra de Cuenta corriente: solo lectura (se cambia desde la compra). */
+function GastoDeCompraFila({ row }: { row: OtroGastoDraft }) {
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border border-black/10 bg-vialto-mist/50 px-3 py-2 text-sm">
+      <div className="min-w-0">
+        <p className="truncate text-vialto-charcoal" title={row.descripcion}>
+          {row.descripcion}
+        </p>
+        <p className="text-xs text-vialto-steel">
+          De una compra de Cuenta corriente: se edita desde la compra.
+          {row.fecha ? ` · ${row.fecha.split('-').reverse().join('/')}` : ''}
+        </p>
+      </div>
+      <span className="shrink-0 tabular-nums">{formatGastoSummary(row)}</span>
+    </div>
+  );
+}
+
 interface Props {
   rows: OtroGastoDraft[];
   onChange: (rows: OtroGastoDraft[]) => void;
@@ -184,6 +213,12 @@ interface Props {
   mostrarCargadoPor?: boolean;
   /** Marca los gastos con obligatorios vacíos: borde rojo + "Falta completar" (ver `faltantesOtroGasto`). */
   marcarIncompletos?: boolean;
+  /**
+   * Solo lectura: inputs deshabilitados y sin botón de eliminar. Lo usa la edición del
+   * viaje con liquidación vigente (`otrosGastos` está en CAMPOS_FISCALES_TRANSPORTE del
+   * backend; editarlos se descartaría al guardar).
+   */
+  disabled?: boolean;
 }
 
 export function OtrosGastosFieldset({
@@ -194,6 +229,7 @@ export function OtrosGastosFieldset({
   stacked = false,
   mostrarCargadoPor = true,
   marcarIncompletos = false,
+  disabled = false,
 }: Props) {
   const userLabelMap = useOrgUserLabels(tenantId);
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
@@ -217,6 +253,9 @@ export function OtrosGastosFieldset({
       </div>
 
       {rows.map((row, i) => {
+        if (row.ccCompraId) {
+          return <GastoDeCompraFila key={`cc-${row.ccCompraId}`} row={row} />;
+        }
         const f = marcarIncompletos
           ? faltantesOtroGasto(row)
           : { descripcion: false, monto: false };
@@ -225,7 +264,7 @@ export function OtrosGastosFieldset({
             key={i}
             title={row.descripcion.trim() || `Gasto ${i + 1}`}
             summary={formatGastoSummary(row)}
-            removable
+            removable={!disabled}
             onRemove={() => setRemoveIndex(i)}
           >
             <div className="flex flex-col gap-3">
@@ -235,6 +274,7 @@ export function OtrosGastosFieldset({
                 </span>
                 <input
                   type="text"
+                  disabled={disabled}
                   value={row.descripcion}
                   onChange={(e) => update(i, { descripcion: e.target.value })}
                   placeholder="Ej. Peaje, estadía…"
@@ -251,6 +291,7 @@ export function OtrosGastosFieldset({
                   <input
                     type="text"
                     inputMode="decimal"
+                    disabled={disabled}
                     value={row.montoStr}
                     onChange={(e) => update(i, { montoStr: maskCurrencyForMoneda(e.target.value, row.moneda) })}
                     placeholder="0.00"
@@ -262,6 +303,7 @@ export function OtrosGastosFieldset({
                 <div className="flex flex-col gap-1">
                   <span className={fieldLabelClass}>Moneda</span>
                   <select
+                    disabled={disabled}
                     value={row.moneda}
                     onChange={(e) => {
                       const m = e.target.value as ViajeMonedaCodigo;
@@ -281,6 +323,7 @@ export function OtrosGastosFieldset({
                   <span className={fieldLabelClass}>Fecha</span>
                   <input
                     type="date"
+                    disabled={disabled}
                     value={row.fecha}
                     onChange={(e) => update(i, { fecha: e.target.value })}
                     className={smallInputClass}
@@ -308,6 +351,7 @@ export function OtrosGastosFieldset({
               {gastoFieldLabel('Descripción', i, true)}
               <input
                 type="text"
+                disabled={disabled}
                 value={row.descripcion}
                 onChange={(e) => update(i, { descripcion: e.target.value })}
                 placeholder="Ej. Peaje, estadía…"
@@ -323,6 +367,7 @@ export function OtrosGastosFieldset({
               <input
                 type="text"
                 inputMode="decimal"
+                disabled={disabled}
                 value={row.montoStr}
                 onChange={(e) => update(i, { montoStr: maskCurrencyForMoneda(e.target.value, row.moneda) })}
                 placeholder="0.00"
@@ -336,6 +381,7 @@ export function OtrosGastosFieldset({
             <div className="flex flex-col gap-1 lg:w-20">
               {gastoFieldLabel('Moneda', i)}
               <select
+                disabled={disabled}
                 value={row.moneda}
                 onChange={(e) => {
                   const m = e.target.value as ViajeMonedaCodigo;
@@ -357,6 +403,7 @@ export function OtrosGastosFieldset({
               {gastoFieldLabel('Fecha', i)}
               <input
                 type="date"
+                disabled={disabled}
                 value={row.fecha}
                 onChange={(e) => update(i, { fecha: e.target.value })}
                 className={`${smallInputClass} lg:w-36`}
@@ -378,6 +425,7 @@ export function OtrosGastosFieldset({
             )}
 
             {/* Eliminar */}
+            {!disabled && (
             <div className="flex flex-col gap-1">
               {i === 0 ? (
                 <span className={`${fieldLabelClass} hidden lg:block`}>&nbsp;</span>
@@ -393,6 +441,7 @@ export function OtrosGastosFieldset({
                 ✕
               </button>
             </div>
+            )}
           </div>
         );
       })}

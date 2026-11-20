@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -342,12 +342,6 @@ export function DepositosPage({
         </div>
       )}
 
-      {/* Estado vacío minimalista igual al de facturación */}
-      {isPlatform && !activeTenantId && (
-        <p className="mt-10 text-sm text-vialto-steel">
-          Seleccioná una empresa para ver sus depósitos.
-        </p>
-      )}
 
       {/* Contenido operativo (se oculta si falta empresa en modo plataforma) */}
       {(!isPlatform || activeTenantId) && (
@@ -462,7 +456,7 @@ export function DepositosPage({
                   ? "No hay depósitos que coincidan con los filtros aplicados."
                   : "Todavía no tenés depósitos cargados."
             }
-            loadingMessage="Cargando…"
+            loadingMessage="Cargando depósitos…"
             rowActions={(deposito) => [
               { id: "editar", label: "Editar depósito", icon: Pencil, onClick: () => openEditForm(deposito) },
             ]}

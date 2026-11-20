@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { DestinatarioViewModal } from "@/components/destinatarios/DestinatarioViewModal";
@@ -215,6 +215,7 @@ export function DestinatariosSuperadminPage() {
         </p>
       )}
 
+      {filtroEmpresa && (
       <ListadoDatos
         className={`mt-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}
         tableColSpan={3}
@@ -303,6 +304,7 @@ export function DestinatariosSuperadminPage() {
           },
         ]}
         rows={filtroEmpresa ? (error ? [] : rowsFiltradas) : []}
+        cargando={loading}
         rowKey={(d) => d.id}
         emptyMessage={
           !filtroEmpresa
@@ -313,7 +315,7 @@ export function DestinatariosSuperadminPage() {
                 ? "No hay destinatarios que coincidan con los filtros aplicados."
                 : "No hay destinatarios para esta empresa."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando destinatarios…"
         rowActions={(d) => [
           {
             id: "ver",
@@ -326,6 +328,7 @@ export function DestinatariosSuperadminPage() {
           },
         ]}
       />
+      )}
 
       {meta && rows && rows.length > 0 && (
         <ListadoPagination

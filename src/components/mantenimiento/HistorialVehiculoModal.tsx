@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useEffect, useMemo, useState } from "react";
 import { ClipboardList, Fuel, Gauge, List, Pencil, Truck } from "lucide-react";
 import { EditarKmVehiculoModal } from "@/components/combustible/EditarKmVehiculoModal";
@@ -98,7 +99,7 @@ export function HistorialVehiculoModal({
       {error ? (
         <p className="text-sm text-red-700">{error}</p>
       ) : !data ? (
-        <p className="text-sm text-vialto-steel">Cargando…</p>
+        <CargandoVialto mensaje="Cargando el historial del vehículo…" chico />
       ) : (
         <div className="grid gap-5">
           <dl className="grid grid-cols-1 border border-black/10 bg-vialto-mist/40 sm:grid-cols-3 sm:divide-x sm:divide-black/10">

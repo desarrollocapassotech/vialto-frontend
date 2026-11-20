@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Eye, Power, PowerOff, Trash2, Truck } from "lucide-react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -193,6 +193,7 @@ export function PlanesSection({
                   title="Plan"
                   filterActive={!!categoria}
                   filterSignature={categoria}
+                  valor={categoria === "documental" ? "Documentales" : categoria === "mecanico" ? "Mecánicos" : null}
                   onClear={() => setCategoria("")}
                 >
                   <select
@@ -216,6 +217,7 @@ export function PlanesSection({
                   title="Estado"
                   filterActive={estado !== "activos"}
                   filterSignature={estado}
+                  valor={estado === "inactivos" ? "Inactivos" : "Todos los estados"}
                   onClear={() => setEstado("activos")}
                 >
                   <select
@@ -256,7 +258,7 @@ export function PlanesSection({
           emptyMessage={
             error ? "No se pudieron cargar los planes." : "No hay planes que coincidan con los filtros aplicados."
           }
-          loadingMessage="Cargando…"
+          loadingMessage="Cargando planes de mantenimiento…"
           actionsTdClassName={`${listadoTablaAccionesTdClass} text-right`}
           rowActionsDestacadas={soloLectura ? ["ver"] : ["ver", "asignar"]}
           rowActionsSubtitle={(p) => p.nombre}

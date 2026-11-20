@@ -22,8 +22,14 @@ export function ComprobanteAdjuntoField({
   onClearExisting,
   disabled = false,
   label = 'Comprobante',
+  labelClassName = `${LABEL} mb-1`,
   error,
 }: {
+  /**
+   * Clase del label, para que coincida con los campos de al lado cuando va en una fila
+   * (ej. a la izquierda del número de comprobante). Incluye su margen inferior.
+   */
+  labelClassName?: string;
   file: File | null;
   /** URL ya guardada (edición). */
   existingUrl?: string | null;
@@ -84,8 +90,8 @@ export function ComprobanteAdjuntoField({
 
   return (
     <>
-      <div className="space-y-1">
-        <span className={LABEL}>{label}</span>
+      <div className="flex min-w-0 flex-col">
+        <span className={labelClassName}>{label}</span>
 
         {!hasSelection ? (
           <div className="flex flex-wrap items-start gap-2">
@@ -110,7 +116,7 @@ export function ComprobanteAdjuntoField({
                 if (selected) handleSelect(selected);
               }}
             />
-            <p className="w-full text-xs text-vialto-steel">PDF o imagen, máximo 10 MB</p>
+            <p className="w-full text-[11px] text-vialto-steel">PDF o imagen, máximo 10 MB</p>
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2 rounded border border-black/10 bg-vialto-mist/30 px-3 py-2">
@@ -151,7 +157,7 @@ export function ComprobanteAdjuntoField({
         )}
 
         {errMsg && (
-          <p className="text-xs font-medium text-red-600">{errMsg}</p>
+          <p className="mt-1 text-xs font-medium text-red-600">{errMsg}</p>
         )}
       </div>
 

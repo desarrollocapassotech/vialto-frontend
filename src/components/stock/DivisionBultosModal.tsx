@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react';
+﻿import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
@@ -192,7 +192,7 @@ export function DivisionBultosModal({
                     type="button"
                     onClick={() => setBultos((n) => Math.max(1, n - 1))}
                     disabled={bultos <= 1 || saving}
-                    className="h-10 w-10 flex items-center justify-center rounded-full border border-black/20 bg-white hover:bg-vialto-mist/60 disabled:opacity-30"
+                    className="h-10 w-10 flex items-center justify-center rounded-none border border-black/20 bg-white hover:bg-vialto-mist/60 disabled:opacity-30"
                   >
                     <Minus className="h-4 w-4 text-vialto-charcoal" />
                   </button>
@@ -214,7 +214,7 @@ export function DivisionBultosModal({
                     disabled={
                       saving || (bultosDisponibles > 0 && bultos >= bultosDisponibles)
                     }
-                    className="h-10 w-10 flex items-center justify-center rounded-full border border-black/20 bg-white hover:bg-vialto-mist/60 disabled:opacity-30"
+                    className="h-10 w-10 flex items-center justify-center rounded-none border border-black/20 bg-white hover:bg-vialto-mist/60 disabled:opacity-30"
                   >
                     <Plus className="h-4 w-4 text-vialto-charcoal" />
                   </button>

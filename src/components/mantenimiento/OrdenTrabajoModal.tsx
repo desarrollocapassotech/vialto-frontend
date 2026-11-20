@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TriangleAlert } from "lucide-react";
 import { CrudFieldLabel, CrudSelect } from "@/components/crud/CrudFields";
@@ -347,7 +348,7 @@ export function OrdenTrabajoModal({
   return (
     <ViewModalShell title={titulo} onClose={descarte.solicitarCierre} descarte={descarte} footer={footer} maxWidthClass="sm:max-w-5xl" scrollBody>
       {cargando ? (
-        <p className="text-sm text-vialto-steel">Cargando…</p>
+        <CargandoVialto mensaje="Cargando la orden de trabajo…" chico />
       ) : modo === "ver" && orden ? (
         <VistaOrden orden={orden} warning={warning} conPlanes={conPlanes} getToken={getToken} tenantId={tenantId} />
       ) : (

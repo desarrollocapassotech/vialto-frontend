@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { Download, Eye, FileText } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ListadoCard } from "@/components/listado/ListadoCard";
@@ -565,6 +565,7 @@ export function StockMovimientosTenantPage({
                 title="Productos"
                 filterActive={!!productoId}
                 filterSignature={productoId}
+                valor={productos.find((x) => x.id === productoId)?.nombre}
                 onClear={() =>
                   setSearchParams((prev) => {
                     const next = new URLSearchParams(prev);
@@ -620,6 +621,7 @@ export function StockMovimientosTenantPage({
                 title="Cliente"
                 filterActive={!!clienteId}
                 filterSignature={clienteId}
+                valor={clientes.find((x) => x.id === clienteId)?.nombre}
                 onClear={() =>
                   setSearchParams((prev) => {
                     const next = new URLSearchParams(prev);
@@ -668,6 +670,7 @@ export function StockMovimientosTenantPage({
                 title="Depósito"
                 filterActive={!!depositoId}
                 filterSignature={depositoId}
+                valor={depositos.find((x) => x.id === depositoId)?.nombre}
                 onClear={() =>
                   setSearchParams((prev) => {
                     const next = new URLSearchParams(prev);
@@ -751,6 +754,7 @@ export function StockMovimientosTenantPage({
                 title="Usuario"
                 filterActive={!!createdBy}
                 filterSignature={createdBy}
+                valor={usuarios.find((x) => x.id === createdBy)?.nombre}
                 onClear={() =>
                   setSearchParams((prev) => {
                     const next = new URLSearchParams(prev);
@@ -801,7 +805,7 @@ export function StockMovimientosTenantPage({
         rows={loading ? null : items}
         rowKey={(op) => op.id}
         emptyMessage="No hay movimientos para mostrar."
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando movimientos de stock…"
         renderMobileCard={(op, { acciones, onClick }) => {
           const impacto =
             op.tipo === "division" ? getDivisionImpacto(op) : null;

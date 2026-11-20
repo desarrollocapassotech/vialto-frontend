@@ -1,4 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import {
+  numeroActualComprobanteManual,
+  useAutocompletarNumeroComprobante,
+} from "@/hooks/useAutocompletarNumeroComprobante";
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -50,6 +54,39 @@ export function AdjuntarComprobanteModal({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  // Factura de ARCA adjunta: completa el número leyéndolo del archivo (estado vigente en un
+  // ref porque la lectura es async).
+  const autocompletarNumero = useAutocompletarNumeroComprobante();
+  const estadoRef = useRef({ numero, comprobante, file });
+  estadoRef.current = { numero, comprobante, file };
+
+  function autocompletarDesde(f: File) {
+    void autocompletarNumero(f, {
+      vigente: () => estadoRef.current.file === f,
+      numeroActual: () => {
+        const c = estadoRef.current.comprobante;
+        return c
+          ? numeroActualComprobanteManual(c, numeroDesdeComprobanteManual(c))
+          : estadoRef.current.numero;
+      },
+      aplicar: (leido, nuevo) => {
+        const c = estadoRef.current.comprobante;
+        if (c) {
+          setComprobante({
+            ...c,
+            cbteTipo: String(leido.cbteTipo),
+            ptoVenta: String(leido.ptoVenta),
+            cbteNro: String(leido.cbteNro),
+            fecha: c.fecha || (comprobanteManual?.conFecha ? leido.fecha ?? "" : ""),
+          });
+        } else {
+          setNumero(nuevo);
+        }
+        setFieldErrors({});
+      },
+    });
+  }
+
   async function guardar() {
     const errs: Record<string, string> = comprobante
       ? { ...validarComprobanteManual(comprobante, Boolean(comprobanteManual?.conFecha)) }
@@ -79,7 +116,8 @@ export function AdjuntarComprobanteModal({
     <ViewModalShell
       title="Adjuntar comprobante"
       // Con fecha son 4 campos en una fila: en el ancho por defecto los títulos se parten.
-      maxWidthClass={comprobanteManual?.conFecha ? "sm:max-w-3xl" : undefined}
+      // Archivo + número en una fila: más ancho; con los campos por separado (y fecha), más todavía.
+      maxWidthClass={comprobanteManual ? "sm:max-w-4xl" : "sm:max-w-2xl"}
       onClose={saving ? () => {} : descarte.solicitarCierre}
       descarte={descarte}
       footer={
@@ -106,6 +144,26 @@ export function AdjuntarComprobanteModal({
     >
       <div className="grid gap-4">
         <p className="text-sm text-vialto-steel">{titulo}</p>
+        {/* Archivo a la izquierda del número, como en Nueva factura. */}
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[auto_minmax(0,1fr)]">
+        <div className="min-w-0 sm:max-w-[14rem]">
+          <ComprobanteAdjuntoField
+            file={file}
+            onFileChange={(f) => {
+              setFile(f);
+              if (f) {
+                setFieldErrors({});
+                autocompletarDesde(f);
+              }
+            }}
+            disabled={saving}
+            label={
+              <>
+                Archivo <span className="text-red-500">*</span>
+              </>
+            }
+          />
+        </div>
         {comprobante ? (
           <ComprobanteManualFields
             value={comprobante}
@@ -126,19 +184,7 @@ export function AdjuntarComprobanteModal({
             />
           </label>
         )}
-        <ComprobanteAdjuntoField
-          file={file}
-          onFileChange={(f) => {
-            setFile(f);
-            if (f) setFieldErrors({});
-          }}
-          disabled={saving}
-          label={
-            <>
-              Archivo <span className="text-red-500">*</span>
-            </>
-          }
-        />
+        </div>
       </div>
     </ViewModalShell>
   );

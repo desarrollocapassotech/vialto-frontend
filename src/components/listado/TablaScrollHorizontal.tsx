@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+﻿import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const TOLERANCIA_PX = 4;
@@ -84,7 +84,7 @@ function IndicadorLado({
         // A la altura del encabezado, para que siempre quede a la vista al entrar a la tabla.
         className={`tabla-scroll-hint pointer-events-auto absolute top-2 ${
           izq ? 'left-1' : 'right-1'
-        } inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-vialto-fire text-white shadow-lg hover:bg-vialto-fire/90 hover:brightness-110`}
+        } inline-flex h-7 w-7 items-center justify-center rounded-none border border-white/20 bg-vialto-fire text-white shadow-lg hover:bg-vialto-fire/90 hover:brightness-110`}
         style={{ '--hint-dir': izq ? -1 : 1 } as CSSProperties}
       >
         <Icon className="h-4 w-4" strokeWidth={2} />

@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -25,7 +26,10 @@ import {
   condicionTributariaPorPais,
 } from "@/lib/ciudades";
 import type { PaisCodigo } from "@/lib/ciudades";
-import type { Transportista } from "@/types/api";
+import type { ProveedorTipo, Transportista } from "@/types/api";
+import { ProveedorTipoSelect } from "@/components/transportistas/ProveedorTipoSelect";
+import { AvisoSinDatosFiscales } from "@/components/transportistas/AvisoSinDatosFiscales";
+import type { TipoProveedorElegido } from "@/lib/proveedorTipo";
 import { VencimientoPermisoInput } from "@/components/forms/VencimientoPermisoInput";
 import { TelefonoInput } from "@/components/forms/TelefonoInput";
 import { isValidPhoneNumber } from "libphonenumber-js";
@@ -41,6 +45,13 @@ export function TransportistaEditPage() {
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
   const { showToast } = useToast();
+  const [tipoElegido, setTipoElegido] = useState<TipoProveedorElegido>({
+    tipo: "transportista",
+    categoria: "",
+  });
+  const tipo = tipoElegido.tipo;
+  const [tipoGuardado, setTipoGuardado] = useState<ProveedorTipo>("transportista");
+  const esTransportista = tipo === "transportista";
   const [nombre, setNombre] = useState("");
   const [pais, setPais] = useState<PaisCodigo | "">("");
   const [idFiscal, setIdFiscal] = useState("");
@@ -55,8 +66,7 @@ export function TransportistaEditPage() {
   const [fechaVencimientoPermiso, setFechaVencimientoPermiso] = useState("");
   const [confirmDelete, setConfirmDelete] = useState("");
   const [confirmarSinDatosFiscales, setConfirmarSinDatosFiscales] =
-    useState(false);
-  const [loading, setLoading] = useState(false);
+    useState(false);  const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,9 +80,12 @@ export function TransportistaEditPage() {
   const domicilioVisible = isVisible("edicion_transportista", "domicilio");
   const emailVisible = isVisible("edicion_transportista", "email");
   const telefonoVisible = isVisible("edicion_transportista", "telefono");
-  const pautVisible = isVisible("edicion_transportista", "paut");
-  const permisoInternacionalVisible = isVisible("edicion_transportista", "permisoInternacional");
-  const fechaVencimientoPermisoVisible = isVisible("edicion_transportista", "fechaVencimientoPermiso");
+  // Datos para Nómina: solo de un transportista.
+  const pautVisible = esTransportista && isVisible("edicion_transportista", "paut");
+  const permisoInternacionalVisible =
+    esTransportista && isVisible("edicion_transportista", "permisoInternacional");
+  const fechaVencimientoPermisoVisible =
+    esTransportista && isVisible("edicion_transportista", "fechaVencimientoPermiso");
 
   const faltanPais = paisVisible && !pais;
   const faltanIdFiscal = idFiscalVisible && !idFiscal.trim();
@@ -113,6 +126,8 @@ export function TransportistaEditPage() {
           : `/api/transportistas/${encodeURIComponent(id)}`;
         const row = await apiJson<Transportista>(detailPath, withToken);
         if (!cancelled) {
+          setTipoElegido({ tipo: row.tipo ?? "transportista", categoria: row.categoria ?? "" });
+          setTipoGuardado(row.tipo ?? "transportista");
           setNombre(row.nombre);
           setPais(paisCodigoDesdeTexto(row.pais ?? ""));
           setIdFiscal(formatIdFiscal(row.idFiscal, row.pais));
@@ -156,7 +171,11 @@ export function TransportistaEditPage() {
   async function onSave() {
     if (!id) return;
     const errs: Record<string, string> = {};
-    if (!nombre.trim()) errs.nombre = "Ingresá el nombre del transportista.";
+    if (!nombre.trim()) errs.nombre = "Ingresá el nombre del proveedor.";
+    // Todo proveedor "otro" lleva el nombre de su tipo (no hay "otro sin especificar").
+    if (tipo === "otro" && !tipoElegido.categoria.trim()) {
+      errs.categoria = "Escribí qué tipo de proveedor es.";
+    }
     if (telefono.trim() && !isValidPhoneNumber(telefono)) {
       errs.telefono = "Ingresá un teléfono válido para el país seleccionado.";
     }
@@ -171,6 +190,8 @@ export function TransportistaEditPage() {
       setFieldErrors({ idFiscal: errorFiscal });
       return;
     }
+    // Falta país/CUIT: hay que confirmar en el aviso de abajo antes de guardar.
+    if (faltanDatosFiscales && !confirmarSinDatosFiscales) return;
     // No aplica cuando se edita para otro tenant desde superadmin: maestro.transportistas
     // refleja la organización activa de Clerk, no el tenant elegido por query param.
     if (!tenantId && idFiscal.trim()) {
@@ -179,7 +200,7 @@ export function TransportistaEditPage() {
       );
       if (yaExiste) {
         setFieldErrors({
-          idFiscal: `Ya existe un transportista con ese ${idFiscalPorPais(pais).label}.`,
+          idFiscal: `Ya existe un proveedor con ese ${idFiscalPorPais(pais).label}.`,
         });
         return;
       }
@@ -194,6 +215,8 @@ export function TransportistaEditPage() {
       await apiJson(path, () => getToken(), {
         method: "PATCH",
         body: JSON.stringify({
+          tipo,
+          categoria: tipo === "otro" ? tipoElegido.categoria.trim() : undefined,
           nombre: nombre.trim(),
           pais: pais || "",
           idFiscal: idFiscal.trim(),
@@ -212,14 +235,14 @@ export function TransportistaEditPage() {
         }),
       });
       if (!tenantId) void maestro.refreshTransportistas();
-      showToast("Transportista guardado exitosamente", "success");
+      showToast("Proveedor guardado exitosamente", "success");
       navigate(
         `/base-de-datos?tab=transportistas${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
         { replace: true },
       );
     } catch (e) {
       setError(friendlyError(e, "transportistas"));
-      showToast("No se pudo guardar el transportista", "error");
+      showToast("No se pudo guardar el proveedor", "error");
     } finally {
       setLoading(false);
     }
@@ -235,7 +258,7 @@ export function TransportistaEditPage() {
         : `/api/transportistas/${encodeURIComponent(id)}`;
       await apiJson(path, () => getToken(), { method: "DELETE" });
       if (!tenantId) void maestro.refreshTransportistas();
-      showToast("Transportista eliminado correctamente", "success");
+      showToast("Proveedor eliminado correctamente", "success");
       navigate(
         `/base-de-datos?tab=transportistas${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
         { replace: true },
@@ -263,9 +286,9 @@ export function TransportistaEditPage() {
   const warningText = warningParts.join(" y/o ");
 
   return (
-    <CrudPageLayout title="Editar transportista">
+    <CrudPageLayout title="Editar proveedor">
       {initialLoading || paisFijoLoading ? (
-        <p className="mt-6 text-vialto-steel">Cargando…</p>
+        <CargandoVialto mensaje="Cargando el proveedor…" />
       ) : (
         <>
           <form
@@ -275,6 +298,24 @@ export function TransportistaEditPage() {
               onSave();
             }}
           >
+            <label className="grid gap-1.5">
+              <CrudFieldLabel required>Tipo</CrudFieldLabel>
+              <ProveedorTipoSelect
+                value={tipoElegido}
+                onChange={setTipoElegido}
+                tenantId={tenantId || undefined}
+                error={!!fieldErrors.categoria}
+              />
+              <CrudFieldError message={fieldErrors.categoria} />
+              {tipo !== tipoGuardado && (
+                <p className="text-xs text-amber-800/90">
+                  Si ya tiene viajes, liquidaciones u órdenes de trabajo cargadas con el tipo
+                  anterior, no se va a poder cambiar.
+                  {tipo !== "transportista" && tipoGuardado === "transportista" &&
+                    " Se borran los datos para Nómina (PAUT y permiso internacional)."}
+                </p>
+              )}
+            </label>
             <label className="grid gap-1.5">
               <CrudFieldLabel required>Nombre</CrudFieldLabel>
               <CrudInput
@@ -344,26 +385,6 @@ export function TransportistaEditPage() {
               </div>
             )}
             <ArcaPadronStatus {...arca} />
-            {faltanDatosFiscales && (
-              <div className="space-y-2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                <p>
-                  Estás guardando el transportista sin {warningText} — esto puede
-                  afectar la facturación/liquidaciones más adelante si no se
-                  completa.
-                </p>
-                <label className="flex items-center gap-2 font-medium">
-                  <input
-                    type="checkbox"
-                    checked={confirmarSinDatosFiscales}
-                    onChange={(e) =>
-                      setConfirmarSinDatosFiscales(e.target.checked)
-                    }
-                    className="h-4 w-4 accent-vialto-charcoal"
-                  />
-                  Entiendo, guardar igual
-                </label>
-              </div>
-            )}
             {domicilioVisible && (
               <label className="grid gap-1.5">
                 <span className={labelClass}>Domicilio</span>
@@ -436,25 +457,31 @@ export function TransportistaEditPage() {
               </div>
             )}
 
+            {/* Al final del formulario, mientras falten país o CUIT. */}
+            {faltanDatosFiscales && (
+              <AvisoSinDatosFiscales
+                faltante={warningText}
+                confirmado={confirmarSinDatosFiscales}
+                onConfirmadoChange={setConfirmarSinDatosFiscales}
+              />
+            )}
             <CrudFormErrorAlert message={error} />
             <CrudSubmitButton
               loading={loading}
               label="Guardar cambios"
-              disabled={
-                !!errorFiscal ||
-                (faltanDatosFiscales && !confirmarSinDatosFiscales)
-              }
+              // Faltando país o CUIT, hasta tildar "Entiendo, guardar igual".
+              disabled={!!errorFiscal || (faltanDatosFiscales && !confirmarSinDatosFiscales)}
             />
           </form>
 
           <CrudDangerZone
-            message="Para eliminar este transportista, escribí su nombre exacto."
+            message="Para eliminar este proveedor, escribí su nombre exacto. Si ya tiene viajes, órdenes de trabajo o cuenta corriente, no se puede eliminar: desactivalo desde el listado."
             confirmValue={confirmDelete}
             onConfirmValueChange={setConfirmDelete}
             canDelete={confirmDelete.trim() === nombre.trim()}
             deleting={deleting}
             onDelete={onDelete}
-            deleteLabel="Eliminar transportista"
+            deleteLabel="Eliminar proveedor"
           />
         </>
       )}

@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import {
@@ -103,7 +104,7 @@ export function MovimientoStockViewModal({
       }
     >
       {loading && (
-        <p className="text-sm text-vialto-steel">Cargando detalle…</p>
+        <CargandoVialto mensaje="Cargando el movimiento…" chico />
       )}
       {error && (
         <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">

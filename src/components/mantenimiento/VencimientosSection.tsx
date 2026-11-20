@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowUp, FileText, Gauge, History, Wrench } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { ArrowDown, ArrowUp, CalendarClock, CircleAlert, FileText, Gauge, History, Wrench } from "lucide-react";
 import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
@@ -62,7 +63,12 @@ export function VencimientosSection({
   const maestro = useMaestroData();
   const [filas, setFilas] = useState<FilaVencimiento[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [estado, setEstado] = useState<EstadoVencimiento | "">("");
+  // `?estado=vencido|proximo` (ej. desde una tarjeta del panel) arranca con ese filtro.
+  const [searchParams] = useSearchParams();
+  const [estado, setEstado] = useState<EstadoVencimiento | "">(() => {
+    const e = searchParams.get("estado");
+    return e === "vencido" || e === "proximo" ? e : "";
+  });
   const [vehiculoId, setVehiculoId] = useState("");
   const [categoria, setCategoria] = useState("");
   const [ordenFecha, setOrdenFecha] = useState<"asc" | "desc">("asc");
@@ -95,6 +101,7 @@ export function VencimientosSection({
   const opcionesRapidas: FiltroRapidoOpcion<EstadoFiltroRapido>[] = ESTADOS_FILTRO_RAPIDO.map((e) => ({
     id: e,
     label: ESTADO_VENCIMIENTO[e].contador,
+    icon: e === "vencido" ? CircleAlert : CalendarClock,
     count: filas ? contadores[e] : undefined,
   }));
 
@@ -153,6 +160,7 @@ export function VencimientosSection({
             value={estado === "vencido" || estado === "proximo" ? estado : ""}
             onChange={(v) => setEstado(v)}
             ariaLabel="Filtrar vencimientos por estado"
+            cargando={filas === null && !error}
           />,
           limpiarFiltrosSlot,
         )}
@@ -187,6 +195,7 @@ export function VencimientosSection({
                 title="Estado"
                 filterActive={!!estado}
                 filterSignature={estado}
+                valor={estado ? ESTADO_VENCIMIENTO[estado].contador : null}
                 onClear={() => setEstado("")}
               >
                 <select
@@ -209,6 +218,7 @@ export function VencimientosSection({
                 title="Vehículo"
                 filterActive={!!vehiculoId}
                 filterSignature={vehiculoId}
+                valor={vehiculosConPlanes.find((veh) => veh.id === vehiculoId)?.patente}
                 onClear={() => setVehiculoId("")}
               >
                 <SearchableEntitySelect<Vehiculo>
@@ -234,6 +244,7 @@ export function VencimientosSection({
                 title="Plan"
                 filterActive={!!categoria}
                 filterSignature={categoria}
+                valor={categoria === "documental" ? "Documentales" : categoria === "mecanico" ? "Mecánicos" : null}
                 onClear={() => setCategoria("")}
               >
                 <select

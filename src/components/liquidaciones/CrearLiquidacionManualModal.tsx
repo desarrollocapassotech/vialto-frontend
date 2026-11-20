@@ -37,6 +37,13 @@ import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFa
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { ComprobanteManualFields } from "@/components/shared/ComprobanteManualFields";
+import { NumeroComprobanteField } from "@/components/shared/NumeroComprobanteField";
+import { URL_NUMERO_INTERNO } from "@/lib/numeroInterno";
+import { numeroDesdeComprobanteManual } from "@/lib/comprobanteManual";
+import {
+  numeroActualComprobanteManual,
+  useAutocompletarNumeroComprobante,
+} from "@/hooks/useAutocompletarNumeroComprobante";
 import {
   comprobanteManualDraftDesde,
   payloadComprobanteLiquidacion,
@@ -85,6 +92,7 @@ import {
   signedMontoConIvaConcepto,
   signedMontoNetoConcepto,
 } from "@/lib/liquidacionConceptosIva";
+import { tramosIvaParaLiquidacion } from "@/lib/viajeTramosTransportista";
 import { useToast } from "@/lib/toast";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import {
@@ -111,6 +119,7 @@ import type {
   ArcaConfig,
 } from "@/types/api";
 import { ordenarAlfabetico } from "@/lib/ordenAlfabetico";
+import { TransportistaSearchSelect } from "@/components/forms/MaestroSearchSelects";
 
 type ViajeItem = Pick<
   Viaje,
@@ -126,6 +135,7 @@ type ViajeItem = Pick<
   | "precioTransportistaExterno"
   | "monedaPrecioTransportistaExterno"
   | "precioTransportistaIvaIncluidoPct"
+  | "tramosTransportista"
   | "cantidadTransportista"
   | "precioUnitarioTransportista"
   | "liquidacionesViaje"
@@ -327,6 +337,20 @@ export function CrearLiquidacionManualModal({
   const elegirTransportistaEnViaje =
     viajeInicial != null &&
     viajePermiteElegirTransportistaLiquidacion(viajeInicial);
+  /**
+   * Opciones del selector de transportista: desde un viaje, solo los del viaje con su rol
+   * ("Contratante", "Efectivo") en el nombre; si no, todos (el selector oculta los inactivos).
+   */
+  const transportistasSelect = useMemo<Transportista[]>(
+    () =>
+      viajeInicial
+        ? transportistaOpcionesViaje.map((o) => ({
+            ...(transportistas.find((t) => t.id === o.id) ?? ({ id: o.id } as Transportista)),
+            nombre: o.rolLabel ? `${o.nombre} — ${o.rolLabel}` : o.nombre,
+          }))
+        : transportistas,
+    [viajeInicial, transportistaOpcionesViaje, transportistas],
+  );
 
   // — Campos del formulario —
   const [transportistaId, setTransportistaId] = useState(
@@ -403,6 +427,8 @@ export function CrearLiquidacionManualModal({
   const [numeroComprobanteProveedor, setNumeroComprobanteProveedor] = useState(
     existente?.numeroComprobanteProveedor ?? "",
   );
+  // "Comprobante interno" (solo alta sin Líquido Producto): número interno que asigna el backend.
+  const [numeroAutomatico, setNumeroAutomatico] = useState(false);
   // Liquidación manual (empresa con ARCA, transportista monotributista): la factura del
   // transportista va por separado — tipo, punto de venta, número y fecha (Libro IVA).
   const [cbteProveedor, setCbteProveedor] = useState<ComprobanteManualDraft>(() =>
@@ -576,6 +602,78 @@ export function CrearLiquidacionManualModal({
   /** Esta liquidación va por ARCA (emisión, pto. de venta, datos fiscales completos). */
   const conArca = hasLiquidoProductoArca && !liquidacionManual;
   const showComprobante = !conArca;
+  /** Número de comprobante libre (sin ARCA): va en la primera fila, junto a comisión e IVA. */
+  const campoNumeroEnFila = showComprobante && !liquidacionManual;
+
+  // — Autocompletar el número desde la factura de ARCA adjunta —
+  const autocompletarNumero = useAutocompletarNumeroComprobante();
+  /** Estado vigente, para decidir después de leer el archivo (async). */
+  const estadoAdjuntoRef = useRef({
+    comprobanteFile,
+    numeroAutomatico,
+    numeroComprobanteProveedor,
+    cbteProveedor,
+    liquidacionManual,
+  });
+  estadoAdjuntoRef.current = {
+    comprobanteFile,
+    numeroAutomatico,
+    numeroComprobanteProveedor,
+    cbteProveedor,
+    liquidacionManual,
+  };
+
+  /**
+   * Factura de ARCA adjunta: completa el número de comprobante (o tipo + punto de venta +
+   * número + fecha en la liquidación manual del monotributista) leyéndolo del PDF/QR. Solo si
+   * está vacío o lo había completado el sistema: nunca pisa lo que escribió el usuario.
+   */
+  /** Archivo del comprobante: siempre a la izquierda del número (o de la factura del transportista). */
+  function renderAdjunto() {
+    return (
+      <div className="min-w-0 sm:max-w-[14rem]">
+        <ComprobanteAdjuntoField
+          file={comprobanteFile}
+          onFileChange={(file) => {
+            setComprobanteFile(file);
+            if (file) void autocompletarNumeroDesdeAdjunto(file);
+          }}
+          disabled={submitting}
+          labelClassName={labelClass}
+        />
+      </div>
+    );
+  }
+
+  function autocompletarNumeroDesdeAdjunto(file: File) {
+    const est = () => estadoAdjuntoRef.current;
+    return autocompletarNumero(file, {
+      vigente: () =>
+        est().comprobanteFile === file && (est().liquidacionManual || !est().numeroAutomatico),
+      numeroActual: () =>
+        est().liquidacionManual
+          ? numeroActualComprobanteManual(
+              est().cbteProveedor,
+              numeroDesdeComprobanteManual(est().cbteProveedor),
+            )
+          : est().numeroComprobanteProveedor,
+      aplicar: (leido, numero) => {
+        if (est().liquidacionManual) {
+          const cbte = est().cbteProveedor;
+          setCbteProveedor({
+            ...cbte,
+            cbteTipo: String(leido.cbteTipo),
+            ptoVenta: String(leido.ptoVenta),
+            cbteNro: String(leido.cbteNro),
+            fecha: cbte.fecha || leido.fecha || "",
+          });
+          setCbteProveedorErrores({});
+        } else {
+          setNumeroComprobanteProveedor(numero);
+        }
+      },
+    });
+  }
   const rangoFechaArca = rangoFechaEmisionArca();
   const errorFechaEmision = conArca ? errorFechaEmisionArca(fechaEmision) : null;
   const cvlpClaseBAlerta = conArca && cvlpClaseBEsperada(condicionIva);
@@ -1162,6 +1260,7 @@ export function CrearLiquidacionManualModal({
       } else if (showComprobante) {
         const nro = numeroComprobanteProveedor.trim();
         if (existente) body.numeroComprobanteProveedor = nro || null;
+        else if (numeroAutomatico) body.numeroAutomatico = true;
         else if (nro) body.numeroComprobanteProveedor = nro;
       }
 
@@ -1276,14 +1375,24 @@ export function CrearLiquidacionManualModal({
   );
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
   const ivaPctNum = ivaPct.trim() !== "" ? Number(ivaPct) : 0;
+  // Flete de cada viaje por alícuota: sus tramos de IVA si tiene, o un solo % para
+  // todo (mismo criterio que el backend al liquidar).
+  const partesFleteViaje = (v: ViajeItem) => {
+    const vBruto = v.precioTransportistaExterno ?? 0;
+    return (
+      tramosIvaParaLiquidacion(
+        vBruto,
+        v.precioTransportistaIvaIncluidoPct,
+        v.tramosTransportista,
+      ) ?? [{ base: vBruto, ivaPct: v.precioTransportistaIvaIncluidoPct || ivaPctNum }]
+    );
+  };
   let ivaGeneral = 0;
   if (selectedViajes.length > 0) {
     let ivaFletes = 0;
     for (const v of selectedViajes) {
-      const vIva = v.precioTransportistaIvaIncluidoPct || ivaPctNum;
-      const vBruto = v.precioTransportistaExterno ?? 0;
-      if (vIva > 0) {
-        ivaFletes += (vBruto * vIva) / 100;
+      for (const parte of partesFleteViaje(v)) {
+        if (parte.ivaPct > 0) ivaFletes += (parte.base * parte.ivaPct) / 100;
       }
     }
     const ivaComision = ivaPctNum > 0 ? (comisionMonto * ivaPctNum) / 100 : 0;
@@ -1314,8 +1423,9 @@ export function CrearLiquidacionManualModal({
     };
     if (selectedViajes.length > 0) {
       for (const v of selectedViajes) {
-        const pct = v.precioTransportistaIvaIncluidoPct || ivaPctNum;
-        if (pct > 0) sumar(pct, ((v.precioTransportistaExterno ?? 0) * pct) / 100);
+        for (const parte of partesFleteViaje(v)) {
+          if (parte.ivaPct > 0) sumar(parte.ivaPct, (parte.base * parte.ivaPct) / 100);
+        }
       }
       if (ivaPctNum > 0) sumar(ivaPctNum, -(comisionMonto * ivaPctNum) / 100);
     } else {
@@ -1552,8 +1662,55 @@ export function CrearLiquidacionManualModal({
                     detalleAbierto ? "lg:border-r lg:border-black/10" : ""
                   }`}
                 >
-                  {/* Transportista, comisión e IVA en una sola fila. */}
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                  {/* Una sola fila: sin ARCA, número de comprobante + transportista + comisión + IVA
+                      (mismo orden que Nueva factura); con ARCA, transportista + fecha de emisión +
+                      comisión + IVA. */}
+                  <div
+                    className={`grid grid-cols-1 gap-3 ${
+                      campoNumeroEnFila
+                        ? "items-start sm:grid-cols-2 lg:grid-cols-[auto_minmax(0,1.3fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                        : conArca
+                          ? "sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                          : "sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                    }`}
+                  >
+                    {/* Sin ARCA: archivo + número de comprobante a la izquierda, como en Nueva factura. */}
+                    {campoNumeroEnFila && renderAdjunto()}
+                    {campoNumeroEnFila &&
+                      (existente ? (
+                        <div>
+                          <label htmlFor="numeroComprobanteProveedor" className={labelClass}>
+                            Número de comprobante
+                          </label>
+                          <input
+                            id="numeroComprobanteProveedor"
+                            type="text"
+                            maxLength={64}
+                            value={numeroComprobanteProveedor}
+                            onChange={(e) => setNumeroComprobanteProveedor(e.target.value)}
+                            placeholder="Ej. 0001-00001234"
+                            className={inputClass}
+                            disabled={submitting}
+                          />
+                        </div>
+                      ) : (
+                        <NumeroComprobanteField
+                          id="numeroComprobanteProveedor"
+                          label="Número de comprobante"
+                          labelClassName={labelClass}
+                          inputClassName={inputClass}
+                          value={numeroComprobanteProveedor}
+                          onChange={setNumeroComprobanteProveedor}
+                          placeholder="Ej. 0001-00001234"
+                          disabled={submitting}
+                          automatico={numeroAutomatico}
+                          onAutomaticoChange={setNumeroAutomatico}
+                          urlNumeroInterno={URL_NUMERO_INTERNO.liquidaciones(
+                            plataforma ? tenantId! : undefined,
+                          )}
+                          getToken={getToken}
+                        />
+                      ))}
                     <div>
                       <label className={labelClass}>
                         {tl.singular} <span className="text-red-500">*</span>
@@ -1563,32 +1720,19 @@ export function CrearLiquidacionManualModal({
                           {transportistaNombre}
                         </div>
                       ) : (
-                        <select
-                          required
+                        /* Con buscador (nombre o CUIT). Desde un viaje: solo sus transportistas,
+                           con el rol en el nombre; si no, los activos. */
+                        <TransportistaSearchSelect
+                          transportistas={transportistasSelect}
                           value={transportistaId}
-                          onChange={(e) => setTransportistaId(e.target.value)}
-                          className={selectClass}
-                        >
-                          <option value="">
-                            — Seleccioná un {tFrase} —
-                          </option>
-                          {ordenarAlfabetico(
-                            viajeInicial
-                              ? transportistaOpcionesViaje
-                              : transportistas.map((t) => ({
-                                  id: t.id,
-                                  nombre: t.nombre,
-                                  rolLabel: "",
-                                })),
-                            (opt) => opt.nombre,
-                          ).map((opt) => (
-                            <option key={opt.id} value={opt.id}>
-                              {opt.rolLabel
-                                ? `${opt.nombre} — ${opt.rolLabel}`
-                                : opt.nombre}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setTransportistaId}
+                          incluirInactivos={Boolean(viajeInicial)}
+                          inputClassName={inputClass}
+                          placeholderCerrado={`Elegí un ${tFrase}…`}
+                          placeholderBuscar={`Buscar ${tFrase}…`}
+                          emptyListChoiceLabel={`Elegí un ${tFrase}…`}
+                          aria-label={tl.singular}
+                        />
                       )}
                     </div>
                     {/* La condición frente al IVA del transportista se ve en el tooltip del Receptor (panel derecho). */}
@@ -1917,49 +2061,27 @@ export function CrearLiquidacionManualModal({
                     </p>
                   )}
 
+                  {/* Monotributista: archivo a la izquierda de la factura del transportista. */}
                   {liquidacionManual && (
-                    <div>
-                      <p className={labelClass}>Factura del {tFrase}</p>
-                      <ComprobanteManualFields
-                        value={cbteProveedor}
-                        onChange={(v) => {
-                          setCbteProveedor(v);
-                          setCbteProveedorErrores({});
-                        }}
-                        errores={cbteProveedorErrores}
-                        conFecha
-                        disabled={submitting}
-                        labelClassName={labelClass}
-                        inputClassName={inputClass}
-                        className="grid grid-cols-1 gap-3 sm:grid-cols-2"
-                      />
+                    <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)]">
+                      {renderAdjunto()}
+                      <div>
+                        <p className={labelClass}>Factura del {tFrase}</p>
+                        <ComprobanteManualFields
+                          value={cbteProveedor}
+                          onChange={(v) => {
+                            setCbteProveedor(v);
+                            setCbteProveedorErrores({});
+                          }}
+                          errores={cbteProveedorErrores}
+                          conFecha
+                          disabled={submitting}
+                          labelClassName={labelClass}
+                          inputClassName={inputClass}
+                          className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+                        />
+                      </div>
                     </div>
-                  )}
-
-                  {showComprobante && !liquidacionManual && (
-                    <div>
-                      <label htmlFor="numeroComprobanteProveedor" className={labelClass}>
-                        Número de comprobante
-                      </label>
-                      <input
-                        id="numeroComprobanteProveedor"
-                        type="text"
-                        maxLength={64}
-                        value={numeroComprobanteProveedor}
-                        onChange={(e) => setNumeroComprobanteProveedor(e.target.value)}
-                        placeholder="Ej. 0001-00001234"
-                        className={inputClass}
-                        disabled={submitting}
-                      />
-                    </div>
-                  )}
-
-                  {showComprobante && (
-                    <ComprobanteAdjuntoField
-                      file={comprobanteFile}
-                      onFileChange={setComprobanteFile}
-                      disabled={submitting}
-                    />
                   )}
 
                   {cvlpClaseBAlerta && (

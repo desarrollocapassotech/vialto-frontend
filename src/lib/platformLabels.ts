@@ -1,10 +1,3 @@
-const facturacion: Record<string, string> = {
-  trial: 'En prueba',
-  active: 'Al día',
-  suspended: 'Suspendido',
-  expired: 'Vencido',
-};
-
 const modulos: Record<string, string> = {
   viajes: 'Viajes',
   clientes: 'Clientes',
@@ -20,11 +13,6 @@ const modulos: Record<string, string> = {
   combustible: 'Combustible',
   mantenimiento: 'Mantenimiento',
 };
-
-export function labelBillingStatus(status: string): string {
-  const s = status.toLowerCase();
-  return facturacion[s] ?? status;
-}
 
 export function labelModulo(code: string): string {
   const c: string = code.toLowerCase();

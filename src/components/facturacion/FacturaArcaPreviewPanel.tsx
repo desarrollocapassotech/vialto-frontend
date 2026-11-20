@@ -33,8 +33,9 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function fmtMoney(n: number) {
-  return `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ARS`;
+function fmtMoneyEn(moneda: string) {
+  return (n: number) =>
+    `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${moneda}`;
 }
 
 // Fecha sin hora: siempre en UTC, si no en Argentina se ve un día antes (ver CLAUDE.md del frontend).
@@ -44,7 +45,9 @@ const fmtDate = fmtDateUtc;
 export function totalesResumenFactura(
   lineas: FacturaLineaDraft[],
   ivaPctDefault: number,
+  moneda = "ARS",
 ): { filas: ResumenTotalFila[]; total: ResumenTotalFila } {
+  const fmtMoney = fmtMoneyEn(moneda);
   const totales = computeFacturaTotales(lineas, ivaPctDefault);
   const ivaPorAlicuota = computeIvaPorAlicuota(lineas, ivaPctDefault);
   return {
@@ -85,6 +88,15 @@ export type FacturaArcaPreviewPanelProps = {
   /** Los datos del receptor se acaban de actualizar solos (desde ARCA): parpadeo suave. */
   receptorResaltado?: boolean;
   feedbackSlot?: ReactNode;
+  /**
+   * Factura sin ARCA (empresa sin el módulo o factura hecha por fuera del sistema): sin tipo
+   * ni emisor; el receptor ocupa el ancho y el comprobante muestra el número.
+   */
+  sinArca?: boolean;
+  /** Número de la factura sin ARCA (lo carga el usuario). */
+  numero?: string;
+  /** Moneda de los viajes (ARS por defecto; sin ARCA puede ser USD). */
+  moneda?: string;
 };
 
 export function FacturaArcaPreviewPanel({
@@ -108,12 +120,19 @@ export function FacturaArcaPreviewPanel({
   estadoReceptor,
   receptorResaltado = false,
   feedbackSlot,
+  sinArca = false,
+  numero,
+  moneda = "ARS",
 }: FacturaArcaPreviewPanelProps) {
   // Empresa efectiva (propia u override de superadmin) para armar el detalle como en el PDF.
   const { tenant: tenantPdf } = useTenantPaisFijo(tenantId);
+  const fmtMoney = fmtMoneyEn(moneda);
   const condicionIva = clienteDetalle?.condicionIva ?? null;
   const letra = facturaLetraFromCondicionIva(condicionIva);
-  const resumenTotales = totalesResumenFactura(lineas, ivaPctDefault);
+  const resumenTotales = totalesResumenFactura(lineas, ivaPctDefault, moneda);
+  // Viajes y conceptos van en secciones separadas (como "Comisión y conceptos" en liquidación).
+  const lineasViajes = lineas.filter((l) => !l.esConcepto);
+  const lineasConceptos = lineas.filter((l) => l.esConcepto);
   const missingClienteFields = missingEmitFields.filter((f) =>
     f.startsWith("Cliente:")
   );
@@ -132,20 +151,22 @@ export function FacturaArcaPreviewPanel({
   return (
     <div className="space-y-4">
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs uppercase tracking-wider text-vialto-steel">
-          Tipo:
-        </span>
-        <span className="text-xs font-semibold uppercase tracking-wider text-vialto-charcoal">
-          {facturaLetraLabel(letra)}
-        </span>
-        <span className="text-xs text-vialto-steel">
-          ({condicionLabel})
-        </span>
-      </div>
+      {!sinArca && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs uppercase tracking-wider text-vialto-steel">
+            Tipo:
+          </span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-vialto-charcoal">
+            {facturaLetraLabel(letra)}
+          </span>
+          <span className="text-xs text-vialto-steel">
+            ({condicionLabel})
+          </span>
+        </div>
+      )}
 
-      <div className="grid grid-cols-2 gap-4">
-        <EmisorArcaResumen arcaConfig={arcaConfig} />
+      <div className={sinArca ? "grid grid-cols-1 gap-4" : "grid grid-cols-2 gap-4"}>
+        {!sinArca && <EmisorArcaResumen arcaConfig={arcaConfig} />}
         <ParteFacturaResumen
           titulo="Receptor"
           nombre={clienteDetalle?.nombre}
@@ -182,6 +203,7 @@ export function FacturaArcaPreviewPanel({
         <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
           Comprobante
         </p>
+        {sinArca && <Row label="Número" value={numero?.trim() || "—"} />}
         <Row label="Fecha de emisión" value={fmtDate(fechaEmision)} />
       </section>
 
@@ -200,17 +222,23 @@ export function FacturaArcaPreviewPanel({
           Detalles del viaje
         </p>
         {lineasDisabled ? (
-          <div className="space-y-3 pt-1">
-            {lineas.map((linea, idx) => (
-              <FacturaLineaDetalle
-                key={idx}
-                linea={linea}
-                ivaPctDefault={ivaPctDefault}
-                formatMonto={fmtMoney}
-                tenant={tenantPdf}
-              />
-            ))}
-          </div>
+          lineasViajes.length === 0 ? (
+            <p className="pt-1 text-xs leading-relaxed text-vialto-steel">
+              Seleccioná el cliente y al menos un viaje para ver el desglose de montos.
+            </p>
+          ) : (
+            <div className="space-y-3 pt-1">
+              {lineasViajes.map((linea, idx) => (
+                <FacturaLineaDetalle
+                  key={idx}
+                  linea={linea}
+                  ivaPctDefault={ivaPctDefault}
+                  formatMonto={fmtMoney}
+                  tenant={tenantPdf}
+                />
+              ))}
+            </div>
+          )
         ) : (
           <div className="pt-1">
             <FacturaLineasEditor
@@ -223,6 +251,26 @@ export function FacturaArcaPreviewPanel({
           </div>
         )}
       </section>
+
+      {/* Conceptos (neto, sin IVA, en el orden de carga), como en el detalle de liquidación. */}
+      {lineasDisabled && lineasConceptos.length > 0 && (
+        <section className="space-y-1">
+          <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
+            Conceptos
+          </p>
+          {lineasConceptos.map((l, idx) => (
+            <Row
+              key={idx}
+              label={
+                (l.cantidad ?? 1) !== 1
+                  ? `${l.descripcion} (${(l.cantidad ?? 1).toLocaleString("es-AR")} × ${fmtMoney(l.precioUnitario ?? l.importe)})`
+                  : l.descripcion
+              }
+              value={`+ ${fmtMoney(l.importe)}`}
+            />
+          ))}
+        </section>
+      )}
 
       <div className="space-y-1 border-t border-black/10 pt-2">
         {resumenTotales.filas.map((f) => (

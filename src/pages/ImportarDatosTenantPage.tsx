@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useSearchParams } from "react-router-dom";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { ImportWizard } from "@/components/importacion/ImportWizard";
@@ -9,7 +10,7 @@ export function ImportarDatosTenantPage() {
 
   if (loading) {
     return (
-      <div className="text-vialto-steel py-12 text-center">Un momento…</div>
+      <CargandoVialto mensaje="Preparando la importación…" />
     );
   }
 

@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { Ban, Clock, Download, FileMinus, FileSearch, Receipt, Trash2 } from "lucide-react";
@@ -414,13 +415,14 @@ function LiquidacionesTab({
 
   if (loading)
     return (
-      <p className="mt-6 text-sm text-vialto-steel">Cargando liquidaciones…</p>
+      <CargandoVialto mensaje="Cargando liquidaciones…" />
     );
   if (error) return <p className="mt-6 text-sm text-amber-700">{error}</p>;
 
   return (
     <div className="mt-6 space-y-3">
       <ListadoDatos
+        loadingMessage="Cargando liquidaciones…"
         columns={[
           {
             id: "periodo",
@@ -500,6 +502,7 @@ function LiquidacionesTab({
           },
         ]}
         rows={items ?? []}
+        cargando={loading}
         rowKey={(liq) => liq.id}
         emptyMessage="No hay liquidaciones para esta empresa."
         rowActions={accionesLiquidacion}
@@ -681,11 +684,12 @@ function LogsTab({ tenantId }: { tenantId: string }) {
   }, [tenantId]);
 
   if (loading)
-    return <p className="mt-6 text-sm text-vialto-steel">Cargando logs…</p>;
+    return <CargandoVialto mensaje="Cargando logs de ARCA…" />;
   if (error) return <p className="mt-6 text-sm text-amber-700">{error}</p>;
 
   return (
     <ListadoDatos
+      loadingMessage="Cargando logs de ARCA…"
       className="mt-6"
       columns={[
         {
@@ -740,6 +744,7 @@ function LogsTab({ tenantId }: { tenantId: string }) {
         },
       ]}
       rows={logs ?? []}
+      cargando={loading}
       rowKey={(log) => log.id}
       emptyMessage="No hay logs registrados para esta empresa."
       renderMobileCard={(log) => (
@@ -812,13 +817,7 @@ export function SuperadminArcaPage() {
           />
         </div>
 
-        {!tenantId && (
-          <p className="mt-6 text-sm text-vialto-steel">
-            Seleccioná una empresa para gestionar su configuración ARCA.
-          </p>
-        )}
-
-        {tenantId && (
+                {tenantId && (
           <>
             <div className="mt-8 flex gap-0.5 border-b border-black/10">
               {TABS.map((t) => (

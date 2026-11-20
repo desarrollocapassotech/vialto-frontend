@@ -56,6 +56,7 @@ import {
 import type { PaisCodigo } from "@/lib/ciudades";
 import {
   etapaViajeLabel,
+  facturacionPermiteVincular,
   liquidacionPermiteVincular,
   VIAJE_ETAPAS_TODAS,
   tooltipEtapaViaje,
@@ -113,6 +114,11 @@ import {
 } from "@/lib/viajesClientes";
 import { conBordeError } from "@/lib/bordeError";
 import { FaltaCampo } from "@/components/shared/FaltaCampo";
+import { TramosTransportistaEditor } from "@/components/viajes/TramosTransportistaEditor";
+import {
+  tramosTransportistaDraftToApi,
+  type TramoTransportistaDraft,
+} from "@/lib/viajeTramosTransportista";
 
 /** A qué campo aplicar el país recién creado desde "+ Nuevo país". */
 type PaisQuickCreateTarget =
@@ -152,6 +158,8 @@ export type ViajeInlineDraft = {
   precioTransportistaExterno: string;
   monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
   precioTransportistaIvaIncluidoPct: string;
+  /** Tramos del pago al transportista con su propio % de IVA. */
+  tramosTransportista: TramoTransportistaDraft[];
   cantidadTransportista: string;
   precioUnitarioTransportista: string;
   otrosGastos: OtroGastoDraft[];
@@ -289,7 +297,6 @@ export function ViajeEditModal({
   tenantId,
   tenant,
   hasLiquidoProductoArca = false,
-  hasFacturasArca = false,
   onRegistrarPago,
   onProductoCreado,
   onClienteCreado,
@@ -481,27 +488,21 @@ export function ViajeEditModal({
 
   const { datosClienteBloqueados, datosTransporteBloqueados } = useMemo(() => {
     if (!snapshotViaje) return { datosClienteBloqueados: false, datosTransporteBloqueados: false };
-    const facturado =
-      snapshotViaje.facturacionEstado === "facturado" ||
-      snapshotViaje.facturacionEstado === "cobrado";
+    // Mismos estados que el backend (FACTURACION/LIQUIDACION_ESTADOS_DISPONIBLES).
+    const facturado = !facturacionPermiteVincular(
+      String(snapshotViaje.facturacionEstado ?? "sin_facturar"),
+    );
+    const liquidado = !liquidacionPermiteVincular(
+      (snapshotViaje as any).liquidacionEstado ?? null,
+    );
 
-    // Cast a any por si liquidacionEstado no está tipado estrictamente en Viaje aún
-    const liquidado =
-      (snapshotViaje as any).liquidacionEstado === "liquidado" ||
-      (snapshotViaje as any).liquidacionEstado === "pagado";
-
-    const hasArca = Boolean(hasFacturasArca || hasLiquidoProductoArca);
-
-    if (hasArca) {
-      const bloqueado = facturado || liquidado;
-      return { datosClienteBloqueados: bloqueado, datosTransporteBloqueados: bloqueado };
-    }
-
+    // Lock por lado, con o sin ARCA (mismo criterio que ViajesService.update): la
+    // factura bloquea el lado cliente y la liquidación el lado transportista.
     return {
       datosClienteBloqueados: facturado,
       datosTransporteBloqueados: liquidado,
     };
-  }, [snapshotViaje, hasFacturasArca, hasLiquidoProductoArca]);
+  }, [snapshotViaje]);
 
   // true si el viaje tiene una liquidación vigente (no disponible para vincular
   // una nueva). Se usa para: (1) bloquear "% de IVA que suma el transportista" — mismo
@@ -543,7 +544,11 @@ export function ViajeEditModal({
     Number(draft.precioTransportistaIvaIncluidoPct.replace(",", ".")) || 0;
   const pagoNetoTransportista =
     pagoBrutoTransportista != null
-      ? engrosarConIva(pagoBrutoTransportista, pctIvaTransportista)
+      ? engrosarConIva(
+          pagoBrutoTransportista,
+          pctIvaTransportista,
+          tramosTransportistaDraftToApi(draft.tramosTransportista),
+        )
       : null;
   const montoIvaTransportista =
     pagoNetoTransportista != null && pagoBrutoTransportista != null
@@ -730,8 +735,8 @@ export function ViajeEditModal({
                   {datosClienteBloqueados && datosTransporteBloqueados
                     ? "Este viaje tiene comprobantes emitidos (factura y liquidación). Los campos de cliente, transportista y montos están bloqueados para evitar discrepancias. Si necesitás modificarlos, primero deberás anular los comprobantes."
                     : datosClienteBloqueados
-                      ? "Este viaje tiene una factura emitida. Los datos del cliente y los montos a cobrar están bloqueados para evitar discrepancias. Si necesitás modificarlos, primero deberás anular la factura."
-                      : "Este viaje tiene una liquidación emitida. Los datos del transportista y los montos a pagar están bloqueados para evitar discrepancias. Si necesitás modificarlos, primero deberás anular la liquidación."}
+                      ? "Este viaje tiene una factura emitida. Los datos del cliente y los montos a cobrar están bloqueados para que no queden distintos de la factura; para modificarlos, primero anulá la factura. Los datos del transportista (cantidad, precio y pagos) se pueden seguir editando hasta liquidarlo."
+                      : "Este viaje tiene una liquidación emitida. Los datos del transportista y los montos a pagar están bloqueados para que no queden distintos de la liquidación; para modificarlos, primero anulá la liquidación. Los datos del cliente y el monto a facturar se pueden seguir editando hasta facturarlo."}
                 </p>
               </div>
             )}
@@ -943,9 +948,7 @@ export function ViajeEditModal({
                     {desgloseActivo ? (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div className="flex flex-col gap-1">
-                          <span className={labelClass}>
-                            Cantidad <span className="text-red-500">*</span>
-                          </span>
+                          <span className={labelClass}>Cantidad</span>
                           <input
                             type="text"
                             inputMode="decimal"
@@ -965,9 +968,7 @@ export function ViajeEditModal({
                           <FaltaCampo show={marcaP("cantidad")} />
                         </div>
                         <div className="flex flex-col gap-1">
-                          <span className={labelClass}>
-                            Tarifa <span className="text-red-500">*</span>
-                          </span>
+                          <span className={labelClass}>Tarifa</span>
                           <div className="flex min-w-0 gap-2">
                             <input
                               type="text"
@@ -1048,7 +1049,7 @@ export function ViajeEditModal({
                             type="text"
                             inputMode="decimal"
                             autoComplete="off"
-                            disabled={datosTransporteBloqueados}
+                            disabled={datosClienteBloqueados}
                             value={draft.monto}
                             onChange={(e) =>
                               setDraft((p) =>
@@ -1068,7 +1069,7 @@ export function ViajeEditModal({
                           />
                           <MonedaSelect
                             value={draft.monedaMonto}
-                            disabled={datosTransporteBloqueados}
+                            disabled={datosClienteBloqueados}
                             onChange={(m: ViajeMonedaCodigo) =>
                               setDraft((p) =>
                                 p
@@ -1613,6 +1614,16 @@ export function ViajeEditModal({
                         )}
                       </>
                     )}
+                    {ivaTransportistaVisible && (
+                      <TramosTransportistaEditor
+                        tramos={draft.tramosTransportista}
+                        onChange={(tramosTransportista) =>
+                          setDraft((p) => (p ? { ...p, tramosTransportista } : p))
+                        }
+                        disabled={liquidacionVigente}
+                        marcarIncompletos={Boolean(error)}
+                      />
+                    )}
                   </div>
                 }
                 // Con flota propia, chofer y vehículos van en la misma fila que las opciones.
@@ -1782,7 +1793,11 @@ export function ViajeEditModal({
                       setDraft((p) => (p ? { ...p, otrosGastos: rows } : p))
                     }
                     tenantId={tenantId}
+                    disabled={datosTransporteBloqueados}
                   />
+                  {/* Con liquidación vigente los gastos quedan fijos (el backend los
+                      rechaza: están en CAMPOS_FISCALES_TRANSPORTE). */}
+                  {!datosTransporteBloqueados && (
                   <button
                     type="button"
                     onClick={() =>
@@ -1802,6 +1817,7 @@ export function ViajeEditModal({
                   >
                     + Agregar gasto
                   </button>
+                  )}
                 </div>
               )}
 

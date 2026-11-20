@@ -1,10 +1,10 @@
-import { useAuth, useOrganization } from "@clerk/clerk-react";
+import { useAuth, useOrganization, useUser } from "@clerk/clerk-react";
 import { useState } from "react";
+import { mutate } from "swr";
+import { isOrgAdmin } from "@/lib/roleLabels";
 import { useNavigate } from "react-router-dom";
-import {
-  TenantOwnerDashboard,
-  AlertsPanel,
-} from "@/components/tenant/TenantOwnerDashboard";
+import { TenantOwnerDashboard } from "@/components/tenant/TenantOwnerDashboard";
+import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { ViajeEditModal } from "@/components/viajes/ViajeEditModal";
@@ -25,15 +25,14 @@ import {
   idPropio2Habilitado,
   idPropio2Label,
   labelIdentificacionPersonalizadaViajes,
+  armarNavegacionCopiarViaje,
 } from "@/lib/viajesFlota";
 import { useToast } from "@/lib/toast";
 import { apiJson } from "@/lib/api";
 import {
-  canAccessCombustible,
   canAccessEmisionFacturasArca,
   canAccessEmisionLiquidoProductoArca,
   canAccessFacturacion,
-  canAccessMantenimiento,
   canAccessViajes,
 } from "@/lib/tenantModules";
 import {
@@ -49,7 +48,8 @@ import {
 import type { Factura, Producto, Viaje } from "@/types/api";
 
 export function TenantHomePage() {
-  const { getToken } = useAuth();
+  const { getToken, orgRole } = useAuth();
+  const { user } = useUser();
   const { organization } = useOrganization();
   const navigate = useNavigate();
   const { tenant, loading, error } = useCurrentTenant();
@@ -138,48 +138,16 @@ export function TenantHomePage() {
   const companyName =
     tenant?.name?.trim() || organization?.name?.trim() || "empresa";
 
-  const alertas = dash.data?.alertas;
-  const showAlertsBlock =
-    tenant != null &&
-    (canAccessFacturacion(tenant.modules) ||
-      hasFacturasArca ||
-      canAccessCombustible(tenant.modules) ||
-      canAccessViajes(tenant.modules) ||
-      canAccessMantenimiento(tenant.modules)) &&
-    alertas != null &&
-    (alertas.facturasVencidas.cantidad > 0 ||
-      alertas.viajesSinFactura.cantidad > 0 ||
-      (alertas.cargasSospechosas?.cantidad ?? 0) > 0 ||
-      (alertas.erroresChofer?.cantidad ?? 0) > 0 ||
-      (alertas.margenBajo?.cantidad ?? 0) > 0 ||
-      (alertas.mantenimiento?.cantidad ?? 0) > 0);
+  const mostrarDashboard = Boolean(organization && !loading && !error && tenant);
 
   return (
     <div className="w-full">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
-        <div>
-          <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl tracking-wide text-vialto-charcoal">
-            Panel de {companyName}
-          </h1>
-        </div>
-
-        {showAlertsBlock && alertas && (
-          <AlertsPanel
-            alertas={alertas}
-            onViewFactura={(id) => void handleViewFactura(id)}
-            loadingFacturaId={loadingFacturaId}
-            onViewViaje={(id) => void handleViewViaje(id)}
-            loadingViajeId={loadingViajeId}
-            shouldClose={
-              viewingFactura !== null ||
-              viewingViaje !== null ||
-              viajeEditor.editingId !== null ||
-              facturaCreator.creating ||
-              crearLiqViaje !== null
-            }
-          />
-        )}
-      </div>
+      {/* Con el dashboard, el título lo dibuja él (al lado del filtro de período). */}
+      {!mostrarDashboard && (
+        <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl tracking-wide text-vialto-charcoal">
+          Panel de {companyName}
+        </h1>
+      )}
 
       {!organization && (
         <div
@@ -200,18 +168,29 @@ export function TenantHomePage() {
       )}
 
       {organization && loading && !error && (
-        <p className="mt-6 text-sm text-vialto-steel">
-          Cargando datos de tu empresa…
-        </p>
+        <CargandoVialto mensaje="Cargando el panel de tu empresa…" />
       )}
 
-      {organization && !loading && !error && tenant && (
+      {mostrarDashboard && organization && tenant && (
         <TenantOwnerDashboard
+          titulo={`Panel de ${companyName}`}
           tenantId={organization.id}
-          modules={tenant.modules}
+          tenant={tenant}
           dash={dash}
           onViewViaje={(id) => void handleViewViaje(id)}
           loadingViajeId={loadingViajeId}
+          onViewFactura={(id) => void handleViewFactura(id)}
+          loadingFacturaId={loadingFacturaId}
+          puedeEditar={isOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata })}
+          onGuardarBloques={async (dashboardBloques) => {
+            const url = `/api/tenants/${encodeURIComponent(organization.id)}`;
+            await apiJson(`${url}/dashboard-bloques`, () => getToken(), {
+              method: "PATCH",
+              body: JSON.stringify({ dashboardBloques }),
+            });
+            // Misma key que useCurrentTenant: el panel se redibuja con lo guardado.
+            await mutate(url);
+          }}
         />
       )}
 
@@ -237,6 +216,12 @@ export function TenantHomePage() {
           editando={abriendoEditorViaje}
           facturando={abriendoFacturar}
           onClose={() => setViewingViaje(null)}
+          onCopiar={() => {
+            const v = viewingViaje;
+            setViewingViaje(null);
+            const nav = armarNavegacionCopiarViaje(v);
+            navigate(nav.to, { state: nav.state });
+          }}
           onEditar={() => {
             const v = viewingViaje;
             void (async () => {

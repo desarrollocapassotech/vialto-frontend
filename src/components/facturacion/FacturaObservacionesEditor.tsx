@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { marcarModalModificado } from "@/lib/descarteModal";
 
 /** Máximo de caracteres por observación (mismo límite que el backend). */
@@ -21,8 +21,9 @@ export function FacturaObservacionesEditor({
   observaciones,
   onChange,
   disabled,
-  labelClassName = "text-xs uppercase tracking-wider text-vialto-steel",
-  inputClassName = "h-8 w-full border border-black/15 bg-white px-2 text-sm",
+  // Mismo estilo que `FacturaConceptosEditor`.
+  labelClassName = "block font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.18em] text-vialto-steel",
+  inputClassName = "h-9 w-full rounded border border-black/15 bg-white px-2 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35",
 }: {
   observaciones: string[];
   onChange: (observaciones: string[]) => void;
@@ -44,26 +45,11 @@ export function FacturaObservacionesEditor({
     onChange(observaciones.filter((_, i) => i !== index));
   }
 
+  // Mismo armado que los conceptos (`FacturaConceptosEditor`): título, renglones y el botón
+  // "+ Agregar" abajo a la izquierda.
   return (
-    <div className="flex shrink-0 flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className={labelClassName}>Observaciones</p>
-        <button
-          type="button"
-          onClick={agregar}
-          disabled={disabled || hayVacia || llegoAlMaximo}
-          title={
-            hayVacia
-              ? "Completá la observación vacía antes de agregar otra."
-              : llegoAlMaximo
-                ? `Hasta ${FACTURA_OBSERVACIONES_MAX} observaciones por factura.`
-                : undefined
-          }
-          className="px-2 py-1 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          + Agregar observación
-        </button>
-      </div>
+    <div className="flex shrink-0 flex-col gap-3">
+      <p className={labelClassName}>Observaciones</p>
       {observaciones.length > 0 && (
         <ul className="flex flex-col gap-1.5">
           {observaciones.map((obs, index) => (
@@ -89,17 +75,33 @@ export function FacturaObservacionesEditor({
                 disabled={disabled}
                 aria-label={`Quitar observación ${index + 1}`}
                 title="Quitar observación"
-                className="flex h-8 w-8 shrink-0 items-center justify-center text-vialto-steel hover:text-red-600 disabled:opacity-50"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center text-vialto-steel hover:bg-vialto-mist hover:text-red-700 disabled:opacity-50"
               >
-                <X className="h-4 w-4" />
+                <Trash2 className="h-4 w-4" strokeWidth={1.75} />
               </button>
             </li>
           ))}
         </ul>
       )}
-      <p className="text-xs text-vialto-steel">
-        Sale en el PDF debajo de los viajes, sin importe.
-      </p>
+      {!disabled && (
+        <div className="flex justify-start">
+          <button
+            type="button"
+            onClick={agregar}
+            disabled={hayVacia || llegoAlMaximo}
+            title={
+              hayVacia
+                ? "Completá la observación vacía antes de agregar otra."
+                : llegoAlMaximo
+                  ? `Hasta ${FACTURA_OBSERVACIONES_MAX} observaciones por factura.`
+                  : undefined
+            }
+            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+          >
+            + Agregar observación
+          </button>
+        </div>
+      )}
     </div>
   );
 }

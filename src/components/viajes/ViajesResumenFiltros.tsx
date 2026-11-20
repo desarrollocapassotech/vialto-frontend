@@ -1,11 +1,13 @@
-import { FiltroRapidoChip } from '@/components/listado/FiltroRapidoChip';
+import { Calculator, CircleCheck, FileClock, type LucideIcon } from 'lucide-react';
+import { FiltroRapidoChip, FiltrosRapidosGrupo } from '@/components/listado/FiltroRapidoChip';
 import type { ViajePagoTransportistaFiltro } from '@/lib/viajesFiltroPagoTransportista';
 
+/** Conteos de los chips. undefined = ese conteo falló (el chip queda sin número y se puede usar). */
 export type ViajesResumenFiltrosData = {
-  sinFacturar: number;
+  sinFacturar?: number;
   /** Viajes con liquidación al transportista pendiente (`liquidacionEstado=sin_liquidar`). */
-  sinLiquidar: number;
-  pagados: number;
+  sinLiquidar?: number;
+  pagados?: number;
 };
 
 type FiltroId = 'sin_facturar' | 'sin_liquidar' | 'pagado';
@@ -14,16 +16,14 @@ type Tipo = 'facturacion' | 'liquidacion' | 'pago';
 const OPCIONES: Array<{
   id: FiltroId;
   label: string;
+  icon: LucideIcon;
   countKey: keyof ViajesResumenFiltrosData;
   tipo: Tipo;
 }> = [
-  { id: 'sin_facturar', label: 'Sin facturar', countKey: 'sinFacturar', tipo: 'facturacion' },
-  { id: 'sin_liquidar', label: 'Sin liquidar', countKey: 'sinLiquidar', tipo: 'liquidacion' },
-  { id: 'pagado', label: 'Pagados', countKey: 'pagados', tipo: 'pago' },
+  { id: 'sin_facturar', label: 'Sin facturar', icon: FileClock, countKey: 'sinFacturar', tipo: 'facturacion' },
+  { id: 'sin_liquidar', label: 'Sin liquidar', icon: Calculator, countKey: 'sinLiquidar', tipo: 'liquidacion' },
+  { id: 'pagado', label: 'Pagados', icon: CircleCheck, countKey: 'pagados', tipo: 'pago' },
 ];
-
-/** Chips que marcan algo pendiente ("Pagados" no: es un estado resuelto, casi siempre > 0). */
-const PENDIENTES: ReadonlySet<FiltroId> = new Set(['sin_facturar', 'sin_liquidar']);
 
 function opcionesVisibles(mostrarFiltroPago: boolean, mostrarFiltroLiquidacion: boolean) {
   return OPCIONES.filter(
@@ -33,18 +33,9 @@ function opcionesVisibles(mostrarFiltroPago: boolean, mostrarFiltroLiquidacion: 
   );
 }
 
-/** Chips visibles de pendientes con su contador, para `FiltrosRapidosBoton` (palpita y tooltip). */
-export function resumenPendientes(
-  resumen: ViajesResumenFiltrosData,
-  { mostrarFiltroPago = true, mostrarFiltroLiquidacion = true } = {},
-): { label: string; count: number }[] {
-  return opcionesVisibles(mostrarFiltroPago, mostrarFiltroLiquidacion)
-    .filter((o) => PENDIENTES.has(o.id))
-    .map((o) => ({ label: o.label, count: resumen[o.countKey] }));
-}
-
 type Props = {
-  resumen: ViajesResumenFiltrosData;
+  /** null = se están contando: los chips no se aplican hasta saber si hay viajes. */
+  resumen: ViajesResumenFiltrosData | null;
   facturacionFiltro: string;
   /** Mismo filtro que el de la columna "Liquidación" de la grilla. */
   liquidacionFiltro: string;
@@ -86,24 +77,22 @@ export function ViajesResumenFiltros({
   }
 
   return (
-    <div
-      className="flex gap-2 overflow-x-auto pb-0.5 lg:flex-wrap lg:pb-0"
-      role="tablist"
-      aria-label="Filtros rápidos de viajes"
-    >
+    <FiltrosRapidosGrupo ariaLabel="Filtros rápidos de viajes">
       {opciones.map((o) => {
         const active = valorActual[o.tipo] === o.id;
-        const count = resumen[o.countKey];
+        const count = resumen?.[o.countKey];
         return (
           <FiltroRapidoChip
             key={o.id}
             label={o.label}
+            icon={o.icon}
             active={active}
             count={count}
+            cargando={resumen === null}
             onClick={() => toggle(o.id, o.tipo)}
           />
         );
       })}
-    </div>
+    </FiltrosRapidosGrupo>
   );
 }

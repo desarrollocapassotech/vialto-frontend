@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Check } from "lucide-react";
-import { FiltroRapidoChip } from "@/components/listado/FiltroRapidoChip";
-import { FiltrosRapidosBoton } from "@/components/listado/FiltrosRapidos";
+import { Check, TriangleAlert } from "lucide-react";
+import { FiltroRapidoChip, FiltrosRapidosIcono } from "@/components/listado/FiltroRapidoChip";
 
 export type PeriodoSospechosas = "todas" | "este_mes" | "mes_anterior" | "ultimos_3_meses";
 
@@ -16,8 +15,8 @@ export const PERIODOS_SOSPECHOSAS: { id: PeriodoSospechosas; label: string }[] =
 export type ConteoSospechosas = Record<PeriodoSospechosas, number>;
 
 /**
- * Filtro rápido de Combustible: embudo al lado del título (palpita si hay cargas
- * sospechosas este mes) + chip "Cargas sospechosas" que despliega el período. Tocar el
+ * Filtro rápido de Combustible: cápsula siempre visible (embudo tenue adentro, como el
+ * dashboard) con el chip "Cargas sospechosas" que despliega el período. Tocar el
  * período activo, o "Quitar filtro", lo apaga.
  */
 export function FiltroCargasSospechosas({
@@ -29,7 +28,6 @@ export function FiltroCargasSospechosas({
   onChange: (value: PeriodoSospechosas | "") => void;
   conteos?: ConteoSospechosas;
 }) {
-  const [abierto, setAbierto] = useState(value !== "");
   const [menuAbierto, setMenuAbierto] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -61,17 +59,12 @@ export function FiltroCargasSospechosas({
 
   return (
     <>
-      <FiltrosRapidosBoton
-        abierto={abierto}
-        onToggle={() => setAbierto((v) => !v)}
-        cantidadActivos={value !== "" ? 1 : 0}
-        pendientes={[{ label: "Cargas sospechosas este mes", count: conteos?.este_mes }]}
-      />
-
-      {abierto && (
-        <div className="relative" ref={menuRef}>
+      {/* Misma cápsula que FiltrosRapidosGrupo, sin overflow (recortaría el menú desplegable). */}
+        <div className="relative flex items-center gap-1 rounded-xl border border-black/10 bg-white p-1 shadow-sm" ref={menuRef}>
+          <FiltrosRapidosIcono />
           <FiltroRapidoChip
             label={label}
+            icon={TriangleAlert}
             active={value !== ""}
             count={count}
             desplegable={{ abierto: menuAbierto }}
@@ -81,7 +74,7 @@ export function FiltroCargasSospechosas({
           {menuAbierto && (
             <div
               role="menu"
-              className="absolute left-0 z-20 mt-1 min-w-[220px] border border-black/15 bg-white shadow-lg"
+              className="absolute left-0 z-20 mt-2 min-w-[220px] overflow-hidden rounded-xl border border-black/10 bg-white py-1 shadow-lg"
             >
               {PERIODOS_SOSPECHOSAS.map((p) => {
                 const seleccionado = value === p.id;
@@ -118,7 +111,6 @@ export function FiltroCargasSospechosas({
             </div>
           )}
         </div>
-      )}
     </>
   );
 }

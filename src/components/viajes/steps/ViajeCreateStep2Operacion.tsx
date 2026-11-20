@@ -28,6 +28,8 @@ import {
 } from "@/components/viajes/PagosTransportistaFieldset";
 import type { ViajeMonedaCodigo } from "@/lib/currencyMask";
 import type { Chofer, Transportista, Vehiculo } from "@/types/api";
+import { TramosTransportistaEditor } from "@/components/viajes/TramosTransportistaEditor";
+import type { TramoTransportistaDraft } from "@/lib/viajeTramosTransportista";
 
 const fieldLabelClass =
   "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
@@ -72,6 +74,11 @@ interface Props {
 
   precioTransportistaIvaIncluidoPct: string;
   onPrecioTransportistaIvaIncluidoPctChange: (v: string) => void;
+
+  /** Tramos del pago al transportista con su propio % de IVA. */
+  tramosTransportista: TramoTransportistaDraft[];
+  onTramosTransportistaChange: (tramos: TramoTransportistaDraft[]) => void;
+  marcarTramosIncompletos?: boolean;
 
   desglosePagoBruto: number | null;
   desglosePagoNeto: number | null;
@@ -160,6 +167,9 @@ export function ViajeCreateStep2Operacion({
   onMonedaPrecioTransportistaChange,
   precioTransportistaIvaIncluidoPct,
   onPrecioTransportistaIvaIncluidoPctChange,
+  tramosTransportista,
+  onTramosTransportistaChange,
+  marcarTramosIncompletos,
   desglosePagoBruto,
   desglosePagoNeto,
   desgloseMontoIva,
@@ -509,6 +519,13 @@ export function ViajeCreateStep2Operacion({
                   </div>
                 )}
               </>
+            )}
+            {ivaTransportistaVisible && (
+              <TramosTransportistaEditor
+                tramos={tramosTransportista}
+                onChange={onTramosTransportistaChange}
+                marcarIncompletos={marcarTramosIncompletos}
+              />
             )}
             <div className="grid gap-3">
               {mostrarVehiculosExternos && (

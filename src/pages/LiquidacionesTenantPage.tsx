@@ -1,4 +1,4 @@
-import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
+﻿import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
 import { transportistaEnFrase } from "@/lib/transportistaLabel";
 import {
   AdjuntarComprobanteClip,
@@ -29,6 +29,7 @@ import {
   Trash2,
   Paperclip,
   BookOpen,
+  FileX,
 } from "lucide-react";
 import { LibroIvaExportModal } from "@/components/shared/LibroIvaExportModal";
 import { FiltroRangoFechas } from "@/components/shared/FiltroRangoFechas";
@@ -1259,6 +1260,7 @@ export function LiquidacionesTenantPage() {
               {
                 id: "pendiente_anulacion",
                 label: "Pendientes de anular",
+                icon: FileX,
                 count: rows?.filter((r) => r.estado === "pendiente_anulacion")
                   .length,
               },
@@ -1266,6 +1268,7 @@ export function LiquidacionesTenantPage() {
             value={estadoFilter === "pendiente_anulacion" ? estadoFilter : ""}
             onChange={(v) => aplicarFiltroEstado(v || "todos")}
             ariaLabel="Filtros rápidos de liquidaciones"
+            cargando={rows === null && !error}
           />
         )}
         {activeTenantId && anyFiltroActivo && (
@@ -1324,6 +1327,7 @@ export function LiquidacionesTenantPage() {
         </div>
       )}
 
+      {(!isSuperAdmin || activeTenantId) && (
       <ListadoDatos
         className="mt-6"
         tableColSpan={(hasArca ? 10 : 9) - (mostrarPeriodo ? 0 : 1)}
@@ -1362,10 +1366,12 @@ export function LiquidacionesTenantPage() {
                 title={tl.singular}
                 filterActive={!!transportistaFilter}
                 filterSignature={transportistaFilter}
+                valor={transportistas.find((t) => t.id === transportistaFilter)?.nombre}
                 onClear={() => aplicarFiltroTransportista("")}
               >
                 <TransportistaSearchSelect
                   id="liquidaciones-col-filtro-transportista"
+                  incluirInactivos
                   transportistas={transportistas}
                   value={transportistaFilter}
                   onChange={(id) => aplicarFiltroTransportista(id)}
@@ -1448,6 +1454,7 @@ export function LiquidacionesTenantPage() {
                   title="Estado"
                   filterActive={estadoFilter !== "todos"}
                   filterSignature={estadoFilter}
+                  valor={estadoFilter !== "todos" ? (ESTADO_LABEL as Record<string, string>)[estadoFilter] : null}
                   onClear={() => aplicarFiltroEstado("todos")}
                 >
                   <select
@@ -1652,16 +1659,14 @@ export function LiquidacionesTenantPage() {
         rowKey={(liq) => liq.id}
         emptyMessage={
           !activeTenantId
-            ? isSuperAdmin
-              ? "Seleccioná una empresa para ver las liquidaciones."
-              : "Cargando datos de empresa..."
+            ? "Cargando datos de empresa..."
             : error
               ? "No se pudieron cargar las liquidaciones."
               : anyFiltroActivo
                 ? "No hay liquidaciones que coincidan con los filtros aplicados."
                 : "Todavía no hay liquidaciones..."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando liquidaciones…"
         onRowClick={(liq) => setAccionesAbiertoLiqId(liq.id)}
         renderActions={(liq) => (
           <LiquidacionAccionesMenu {...accionesProps(liq)} />
@@ -1727,6 +1732,7 @@ export function LiquidacionesTenantPage() {
           />
         )}
       />
+      )}
 
       {activeTenantId &&
         (!error || !isSuperAdmin) &&

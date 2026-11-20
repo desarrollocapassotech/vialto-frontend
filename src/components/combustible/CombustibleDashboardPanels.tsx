@@ -1,3 +1,6 @@
+﻿import { useTablaDashboard } from "@/hooks/useTablaDashboard";
+import { TituloOrdenable } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { PaginacionCompacta } from "@/components/listado/PaginacionCompacta";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import {
   useLayoutEffect,
@@ -262,6 +265,8 @@ export function VehiculoRankingTable({
   periodo?: { from: string; to: string } | null;
 }) {
   const navigate = useNavigate();
+  const tabla = useTablaDashboard(items, { vehiculo: { valor: (x) => x.patente }, litros: { valor: (x) => x.litros, tipo: "numero" }, costoKm: { valor: (x) => x.costoPorKm, tipo: "numero" }, l100: { valor: (x) => x.litrosPor100Km, tipo: "numero" }, monto: { valor: (x) => x.monto, tipo: "numero" }, cargas: { valor: (x) => x.cantidad, tipo: "numero" } });
+  const paginacion = tabla.paginacion;
   if (items.length === 0) {
     return (
       <p className="text-sm text-vialto-steel">
@@ -275,22 +280,22 @@ export function VehiculoRankingTable({
         <thead>
           <tr className="border-b border-black/10">
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Vehículo
+              <TituloOrdenable title="Vehículo" orden={tabla.ordenColumna("vehiculo")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Litros
+              <TituloOrdenable title="Litros" orden={tabla.ordenColumna("litros")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Costo/km
+              <TituloOrdenable title="Costo/km" orden={tabla.ordenColumna("costoKm")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              L/100km
+              <TituloOrdenable title="L/100km" orden={tabla.ordenColumna("l100")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Monto
+              <TituloOrdenable title="Monto" orden={tabla.ordenColumna("monto")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Cargas
+              <TituloOrdenable title="Cargas" orden={tabla.ordenColumna("cargas")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
               Acciones
@@ -298,7 +303,7 @@ export function VehiculoRankingTable({
           </tr>
         </thead>
         <tbody>
-          {items.map((v) => {
+          {tabla.visibles.map((v) => {
             const qs = new URLSearchParams({ vehiculoId: v.vehiculoId });
             if (periodo?.from) qs.set("from", periodo.from);
             if (periodo?.to) qs.set("to", periodo.to);
@@ -319,7 +324,7 @@ export function VehiculoRankingTable({
                       {fmtTipoVehiculo(v.tipo)}
                     </span>
                     {v.esOutlier && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-800">
+                      <span className="rounded-none bg-amber-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-800">
                         Consume más que su categoría
                       </span>
                     )}
@@ -348,6 +353,7 @@ export function VehiculoRankingTable({
           })}
         </tbody>
       </table>
+      <PaginacionCompacta paginacion={paginacion} />
     </div>
   );
 }
@@ -363,6 +369,8 @@ export function ChoferRankingTable({
   periodo?: { from: string; to: string } | null;
 }) {
   const navigate = useNavigate();
+  const tabla = useTablaDashboard(items, { chofer: { valor: (x) => x.nombre }, litros: { valor: (x) => x.litros, tipo: "numero" }, monto: { valor: (x) => x.monto, tipo: "numero" }, cargas: { valor: (x) => x.cantidad, tipo: "numero" } });
+  const paginacion = tabla.paginacion;
   if (items.length === 0) {
     return (
       <p className="text-sm text-vialto-steel">
@@ -376,16 +384,16 @@ export function ChoferRankingTable({
         <thead>
           <tr className="border-b border-black/10">
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Chofer
+              <TituloOrdenable title="Chofer" orden={tabla.ordenColumna("chofer")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Litros
+              <TituloOrdenable title="Litros" orden={tabla.ordenColumna("litros")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Monto
+              <TituloOrdenable title="Monto" orden={tabla.ordenColumna("monto")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Cargas
+              <TituloOrdenable title="Cargas" orden={tabla.ordenColumna("cargas")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
               Acciones
@@ -393,7 +401,7 @@ export function ChoferRankingTable({
           </tr>
         </thead>
         <tbody>
-          {items.map((c) => {
+          {tabla.visibles.map((c) => {
             const qs = c.choferId
               ? new URLSearchParams({ choferId: c.choferId })
               : null;
@@ -424,6 +432,7 @@ export function ChoferRankingTable({
           })}
         </tbody>
       </table>
+      <PaginacionCompacta paginacion={paginacion} />
     </div>
   );
 }
@@ -752,6 +761,8 @@ export function AlertasList({
       data: e,
     })),
   ].sort((x, y) => new Date(y.fecha).getTime() - new Date(x.fecha).getTime());
+  const tabla = useTablaDashboard(filas, { tipo: { valor: (x) => (x.kind === "sospechosa" ? x.data.motivoSospecha : "error") }, fecha: { valor: (x) => x.fecha, tipo: "fecha" }, vehiculo: { valor: (x) => x.data.patente }, conductor: { valor: (x) => x.data.choferNombre }, litros: { valor: (x) => x.data.litros, tipo: "numero" }, costo: { valor: (x) => (x.kind === "sospechosa" ? x.data.precioPorLitro : (x.data.precioPorLitro ?? (x.data.importe != null && x.data.litros ? x.data.importe / x.data.litros : null))), tipo: "numero" }, monto: { valor: (x) => x.data.importe, tipo: "numero" } });
+  const paginacion = tabla.paginacion;
 
   if (filas.length === 0) {
     return (
@@ -768,25 +779,25 @@ export function AlertasList({
         <thead>
           <tr className="border-b border-black/10">
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Tipo
+              <TituloOrdenable title="Tipo" orden={tabla.ordenColumna("tipo")} />
             </th>
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Fecha
+              <TituloOrdenable title="Fecha" orden={tabla.ordenColumna("fecha")} />
             </th>
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Vehículo
+              <TituloOrdenable title="Vehículo" orden={tabla.ordenColumna("vehiculo")} />
             </th>
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Conductor
+              <TituloOrdenable title="Conductor" orden={tabla.ordenColumna("conductor")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Litros
+              <TituloOrdenable title="Litros" orden={tabla.ordenColumna("litros")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Costo/L
+              <TituloOrdenable title="Costo/L" orden={tabla.ordenColumna("costo")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Monto
+              <TituloOrdenable title="Monto" orden={tabla.ordenColumna("monto")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
               Acciones
@@ -794,7 +805,7 @@ export function AlertasList({
           </tr>
         </thead>
         <tbody>
-          {filas.map((fila) => {
+          {tabla.visibles.map((fila) => {
             if (fila.kind === "sospechosa") {
               const a = fila.data;
               const acciones: AccionOpcion[] = [
@@ -886,6 +897,7 @@ export function AlertasList({
           })}
         </tbody>
       </table>
+      <PaginacionCompacta paginacion={paginacion} />
 
       {viewingCargaId && (
         <CargaCombustibleViewModal
@@ -1272,6 +1284,8 @@ export function ViajesCruceTable({
 }: {
   items: CombustibleViajesCruceItem[];
 }) {
+  const tabla = useTablaDashboard(items, { vehiculo: { valor: (x) => x.patente }, litros: { valor: (x) => x.litrosPeriodo, tipo: "numero" }, km: { valor: (x) => x.kmFacturadosPeriodo, tipo: "numero" }, l100: { valor: (x) => x.litrosPor100KmFacturado, tipo: "numero" } });
+  const paginacion = tabla.paginacion;
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-vialto-steel">
@@ -1289,21 +1303,21 @@ export function ViajesCruceTable({
             <thead>
               <tr className="border-b border-black/10">
                 <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                  Vehículo
+                  <TituloOrdenable title="Vehículo" orden={tabla.ordenColumna("vehiculo")} />
                 </th>
                 <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                  Litros cargados
+                  <TituloOrdenable title="Litros cargados" orden={tabla.ordenColumna("litros")} />
                 </th>
                 <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                  Km facturados
+                  <TituloOrdenable title="Km facturados" orden={tabla.ordenColumna("km")} />
                 </th>
                 <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                  L/100km facturado
+                  <TituloOrdenable title="L/100km facturado" orden={tabla.ordenColumna("l100")} />
                 </th>
               </tr>
             </thead>
             <tbody>
-              {items.map((i) => (
+              {tabla.visibles.map((i) => (
                 <tr
                   key={i.vehiculoId}
                   className="border-b border-black/5 last:border-0"
@@ -1326,6 +1340,7 @@ export function ViajesCruceTable({
               ))}
             </tbody>
           </table>
+          <PaginacionCompacta paginacion={paginacion} />
         </div>
       )}
     </div>

@@ -36,7 +36,6 @@ import { PadronValidacionEstado } from "@/components/shared/PadronValidacionEsta
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import {
   FacturaManualCheckbox,
-  FacturaTotalesPreview,
   facturaPayloadFromDraft,
   filterFacturaTramosByViajeIds,
   validateFacturaDraftTramos,
@@ -46,6 +45,21 @@ import {
   type FacturaDraft,
 } from "@/components/facturacion/FacturaEditModal";
 import { ComprobanteManualFields } from "@/components/shared/ComprobanteManualFields";
+import { NumeroComprobanteField } from "@/components/shared/NumeroComprobanteField";
+import { URL_NUMERO_INTERNO } from "@/lib/numeroInterno";
+import { FacturaConceptosEditor } from "@/components/facturacion/FacturaConceptosEditor";
+import { FaltaCampo } from "@/components/shared/FaltaCampo";
+import { conBordeError } from "@/lib/bordeError";
+import {
+  conceptosIncompletos as indicesConceptosIncompletos,
+  sincronizarConceptosConViajes,
+  type FacturaConceptoDraft,
+} from "@/lib/facturaConceptos";
+import { numeroDesdeComprobanteManual } from "@/lib/comprobanteManual";
+import {
+  numeroActualComprobanteManual,
+  useAutocompletarNumeroComprobante,
+} from "@/hooks/useAutocompletarNumeroComprobante";
 import type { ComprobanteManualErrores } from "@/lib/comprobanteManual";
 import {
   FacturaTramosEditor,
@@ -127,7 +141,9 @@ function validateFacturaDraft(
   hasArca: boolean,
 ): string | null {
   // Sin ARCA el número es obligatorio (con ARCA lo asigna AFIP al emitir).
-  if (!hasArca && !draft.numero.trim()) return "Ingresá el número de comprobante.";
+  if (!hasArca && !draft.numeroInterno && !draft.numero.trim()) {
+    return "Ingresá el número de comprobante.";
+  }
   if (!draft.fechaEmision) return "Ingresá la fecha de emisión.";
   if (monedaUnicaDeViajes(draft.viajeIds, viajes) === null) {
     return "Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.";
@@ -158,6 +174,7 @@ function FacturaContraparteField({
   onClienteChange,
   compact = false,
   loading = false,
+  error = false,
 }: {
   clienteId: string;
   clientes: Cliente[];
@@ -167,26 +184,30 @@ function FacturaContraparteField({
    * pueda elegir un cliente de la lista sin filtrar (ver `allAvailableClientes`) que
    * un instante después queda excluido por no tener nada disponible para facturar. */
   loading?: boolean;
+  /** Se intentó guardar sin cliente: borde rojo + "Falta completar". */
+  error?: boolean;
 }) {
   const labelClass = compact
     ? compactLabelClass
     : "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
   const inputClass = compact ? compactInputClass : standardInputClass;
 
+  // Obligatorio, como en Nueva liquidación: los viajes se eligen recién con el cliente.
   return (
     <div className="flex flex-col gap-1">
-      <label className={labelClass}>Cliente</label>
+      <label className={labelClass}>
+        Cliente <span className="text-red-500">*</span>
+      </label>
       <ClienteSearchSelect
         clientes={clientes}
         value={clienteId}
         onChange={onClienteChange}
-        inputClassName={inputClass}
-        allowEmptyValue
-        emptyListChoiceLabel="— Sin cliente —"
-        placeholderCerrado="— Sin cliente —"
+        inputClassName={conBordeError(inputClass, error)}
+        placeholderCerrado="Elegí un cliente…"
         loading={loading}
         aria-label="Cliente"
       />
+      <FaltaCampo show={error} />
     </div>
   );
 }
@@ -371,6 +392,10 @@ export function FacturaCreateModal({
   const [lineasIncomplete, setLineasIncomplete] = useState<number[]>([]);
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [cbteManualErrores, setCbteManualErrores] = useState<ComprobanteManualErrores>({});
+  const autocompletarNumero = useAutocompletarNumeroComprobante();
+  /** Draft vigente, para decidir después de leer el adjunto (async) con el estado actual. */
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
 
   // No se restringe a los clientes de los viajes ya tildados: cambiar de cliente limpia
@@ -428,6 +453,12 @@ export function FacturaCreateModal({
   // `ivaPrecargadoRef`); si el usuario lo borra, se factura sin IVA.
   const ivaPctDefault =
     draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0;
+  /** IVA con el que entran los conceptos (los gastos precargados y los nuevos). */
+  const ivaPctConceptos = Number.isFinite(ivaPctDefault) ? ivaPctDefault : 21;
+  const [conceptosIncompletos, setConceptosIncompletos] = useState<number[]>([]);
+  /** Se intentó guardar sin cliente (obligatorio): se marca hasta que se elija uno. */
+  const [marcarCliente, setMarcarCliente] = useState(false);
+  const faltaCliente = marcarCliente && !draft.clienteId;
 
   const bloqueadoUsd = useMemo(() => {
     if (!conArca) return false;
@@ -449,6 +480,8 @@ export function FacturaCreateModal({
   // Panel de detalle oculto por defecto (debajo queda la barra de totales). Si aparece
   // un aviso que solo vive en el panel, se abre solo para que no pase desapercibido.
   const [detalleAbierto, setDetalleAbierto] = useState(false);
+  /** Moneda de los viajes elegidos (para el detalle y los totales; ARS si no hay). */
+  const monedaFactura = monedaUnicaDeViajes(draft.viajeIds, derivedViajes) ?? "ARS";
   const avisoEnPanel = bloqueadoUsd || sinConfigArca || arcaConfigMissing;
   useEffect(() => {
     if (avisoEnPanel) setDetalleAbierto(true);
@@ -646,10 +679,65 @@ export function FacturaCreateModal({
     setLineasIncomplete([]);
   }, [lineas]);
 
+  // Borrador que llega con viajes ya elegidos (ej. "Facturar" desde la grilla de Viajes) y sin
+  // conceptos (`undefined`): se precargan los gastos de esos viajes cuando terminan de cargar.
+  useEffect(() => {
+    if (!open || draft.conceptos !== undefined || viajesLoading) return;
+    setDraft((prev) =>
+      prev.conceptos !== undefined
+        ? prev
+        : {
+            ...prev,
+            conceptos: sincronizarConceptosConViajes(
+              [],
+              [],
+              prev.viajeIds,
+              derivedViajes,
+              prev.clienteId,
+              ivaPctConceptos,
+            ),
+          },
+    );
+  }, [open, draft.conceptos, viajesLoading, derivedViajes, ivaPctConceptos, setDraft]);
+
   if (!open) return null;
 
   function patch(p: Partial<FacturaDraft>) {
     setDraft((prev) => ({ ...prev, ...p }));
+  }
+
+  /**
+   * Factura de ARCA adjunta: completa el número (o tipo + punto de venta + número en una
+   * factura manual) leyéndolo del PDF/QR. Solo si el campo está vacío o lo había completado
+   * el sistema: nunca pisa lo que escribió el usuario ni un comprobante interno.
+   */
+  function autocompletarNumeroDesdeAdjunto(file: File) {
+    return autocompletarNumero(file, {
+      // Ya cambiaron el archivo o pasaron a comprobante interno mientras se leía.
+      vigente: () =>
+        draftRef.current.comprobanteFile === file && !draftRef.current.numeroInterno,
+      numeroActual: () => {
+        const d = draftRef.current;
+        if (!d.manual) return d.numero;
+        const cbte = comprobanteManualDeDraft(d);
+        return numeroActualComprobanteManual(cbte, numeroDesdeComprobanteManual(cbte));
+      },
+      aplicar: (leido, numero) => {
+        if (draftRef.current.manual) {
+          patch({
+            comprobanteManual: {
+              ...comprobanteManualDeDraft(draftRef.current),
+              cbteTipo: String(leido.cbteTipo),
+              ptoVenta: String(leido.ptoVenta),
+              cbteNro: String(leido.cbteNro),
+            },
+          });
+          setCbteManualErrores({});
+        } else {
+          patch({ numero });
+        }
+      },
+    });
   }
 
   /** Mueve el vencimiento junto con la emisión mientras siga en el default (emisión + 30 días). */
@@ -672,9 +760,54 @@ export function FacturaCreateModal({
       viajeIds: ids,
       facturarPorTramo,
       tramos: facturarPorTramo ? tramos : [],
+      // Los gastos de los viajes nuevos entran como conceptos; los de los quitados se van.
+      conceptos: sincronizarConceptosConViajes(
+        draft.conceptos ?? [],
+        draft.viajeIds,
+        ids,
+        derivedViajes,
+        draft.clienteId,
+        ivaPctConceptos,
+      ),
     });
     setTramosIncomplete([]);
+    setConceptosIncompletos([]);
     setLocalError(null);
+  }
+
+  function cambiarConceptos(conceptos: FacturaConceptoDraft[]) {
+    patch({ conceptos });
+    setConceptosIncompletos([]);
+    setLocalError(null);
+  }
+
+  /**
+   * Conceptos a medio cargar: se marcan en rojo y se avisa en el pie. Devuelve false si hay.
+   * Los renglones totalmente vacíos no cuentan (se descartan al guardar).
+   */
+  /** "+ Agregar concepto" con conceptos sin completar: los marca y avisa en el pie. */
+  function avisarConceptosIncompletos(indices: number[]) {
+    setConceptosIncompletos(indices);
+    notifyError("Completá el concepto, la cantidad y el monto unitario antes de agregar otro.");
+  }
+
+  function validarConceptos(): boolean {
+    const incompletos = indicesConceptosIncompletos(draft.conceptos ?? [], ivaPctConceptos);
+    setConceptosIncompletos(incompletos);
+    if (incompletos.length === 0) return true;
+    notifyError("Completá el concepto, la cantidad y el monto unitario en los conceptos marcados.");
+    return false;
+  }
+
+  /** Cambio de cliente: se limpian los viajes y con ellos sus gastos (quedan los manuales). */
+  function cambiarCliente(id: string) {
+    patch({
+      clienteId: id,
+      viajeIds: [],
+      facturarPorTramo: false,
+      tramos: [],
+      conceptos: (draft.conceptos ?? []).filter((c) => !c.viajeId),
+    });
   }
 
   function handleToggleFacturarPorTramo(checked: boolean) {
@@ -723,8 +856,17 @@ export function FacturaCreateModal({
     });
   }
 
+  /** Cliente obligatorio: sin él, marca el campo y avisa en el pie. */
+  function validarCliente(): boolean {
+    if (draft.clienteId) return true;
+    setMarcarCliente(true);
+    notifyError("Completá los campos marcados en rojo.");
+    return false;
+  }
+
   async function handleUnifiedSubmit(action: "borrador" | "emitir") {
     if (busy) return;
+    if (!validarCliente()) return;
     const validationError = validateFacturaDraft(draft, viajes, conArca);
     if (validationError) {
       notifyError(validationError);
@@ -736,6 +878,7 @@ export function FacturaCreateModal({
       notifyError(tramosCheck.message);
       return;
     }
+    if (!validarConceptos()) return;
 
     if (action === "emitir") {
       if (emisionBloqueada) {
@@ -852,6 +995,7 @@ export function FacturaCreateModal({
 
   async function handleManualSave() {
     if (busy) return;
+    if (!validarCliente()) return;
 
     if (draft.manual) {
       const errsCbte = erroresComprobanteFacturaManual(draft);
@@ -861,7 +1005,7 @@ export function FacturaCreateModal({
         notifyError(primerErrorCbte);
         return;
       }
-    } else if (!conArca && !draft.numero.trim()) {
+    } else if (!conArca && !draft.numeroInterno && !draft.numero.trim()) {
       notifyError("Ingresá el número de comprobante.");
       return;
     }
@@ -871,6 +1015,7 @@ export function FacturaCreateModal({
       notifyError(tramosCheck.message);
       return;
     }
+    if (!validarConceptos()) return;
     setTramosIncomplete([]);
     setLocalError(null);
 
@@ -978,7 +1123,8 @@ export function FacturaCreateModal({
       checked={Boolean(draft.manual)}
       disabled={busy}
       onChange={(manual) => {
-        patch({ manual });
+        // Sin el tilde se emite en ARCA: el número interno deja de aplicar.
+        patch(manual ? { manual } : { manual, numeroInterno: false });
         setLocalError(null);
       }}
     />
@@ -1006,15 +1152,9 @@ export function FacturaCreateModal({
           clienteId={draft.clienteId}
           clientes={filteredClientes}
           loading={viajesLoading}
-          onClienteChange={(id) =>
-            patch({
-              clienteId: id,
-              viajeIds: [],
-              facturarPorTramo: false,
-              tramos: [],
-            })
-          }
+          onClienteChange={cambiarCliente}
           compact
+          error={faltaCliente}
         />
         {/* Con ARCA no hay campo Número: el IVA ocupa el lugar libre al lado del cliente. */}
         {hasArca && compactIvaField}
@@ -1048,6 +1188,8 @@ export function FacturaCreateModal({
         </div>
         {!hasArca && <div className="sm:col-span-2">{compactIvaField}</div>}
       </div>
+      {/* Como en Nueva liquidación: los viajes aparecen recién con el cliente elegido. */}
+      {draft.clienteId && (
       <div className="flex min-h-[14rem] flex-1 flex-col gap-1 overflow-hidden">
         <p className={compactLabelClass}>
           Viajes <span className="text-red-500">*</span>
@@ -1078,6 +1220,7 @@ export function FacturaCreateModal({
           />
         </div>
       </div>
+      )}
       {draft.viajeIds.length > 0 && (
         <label className="inline-flex items-center gap-2 text-xs text-vialto-charcoal">
           <input
@@ -1105,12 +1248,18 @@ export function FacturaCreateModal({
           incompleteIndices={tramosIncomplete}
         />
       )}
+      <FacturaConceptosEditor
+        conceptos={draft.conceptos ?? []}
+        onChange={cambiarConceptos}
+        ivaPctDefault={ivaPctConceptos}
+        incompletos={conceptosIncompletos}
+            onIncompletos={avisarConceptosIncompletos}
+        disabled={busy}
+      />
       <FacturaObservacionesEditor
         observaciones={draft.observaciones ?? []}
         onChange={(observaciones) => patch({ observaciones })}
         disabled={busy}
-        labelClassName={compactLabelClass}
-        inputClassName={compactInputClass}
       />
       {/* Sin Neto/Total acá: ya los muestra el panel de la derecha (FacturaArcaPreviewPanel). */}
       {monedaInvalida && (
@@ -1126,88 +1275,141 @@ export function FacturaCreateModal({
   const standardFields = (
     <>
       {manualCheckbox}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* Con ARCA el número lo asigna AFIP al emitir: no se carga a mano. Factura
-            manual: tipo + punto de venta + número por separado (Libro IVA). */}
-        {draft.manual ? (
-          <ComprobanteManualFields
-            value={comprobanteManualDeDraft(draft)}
-            onChange={(comprobanteManual) => {
-              patch({ comprobanteManual });
-              setCbteManualErrores({});
-            }}
-            errores={cbteManualErrores}
-            disabled={busy}
-            labelClassName="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel"
-            inputClassName="h-9 w-full border border-black/20 bg-white px-3 text-sm"
-            className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-3"
-          />
-        ) : (
-          !conArca && (
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Número de comprobante <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={draft.numero}
-                onChange={(e) => patch({ numero: e.target.value })}
-                placeholder="0001-00000001"
-                className="h-9 border border-black/20 bg-white px-3 text-sm"
+      {/* Orden: cliente + fechas · adjunto + número + IVA · viajes · conceptos · observaciones. */}
+      <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="sm:col-span-2 lg:col-span-1">
+            <FacturaContraparteField
+              clienteId={draft.clienteId}
+              clientes={filteredClientes}
+              loading={viajesLoading}
+              onClienteChange={cambiarCliente}
+              error={faltaCliente}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+              Fecha de emisión <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={draft.fechaEmision}
+              onChange={(e) => cambiarFechaEmision(e.target.value)}
+              className="h-9 border border-black/20 bg-white px-3 text-sm"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+              Fecha de vencimiento
+            </label>
+            <input
+              type="date"
+              value={draft.fechaVencimiento}
+              onChange={(e) => patch({ fechaVencimiento: e.target.value })}
+              className="h-9 border border-black/20 bg-white px-3 text-sm"
+            />
+          </div>
+        </div>
+        <div
+          className={`grid grid-cols-1 items-start gap-4 ${
+            adjuntoVisible
+              ? "sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,12rem)]"
+              : "sm:grid-cols-[minmax(0,1fr)_minmax(0,12rem)]"
+          }`}
+        >
+          {adjuntoVisible && (
+            <div className="min-w-0 sm:max-w-[16rem]">
+              <ComprobanteAdjuntoField
+                file={draft.comprobanteFile}
+                existingUrl={draft.comprobanteUrl}
+                onFileChange={(file) => {
+                  patch(
+                    file
+                      ? { comprobanteFile: file, comprobanteUrl: null }
+                      : { comprobanteFile: null },
+                  );
+                  if (file) void autocompletarNumeroDesdeAdjunto(file);
+                }}
+                onClearExisting={() =>
+                  patch({ comprobanteUrl: null, comprobanteFile: null })
+                }
+                disabled={busy}
               />
             </div>
-          )
-        )}
-        <FacturaContraparteField
-          clienteId={draft.clienteId}
-          clientes={filteredClientes}
-          loading={viajesLoading}
-          onClienteChange={(id) =>
-            patch({
-              clienteId: id,
-              viajeIds: [],
-              facturarPorTramo: false,
-              tramos: [],
-            })
-          }
-        />
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-            Fecha de emisión <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="date"
-            value={draft.fechaEmision}
-            onChange={(e) => cambiarFechaEmision(e.target.value)}
-            className="h-9 border border-black/20 bg-white px-3 text-sm"
-          />
+          )}
+          {/* Con ARCA el número lo asigna AFIP al emitir: no se carga a mano. Factura
+              manual: tipo + punto de venta + número por separado (Libro IVA). */}
+          {/* "Comprobante interno": número interno que asigna el backend al guardar (en una
+              factura manual reemplaza al tipo + punto de venta + número). */}
+          {draft.manual && !draft.numeroInterno ? (
+            <div className="flex flex-col gap-1">
+              <ComprobanteManualFields
+                value={comprobanteManualDeDraft(draft)}
+                onChange={(comprobanteManual) => {
+                  patch({ comprobanteManual });
+                  setCbteManualErrores({});
+                }}
+                errores={cbteManualErrores}
+                disabled={busy}
+                labelClassName="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel"
+                inputClassName="h-9 w-full border border-black/20 bg-white px-3 text-sm"
+                className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+              />
+              {/* Mismo lugar que en NumeroComprobanteField: debajo del número. */}
+              <label className="inline-flex cursor-pointer items-center gap-1.5 self-start text-[11px] text-vialto-steel">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 border-black/20"
+                  checked={false}
+                  disabled={busy}
+                  onChange={() => {
+                    patch({ numeroInterno: true });
+                    setCbteManualErrores({});
+                  }}
+                />
+                Comprobante interno
+              </label>
+            </div>
+          ) : (
+            !conArca && (
+              <NumeroComprobanteField
+                id="factura-numero"
+                label={
+                  <>
+                    Número de comprobante <span className="text-red-500">*</span>
+                  </>
+                }
+                labelClassName="mb-1 text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel"
+                inputClassName="h-9 w-full border border-black/20 bg-white px-3 text-sm"
+                value={draft.numero}
+                onChange={(numero) => patch({ numero })}
+                placeholder="0001-00000001"
+                disabled={busy}
+                automatico={Boolean(draft.numeroInterno)}
+                onAutomaticoChange={(numeroInterno) => patch({ numeroInterno })}
+                urlNumeroInterno={URL_NUMERO_INTERNO.facturas(tenantId?.trim() || undefined)}
+                getToken={() => getToken()}
+              />
+            )
+          )}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+              {draft.facturarPorTramo ? "IVA (%) viajes sin tramo" : "IVA (%)"}
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={draft.ivaPct}
+              onChange={(e) => patch({ ivaPct: e.target.value })}
+              placeholder="0"
+              className="h-9 border border-black/20 bg-white px-3 text-sm"
+            />
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-            Fecha de vencimiento
-          </label>
-          <input
-            type="date"
-            value={draft.fechaVencimiento}
-            onChange={(e) => patch({ fechaVencimiento: e.target.value })}
-            className="h-9 border border-black/20 bg-white px-3 text-sm"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-            {draft.facturarPorTramo ? "IVA (%) viajes sin tramo" : "IVA (%)"}
-          </label>
-          <input
-            type="number"
-            min="0"
-            max="100"
-            step="0.01"
-            value={draft.ivaPct}
-            onChange={(e) => patch({ ivaPct: e.target.value })}
-            placeholder="0"
-            className="h-9 border border-black/20 bg-white px-3 text-sm"
-          />
-        </div>
+        {/* Como en Nueva liquidación: los viajes aparecen recién con el cliente elegido. */}
+        {draft.clienteId && (
         <div className="col-span-full flex flex-col gap-1">
           <div className="flex items-baseline justify-between gap-2">
             <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
@@ -1235,6 +1437,7 @@ export function FacturaCreateModal({
             unidadCantidad={unidadCantidadViajes(tenantEfectivo)}
           />
         </div>
+        )}
         {draft.viajeIds.length > 0 && (
           <div className="col-span-full">
             <label className="inline-flex items-center gap-2 text-sm text-vialto-charcoal">
@@ -1267,41 +1470,29 @@ export function FacturaCreateModal({
           </div>
         )}
         <div className="col-span-full">
+          <FacturaConceptosEditor
+            conceptos={draft.conceptos ?? []}
+            onChange={cambiarConceptos}
+            ivaPctDefault={ivaPctConceptos}
+            incompletos={conceptosIncompletos}
+            onIncompletos={avisarConceptosIncompletos}
+            disabled={busy}
+          />
+        </div>
+        <div className="col-span-full">
           <FacturaObservacionesEditor
             observaciones={draft.observaciones ?? []}
             onChange={(observaciones) => patch({ observaciones })}
             disabled={busy}
-            labelClassName="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel"
-            inputClassName="h-9 w-full border border-black/20 bg-white px-3 text-sm"
           />
         </div>
       </div>
-      <FacturaTotalesPreview draft={draft} viajes={derivedViajes} />
       {monedaInvalida && (
         <p className="mt-3 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
           Los viajes seleccionados tienen distintas monedas. Una factura no
           puede contener viajes en distintas monedas. Generá una factura por
           moneda.
         </p>
-      )}
-      {adjuntoVisible && (
-        <div className="mt-4">
-          <ComprobanteAdjuntoField
-            file={draft.comprobanteFile}
-            existingUrl={draft.comprobanteUrl}
-            onFileChange={(file) =>
-              patch(
-                file
-                  ? { comprobanteFile: file, comprobanteUrl: null }
-                  : { comprobanteFile: null },
-              )
-            }
-            onClearExisting={() =>
-              patch({ comprobanteUrl: null, comprobanteFile: null })
-            }
-            disabled={busy}
-          />
-        </div>
       )}
     </>
   );
@@ -1323,11 +1514,8 @@ export function FacturaCreateModal({
           className={[
             "relative flex max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl sm:rounded-lg sm:border sm:border-black/15",
             step === "autorizada" ? "h-auto" : "h-full",
-            step === "autorizada"
-              ? "sm:h-auto"
-              : unifiedArca
-                ? "sm:h-[92vh]"
-                : "sm:h-auto sm:max-h-[92vh]",
+            // Con y sin ARCA: formulario + panel de detalle ocultable (como Nueva liquidación).
+            step === "autorizada" ? "sm:h-auto" : "sm:h-[92vh]",
             step === "autorizada"
               ? "max-w-[min(34rem,calc(100vw-1rem))]"
               : "max-w-[min(110rem,calc(100vw-1rem))]",
@@ -1393,9 +1581,7 @@ export function FacturaCreateModal({
           <div
             className={[
               "min-h-0 flex-1 overflow-hidden",
-              step === "form" && unifiedArca
-                ? "flex flex-col"
-                : "overflow-y-auto",
+              step === "form" ? "flex flex-col" : "overflow-y-auto",
             ].join(" ")}
           >
             {step === "form" ? (
@@ -1488,9 +1674,51 @@ export function FacturaCreateModal({
                 )}
                 </>
               ) : (
-                <div className="overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-                  {standardFields}
+                // Sin ARCA (o factura hecha por fuera del sistema): mismo armado que con ARCA y
+                // que Nueva liquidación — panel de detalle a la derecha, ocultable, y barra de
+                // totales abajo mientras está oculto.
+                <>
+                <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+                  <div
+                    className={[
+                      "relative flex min-h-0 flex-col overflow-y-auto px-4 py-4 sm:px-6 sm:py-5",
+                      detalleAbierto
+                        ? "border-b border-black/10 lg:w-[68%] lg:max-w-[68%] lg:shrink-0 lg:border-b-0 lg:border-r"
+                        : "flex-1",
+                    ].join(" ")}
+                  >
+                    {!detalleAbierto && (
+                      <div className="mb-3 flex justify-end">
+                        <VerDetalleButton onClick={() => setDetalleAbierto(true)} />
+                      </div>
+                    )}
+                    {standardFields}
+                  </div>
+                  {detalleAbierto && (
+                  <div className="min-h-0 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:w-[32%] lg:max-w-[32%] lg:shrink-0 lg:min-w-0">
+                    <DetalleComprobanteEncabezado onOcultar={() => setDetalleAbierto(false)} />
+                    <FacturaArcaPreviewPanel
+                      sinArca
+                      numero={draft.numeroInterno ? "Comprobante interno" : draft.numero}
+                      moneda={monedaFactura}
+                      arcaConfig={null}
+                      clienteDetalle={clienteDetalle}
+                      fechaEmision={draft.fechaEmision}
+                      lineas={lineas}
+                      onLineasChange={() => {}}
+                      ivaPctDefault={ivaPctDefault}
+                      lineasDisabled
+                      tenantId={tenantId}
+                    />
+                  </div>
+                  )}
                 </div>
+                {!detalleAbierto && (
+                  <ResumenTotalesBarra
+                    {...totalesResumenFactura(lineas, ivaPctDefault, monedaFactura)}
+                  />
+                )}
+                </>
               )
             ) : (
               <div className="overflow-y-auto px-4 py-5 sm:px-6">

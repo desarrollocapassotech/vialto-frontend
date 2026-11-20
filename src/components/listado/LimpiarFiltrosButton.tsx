@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useSlotLimpiarFiltros } from "./filtrosActivos";
 
 /**
  * Para secciones (pestañas) cuyos filtros viven en el componente hijo pero el título
@@ -20,8 +21,10 @@ export function LimpiarFiltrosPortal({
 }
 
 /**
- * "× Limpiar filtros" sutil, al lado del título del listado (mismo estilo que Viajes).
- * Regla global: toda tabla con filtros lo pone junto al `<h1>`, no entre las acciones.
+ * "× Limpiar filtros" sutil. Si hay una grilla en pantalla, se dibuja al final de su fila
+ * de badges de filtros aplicados (`FiltrosActivosBarra`), junto a lo que limpia; si no,
+ * queda donde la página lo pone (al lado del título). Usa el handler de la página, así
+ * limpia todos sus filtros (también los rápidos).
  */
 export function LimpiarFiltrosButton({
   onClick,
@@ -36,12 +39,13 @@ export function LimpiarFiltrosButton({
   /** true = oculto en mobile (ahí se limpia desde el sheet de filtros). */
   soloDesktop?: boolean;
 }) {
-  return (
+  const slot = useSlotLimpiarFiltros();
+  const boton = (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`${soloDesktop ? "hidden lg:inline-flex" : "inline-flex"} h-10 shrink-0 items-center gap-1 px-2 text-xs text-vialto-steel underline-offset-4 transition-colors hover:text-vialto-charcoal hover:underline disabled:pointer-events-none disabled:opacity-50`}
+      className={`${soloDesktop ? "hidden lg:inline-flex" : "inline-flex"} ${slot ? "h-7" : "h-10"} shrink-0 items-center gap-1 px-2 text-xs text-vialto-steel underline-offset-4 transition-colors hover:text-vialto-charcoal hover:underline disabled:pointer-events-none disabled:opacity-50`}
       aria-label={
         cantidad != null
           ? `Limpiar filtros (${cantidad} activo${cantidad !== 1 ? "s" : ""})`
@@ -52,4 +56,5 @@ export function LimpiarFiltrosButton({
       Limpiar filtros{cantidad != null ? ` (${cantidad})` : ""}
     </button>
   );
+  return slot ? createPortal(boton, slot) : boton;
 }

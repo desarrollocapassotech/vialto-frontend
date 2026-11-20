@@ -94,7 +94,7 @@ const ENTRIES: Entry[] = [
     ],
   },
   ...entidadEntries("clientes", "Nuevo cliente", "Editar cliente"),
-  ...entidadEntries("transportistas", "Nuevo transportista", "Editar transportista"),
+  ...entidadEntries("transportistas", "Nuevo proveedor", "Editar proveedor"),
   ...entidadEntries("choferes", "Nuevo chofer", "Editar chofer"),
   ...entidadEntries("destinatarios", "Nuevo destinatario", "Editar destinatario"),
   ...entidadEntries("vehiculos", "Nuevo vehículo", "Editar vehículo"),
@@ -156,11 +156,12 @@ const ENTRIES: Entry[] = [
     ],
   },
   {
-    pattern: "/superadmin/empresas/:orgId/editar",
+    // Ficha de la empresa: `SuperadminEmpresaPage` reemplaza "Empresa" por el nombre.
+    pattern: "/superadmin/empresas/:orgId",
     build: (_p, ctx) => [
       homeCrumb(ctx),
       { label: "Empresas", to: "/superadmin/empresas" },
-      { label: "Editar empresa" },
+      { label: "Empresa" },
     ],
   },
   {
@@ -198,10 +199,6 @@ const ENTRIES: Entry[] = [
     ],
   },
   { pattern: "/superadmin/arca", build: (_p, ctx) => [homeCrumb(ctx), { label: "ARCA / AFIP" }] },
-  {
-    pattern: "/superadmin/campos-empresa",
-    build: (_p, ctx) => [homeCrumb(ctx), { label: "Configuración por empresa" }],
-  },
   {
     pattern: "/superadmin/notificaciones",
     build: (_p, ctx) => [homeCrumb(ctx), { label: "Notificaciones" }],

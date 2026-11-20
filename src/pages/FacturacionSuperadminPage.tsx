@@ -34,13 +34,7 @@ export function FacturacionSuperadminPage() {
         />
       </div>
 
-      {!filtroEmpresa && (
-        <p className="mt-10 text-vialto-steel text-sm">
-          Seleccioná una empresa para ver sus facturas.
-        </p>
-      )}
-
-      {filtroEmpresa ? (
+            {filtroEmpresa ? (
         <div className="mt-8">
           <FacturacionTenantPage
             tenantId={filtroEmpresa}

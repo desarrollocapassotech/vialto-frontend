@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -266,6 +266,7 @@ export function SuperadminUsersPage() {
           </p>
         )}
 
+        {filtroEmpresa && (
         <ListadoDatos
           className={`mt-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}
           tableColSpan={5}
@@ -336,6 +337,7 @@ export function SuperadminUsersPage() {
                   title="Rol"
                   filterActive={!!filtroRol}
                   filterSignature={filtroRol}
+                  valor={filtroRol ? formatRole(filtroRol) : null}
                   onClear={() => {
                     setFiltroRol("");
                     setPage(1);
@@ -397,6 +399,7 @@ export function SuperadminUsersPage() {
             },
           ]}
           rows={!filtroEmpresa || error ? [] : rowsFiltradas}
+          cargando={loading}
           rowKey={(u) => u.userId ?? u.email ?? `${u.firstName}-${u.lastName}`}
           emptyMessage={
             !filtroEmpresa
@@ -407,13 +410,14 @@ export function SuperadminUsersPage() {
                   ? "No hay usuarios que coincidan con los filtros aplicados."
                   : "No hay usuarios en esta empresa."
           }
-          loadingMessage="Cargando…"
+          loadingMessage="Cargando usuarios…"
           rowActions={(u) =>
             u.userId
               ? [{ id: "ver", label: "Ver usuario", icon: Eye, onClick: () => setViewingUser(u) }]
               : []
           }
         />
+        )}
 
         {/* COMPONENTE DE PAGINACIÓN */}
         {meta && rows && rows.length > 0 && (

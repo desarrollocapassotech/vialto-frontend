@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { apiJson } from "@/lib/api";
@@ -87,7 +88,7 @@ export function HistorialAsignacionModal({
         )}
 
         {!error && historial === null && (
-          <p className="mt-4 text-sm text-vialto-steel">Cargando…</p>
+          <CargandoVialto mensaje="Cargando el historial de asignaciones…" chico />
         )}
 
         {!error && historial !== null && historial.length === 0 && (

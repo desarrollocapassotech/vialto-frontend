@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { PaisModal } from "@/components/viajes/PaisModal";
 import { PaisViewModal } from "@/components/viajes/PaisViewModal";
@@ -133,6 +133,7 @@ export function PaisesSuperadminPage() {
         </p>
       )}
 
+      {filtroEmpresa && (
       <ListadoDatos
         className="mt-6"
         tableColSpan={3}
@@ -173,7 +174,7 @@ export function PaisesSuperadminPage() {
               ? "No se pudieron cargar los países."
               : "No hay países cargados para esta empresa."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando países…"
         rowActionsMaxIconos={3}
         rowActions={(p) => [
           { id: "ver", label: "Ver país", icon: Eye, onClick: () => setViewingPais(p) },
@@ -194,6 +195,7 @@ export function PaisesSuperadminPage() {
               ]),
         ]}
       />
+      )}
 
       {viewingPais && (
         <PaisViewModal

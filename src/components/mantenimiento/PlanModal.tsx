@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useEffect, useState } from "react";
 import { CrudFieldLabel, CrudSelect } from "@/components/crud/CrudFields";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
@@ -237,7 +238,7 @@ export function PlanModal({
   return (
     <ViewModalShell title={titulo} onClose={descarte.solicitarCierre} descarte={descarte} footer={footer} maxWidthClass="sm:max-w-3xl" scrollBody>
       {cargando ? (
-        <p className="text-sm text-vialto-steel">Cargando…</p>
+        <CargandoVialto mensaje="Cargando el plan…" chico />
       ) : modo === "ver" && plan ? (
         <div className="grid gap-5">
           <div className={viewModalGridClass}>

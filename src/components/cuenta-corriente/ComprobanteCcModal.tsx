@@ -1,5 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
+import { useAutocompletarNumeroComprobante } from '@/hooks/useAutocompletarNumeroComprobante';
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -51,6 +52,19 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
     )?.trim() || null;
   const [file, setFile] = useState<File | null>(null);
   const [quitarGuardado, setQuitarGuardado] = useState(false);
+  // Factura de ARCA adjunta: completa el número si está vacío o lo completó el sistema.
+  const autocompletarNumero = useAutocompletarNumeroComprobante();
+  const estadoRef = useRef({ file, numero });
+  estadoRef.current = { file, numero };
+  function cambiarArchivo(f: File | null) {
+    setFile(f);
+    if (!f || !numeroEditable) return;
+    void autocompletarNumero(f, {
+      vigente: () => estadoRef.current.file === f,
+      numeroActual: () => estadoRef.current.numero,
+      aplicar: (_leido, nuevo) => setNumero(nuevo),
+    });
+  }
 
   // El vencimiento no puede ser anterior a la fecha del comprobante (YYYY-MM-DD, como texto).
   const fechaComprobante = fechaDiaYmd(movimiento.fecha) ?? '';
@@ -113,6 +127,25 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
       }
     >
       <form id="comprobante-cc-form" onSubmit={handleSubmit} className="space-y-4">
+        {/* Archivo a la izquierda del número, como en Nueva factura. */}
+        <div
+          className={
+            archivoEditable ? 'grid grid-cols-1 items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)]' : ''
+          }
+        >
+        {archivoEditable && (
+          <div className="min-w-0 sm:max-w-[14rem]">
+            <ComprobanteAdjuntoField
+              file={file}
+              existingUrl={quitarGuardado ? null : urlGuardada}
+              onFileChange={cambiarArchivo}
+              onClearExisting={() => setQuitarGuardado(true)}
+              disabled={saving}
+              label="Archivo"
+              labelClassName={labelClass}
+            />
+          </div>
+        )}
         <div>
           <label className={labelClass} htmlFor="cc-numero-comprobante">
             {esLiquidacion
@@ -151,17 +184,7 @@ export function ComprobanteCcModal({ movimiento, onClose, onDone }: Props) {
             </p>
           )}
         </div>
-
-        {archivoEditable && (
-          <ComprobanteAdjuntoField
-            file={file}
-            existingUrl={quitarGuardado ? null : urlGuardada}
-            onFileChange={setFile}
-            onClearExisting={() => setQuitarGuardado(true)}
-            disabled={saving}
-            label="Archivo"
-          />
-        )}
+        </div>
 
         {vencimientoEditable && (
           <div>

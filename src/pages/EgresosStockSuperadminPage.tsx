@@ -124,9 +124,7 @@ export function EgresosStockSuperadminPage() {
 
       <EmpresaFilterBar tenants={tenants} value={tenantId} onChange={handleTenantChange} />
 
-      {!tenantId ? (
-        <p className="text-sm text-vialto-steel">Seleccioná una empresa para registrar egresos.</p>
-      ) : (
+      {tenantId && (
         <EgresosStockTenantPage
           tenantId={tenantId}
           clientesExternos={clientes}

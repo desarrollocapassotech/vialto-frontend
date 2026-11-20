@@ -41,6 +41,11 @@ export interface OtroGasto {
   createdBy?: string;
   /** Nombre o correo resuelto vía Clerk (solo en detalle). */
   createdByLabel?: string | null;
+  /**
+   * Gasto que viene de una compra de Cuenta corriente vinculada al viaje: no se edita ni
+   * se borra desde el viaje (se cambia desde la compra). Ver `vialto-backend/.../compra-viajes.ts`.
+   */
+  ccCompraId?: string;
 }
 
 /** Cliente adicional de un viaje multi-cliente: origen/destino(s)/productos y cobro propios. */
@@ -160,6 +165,8 @@ export interface Viaje {
   monedaPrecioTransportistaExterno?: string;
   /** % de IVA que el transportista suma en efectivo por encima de precioTransportistaExterno (que siempre es neto). 0 = no suma IVA. No afecta el cálculo de la Liquidación/CVLP, solo el pago en efectivo y la ganancia bruta. */
   precioTransportistaIvaIncluidoPct?: number;
+  /** Tramos del pago al transportista con su propio % de IVA; lo no cubierto usa el % general. Vacío = un solo % para todo. */
+  tramosTransportista?: { detalle: string; monto: number; ivaPct: number }[];
   /** Solo cuando monedaMonto != monedaPrecioTransportistaExterno (transporte externo). */
   gananciaBrutaManual?: number | null;
   monedaGananciaBrutaManual?: string | null;
@@ -346,6 +353,10 @@ export interface VehiculoKmEdicion {
   createdAt: string;
 }
 
+/** Espejo de `PROVEEDOR_TIPOS` del backend (`shared/util/proveedor-tipo.ts`). */
+export type ProveedorTipo = 'transportista' | 'taller' | 'otro';
+
+/** Proveedor (tabla `transportistas`): transportista, taller u otro. */
 export interface Transportista {
   id: string;
   tenantId: string;
@@ -357,8 +368,16 @@ export interface Transportista {
   domicilio: string | null;
   condicionIva: number | null;
   condicionTributaria: string | null;
-  /** En API siempre `externo` para subcontratistas; flota propia = sin vinculo en chofer/vehiculo. */
-  tipo?: string;
+  /**
+   * Tipo de proveedor (nov 2026): la tabla guarda todos los proveedores de la empresa.
+   * Solo `transportista` se ofrece en Viajes/Liquidaciones/Choferes/Vehículos y solo
+   * `taller` en las órdenes de trabajo. Ver `lib/proveedorTipo.ts`.
+   */
+  tipo: ProveedorTipo;
+  /** Solo tipo `otro`: nombre del tipo que cargó la empresa (ej. "Combustible"). */
+  categoria?: string | null;
+  /** false = desactivado: no se ofrece en los selectores, conserva el historial. */
+  activo: boolean;
   paut: string | null;
   permisoInternacional: string | null;
   fechaVencimientoPermiso: string | null;
@@ -385,9 +404,6 @@ export interface Tenant {
   name: string;
   idFiscal: string | null;
   modules: string[];
-  maxUsers: number;
-  billingStatus: string;
-  billingRenewsAt: string | null;
   /** Label del campo "ID propio" en el módulo de viajes, personalizable por tenant (ej. "Nro de CTG"). */
   labelIdentificacionPersonalizadaViajes: string | null;
   /** true = muestra la columna/campo dedicado "ID Sistema" en Viajes. Default true. */
@@ -425,6 +441,8 @@ export interface Tenant {
   tipoFlotaDefault?: "propia" | "externa" | null;
   /** false = sin dashboard; el inicio es el primer módulo contratado (`lib/tenantHome.ts`). Default true; solo lo cambia superadmin. */
   dashboardHabilitado?: boolean;
+  /** Bloques del dashboard en orden ([] = set recomendado por módulos). Leer con `bloquesEfectivos` (`lib/dashboardBloques.ts`). */
+  dashboardBloques?: string[];
   /** Default true. false = origen/destino de Viajes en texto libre, sin buscador de ciudades ni validación en el import. */
   recomendacionCiudadesHabilitada?: boolean;
   /** Default false (se oculta "Marcar como cobrada" en Facturas). true = habilitada; solo lo cambia superadmin. */
@@ -580,6 +598,14 @@ export interface Factura {
   tramos?: FacturaTramo[];
   /** Renglones de texto sin importe que van en el PDF debajo de los viajes. */
   observaciones?: string[];
+  /** Conceptos además de los viajes (estadía, gastos del viaje…): neto e IVA de cada uno. */
+  conceptos?: {
+    descripcion: string;
+    cantidad?: number;
+    precioUnitario?: number;
+    importe: number;
+    ivaPct: number;
+  }[];
   comprobanteUrl: string | null;
   cbteTipo?: number | null;
   cbteNro?: number | null;

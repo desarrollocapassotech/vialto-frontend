@@ -14,6 +14,23 @@
   --color-vialto-mist: #f5f3f0;
   --color-vialto-white: #ffffff;
 
+  /*
+   * Esquinas rectas en todo el sistema (nov 2026): aspecto más duro, de transporte y
+   * logística. Todas las clases `rounded`, `rounded-sm` … `rounded-4xl` (y sus variantes
+   * por lado) quedan en 0. `rounded-full` se conserva SOLO para lo que tiene que ser un
+   * círculo (spinners, puntos de estado, foto de perfil); no usarlo en botones, badges,
+   * contadores ni switches.
+   */
+  --radius: 0;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
+
   --font-display: "Bebas Neue", ui-sans-serif, system-ui, sans-serif;
   --font-body: Barlow, ui-sans-serif, system-ui, sans-serif;
   --font-ui: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
@@ -87,7 +104,7 @@
 
 .sidebar-scrollbar::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
-  border-radius: 999px;
+  border-radius: 0;
   background: rgb(255 255 255 / 0.28);
   background-clip: padding-box;
 }
@@ -97,26 +114,8 @@
   background-clip: padding-box;
 }
 
-@keyframes sidebar-expand-hint {
-  0%,
-  100% {
-    transform: translateX(0);
-    box-shadow: 0 4px 14px rgb(0 0 0 / 0.24);
-  }
-  50% {
-    transform: translateX(5px);
-    box-shadow:
-      0 0 0 5px rgb(232 71 10 / 0.2),
-      4px 4px 26px rgb(232 71 10 / 0.9);
-  }
-}
-
-.sidebar-control-zone:hover .sidebar-expand-button {
-  animation: sidebar-expand-hint 1.2s ease-in-out infinite;
-}
-
-/* Flecha de "hay más columnas" en tablas con scroll horizontal: mismo pulso que la
-   flecha del menú lateral. `--hint-dir` = 1 (derecha) / -1 (izquierda). */
+/* Flecha de "hay más columnas" en tablas con scroll horizontal (pulso lateral).
+   `--hint-dir` = 1 (derecha) / -1 (izquierda). */
 @keyframes tabla-scroll-hint {
   0%,
   100% {
@@ -171,6 +170,18 @@
   }
 }
 
+/* Configuración por empresa (superadmin): buscador. Con búsqueda activa se ocultan
+   las secciones sin filas que coincidan, y si no queda ninguna se avisa. */
+.config-sin-resultados {
+  display: none;
+}
+.config-buscando .config-seccion:not(:has([data-config-fila])) {
+  display: none;
+}
+.config-buscando:not(:has([data-config-fila])) .config-sin-resultados {
+  display: block;
+}
+
 @media screen and (max-width: 768px) {
   input,
   textarea,
@@ -178,3 +189,17 @@
     font-size: 16px;
   }
 }
+
+/* Aparición suave (capa de carga del dashboard). */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+
+/* Línea punteada de la ruta del login que avanza (período = 28 + 26 del dasharray). */
+@keyframes ruta-avance {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -54; }
+}
+

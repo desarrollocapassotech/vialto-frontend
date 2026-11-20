@@ -6,6 +6,7 @@ import {
 } from "@clerk/clerk-react";
 import { Link, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
+import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { MaestroDataProvider, useMaestroData } from "@/hooks/useMaestroData";
 import {
   isPlatformSuperadmin,
@@ -17,7 +18,11 @@ import { HomePage } from "@/pages/HomePage";
 import { ViajesPage } from "@/pages/ViajesPage";
 import { BaseDeDatosPage } from "@/pages/BaseDeDatosPage";
 import { SuperadminTenantCreatePage } from "@/pages/SuperadminTenantCreatePage";
-import { SuperadminTenantEditPage } from "@/pages/SuperadminTenantEditPage";
+import {
+  RedirectConfiguracionEmpresa,
+  RedirectEditarEmpresa,
+  SuperadminEmpresaPage,
+} from "@/pages/SuperadminEmpresaPage";
 import { ClienteCreatePage } from "@/pages/ClienteCreatePage";
 import { ClienteEditPage } from "@/pages/ClienteEditPage";
 import { TransportistaCreatePage } from "@/pages/TransportistaCreatePage";
@@ -50,7 +55,7 @@ import { SuperadminUserCreatePage } from "@/pages/SuperadminUserCreatePage";
 import { SuperadminUserEditPage } from "@/pages/SuperadminUserEditPage";
 import { SuperadminArcaPage } from "@/pages/SuperadminArcaPage";
 import { LiquidacionesTenantPage } from "@/pages/LiquidacionesTenantPage";
-import { CuentaCorrienteTenantPage } from "@/pages/CuentaCorrienteTenantPage";
+import { CuentaCorrientePage } from "@/pages/CuentaCorrientePage";
 import { ArcaConfigTenantPage } from "@/pages/ArcaConfigTenantPage";
 import { CombustiblePage } from "@/pages/CombustiblePage";
 import { MantenimientoTenantPage } from "@/pages/MantenimientoTenantPage";
@@ -58,7 +63,6 @@ import { PasswordSignInPage } from "@/pages/PasswordSignInPage";
 import { PasswordSignUpPage } from "@/pages/PasswordSignUpPage";
 import { TaskSetupMFAPage } from "@/pages/TaskSetupMFAPage";
 import { TaskChooseOrganizationPage } from "@/pages/TaskChooseOrganizationPage";
-import { CamposEmpresaPage } from "@/pages/CamposEmpresaPage";
 import { CombustibleSuperadminPage } from "@/pages/CombustibleSuperadimPage";
 import { ConceptosConfigTenantPage } from "@/pages/ConceptosConfigTenatPage";
 import { ConfiguracionNotificacionesTenantPage } from "@/pages/ConfiguracionNotificacionesTenantPage";
@@ -70,8 +74,8 @@ function RequireAuth() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-vialto-mist text-vialto-steel">
-        Un momento…
+      <div className="min-h-screen flex items-center justify-center bg-vialto-mist">
+        <CargandoVialto mensaje="Iniciando Vialto…" />
       </div>
     );
   }
@@ -244,8 +248,8 @@ function RequireModule({ module }: { module: string }) {
     tenantLoading
   ) {
     return (
-      <div className="min-h-[40vh] flex items-center justify-center text-vialto-steel">
-        Un momento…
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <CargandoVialto mensaje="Preparando tu empresa…" />
       </div>
     );
   }
@@ -320,7 +324,10 @@ export default function App() {
             />
             <Route path="facturacion" element={<FacturacionPage />} />
             <Route path="liquidaciones" element={<LiquidacionesTenantPage />} />
-            <Route path="cuenta-corriente" element={<CuentaCorrienteTenantPage />} />
+            <Route
+              path="cuenta-corriente"
+              element={<CuentaCorrientePage />}
+            />
           </Route>
           {/* rutas legacy → redirigen al tab correspondiente en /base-de-datos */}
           <Route
@@ -476,7 +483,7 @@ export default function App() {
           <Route path="superadmin/arca" element={<SuperadminArcaPage />} />
           <Route
             path="superadmin/campos-empresa"
-            element={<CamposEmpresaPage />}
+            element={<RedirectConfiguracionEmpresa />}
           />
           <Route
             path="superadmin/notificaciones"
@@ -500,7 +507,11 @@ export default function App() {
           />
           <Route
             path="superadmin/empresas/:orgId/editar"
-            element={<SuperadminTenantEditPage />}
+            element={<RedirectEditarEmpresa />}
+          />
+          <Route
+            path="superadmin/empresas/:orgId"
+            element={<SuperadminEmpresaPage />}
           />
           <Route
             path="superadmin/empresas/:orgId/importar"

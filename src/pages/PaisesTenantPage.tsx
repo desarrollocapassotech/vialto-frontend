@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useState } from "react";
 import { PaisModal } from "@/components/viajes/PaisModal";
 import { PaisViewModal } from "@/components/viajes/PaisViewModal";
@@ -17,6 +17,8 @@ import type { Pais } from "@/types/api";
 export function PaisesTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [rows, setRows] = useState<Pais[] | null>(null);
+  /** Pedido de la lista en curso (filtros, página): muestra el loader en la grilla. */
+  const [cargandoLista, setCargandoLista] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewingPais, setViewingPais] = useState<Pais | null>(null);
   const [editingPais, setEditingPais] = useState<Pais | null>(null);
@@ -36,7 +38,10 @@ export function PaisesTenantPage() {
     let cancelled = false;
     (async () => {
       try {
-        await load();
+        setCargandoLista(true);
+        await load().finally(() => {
+          if (!cancelled) setCargandoLista(false);
+        });
         if (!cancelled) setError(null);
       } catch (e) {
         if (!cancelled) {
@@ -133,14 +138,15 @@ export function PaisesTenantPage() {
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
         ]}
-        rows={error ? [] : rows ?? []}
+        rows={error ? [] : rows}
+        cargando={!error && cargandoLista}
         rowKey={(p) => p.id}
         emptyMessage={
           error
             ? "No se pudieron cargar los países."
             : "Todavía no tenés países cargados."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando países…"
         rowActionsMaxIconos={3}
         rowActions={(p) => [
           { id: "ver", label: "Ver país", icon: Eye, onClick: () => setViewingPais(p) },

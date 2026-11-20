@@ -42,11 +42,7 @@ export function StockMovimientosSuperadminPage() {
         onChange={handleTenantChange}
       />
 
-      {!tenantId ? (
-        <p className="text-sm text-vialto-steel">
-          Seleccioná una empresa para ver los movimientos.
-        </p>
-      ) : (
+      {tenantId && (
         <StockMovimientosTenantPage tenantId={tenantId} />
       )}
     </div>

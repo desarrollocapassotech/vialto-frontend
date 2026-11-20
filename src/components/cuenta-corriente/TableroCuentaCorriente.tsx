@@ -3,6 +3,9 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { FileDown } from 'lucide-react';
 import { formatCurrencyArFromNumber } from '@/lib/currencyMask';
+import { useTablaDashboard } from '@/hooks/useTablaDashboard';
+import { TituloOrdenable } from '@/components/viajes/ViajesListadoHeaderFiltro';
+import { PaginacionCompacta } from '@/components/listado/PaginacionCompacta';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   descargarListadoDeudoresPdf,
@@ -55,6 +58,12 @@ function ItemsTabla({
   items: TableroItem[];
   onClick: Props['onSeleccionarContraparte'];
 }) {
+  const tabla = useTablaDashboard(items, {
+    contraparte: { valor: (x) => x.contraparteNombre },
+    vencimiento: { valor: (x) => x.fechaVencimiento, tipo: 'fecha' },
+    pendiente: { valor: (x) => x.pendiente, tipo: 'numero' },
+  });
+  const paginacion = tabla.paginacion;
   if (items.length === 0) return null;
   return (
     <div className="overflow-x-auto bg-white border border-black/10 p-4">
@@ -65,18 +74,18 @@ function ItemsTabla({
         <thead>
           <tr className="border-b border-black/10">
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Contraparte
+              <TituloOrdenable title="Contraparte" orden={tabla.ordenColumna('contraparte')} />
             </th>
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Vencimiento
+              <TituloOrdenable title="Vencimiento" orden={tabla.ordenColumna('vencimiento')} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Pendiente
+              <TituloOrdenable title="Pendiente" orden={tabla.ordenColumna('pendiente')} />
             </th>
           </tr>
         </thead>
         <tbody>
-          {items.map((it) => (
+          {tabla.visibles.map((it) => (
             <tr
               key={it.id}
               className="cursor-pointer border-b border-black/5 last:border-0 hover:bg-vialto-mist"
@@ -95,6 +104,7 @@ function ItemsTabla({
           ))}
         </tbody>
       </table>
+      <PaginacionCompacta paginacion={paginacion} />
     </div>
   );
 }

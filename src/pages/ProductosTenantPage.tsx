@@ -1,4 +1,4 @@
-import { useAuth, useUser } from "@clerk/clerk-react";
+﻿import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -48,6 +48,8 @@ export function ProductosTenantPage() {
   const pluralFrase = labelEnFrase(labels.plural);
 
   const [rows, setRows] = useState<Producto[] | null>(null);
+  /** Pedido de la lista en curso (filtros, página): muestra el loader en la grilla. */
+  const [cargandoLista, setCargandoLista] = useState(false);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -93,7 +95,10 @@ export function ProductosTenantPage() {
     let cancelled = false;
     void (async () => {
       try {
-        await load();
+        setCargandoLista(true);
+        await load().finally(() => {
+          if (!cancelled) setCargandoLista(false);
+        });
         if (!cancelled) setError(null);
       } catch (e) {
         if (!cancelled) {
@@ -407,13 +412,14 @@ export function ProductosTenantPage() {
           },
         ]}
         rows={error ? [] : rows}
+        cargando={!error && cargandoLista}
         rowKey={(r) => r.id}
         emptyMessage={
           error
             ? `No se pudieron cargar los ${pluralFrase}.`
             : `No hay ${pluralFrase} que coincidan con el criterio.`
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando productos…"
         rowActions={(r) => [
           {
             id: "ver",

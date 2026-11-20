@@ -260,6 +260,7 @@ export function IngresosStockHistorialTenantPage({
                 title="Cliente"
                 filterActive={!!clienteId}
                 filterSignature={clienteId}
+                valor={clientes.find((x) => x.id === clienteId)?.nombre}
                 onClear={() =>
                   setSearchParams((prev) => {
                     const next = new URLSearchParams(prev);
@@ -306,6 +307,7 @@ export function IngresosStockHistorialTenantPage({
                 title="Depósito"
                 filterActive={!!depositoId}
                 filterSignature={depositoId}
+                valor={depositos.find((x) => x.id === depositoId)?.nombre}
                 onClear={() =>
                   setSearchParams((prev) => {
                     const next = new URLSearchParams(prev);
@@ -352,6 +354,7 @@ export function IngresosStockHistorialTenantPage({
                 title="Productos"
                 filterActive={!!productoId}
                 filterSignature={productoId}
+                valor={productos.find((x) => x.id === productoId)?.nombre}
                 onClear={() =>
                   setSearchParams((prev) => {
                     const next = new URLSearchParams(prev);
@@ -413,7 +416,7 @@ export function IngresosStockHistorialTenantPage({
         rows={loading ? null : items}
         rowKey={(op) => op.id}
         emptyMessage="No hay ingresos registrados."
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando ingresos de stock…"
         rowActions={(op) => [
           { id: "ver", label: "Ver ingreso", icon: Eye, onClick: () => setViendo(op) },
         ]}

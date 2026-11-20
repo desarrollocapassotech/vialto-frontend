@@ -1,8 +1,12 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye } from "lucide-react";
 import { CeldaAccionesFila } from "@/components/ui/AccionesFila";
 import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { clickFilaAcciones } from "@/lib/accionesFila";
+import { useTablaDashboard } from "@/hooks/useTablaDashboard";
+import { TituloOrdenable } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { PaginacionCompacta } from "@/components/listado/PaginacionCompacta";
 import { etapaViajeLabel } from "@/lib/viajesIndicadores";
 import type {
   FinancieroDashboardResponse,
@@ -142,6 +146,8 @@ function MargenEntidadTable({
   items: FinancieroMargenPorEntidad[];
   columnaNombre: string;
 }) {
+  const tabla = useTablaDashboard(items, { nombre: { valor: (x) => x.nombre }, viajes: { valor: (x) => x.cantViajes, tipo: "numero" }, facturado: { valor: (x) => x.facturado.ARS || x.facturado.USD, tipo: "numero" }, margen: { valor: (x) => x.margen.ARS || x.margen.USD, tipo: "numero" } });
+  const paginacion = tabla.paginacion;
   if (items.length === 0) return <EmptyState text="Sin viajes con margen calculado en el período." />;
   return (
     <div className="overflow-x-auto bg-white border border-black/10 p-4">
@@ -149,21 +155,21 @@ function MargenEntidadTable({
         <thead>
           <tr className="border-b border-black/10">
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              {columnaNombre}
+              <TituloOrdenable title={columnaNombre} orden={tabla.ordenColumna("nombre")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Viajes
+              <TituloOrdenable title="Viajes" orden={tabla.ordenColumna("viajes")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Facturado
+              <TituloOrdenable title="Facturado" orden={tabla.ordenColumna("facturado")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Margen
+              <TituloOrdenable title="Margen" orden={tabla.ordenColumna("margen")} />
             </th>
           </tr>
         </thead>
         <tbody>
-          {items.map((it) => (
+          {tabla.visibles.map((it) => (
             <tr key={it.id} className="border-b border-black/5 last:border-0">
               <td className="py-2 font-medium text-vialto-charcoal">{it.nombre}</td>
               <td className="py-2 text-right text-vialto-charcoal">{it.cantViajes}</td>
@@ -177,6 +183,7 @@ function MargenEntidadTable({
           ))}
         </tbody>
       </table>
+      <PaginacionCompacta paginacion={paginacion} />
     </div>
   );
 }
@@ -196,6 +203,8 @@ export function MargenPorRutaTable({
   items: FinancieroMargenPorRuta[];
   columnaClave: string;
 }) {
+  const tabla = useTablaDashboard(items, { clave: { valor: (x) => x.clave }, viajes: { valor: (x) => x.cantViajes, tipo: "numero" } });
+  const paginacion = tabla.paginacion;
   if (items.length === 0) return <EmptyState text="Sin datos en el período seleccionado." />;
   return (
     <div className="overflow-x-auto bg-white border border-black/10 p-4">
@@ -203,15 +212,15 @@ export function MargenPorRutaTable({
         <thead>
           <tr className="border-b border-black/10">
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              {columnaClave}
+              <TituloOrdenable title={columnaClave} orden={tabla.ordenColumna("clave")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Viajes
+              <TituloOrdenable title="Viajes" orden={tabla.ordenColumna("viajes")} />
             </th>
           </tr>
         </thead>
         <tbody>
-          {items.map((it) => (
+          {tabla.visibles.map((it) => (
             <tr key={it.clave} className="border-b border-black/5 last:border-0">
               <td className="py-2 text-vialto-charcoal">{it.clave}</td>
               <td className="py-2 text-right text-vialto-charcoal">{it.cantViajes}</td>
@@ -219,6 +228,7 @@ export function MargenPorRutaTable({
           ))}
         </tbody>
       </table>
+      <PaginacionCompacta paginacion={paginacion} />
     </div>
   );
 }
@@ -233,6 +243,8 @@ export function MargenAlertasList({
   loadingViajeId?: string | null;
 }) {
   const accionesViaje = useAccionesVerViaje(onViewViaje, loadingViajeId);
+  const tabla = useTablaDashboard(alertas, { viaje: { valor: (x) => x.numero || x.viajeId }, cliente: { valor: (x) => x.clienteNombre }, transportista: { valor: (x) => x.transportistaNombre }, facturado: { valor: (x) => x.facturado, tipo: "numero" }, margen: { valor: (x) => x.margen, tipo: "numero" } });
+  const paginacion = tabla.paginacion;
   if (alertas.length === 0) {
     return <EmptyState text="Sin viajes con margen bajo o negativo en el período." />;
   }
@@ -242,19 +254,19 @@ export function MargenAlertasList({
         <thead>
           <tr className="border-b border-black/10">
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Viaje
+              <TituloOrdenable title="Viaje" orden={tabla.ordenColumna("viaje")} />
             </th>
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Cliente
+              <TituloOrdenable title="Cliente" orden={tabla.ordenColumna("cliente")} />
             </th>
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Transportista
+              <TituloOrdenable title="Transportista" orden={tabla.ordenColumna("transportista")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Facturado
+              <TituloOrdenable title="Facturado" orden={tabla.ordenColumna("facturado")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Margen
+              <TituloOrdenable title="Margen" orden={tabla.ordenColumna("margen")} />
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
               Acciones
@@ -262,7 +274,7 @@ export function MargenAlertasList({
           </tr>
         </thead>
         <tbody>
-          {alertas.map((a) => (
+          {tabla.visibles.map((a) => (
             <tr
               key={a.viajeId}
               className={FILA_CLICKEABLE}
@@ -282,6 +294,7 @@ export function MargenAlertasList({
           ))}
         </tbody>
       </table>
+      <PaginacionCompacta paginacion={paginacion} />
     </div>
   );
 }
@@ -301,7 +314,17 @@ export function ViajesFunnelPanel({
 }) {
   const accionesViaje = useAccionesVerViaje(onViewViaje, loadingViajeId);
   const funnel = data?.viajesFunnel;
-  if (loading || !funnel) return <EmptyState text="Cargando…" />;
+  const tablaSinLiquidar = useTablaDashboard(funnel?.sinLiquidar.items ?? [], {
+    viaje: { valor: (x) => x.numero || x.id },
+    transportista: { valor: (x) => x.transportistaNombre },
+  });
+  const tablaSinFacturar = useTablaDashboard(funnel?.sinFacturar.items ?? [], {
+    viaje: { valor: (x) => x.numero || x.id },
+    cliente: { valor: (x) => x.clienteNombre },
+  });
+  const pagSinLiquidar = tablaSinLiquidar.paginacion;
+  const pagSinFacturar = tablaSinFacturar.paginacion;
+  if (loading || !funnel) return <CargandoVialto mensaje="Cargando viajes…" chico />;
 
   return (
     <div className="flex flex-col gap-4">
@@ -338,10 +361,10 @@ export function ViajesFunnelPanel({
                 <thead>
                   <tr className="border-b border-black/10">
                     <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                      Viaje
+                      <TituloOrdenable title="Viaje" orden={tablaSinLiquidar.ordenColumna("viaje")} />
                     </th>
                     <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                      Transportista
+                      <TituloOrdenable title="Transportista" orden={tablaSinLiquidar.ordenColumna("transportista")} />
                     </th>
                     <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
                       Acciones
@@ -349,7 +372,7 @@ export function ViajesFunnelPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {funnel.sinLiquidar.items.map((it) => (
+                  {tablaSinLiquidar.visibles.map((it) => (
                     <tr
                       key={it.id}
                       className={FILA_CLICKEABLE}
@@ -364,6 +387,7 @@ export function ViajesFunnelPanel({
                   ))}
                 </tbody>
               </table>
+              <PaginacionCompacta paginacion={pagSinLiquidar} />
             </div>
           )}
         </div>
@@ -383,10 +407,10 @@ export function ViajesFunnelPanel({
                 <thead>
                   <tr className="border-b border-black/10">
                     <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                      Viaje
+                      <TituloOrdenable title="Viaje" orden={tablaSinFacturar.ordenColumna("viaje")} />
                     </th>
                     <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                      Cliente
+                      <TituloOrdenable title="Cliente" orden={tablaSinFacturar.ordenColumna("cliente")} />
                     </th>
                     <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
                       Acciones
@@ -394,7 +418,7 @@ export function ViajesFunnelPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {funnel.sinFacturar.items.map((it) => (
+                  {tablaSinFacturar.visibles.map((it) => (
                     <tr
                       key={it.id}
                       className={FILA_CLICKEABLE}
@@ -409,6 +433,7 @@ export function ViajesFunnelPanel({
                   ))}
                 </tbody>
               </table>
+              <PaginacionCompacta paginacion={pagSinFacturar} />
             </div>
           )}
         </div>
@@ -427,7 +452,7 @@ export function LiquidacionesPanel({
   loading: boolean;
 }) {
   const liq = data?.liquidaciones;
-  if (loading || !liq) return <EmptyState text="Cargando…" />;
+  if (loading || !liq) return <CargandoVialto mensaje="Cargando liquidaciones…" chico />;
 
   const acordadoTotal: FinancieroMoney = { ARS: 0, USD: 0 };
   const pagadoTotal: FinancieroMoney = { ARS: 0, USD: 0 };
@@ -503,7 +528,9 @@ export function FacturacionPanel({
   loading: boolean;
 }) {
   const fac = data?.facturacion;
-  if (loading || !fac) return <EmptyState text="Cargando…" />;
+  const tablaRanking = useTablaDashboard(fac?.rankingClientes ?? [], { cliente: { valor: (x) => x.nombre }, facturado: { valor: (x) => x.facturado.ARS || x.facturado.USD, tipo: "numero" }, cobrado: { valor: (x) => x.cobrado.ARS || x.cobrado.USD, tipo: "numero" }, facturas: { valor: (x) => x.cantFacturas, tipo: "numero" } });
+  const pagRanking = tablaRanking.paginacion;
+  if (loading || !fac) return <CargandoVialto mensaje="Cargando facturación…" chico />;
 
   return (
     <div className="flex flex-col gap-4">
@@ -561,21 +588,21 @@ export function FacturacionPanel({
               <thead>
                 <tr className="border-b border-black/10">
                   <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Cliente
+                    <TituloOrdenable title="Cliente" orden={tablaRanking.ordenColumna("cliente")} />
                   </th>
                   <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Facturado
+                    <TituloOrdenable title="Facturado" orden={tablaRanking.ordenColumna("facturado")} />
                   </th>
                   <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Cobrado
+                    <TituloOrdenable title="Cobrado" orden={tablaRanking.ordenColumna("cobrado")} />
                   </th>
                   <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Facturas
+                    <TituloOrdenable title="Facturas" orden={tablaRanking.ordenColumna("facturas")} />
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {fac.rankingClientes.map((c) => (
+                {tablaRanking.visibles.map((c) => (
                   <tr key={c.clienteId} className="border-b border-black/5 last:border-0">
                     <td className="py-2 font-medium text-vialto-charcoal">{c.nombre}</td>
                     <td className="py-2 text-right text-vialto-charcoal">
@@ -589,6 +616,7 @@ export function FacturacionPanel({
                 ))}
               </tbody>
             </table>
+            <PaginacionCompacta paginacion={pagRanking} />
           </div>
         )}
       </div>

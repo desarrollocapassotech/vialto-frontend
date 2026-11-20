@@ -1,4 +1,4 @@
-import {
+﻿import {
   AdjuntarComprobanteClip,
   ComprobanteAdjuntoClip,
 } from "@/components/shared/ComprobanteAdjuntoClip";
@@ -53,7 +53,7 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
-import { BookOpen, Clock, Download, FlaskConical } from "lucide-react";
+import { BookOpen, CalendarX, Clock, Download, FlaskConical, Wallet } from "lucide-react";
 import { LibroIvaExportModal } from "@/components/shared/LibroIvaExportModal";
 import {
   clientesConViajesPendientesFactura,
@@ -312,21 +312,57 @@ export function FacturacionTenantPage({
   const [numFiltro, setNumFiltro] = useState("");
   const [numFiltroInput, setNumFiltroInput] = useState("");
   const [clienteIdFiltro, setClienteIdFiltro] = useState("");
-  const [emisionDesdeFiltro, setEmisionDesdeFiltro] = useState("");
-  const [emisionHastaFiltro, setEmisionHastaFiltro] = useState("");
+  // Un link puede llegar con filtros (ej. desde una tarjeta del dashboard):
+  // ?estado=facturado|vencida|cobrado|anulado|borrador, ?cobro=sin_cobrar|vencida y
+  // ?desde=/?hasta= (fecha de emisión, AAAA-MM-DD). Se aplican al abrir y se sacan de la URL.
+  const [filtrosDesdeUrl] = useState(() => {
+    const leer = (k: string) => searchParams.get(k)?.trim() ?? "";
+    const estado = leer("estado");
+    const cobro = leer("cobro");
+    const fecha = (s: string) => (/^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "");
+    return {
+      estado: ["facturado", "vencida", "cobrado", "anulado", "borrador"].includes(estado)
+        ? estado
+        : "",
+      cobro: (cobro === "sin_cobrar" || cobro === "vencida" ? cobro : "") as
+        | ""
+        | "sin_cobrar"
+        | "vencida",
+      desde: fecha(leer("desde")),
+      hasta: fecha(leer("hasta")),
+    };
+  });
+  const [emisionDesdeFiltro, setEmisionDesdeFiltro] = useState(filtrosDesdeUrl.desde);
+  const [emisionHastaFiltro, setEmisionHastaFiltro] = useState(filtrosDesdeUrl.hasta);
   const [vencimientoDesdeFiltro, setVencimientoDesdeFiltro] = useState("");
   const [vencimientoHastaFiltro, setVencimientoHastaFiltro] = useState("");
-  const [estadoFiltro, setEstadoFiltro] = useState("");
+  const [estadoFiltro, setEstadoFiltro] = useState(filtrosDesdeUrl.estado);
   /** Filtro rápido (ícono al lado del título): eje de cobro, combinable con Estado. */
   const [cobroFiltro, setCobroFiltro] = useState<"" | "sin_cobrar" | "vencida">(
-    "",
+    filtrosDesdeUrl.cobro,
   );
+  useEffect(() => {
+    const claves = ["estado", "cobro", "desde", "hasta"];
+    if (!claves.some((k) => searchParams.has(k))) return;
+    setSearchParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        claves.forEach((k) => next.delete(k));
+        return next;
+      },
+      { replace: true },
+    );
+    // Solo al montar: los filtros ya quedaron en el estado inicial.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Conteos de los chips de filtro rápido (sin cobrar / vencidas), sobre todas las facturas. */
   const [resumenCobroApi, setResumenCobroApi] = useState<{
     sinCobrar: number;
     vencidas: number;
   } | null>(null);
+  /** El conteo de los filtros rápidos falló: los chips se habilitan igual (sin número). */
+  const [resumenCobroFallo, setResumenCobroFallo] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [libroIvaOpen, setLibroIvaOpen] = useState(false);
   const [exportandoExcel, setExportandoExcel] = useState(false);
@@ -505,10 +541,14 @@ export function FacturacionTenantPage({
       () => getToken(),
     )
       .then((r) => {
-        if (!cancelled) setResumenCobroApi(r);
+        if (!cancelled) {
+          setResumenCobroApi(r);
+          setResumenCobroFallo(false);
+        }
       })
       .catch(() => {
-        // Sin conteo, los chips se muestran igual (sin número).
+        // Sin conteo, los chips se muestran igual (sin número) y se pueden usar.
+        if (!cancelled) setResumenCobroFallo(true);
       });
     return () => {
       cancelled = true;
@@ -1459,11 +1499,12 @@ export function FacturacionTenantPage({
                   {
                     id: "sin_cobrar" as const,
                     label: "Sin cobrar",
+                    icon: Wallet,
                     count: resumenCobro?.sinCobrar,
                   },
                 ]
               : []),
-            { id: "vencida" as const, label: "Vencidas", count: resumenCobro?.vencidas },
+            { id: "vencida" as const, label: "Vencidas", icon: CalendarX, count: resumenCobro?.vencidas },
           ]}
           value={cobroFiltro}
           onChange={(v) => {
@@ -1472,6 +1513,7 @@ export function FacturacionTenantPage({
             setCobroFiltro(v);
           }}
           ariaLabel="Filtros rápidos de facturas"
+          cargando={resumenCobro == null && !resumenCobroFallo}
         />
         {anyFiltroActivo && (
           <LimpiarFiltrosButton onClick={limpiarFiltros} soloDesktop />
@@ -1524,11 +1566,12 @@ export function FacturacionTenantPage({
         className="mt-6"
         columns={[]}
         rows={error ? [] : filasListado}
+        cargando={!error && listadoRefetching}
         rowKey={(f) => f.id}
         emptyMessage={
           error ? "No se pudieron cargar las facturas." : facturasEmptyMessage
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando facturas…"
         tableColSpan={7}
         filters={facturasListadoFiltros}
         activeFilterCount={activeFilterCount}
@@ -1580,6 +1623,7 @@ export function FacturacionTenantPage({
                 title="Cliente"
                 filterActive={!!clienteIdFiltro}
                 filterSignature={clienteIdFiltro}
+                valor={clientes.find((c) => c.id === clienteIdFiltro)?.nombre}
                 onClear={() => {
                   setListadoRefetching(true);
                   setPage(1);

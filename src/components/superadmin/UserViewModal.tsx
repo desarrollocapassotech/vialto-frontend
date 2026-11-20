@@ -1,28 +1,30 @@
-import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   ViewModalShell,
   viewModalBtnGhost,
   viewModalBtnPrimary,
   viewModalGridClass,
-} from '@/components/ui/ViewModalShell';
-import type { PlatformUser } from '@/types/api';
+} from "@/components/ui/ViewModalShell";
+import type { PlatformUser } from "@/types/api";
 
 function formatRole(role: string, platformRole?: string | null) {
-  if (platformRole === 'superadmin') return 'Superadmin';
-  if (platformRole === 'stock_viewer') return 'Consulta de stock';
-  if (platformRole === 'stock_operator') return 'Operador de stock';
-  if (role === 'org:admin') return 'Admin';
-  return 'Miembro';
+  if (platformRole === "superadmin") return "Superadmin";
+  if (platformRole === "stock_viewer") return "Consulta de stock";
+  if (platformRole === "stock_operator") return "Operador de stock";
+  if (role === "org:admin") return "Admin";
+  return "Miembro";
 }
 
 function formatDate(value: number | string) {
   try {
-    return new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(
-      typeof value === 'number' ? new Date(value) : new Date(value),
-    );
+    return new Intl.DateTimeFormat("es-AR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(typeof value === "number" ? new Date(value) : new Date(value));
   } catch {
-    return '—';
+    return "—";
   }
 }
 
@@ -37,13 +39,14 @@ export function UserViewModal({
 }) {
   useEffect(() => {
     function handler(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === "Escape") onClose();
     }
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const nombreCompleto = [user.firstName, user.lastName].filter(Boolean).join(' ') || '—';
+  const nombreCompleto =
+    [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
   const editTo = user.userId
     ? `/superadmin/usuarios/${encodeURIComponent(user.userId)}/editar?tenantId=${encodeURIComponent(tenantId)}`
     : null;
@@ -68,16 +71,20 @@ export function UserViewModal({
     >
       <div className={viewModalGridClass}>
         {[
-          { label: 'Nombre', value: nombreCompleto },
-          { label: 'Email', value: user.email },
-          { label: 'Rol', value: formatRole(user.role, user.platformRole) },
-          { label: 'Alta', value: formatDate(user.createdAt) },
-        ].filter(c => c.value != null && c.value !== '').map((c, i) => (
-          <div key={i} className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{c.label}</p>
-            <p className="mt-1 text-sm [overflow-wrap:anywhere]">{c.value}</p>
-          </div>
-        ))}
+          { label: "Nombre", value: nombreCompleto },
+          { label: "Email", value: user.email },
+          { label: "Rol", value: formatRole(user.role, user.platformRole) },
+          { label: "Alta", value: formatDate(user.createdAt) },
+        ]
+          .filter((c) => c.value != null && c.value !== "")
+          .map((c, i) => (
+            <div key={i} className="min-w-0">
+              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                {c.label}
+              </p>
+              <p className="mt-1 text-sm [overflow-wrap:anywhere]">{c.value}</p>
+            </div>
+          ))}
       </div>
     </ViewModalShell>
   );

@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -46,7 +47,7 @@ export function SuperadminImportarPage() {
           </h1>
         )}
         {loading && (
-          <p className="mt-6 text-sm text-vialto-steel">Cargando empresa…</p>
+          <CargandoVialto mensaje="Cargando la empresa…" />
         )}
         {error && <p className="mt-6 text-sm text-red-600">{error}</p>}
 

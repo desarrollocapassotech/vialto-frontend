@@ -1,24 +1,16 @@
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { CrudFieldLabel, CrudInput, CrudSelect } from '@/components/crud/CrudFields';
-import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
-import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
-import { labelModulo } from '@/lib/platformLabels';
-import { AVAILABLE_MODULES } from '@/lib/moduleCatalog';
-import {
-  LiquidacionAnulacionMetodoRadios,
-  type LiquidacionAnulacionMetodo,
-} from '@/components/superadmin/LiquidacionAnulacionMetodoFields';
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { CrudFieldLabel, CrudInput } from "@/components/crud/CrudFields";
+import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
+import { labelModulo } from "@/lib/platformLabels";
+import { AVAILABLE_MODULES } from "@/lib/moduleCatalog";
 
+/** Alta de empresa. La edici�n vive en la ficha de la empresa (SuperadminEmpresaPage). */
 export interface TenantFormValues {
   name: string;
   clerkOrgId: string;
   idFiscal: string;
   modules: string[];
-  billingStatus?: 'trial' | 'active' | 'suspended' | 'expired';
-  maxUsers?: string;
-  billingRenewsAt?: string;
-  /** Método de anulación del CVLP (060). Default 'nota_credito_debito' para tenants nuevos. */
-  liquidacionAnulacionMetodo?: 'nota_credito_debito' | 'manual';
 }
 
 interface TenantFormProps {
@@ -27,8 +19,6 @@ interface TenantFormProps {
   onSubmit: () => void;
   submitLabel: string;
   loading: boolean;
-  includeAdvancedFields?: boolean;
-  disableOrgId?: boolean;
   showOrgIdInput?: boolean;
   fieldErrors?: Record<string, string>;
   formError?: string | null;
@@ -63,8 +53,6 @@ export function TenantForm({
   onSubmit,
   submitLabel,
   loading,
-  includeAdvancedFields = false,
-  disableOrgId = false,
   showOrgIdInput = true,
   fieldErrors = {},
   formError,
@@ -104,8 +92,6 @@ export function TenantForm({
                 onChange={(e) =>
                   onChange({ ...values, clerkOrgId: e.target.value })
                 }
-                disabled={disableOrgId}
-                className="disabled:bg-black/5"
                 error={fieldErrors.clerkOrgId}
               />
               <CrudFieldError message={fieldErrors.clerkOrgId} />
@@ -152,70 +138,6 @@ export function TenantForm({
           })}
         </div>
       </SectionCard>
-
-      {includeAdvancedFields && values.modules.includes('emision-liquido-producto-arca') && (
-        <SectionCard
-          title="Anulación de liquidaciones (CVLP 060)"
-          description="Cómo se anula un comprobante 060 ya emitido para este tenant."
-        >
-          <LiquidacionAnulacionMetodoRadios
-            value={
-              (values.liquidacionAnulacionMetodo as LiquidacionAnulacionMetodo) ??
-              'nota_credito_debito'
-            }
-            onChange={(liquidacionAnulacionMetodo) =>
-              onChange({ ...values, liquidacionAnulacionMetodo })
-            }
-          />
-        </SectionCard>
-      )}
-
-      {includeAdvancedFields && (
-        <SectionCard title="Suscripción">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <label className="flex flex-col gap-1.5">
-              <CrudFieldLabel>Estado</CrudFieldLabel>
-              <CrudSelect
-                value={values.billingStatus ?? 'trial'}
-                onChange={(e) =>
-                  onChange({
-                    ...values,
-                    billingStatus: e.target.value as NonNullable<
-                      TenantFormValues['billingStatus']
-                    >,
-                  })
-                }
-              >
-                <option value="trial">En prueba</option>
-                <option value="active">Al día</option>
-                <option value="suspended">Suspendido</option>
-                <option value="expired">Vencido</option>
-              </CrudSelect>
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <CrudFieldLabel>Máx. usuarios</CrudFieldLabel>
-              <CrudInput
-                type="number"
-                min={1}
-                value={values.maxUsers ?? ''}
-                onChange={(e) =>
-                  onChange({ ...values, maxUsers: e.target.value })
-                }
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <CrudFieldLabel>Renovación</CrudFieldLabel>
-              <CrudInput
-                type="date"
-                value={values.billingRenewsAt ?? ''}
-                onChange={(e) =>
-                  onChange({ ...values, billingRenewsAt: e.target.value })
-                }
-              />
-            </label>
-          </div>
-        </SectionCard>
-      )}
 
       <CrudFormErrorAlert message={formError} />
       <CrudSubmitButton loading={loading} label={submitLabel} />

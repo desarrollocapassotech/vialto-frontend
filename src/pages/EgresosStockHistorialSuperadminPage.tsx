@@ -35,9 +35,7 @@ export function EgresosStockHistorialSuperadminPage() {
 
       <EmpresaFilterBar tenants={tenants} value={tenantId} onChange={handleTenantChange} />
 
-      {!tenantId ? (
-        <p className="text-sm text-vialto-steel">Seleccioná una empresa para ver el historial.</p>
-      ) : (
+      {tenantId && (
         <EgresosStockHistorialTenantPage tenantId={tenantId} embeddedInSuperadmin />
       )}
     </div>

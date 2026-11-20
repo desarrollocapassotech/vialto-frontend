@@ -1,4 +1,4 @@
-import { fechaDiaYmd, fmtDateUtc } from "@/lib/fmtDateUtc";
+﻿import { fechaDiaYmd, fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -10,11 +10,12 @@ import {
   FileSearch,
   FileSpreadsheet,
   FileText,
-  Filter,
   History,
   Trash2,
   Undo2,
-  X,
+  CalendarX,
+  Unlink,
+  Wallet,
 } from 'lucide-react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
@@ -33,8 +34,6 @@ import { formatCurrencyArFromNumber } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   fetchMovimientos,
-  fetchSaldoCliente,
-  fetchSaldoProveedor,
   fmtSaldoCc as fmtSaldo,
   cuentaEnHistorialCc,
   esDebeCc,
@@ -42,9 +41,10 @@ import {
   ESTADO_IMPUTACION_COMPROBANTE_LABEL,
   type EstadoImputacionComprobanteCc,
   type MovimientoCc,
-  type SaldoPorMoneda,
   type TipoContraparte,
   type TipoMovimientoCc,
+  apiPathOrdenPago,
+  tieneOrdenPago,
 } from '@/lib/cuentaCorriente';
 import { MovimientoCcFormModal } from './MovimientoCcFormModal';
 import { ImputarPagoModal } from './ImputarPagoModal';
@@ -66,6 +66,7 @@ import {
   comprasNacenDeLiquidaciones,
   ventasNacenDeFacturas,
 } from '@/lib/tenantModules';
+import type { ProveedorTipo } from '@/types/api';
 import { ExportarEstadoCuentaModal } from './ExportarEstadoCuentaModal';
 import { LimpiarFiltrosPortal } from "@/components/listado/LimpiarFiltrosButton";
 import { FiltrosRapidos, type FiltroRapidoOpcion } from '@/components/listado/FiltrosRapidos';
@@ -177,46 +178,56 @@ type Props = {
   tipoContraparte: TipoContraparte;
   contraparteId: string;
   contraparteNombre: string;
-  /**
-   * Lugar de la página donde dibujar las tarjetas de saldo (en la fila del selector de
-   * cuenta, para aprovechar el espacio). Sin él, van arriba de la grilla.
-   */
-  saldosSlot?: HTMLElement | null;
-  /** Misma fila que el selector y los saldos: Exportar / Nueva venta / Registrar cobro. */
+  /** Fila de acciones de la página: Exportar / Nueva venta / Registrar cobro. */
   accionesSlot?: HTMLElement | null;
   /** Junto al título de la página: ahí va "Limpiar filtros" (regla global). */
   limpiarFiltrosSlot?: HTMLElement | null;
   /** Junto al título: embudo + chips de filtro rápido ("Sin imputar"), como en Viajes. */
   filtrosRapidosSlot?: HTMLElement | null;
+  /** Tipo del proveedor (solo lado proveedor): decide si se puede cargar una compra a mano. */
+  proveedorTipo?: ProveedorTipo | null;
+  /**
+   * Vista de solo lectura del superadmin sobre otra empresa: sin cargar, imputar, deshacer
+   * ni eliminar, y sin abrir facturas/liquidaciones ni sus PDF de ARCA (van por rutas de la
+   * empresa propia). Se ven saldos, movimientos, detalle, adjuntos, orden de pago y exportar.
+   */
+  soloLectura?: boolean;
+  /** Módulos de la empresa que se está viendo (superadmin); sin esto, los de la empresa propia. */
+  modulosEmpresa?: string[];
 };
 
 export function CuentaContraparteView({
   tipoContraparte,
   contraparteId,
   contraparteNombre,
-  saldosSlot,
+  proveedorTipo = null,
   accionesSlot,
   limpiarFiltrosSlot,
   filtrosRapidosSlot,
+  soloLectura = false,
+  modulosEmpresa,
 }: Props) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
   const { tenant } = useCurrentTenant();
   // Venta/compra manual solo si la empresa no tiene el módulo que la genera (con
-  // Facturación las ventas salen de las facturas; con Liquidaciones, las compras de las
-  // liquidaciones). Hasta saber los módulos no se ofrece, para no mostrarla de más.
-  const modulos = tenant?.modules ?? [];
+  // Facturación las ventas salen de las facturas; con Liquidaciones, las compras a
+  // transportistas salen de las liquidaciones — a un taller u otro proveedor sí se cargan).
+  // Hasta saber los módulos no se ofrece, para no mostrarla de más.
+  const modulos = modulosEmpresa ?? tenant?.modules ?? [];
   const permiteCargoManual =
+    !soloLectura &&
     tenant != null &&
     (tipoContraparte === 'cliente'
       ? !ventasNacenDeFacturas(modulos)
-      : !comprasNacenDeLiquidaciones(modulos));
+      : !comprasNacenDeLiquidaciones(modulos) ||
+        (proveedorTipo != null && proveedorTipo !== 'transportista'));
   // "Ver factura/liquidación" solo si la empresa tiene el módulo (si no, no puede abrirla).
-  const puedeVerFacturas = ventasNacenDeFacturas(modulos);
-  const puedeVerLiquidaciones = comprasNacenDeLiquidaciones(modulos);
+  // En solo lectura del superadmin no: se abren por rutas de la empresa propia.
+  const puedeVerFacturas = !soloLectura && ventasNacenDeFacturas(modulos);
+  const puedeVerLiquidaciones = !soloLectura && comprasNacenDeLiquidaciones(modulos);
   const hasArcaLiquidaciones = canAccessEmisionLiquidoProductoArca(modulos);
   const [movimientos, setMovimientos] = useState<MovimientoCc[] | null>(null);
-  const [saldos, setSaldos] = useState<SaldoPorMoneda[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -225,21 +236,14 @@ export function CuentaContraparteView({
   const cargarDatos = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return;
     try {
-      const [movs, saldo] = await Promise.all([
-        fetchMovimientos(
-          () => getToken(),
-          tipoContraparte === 'cliente' ? { clienteId: contraparteId } : { proveedorId: contraparteId },
-        ),
-        tipoContraparte === 'cliente'
-          ? fetchSaldoCliente(() => getToken(), contraparteId)
-          : fetchSaldoProveedor(() => getToken(), contraparteId),
-      ]);
+      const movs = await fetchMovimientos(
+        () => getToken(),
+        tipoContraparte === 'cliente' ? { clienteId: contraparteId } : { proveedorId: contraparteId },
+      );
       setMovimientos(movs);
-      setSaldos(saldo.saldos);
       setError(null);
     } catch (e) {
       setMovimientos(null);
-      setSaldos(null);
       setError(friendlyError(e, 'cuentaCorriente'));
     }
   }, [getToken, isLoaded, isSignedIn, tipoContraparte, contraparteId]);
@@ -298,9 +302,8 @@ export function CuentaContraparteView({
   const [comprobanteFiltro, setComprobanteFiltro] = useState('');
   // Estado de imputación (Sin imputar / Imputado en parte / Imputado). Vacío = todos.
   const [imputacionFiltro, setImputacionFiltro] = useState<EstadoImputacionComprobanteCc | ''>('');
-  // Se elige tocando la tarjeta de saldo de esa moneda (solo si la cuenta tiene más de una).
+  // Filtro de la columna Moneda.
   const [monedaFiltro, setMonedaFiltro] = useState('');
-  const multimoneda = (saldos?.length ?? 0) > 1;
   // Filtros rápidos junto al título (mismo componente que Viajes/Facturas/Liquidaciones),
   // excluyentes entre sí.
   const [filtroRapido, setFiltroRapido] = useState<FiltroRapidoCc | ''>('');
@@ -397,7 +400,8 @@ export function CuentaContraparteView({
    * Clips de la columna Comprobante, mismo criterio y colores que las grillas de Facturas y
    * Liquidaciones: gris = comprobante (adjunto o PDF de ARCA), azul = PDF de liquidación
    * (sin ARCA), rojo = anulación. Un cargo muestra los suyos; una anulación, el de la
-   * anulación del cargo que compensa. Los cobros/pagos no llevan clip.
+   * anulación del cargo que compensa. Un movimiento manual, su adjunto; un pago a proveedor,
+   * además el PDF de su orden de pago (azul).
    */
   function clipsDe(m: MovimientoConSaldo): ReactNode {
     const tk = () => getToken();
@@ -405,14 +409,19 @@ export function CuentaContraparteView({
       const u = url?.trim();
       return u ? () => abrirAdjunto({ url: u }, titulo) : undefined;
     };
-    const pdfLiq = (id: string, kind: 'pdf' | 'pdf-anulacion', titulo: string) => () =>
-      void abrirAdjuntoEnPestana(
-        { apiPath: `/api/integracion-arca/liquidaciones/${encodeURIComponent(id)}/${kind}` },
-        tk,
-        titulo,
-      );
-    const pdfFactura = (id: string, kind: 'factura' | 'nc') => () =>
-      void verPdfFacturaArca(id, kind, tk).catch(() => undefined);
+    // PDF de ARCA / de liquidación: van por rutas de la empresa propia, así que en la vista
+    // de solo lectura del superadmin no se ofrecen (sí los adjuntos y la orden de pago).
+    const pdfLiq = (id: string, kind: 'pdf' | 'pdf-anulacion', titulo: string) =>
+      soloLectura
+        ? undefined
+        : () =>
+            void abrirAdjuntoEnPestana(
+              { apiPath: `/api/integracion-arca/liquidaciones/${encodeURIComponent(id)}/${kind}` },
+              tk,
+              titulo,
+            );
+    const pdfFactura = (id: string, kind: 'factura' | 'nc') =>
+      soloLectura ? undefined : () => void verPdfFacturaArca(id, kind, tk).catch(() => undefined);
 
     if (m.tipo === 'credito' && m.anulaMovimientoId) {
       const anulado = (movimientos ?? []).find((x) => x.id === m.anulaMovimientoId);
@@ -436,6 +445,26 @@ export function CuentaContraparteView({
       return abrir ? <ComprobanteAdjuntoClip onClick={abrir} tono="anulacion" titulo={titulo} /> : null;
     }
 
+    // Movimiento manual: su archivo adjunto (si tiene) y, en un pago a proveedor, el PDF de
+    // su orden de pago (azul, como el PDF de liquidación).
+    if (m.origen === 'manual') {
+      const manuales: ReactNode[] = [];
+      const abrir = adjunto(m.comprobanteUrl ?? null, 'Comprobante');
+      if (abrir) manuales.push(<ComprobanteAdjuntoClip key="cbte" onClick={abrir} />);
+      if (tieneOrdenPago(m)) {
+        manuales.push(
+          <ComprobanteAdjuntoClip
+            key="op"
+            onClick={() =>
+              void abrirAdjuntoEnPestana({ apiPath: apiPathOrdenPago(m.id) }, tk, 'Orden de pago')
+            }
+            tono="pdf"
+            titulo="Ver orden de pago"
+          />,
+        );
+      }
+      return manuales.length ? <>{manuales}</> : null;
+    }
     if (m.tipo !== 'cargo') return null;
     const clips: ReactNode[] = [];
     const f = m.facturaComprobantes;
@@ -449,7 +478,7 @@ export function CuentaContraparteView({
           ? pdfLiq(m.liquidacionId, 'pdf', 'Liquidación')
           : adjunto(l.comprobanteUrl, 'Comprobante');
       if (abrir) clips.push(<ComprobanteAdjuntoClip key="cbte" onClick={abrir} />);
-      if (!hasArcaLiquidaciones && l.cbteNro == null) {
+      if (!soloLectura && !hasArcaLiquidaciones && l.cbteNro == null) {
         const liqId = m.liquidacionId;
         clips.push(
           <ComprobanteAdjuntoClip
@@ -478,6 +507,8 @@ export function CuentaContraparteView({
         onClick: () => setModal({ kind: 'detalle', movimiento: m }),
       });
     }
+    // Solo lectura (superadmin): solo "Ver …" (y el detalle, sin editar ni eliminar).
+    if (soloLectura) return opciones;
     const puedeImputar =
       m.tipo === 'cargo' &&
       (m.estadoDisponibilidad === 'pendiente' || m.estadoDisponibilidad === 'parcial');
@@ -681,59 +712,6 @@ export function CuentaContraparteView({
     </select>
   );
 
-  // Una tarjeta chica por moneda. Con más de una moneda, tocarla filtra la grilla.
-  const saldosNode =
-    saldos && saldos.length > 0 ? (
-      <div className="flex flex-wrap gap-2">
-        {saldos.map((s) => {
-          const activa = monedaFiltro === s.moneda;
-          const monto = (
-            <span
-              className="font-[family-name:var(--font-display)] text-lg tracking-wide tabular-nums text-white"
-            >
-              {fmtSaldo(s.saldo)}
-            </span>
-          );
-          // Mismo alto que el select de la cuenta (h-9), alineadas abajo con él.
-          const cardClass = `flex h-9 min-w-[9.5rem] items-center px-3 text-left ${
-            activa ? 'bg-vialto-charcoal ring-2 ring-vialto-fire' : 'bg-vialto-graphite'
-          }`;
-          return (
-            <div key={s.moneda} className="flex flex-col">
-              <span className="mb-1 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel">
-                Saldo {s.moneda}
-              </span>
-              {/* Con una sola moneda no hay nada que filtrar: la tarjeta es solo informativa. */}
-              {multimoneda ? (
-                <button
-                  type="button"
-                  onClick={() => setMonedaFiltro(activa ? '' : s.moneda)}
-                  aria-pressed={activa}
-                  title={activa ? 'Ver todas las monedas' : `Ver solo movimientos en ${s.moneda}`}
-                  className={`${cardClass} group cursor-pointer justify-between gap-3 transition hover:brightness-110`}
-                >
-                  {monto}
-                  {/* Pista de que filtra: embudo; activa, una ✕ para volver a todas. */}
-                  {activa ? (
-                    <X className="h-3.5 w-3.5 shrink-0 text-white" aria-hidden />
-                  ) : (
-                    <Filter
-                      className="h-3.5 w-3.5 shrink-0 text-white/50 transition group-hover:text-white"
-                      aria-hidden
-                    />
-                  )}
-                </button>
-              ) : (
-                <div className={cardClass}>{monto}</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    ) : saldos ? (
-      <p className="text-sm text-vialto-steel">Sin movimientos todavía.</p>
-    ) : null;
-
   const accionesNode = (
     <div className="ml-auto flex flex-wrap gap-2">
       <button
@@ -762,37 +740,40 @@ export function CuentaContraparteView({
           {tipoContraparte === 'cliente' ? 'Nueva venta' : 'Nueva compra'}
         </button>
       )}
-      <button
-        type="button"
-        onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'pago' })}
-        className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-      >
-        {tipoContraparte === 'cliente' ? 'Registrar cobro' : 'Registrar pago'}
-      </button>
+      {!soloLectura && (
+        <button
+          type="button"
+          onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'pago' })}
+          className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+        >
+          {tipoContraparte === 'cliente' ? 'Registrar cobro' : 'Registrar pago'}
+        </button>
+      )}
     </div>
   );
 
   return (
     <div>
       {visorAdjunto}
-      {saldosSlot ? createPortal(saldosNode, saldosSlot) : null}
       {accionesSlot ? createPortal(accionesNode, accionesSlot) : null}
       {/* Filtro rápido junto al título, igual que Viajes. */}
       {filtrosRapidosSlot &&
         createPortal(
           <FiltrosRapidos
             opciones={[
-              { id: 'sin_imputar', label: 'Sin imputar', count: cantidadesFiltroRapido.sin_imputar },
-              { id: 'vencidos', label: 'Vencidos', count: cantidadesFiltroRapido.vencidos },
+              { id: 'sin_imputar', label: 'Sin imputar', icon: Unlink, count: cantidadesFiltroRapido.sin_imputar },
+              { id: 'vencidos', label: 'Vencidos', icon: CalendarX, count: cantidadesFiltroRapido.vencidos },
               {
                 id: 'sin_cobrar',
                 label: tipoContraparte === 'cliente' ? 'Sin cobrar' : 'Sin pagar',
+                icon: Wallet,
                 count: cantidadesFiltroRapido.sin_cobrar,
               },
             ] satisfies FiltroRapidoOpcion<FiltroRapidoCc>[]}
             value={filtroRapido}
             onChange={setFiltroRapido}
             ariaLabel="Filtros rápidos de cuenta corriente"
+            cargando={movimientosConSaldo == null && !error}
           />,
           filtrosRapidosSlot,
         )}
@@ -802,11 +783,8 @@ export function CuentaContraparteView({
         onClick={limpiarFiltros}
         soloDesktop
       />
-      {(!saldosSlot || !accionesSlot) && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          {!saldosSlot && saldosNode}
-          {!accionesSlot && accionesNode}
-        </div>
+      {!accionesSlot && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">{accionesNode}</div>
       )}
 
       {error && (
@@ -924,7 +902,7 @@ export function CuentaContraparteView({
               ? 'No hay movimientos que coincidan con los filtros aplicados.'
               : 'Todavía no hay movimientos para esta cuenta.'
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando movimientos de la cuenta…"
         activeFilterCount={activeFilterCount}
         onClearFilters={limpiarFiltros}
         filters={
@@ -1111,8 +1089,10 @@ export function CuentaContraparteView({
           movimientos={movimientos ?? []}
           onClose={() => setModal(null)}
           onSaved={cargarDatos}
+          soloLectura={soloLectura}
           // Factura/liquidación: su edición de siempre (número y vencimiento).
           onEditarAutomatico={
+            !soloLectura &&
             modal.movimiento.origen !== 'manual' &&
             (modal.movimiento.comprobanteEditable || modal.movimiento.vencimientoEditable)
               ? () => setModal({ kind: 'comprobante', movimiento: modal.movimiento })

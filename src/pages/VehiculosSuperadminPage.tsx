@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, Pencil } from "lucide-react";
@@ -212,6 +212,7 @@ export function VehiculosSuperadminPage() {
         </p>
       )}
 
+      {filtroEmpresa && (
       <ListadoDatos
         className="mt-6"
         tableColSpan={4}
@@ -318,6 +319,7 @@ export function VehiculosSuperadminPage() {
           },
         ]}
         rows={!filtroEmpresa || error ? [] : rows}
+        cargando={loading}
         rowKey={(v) => v.id}
         emptyMessage={
           !filtroEmpresa
@@ -328,7 +330,7 @@ export function VehiculosSuperadminPage() {
                 ? "No hay vehículos que coincidan con los filtros aplicados."
                 : "No hay vehículos cargados para esta empresa."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando vehículos…"
         rowActionsSubtitle={(v) => v.patente}
         rowActions={(v) => [
           {
@@ -351,6 +353,7 @@ export function VehiculosSuperadminPage() {
           },
         ]}
       />
+      )}
 
       {filtroEmpresa && !error && meta && meta.total > 0 && (
         <ListadoPagination

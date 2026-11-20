@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { DestinatarioViewModal } from "@/components/destinatarios/DestinatarioViewModal";
@@ -213,6 +213,7 @@ export function DestinatariosTenantPage() {
           },
         ]}
         rows={error ? [] : rowsFiltradas}
+        cargando={loading}
         rowKey={(d) => d.id}
         emptyMessage={
           error
@@ -221,7 +222,7 @@ export function DestinatariosTenantPage() {
               ? "No hay destinatarios que coincidan con los filtros aplicados."
               : "Todavía no hay destinatarios cargados."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando destinatarios…"
         rowActions={(d) => [
           {
             id: "ver",

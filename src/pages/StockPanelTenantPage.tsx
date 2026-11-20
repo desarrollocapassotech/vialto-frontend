@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import {
   ChevronDown,
@@ -549,7 +550,7 @@ export function StockPanelTenantPage({
       id: dep.id,
       label: dep.nombre,
       trailing: (
-        <span className="rounded-full bg-black/8 px-1.5 py-0.5 text-xs font-semibold leading-none text-vialto-steel">
+        <span className="rounded-none bg-black/8 px-1.5 py-0.5 text-xs font-semibold leading-none text-vialto-steel">
           {count}
         </span>
       ),
@@ -763,17 +764,11 @@ export function StockPanelTenantPage({
         </div>
       )}
 
-      {/* Estado vacío minimalista igual al de facturación */}
-      {isPlatform && !activeTenantId && (
-        <p className="mt-10 text-sm text-vialto-steel">
-          Seleccioná una empresa para ver su inventario.
-        </p>
-      )}
 
       {/* Solo renderizamos el contenido si estamos en modo normal o si ya se seleccionó una empresa */}
       {(!isPlatform || activeTenantId) && (
         <>
-          {loading && <p className="text-sm text-vialto-steel">Cargando…</p>}
+          {loading && <CargandoVialto mensaje="Cargando stock…" />}
 
           {!loading && depositos.length === 0 && (
             <p className="text-sm text-vialto-steel">
@@ -805,7 +800,7 @@ export function StockPanelTenantPage({
                       <span className="truncate font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-vialto-charcoal">
                         {depositoActivo?.nombre ?? "Depósito"}
                       </span>
-                      <span className="shrink-0 rounded-full bg-vialto-fire/15 px-1.5 py-0.5 text-xs font-semibold leading-none text-vialto-fire">
+                      <span className="shrink-0 rounded-none bg-vialto-fire/15 px-1.5 py-0.5 text-xs font-semibold leading-none text-vialto-fire">
                         {depositoActivoCount}
                       </span>
                       <ChevronDown
@@ -852,7 +847,7 @@ export function StockPanelTenantPage({
                         {dep.nombre}
                         <span
                           className={[
-                            "rounded-full px-1.5 py-0.5 text-xs font-semibold leading-none",
+                            "rounded-none px-1.5 py-0.5 text-xs font-semibold leading-none",
                             activo
                               ? "bg-vialto-fire/15 text-vialto-fire"
                               : "bg-black/8 text-vialto-steel",
@@ -884,7 +879,7 @@ export function StockPanelTenantPage({
                             productoNombre: resumenProducto.nombre,
                           })
                         }
-                        className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
+                        className="rounded-none border border-black/15 bg-white px-3 py-1.5 text-xs uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
                       >
                         Ver detalle
                       </button>
@@ -912,8 +907,10 @@ export function StockPanelTenantPage({
               )}
 
               <ListadoDatos
+                loadingMessage="Cargando stock…"
                 columns={[]}
                 rows={paginatedItems}
+                cargando={loading}
                 rowKey={(item) => item.id}
                 emptyMessage={stockEmptyMessage}
                 tableColSpan={colSpan}
@@ -936,6 +933,7 @@ export function StockPanelTenantPage({
                         title="Cliente"
                         filterActive={!!filtroClienteId.trim()}
                         filterSignature={filtroClienteId}
+                        valor={clientesEnDeposito.find((c) => c.id === filtroClienteId)?.nombre}
                         onClear={() => setFiltroClienteId("")}
                       >
                         <ClienteSearchSelect
@@ -964,6 +962,7 @@ export function StockPanelTenantPage({
                         title="Producto"
                         filterActive={!!filtroProductoId.trim()}
                         filterSignature={filtroProductoId}
+                        valor={productosEnDeposito.find((p) => p.id === filtroProductoId)?.nombre}
                         onClear={() => setFiltroProductoId("")}
                       >
                         <SearchableEntitySelect<ProductoFiltro>
@@ -1000,6 +999,7 @@ export function StockPanelTenantPage({
                         alignRight
                         filterActive={soloConStockCant1}
                         filterSignature={soloConStockCant1 ? "1" : ""}
+                        valor="Solo con stock"
                         onClear={() => setSoloConStockCant1(false)}
                       >
                         <label className="flex cursor-pointer items-center justify-end gap-2 text-sm text-vialto-charcoal">
@@ -1031,6 +1031,7 @@ export function StockPanelTenantPage({
                           alignRight
                           filterActive={soloConStockCant2}
                           filterSignature={soloConStockCant2 ? "1" : ""}
+                          valor={`Solo con ${LABEL_SUELTOS.toLowerCase()}`}
                           onClear={() => setSoloConStockCant2(false)}
                         >
                           <label className="flex cursor-pointer items-center justify-end gap-2 text-sm text-vialto-charcoal">

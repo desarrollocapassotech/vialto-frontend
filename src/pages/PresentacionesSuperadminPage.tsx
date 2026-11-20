@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import {
   useCallback,
   useEffect,
@@ -380,7 +380,7 @@ export function PresentacionesSuperadminPage() {
                   ? "No hay presentaciones que coincidan con los filtros aplicados."
                   : "No hay presentaciones para esta empresa."
             }
-            loadingMessage="Cargando…"
+            loadingMessage="Cargando presentaciones…"
             rowActions={(row) => [
               {
                 id: "editar",

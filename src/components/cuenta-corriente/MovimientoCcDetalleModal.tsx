@@ -1,5 +1,9 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { ComprobanteAdjuntoField } from '@/components/shared/ComprobanteAdjuntoField';
+import { uploadComprobante } from '@/lib/comprobanteUpload';
+import { useAbrirAdjunto } from '@/hooks/useAbrirAdjunto';
+import { useAutocompletarNumeroComprobante } from '@/hooks/useAutocompletarNumeroComprobante';
 import { ChevronRight } from 'lucide-react';
 import {
   ViewModalShell,
@@ -28,8 +32,19 @@ import { fechaDiaYmd, fmtDateUtc } from '@/lib/fmtDateUtc';
 import { friendlyError } from '@/lib/friendlyError';
 import { useToast } from '@/lib/toast';
 import { useConfirmarDescarte } from '@/hooks/useConfirmarDescarte';
+import { roundMoney2 } from '@/lib/facturaTotales';
+import {
+  ViajesCompraField,
+  errorRepartoViajes,
+  viajeCompraDraftFromApi,
+  viajesCompraToApi,
+  type ViajeCompraDraft,
+} from './ViajesCompraField';
+import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
 import {
   actualizarMovimiento,
+  apiPathOrdenPago,
+  tieneOrdenPago,
   claseMontoCobroPago,
   eliminarMovimiento,
   estadoMovimientoCcLabel,
@@ -58,6 +73,8 @@ type Props = {
   onEditarAutomatico: (() => void) | null;
   /** Abre el detalle de un comprobante asociado (el cobro de una venta, la venta de un cobro). */
   onVerMovimiento: (m: MovimientoCc) => void;
+  /** Vista de solo lectura del superadmin: sin Editar, Eliminar ni Deshacer imputación. */
+  soloLectura?: boolean;
 };
 
 const monto = (n: number, moneda: string) => `$ ${formatCurrencyArFromNumber(n)} ${moneda}`;
@@ -182,13 +199,22 @@ export function MovimientoCcDetalleModal({
   onSaved,
   onEditarAutomatico,
   onVerMovimiento,
+  soloLectura = false,
 }: Props) {
   const { getToken } = useAuth();
   const { showToast } = useToast();
   const nombre = nombreMovimientoCc(m);
   const esCargo = m.tipo === 'cargo';
   const esCliente = !!m.clienteId;
+  /** Venta/compra: su factura; cobro: el recibo; pago: la orden de pago. */
+  const nombreNumero = esCargo
+    ? 'Número de comprobante'
+    : esCliente
+      ? 'Número de recibo'
+      : 'Número de orden de pago';
   const manual = m.origen === 'manual';
+  /** Pago a proveedor: el número de la orden de pago lo asigna el sistema, no se edita. */
+  const esPagoProveedor = m.tipo === 'pago' && !esCliente;
   const anulado = m.estadoDisponibilidad === 'anulado';
   const porId = new Map(movimientos.map((x) => [x.id, x]));
 
@@ -205,10 +231,10 @@ export function MovimientoCcDetalleModal({
         imputacionId: i.imputacionId,
       }));
   const tieneImputaciones = imputaciones.length > 0;
-  const editable = manual && !anulado;
-  const puedeEditar = editable || !!onEditarAutomatico;
+  const editable = !soloLectura && manual && !anulado;
+  const puedeEditar = editable || (!soloLectura && !!onEditarAutomatico);
   // Eliminar aunque esté imputado: el backend deshace sus imputaciones antes.
-  const puedeEliminar = movimientoCcEliminable(m);
+  const puedeEliminar = !soloLectura && movimientoCcEliminable(m);
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
 
   const [editando, setEditando] = useState(false);
@@ -220,8 +246,34 @@ export function MovimientoCcDetalleModal({
   const [formaPago, setFormaPago] = useState(m.referencia ?? '');
   const [lineas, setLineas] = useState<FacturaLineaDraft[]>(() => lineasIniciales(m));
   const [lineasIncompletas, setLineasIncompletas] = useState<number[]>([]);
+  // Compra manual: viajes a los que se carga como gasto (opcional).
+  const esCompra = esCargo && !esCliente;
+  const viajesGuardados = m.viajesCompra ?? [];
+  const [viajes, setViajes] = useState<ViajeCompraDraft[]>(() =>
+    viajesGuardados.map(viajeCompraDraftFromApi),
+  );
+  const [marcarErrorViajes, setMarcarErrorViajes] = useState(false);
+  const netoLineas = roundMoney2(lineas.reduce((s, l) => s + (Number(l.importe) || 0), 0));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Archivo del comprobante (movimiento manual). Al adjuntar una factura de ARCA se
+  // completa el número si está vacío o lo había completado el sistema.
+  const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
+  const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
+  const [quitarArchivo, setQuitarArchivo] = useState(false);
+  const autocompletarNumero = useAutocompletarNumeroComprobante();
+  const estadoAdjuntoRef = useRef({ comprobanteFile, numero });
+  estadoAdjuntoRef.current = { comprobanteFile, numero };
+  function cambiarArchivo(file: File | null) {
+    setComprobanteFile(file);
+    if (!file) return;
+    setQuitarArchivo(false);
+    void autocompletarNumero(file, {
+      vigente: () => estadoAdjuntoRef.current.comprobanteFile === file,
+      numeroActual: () => estadoAdjuntoRef.current.numero,
+      aplicar: (_leido, nuevo) => setNumero(nuevo),
+    });
+  }
   /** Mensaje de la confirmación de cambio de importe con imputaciones (null = cerrada). */
   const [confirmarImporte, setConfirmarImporte] = useState<string | null>(null);
   /** Vencimiento anterior a la emisión (YYYY-MM-DD, se comparan como texto). */
@@ -279,8 +331,8 @@ export function MovimientoCcDetalleModal({
 
   /** Validaciones del formulario; muestra el error y devuelve false si algo falta. */
   function validarFormulario(): boolean {
-    if (!numero.trim()) {
-      setError('Ingresá el número de comprobante.');
+    if (!esPagoProveedor && !numero.trim()) {
+      setError(`Ingresá el ${nombreNumero.toLowerCase()}.`);
       return false;
     }
     if (!fecha) {
@@ -302,6 +354,14 @@ export function MovimientoCcDetalleModal({
       setError('Ingresá un importe mayor a 0.');
       return false;
     }
+    if (esCompra) {
+      const errViajes = errorRepartoViajes(viajes, netoLineas);
+      if (errViajes) {
+        setMarcarErrorViajes(true);
+        setError(errViajes);
+        return false;
+      }
+    }
     return true;
   }
 
@@ -311,8 +371,18 @@ export function MovimientoCcDetalleModal({
     setSaving(true);
     setError(null);
     try {
+      // Archivo: uno nuevo se sube; "Quitar" sin elegir otro lo borra; si no, no se toca.
+      const comprobanteUrl = !esCargo
+        ? undefined
+        : comprobanteFile
+        ? await uploadComprobante(() => getToken(), comprobanteFile, 'cuenta-corriente')
+        : quitarArchivo
+          ? null
+          : undefined;
       await actualizarMovimiento(() => getToken(), m.id, {
-        numeroComprobante: numero.trim(),
+        ...(comprobanteUrl !== undefined ? { comprobanteUrl } : {}),
+        // La orden de pago la numera el sistema: no se toca.
+        ...(esPagoProveedor ? {} : { numeroComprobante: numero.trim() }),
         fecha,
         ...(esCargo ? { fechaVencimiento: vencimiento || null } : { formaPago: formaPago.trim() }),
         // El importe se manda siempre: con imputaciones, el backend las ajusta al nuevo total.
@@ -327,6 +397,7 @@ export function MovimientoCcDetalleModal({
               })),
             }
           : { importe }),
+        ...(esCompra ? { viajes: viajesCompraToApi(viajes) } : {}),
       });
       // Venta/compra en femenino, cobro/pago en masculino.
       showToast(
@@ -400,20 +471,52 @@ export function MovimientoCcDetalleModal({
     >
       {editando ? (
         <form id="detalle-cc-form" onSubmit={guardar} className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem]">
+          <div
+            className={`grid grid-cols-1 items-start gap-3 ${
+              esCargo
+                ? 'sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_7rem]'
+                : 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem]'
+            }`}
+          >
+            {/* Venta/compra: archivo a la izquierda del número, como en Nueva factura.
+                Cobro/pago no lleva archivo (se confundía con la factura que cancela). */}
+            {esCargo && (
+              <div className="min-w-0 sm:max-w-[14rem]">
+                <ComprobanteAdjuntoField
+                  file={comprobanteFile}
+                  existingUrl={quitarArchivo ? null : m.comprobanteUrl}
+                  onFileChange={cambiarArchivo}
+                  onClearExisting={() => setQuitarArchivo(true)}
+                  disabled={saving}
+                  labelClassName={labelClass}
+                />
+              </div>
+            )}
             <div>
               <label className={labelClass} htmlFor="det-numero">
-                Número de comprobante <span className="text-red-500">*</span>
+                {nombreNumero} {!esPagoProveedor && <span className="text-red-500">*</span>}
               </label>
-              <input
-                id="det-numero"
-                type="text"
-                maxLength={64}
-                className={inputClass}
-                value={numero}
-                onChange={(e) => setNumero(e.target.value)}
-                required
-              />
+              {esPagoProveedor ? (
+                // La orden de pago la numera el sistema: solo se muestra.
+                <input
+                  id="det-numero"
+                  type="text"
+                  readOnly
+                  tabIndex={-1}
+                  value={numero || 's/n'}
+                  className={`${inputClass} cursor-default border-dashed bg-vialto-mist/60 tabular-nums text-vialto-steel`}
+                />
+              ) : (
+                <input
+                  id="det-numero"
+                  type="text"
+                  maxLength={64}
+                  className={inputClass}
+                  value={numero}
+                  onChange={(e) => setNumero(e.target.value)}
+                  required
+                />
+              )}
             </div>
             {esCargo ? (
               <div>
@@ -523,6 +626,20 @@ export function MovimientoCcDetalleModal({
             />
           )}
 
+          {esCompra && (
+            <ViajesCompraField
+              neto={netoLineas}
+              moneda={moneda}
+              value={viajes}
+              onChange={(rows) => {
+                setViajes(rows);
+                setError(null);
+              }}
+              marcarError={marcarErrorViajes}
+              repartoManualInicial={viajesGuardados.length > 0}
+            />
+          )}
+
         </form>
       ) : (
         <div className="space-y-5">
@@ -538,6 +655,34 @@ export function MovimientoCcDetalleModal({
             )}
             <Dato label="Moneda">{m.moneda}</Dato>
             <Dato label="Estado">{estadoMovimientoCcLabel(m)}</Dato>
+            {tieneOrdenPago(m) && (
+              <Dato label="Orden de pago">
+                <button
+                  type="button"
+                  className="text-vialto-charcoal underline-offset-2 hover:underline"
+                  onClick={() =>
+                    void abrirAdjuntoEnPestana(
+                      { apiPath: apiPathOrdenPago(m.id) },
+                      () => getToken(),
+                      'Orden de pago',
+                    )
+                  }
+                >
+                  Ver PDF
+                </button>
+              </Dato>
+            )}
+            {manual && m.comprobanteUrl?.trim() && (
+              <Dato label="Comprobante">
+                <button
+                  type="button"
+                  className="text-vialto-charcoal underline-offset-2 hover:underline"
+                  onClick={() => abrirAdjunto({ url: m.comprobanteUrl! }, 'Comprobante')}
+                >
+                  Ver archivo
+                </button>
+              </Dato>
+            )}
           </dl>
 
           {esCargo && lineasVista && (
@@ -617,6 +762,33 @@ export function MovimientoCcDetalleModal({
             )}
           </div>
 
+          {viajesGuardados.length > 0 && (
+            <section>
+              <p className="mb-1 text-xs uppercase tracking-wider text-vialto-steel">
+                Cargada como gasto de {viajesGuardados.length === 1 ? 'un viaje' : `${viajesGuardados.length} viajes`} (importe sin IVA)
+              </p>
+              <ul className="divide-y divide-black/10 border border-black/10 text-sm">
+                {viajesGuardados.map((v) => (
+                  <li key={v.viajeId} className="flex items-center gap-2 px-3 py-2">
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="font-medium">{v.numero}</span>
+                      <span className="ml-2 text-xs text-vialto-steel">
+                        {[
+                          v.fechaCarga ? fmtDateUtc(v.fechaCarga) : null,
+                          v.cliente,
+                          [v.origen, v.destino].filter(Boolean).join(' → '),
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    </span>
+                    <span className="shrink-0 tabular-nums">{monto(v.importe, m.moneda)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {tieneImputaciones && (
             <section>
               <p className="mb-1 text-xs uppercase tracking-wider text-vialto-steel">
@@ -658,16 +830,18 @@ export function MovimientoCcDetalleModal({
                       ) : (
                         <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-sm">{contenido}</div>
                       )}
-                      <DeshacerImputacionButton
-                        imputacionId={imputacionId}
-                        descripcion={`${monto(importe, m.moneda)} ${esCargo ? 'del' : 'a'} ${
-                          otro ? nombreMovimientoCc(otro) : 'comprobante'
-                        } ${otro?.numeroComprobante?.trim() || 'sin comprobante'}`}
-                        onDeshecha={() => {
-                          onSaved();
-                          onClose();
-                        }}
-                      />
+                      {!soloLectura && (
+                        <DeshacerImputacionButton
+                          imputacionId={imputacionId}
+                          descripcion={`${monto(importe, m.moneda)} ${esCargo ? 'del' : 'a'} ${
+                            otro ? nombreMovimientoCc(otro) : 'comprobante'
+                          } ${otro?.numeroComprobante?.trim() || 'sin comprobante'}`}
+                          onDeshecha={() => {
+                            onSaved();
+                            onClose();
+                          }}
+                        />
+                      )}
                     </li>
                   );
                 })}
@@ -706,6 +880,7 @@ export function MovimientoCcDetalleModal({
           }}
         />
       )}
+      {visorAdjunto}
     </ViewModalShell>
   );
 }

@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
@@ -11,7 +12,7 @@ import type { Tenant } from "@/types/api";
  * Pantalla standalone de configuración de templates — llegada desde el
  * wizard de import (link "Configurar templates" / error de "columnas
  * faltantes") o desde la sección embebida en "Configuración por empresa"
- * (`CamposEmpresaPage`, que abre esta misma ruta con el tenant ya elegido).
+ * (`SuperadminEmpresaPage`, que abre esta misma ruta con el tenant ya elegido).
  * La lógica real vive en `ImportTemplatesConfig` — este componente solo
  * resuelve el tenant a partir de `:orgId`.
  */
@@ -57,7 +58,7 @@ export function SuperadminImportTemplatesPage() {
         {tenant && <p className="mt-2 text-vialto-steel">{tenant.name}</p>}
 
         {tenantLoading && (
-          <p className="mt-6 text-sm text-vialto-steel">Cargando empresa…</p>
+          <CargandoVialto mensaje="Cargando la empresa…" />
         )}
         {tenantError && <p className="mt-6 text-sm text-red-600">{tenantError}</p>}
 

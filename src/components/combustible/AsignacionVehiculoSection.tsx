@@ -1,3 +1,4 @@
+﻿import { etiquetaDeOpcion } from "@/components/listado/filtrosActivos";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
@@ -294,7 +295,7 @@ export function AsignacionVehiculoSection({
         rows={asignaciones === null ? null : filasFiltradas}
         rowKey={(r) => r.id}
         emptyMessage="No hay choferes cargados para esta empresa."
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando asignaciones de vehículos…"
         tableColSpan={5}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
@@ -303,6 +304,7 @@ export function AsignacionVehiculoSection({
                 title="Chofer"
                 filterActive={!!choferFiltroId}
                 filterSignature={choferFiltroId}
+                valor={etiquetaDeOpcion(choferOptions, choferFiltroId)}
                 onClear={() => setChoferFiltroId("")}
               >
                 <SearchableSelect
@@ -321,6 +323,7 @@ export function AsignacionVehiculoSection({
                 title="Vehículo asignado"
                 filterActive={!!vehiculoFiltroId}
                 filterSignature={vehiculoFiltroId}
+                valor={etiquetaDeOpcion(vehiculoOptions, vehiculoFiltroId)}
                 onClear={() => setVehiculoFiltroId("")}
               >
                 <SearchableSelect

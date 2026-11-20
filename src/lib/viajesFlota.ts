@@ -180,6 +180,8 @@ function stubTransportista(
     id: t.id,
     tenantId: v.tenantId,
     nombre: t.nombre,
+    tipo: "transportista",
+    activo: true,
     pais: null,
     idFiscal: null,
     email: null,
@@ -577,6 +579,60 @@ export function clientesRutaListadoViaje(
     });
   }
   return out;
+}
+
+export interface NavegacionCopiarViaje {
+  to: string;
+  state: {
+    copiarDe: {
+      clienteIds: string[];
+      transportistaId: string | null;
+      modo: 'propio' | 'externo';
+    };
+  };
+}
+
+/**
+ * Construye la URL y el estado de navegación para duplicar/copiar un viaje en el alta (/viajes/nuevo),
+ * preservando los clientes (principal y adicionales) y el porteador/modo operativo.
+ */
+export function armarNavegacionCopiarViaje(
+  v: Pick<Viaje, 'clienteId' | 'clientesViaje' | 'transportistaId'>,
+  options?: { tenantId?: string },
+): NavegacionCopiarViaje {
+  const clienteIds = [
+    ...(v.clienteId ? [v.clienteId] : []),
+    ...(v.clientesViaje ?? []).map((c) => c.clienteId),
+  ].filter(Boolean);
+  const isPropio = !v.transportistaId;
+  const modo: 'propio' | 'externo' = isPropio ? 'propio' : 'externo';
+  const transportistaId = v.transportistaId ?? '';
+
+  const params = new URLSearchParams();
+  if (options?.tenantId) {
+    params.set('tenantId', options.tenantId);
+  }
+  if (clienteIds.length === 1) {
+    params.set('clienteId', clienteIds[0]);
+  } else if (clienteIds.length > 1) {
+    params.set('clienteIds', clienteIds.join(','));
+  }
+  if (transportistaId) {
+    params.set('transportistaId', transportistaId);
+  } else {
+    params.set('modo', 'propio');
+  }
+
+  return {
+    to: `/viajes/nuevo?${params.toString()}`,
+    state: {
+      copiarDe: {
+        clienteIds,
+        transportistaId: transportistaId || null,
+        modo,
+      },
+    },
+  };
 }
 
 /**

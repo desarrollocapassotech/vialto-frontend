@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { formatIdFiscal } from "@/lib/ciudades/paises";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -212,6 +212,7 @@ export function ClientesSuperadminPage() {
         </p>
       )}
 
+      {filtroEmpresa && (
       <ListadoDatos
         className="mt-6"
         tableColSpan={6}
@@ -379,6 +380,7 @@ export function ClientesSuperadminPage() {
           }] : []),
         ]}
         rows={!filtroEmpresa || error ? [] : rowsPagina}
+        cargando={loading}
         rowKey={(c) => c.id}
         emptyMessage={
           !filtroEmpresa
@@ -389,11 +391,12 @@ export function ClientesSuperadminPage() {
                 ? "No hay clientes que coincidan con los filtros aplicados."
                 : "No hay clientes cargados para esta empresa."
         }
-        loadingMessage="Cargando…"
+        loadingMessage="Cargando clientes…"
         rowActions={(c) => [
           { id: "ver", label: "Ver cliente", icon: Eye, onClick: () => setViewingCliente(c) },
         ]}
       />
+      )}
 
       {filtroEmpresa && !error && meta && meta.total > 0 && (
         <ListadoPagination

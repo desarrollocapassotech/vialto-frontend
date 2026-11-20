@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+﻿import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useState } from "react";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -178,12 +178,6 @@ export function DivisionesStockHistorialTenantPage({
         </div>
       )}
 
-      {/* Estado vacío minimalista igual al de facturación y depósitos */}
-      {isPlatform && !activeTenantId && (
-        <p className="mt-10 text-sm text-vialto-steel">
-          Seleccioná una empresa para ver su historial de divisiones.
-        </p>
-      )}
 
       {/* Solo renderizamos el contenido si estamos en modo normal o si ya se seleccionó una empresa */}
       {(!isPlatform || activeTenantId) && (
@@ -258,6 +252,7 @@ export function DivisionesStockHistorialTenantPage({
                     title="Cliente"
                     filterActive={!!clienteId}
                     filterSignature={clienteId}
+                    valor={clientes.find((x) => x.id === clienteId)?.nombre}
                     onClear={() =>
                       setSearchParams((prev) => {
                         const next = new URLSearchParams(prev);
@@ -304,6 +299,7 @@ export function DivisionesStockHistorialTenantPage({
                     title="Depósito"
                     filterActive={!!depositoId}
                     filterSignature={depositoId}
+                    valor={depositos.find((x) => x.id === depositoId)?.nombre}
                     onClear={() =>
                       setSearchParams((prev) => {
                         const next = new URLSearchParams(prev);
@@ -350,6 +346,7 @@ export function DivisionesStockHistorialTenantPage({
                     title="Producto"
                     filterActive={!!productoId}
                     filterSignature={productoId}
+                    valor={productos.find((x) => x.id === productoId)?.nombre}
                     onClear={() =>
                       setSearchParams((prev) => {
                         const next = new URLSearchParams(prev);
@@ -414,7 +411,7 @@ export function DivisionesStockHistorialTenantPage({
             rows={loading ? null : items}
             rowKey={(op) => op.id}
             emptyMessage="No hay divisiones registradas."
-            loadingMessage="Cargando…"
+            loadingMessage="Cargando divisiones de stock…"
             rowActions={(op) => [
               { id: "ver", label: "Ver división", icon: Eye, onClick: () => setViendo(op) },
             ]}

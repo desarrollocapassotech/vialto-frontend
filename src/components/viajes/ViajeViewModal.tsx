@@ -1,12 +1,13 @@
 import { useEffect, type ReactNode } from "react";
 import { transportistaEnFrase, transportistaLabels } from "@/lib/transportistaLabel";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/clerk-react";
+import { puedeGestionarComoAdminEmpresa } from "@/lib/roleLabels";
 import { abrirAdjuntoEnPestana } from "@/lib/abrirAdjunto";
 import { useAbrirAdjunto } from "@/hooks/useAbrirAdjunto";
 import { verPdfLiquidacion } from "@/lib/liquidacionContratoPdf";
 import { verPdfFacturaArca } from "@/lib/facturaPdfArca";
 import { ComprobanteAdjuntoClip } from "@/components/shared/ComprobanteAdjuntoClip";
-import { Banknote, Receipt } from "lucide-react";
+import { Banknote, Copy, Receipt } from "lucide-react";
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -155,6 +156,7 @@ export function ViajeViewModal({
   viaje,
   onClose,
   onEditar,
+  onCopiar,
   tenantId,
   hasLiquidoProductoArca = false,
   editando = false,
@@ -181,6 +183,8 @@ export function ViajeViewModal({
   modulos?: string[] | null;
   onClose: () => void;
   onEditar: () => void;
+  /** Si se pasa, muestra un botón "Copiar" junto a "Editar". */
+  onCopiar?: () => void;
   onVerFactura?: () => void;
   /** Clerk org id para resolver nombres en vista superadmin. */
   tenantId?: string;
@@ -212,7 +216,9 @@ export function ViajeViewModal({
   // Nombre que la empresa le da al transportista (superadmin).
   const tl = transportistaLabels(tenantEfectivo);
   const transpFrase = transportistaEnFrase(tl.singular);
-  const { getToken } = useAuth();
+  const { getToken, orgRole } = useAuth();
+  const { user } = useUser();
+  const esAdmin = puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
   const { abrirAdjunto, visorAdjunto } = useAbrirAdjunto();
   /** Comprobante adjunto: foto en el visor, documento en pestaña nueva. */
   function verAdjunto(url: string | null | undefined) {
@@ -310,38 +316,38 @@ export function ViajeViewModal({
   }
   const clientesDetalle = esMultiCliente
     ? [
-        {
-          id: "principal",
-          nombre: clienteNombre,
-          ruta: textoRutaViaje(
-            viaje.origen,
-            etiquetasDestinosDesdeViaje(viaje),
-          ),
-          carga: productosDesc || "—",
-          monedaMonto: viaje.monedaMonto ?? null,
-          facturado: !facturacionPermiteVincular(viaje.facturacionEstado),
-          ivaPct: viaje.factura?.ivaPct ?? null,
-          monto: montoConIva(
-            viaje.monto,
-            viaje.factura?.ivaPct ?? null,
-            !facturacionPermiteVincular(viaje.facturacionEstado),
-          ),
-        },
-        ...clientesExtra.map((c) => ({
-          id: c.id,
-          nombre: c.cliente?.nombre || "—",
-          ruta: rutaClienteAdicional(c),
-          carga: cargaClienteAdicional(c),
-          monedaMonto: c.monedaMonto,
-          facturado: !facturacionPermiteVincular(c.facturacionEstado),
-          ivaPct: c.factura?.ivaPct ?? null,
-          monto: montoConIva(
-            c.monto,
-            c.factura?.ivaPct ?? null,
-            !facturacionPermiteVincular(c.facturacionEstado),
-          ),
-        })),
-      ]
+      {
+        id: "principal",
+        nombre: clienteNombre,
+        ruta: textoRutaViaje(
+          viaje.origen,
+          etiquetasDestinosDesdeViaje(viaje),
+        ),
+        carga: productosDesc || "—",
+        monedaMonto: viaje.monedaMonto ?? null,
+        facturado: !facturacionPermiteVincular(viaje.facturacionEstado),
+        ivaPct: viaje.factura?.ivaPct ?? null,
+        monto: montoConIva(
+          viaje.monto,
+          viaje.factura?.ivaPct ?? null,
+          !facturacionPermiteVincular(viaje.facturacionEstado),
+        ),
+      },
+      ...clientesExtra.map((c) => ({
+        id: c.id,
+        nombre: c.cliente?.nombre || "—",
+        ruta: rutaClienteAdicional(c),
+        carga: cargaClienteAdicional(c),
+        monedaMonto: c.monedaMonto,
+        facturado: !facturacionPermiteVincular(c.facturacionEstado),
+        ivaPct: c.factura?.ivaPct ?? null,
+        monto: montoConIva(
+          c.monto,
+          c.factura?.ivaPct ?? null,
+          !facturacionPermiteVincular(c.facturacionEstado),
+        ),
+      })),
+    ]
     : [];
 
   const ver = (key: string) => isVisible("detalle_viaje", key);
@@ -384,23 +390,23 @@ export function ViajeViewModal({
     ...(esMultiCliente
       ? []
       : [
-          {
-            key: "origen",
-            label: "Ruta",
-            value: textoRutaViaje(
-              viaje.origen,
-              etiquetasDestinosDesdeViaje(viaje),
-            ),
-          },
-        ]),
+        {
+          key: "origen",
+          label: "Ruta",
+          value: textoRutaViaje(
+            viaje.origen,
+            etiquetasDestinosDesdeViaje(viaje),
+          ),
+        },
+      ]),
     // Carga y descarga en un solo dato; si no hay carga, la descarga va sola.
     fechaCargaTxt
       ? {
-          key: "fechaCarga",
-          label: "Fecha de carga",
-          value: fechaCargaTxt,
-          sub: fechaDescargaTxt ? `Descarga ${fechaDescargaTxt}` : undefined,
-        }
+        key: "fechaCarga",
+        label: "Fecha de carga",
+        value: fechaCargaTxt,
+        sub: fechaDescargaTxt ? `Descarga ${fechaDescargaTxt}` : undefined,
+      }
       : { key: "fechaDescarga", label: "Fecha de descarga", value: fechaDescargaTxt },
     { key: "vehiculosRows", label: "Vehículos", value: vehiculoPatentes },
     ...(esMultiCliente
@@ -410,17 +416,18 @@ export function ViajeViewModal({
     ...(tieneFacturacion
       ? []
       : [
-          {
-            key: "monto",
-            label: "Tarifa cliente",
-            value: montoClienteTxt,
-            sub: montoClienteSub,
-          },
-        ]),
+        {
+          key: "monto",
+          label: "Tarifa cliente",
+          value: montoClienteTxt,
+          sub: montoClienteSub,
+        },
+      ]),
   ].filter((c) => c.value != null && c.value !== "" && ver(c.key));
 
   // ── Estado ───────────────────────────────────────────────────────────────
   const valorizacion = evaluarValorizacionViaje(viaje);
+  const edicionBloqueadaPorValorizacion = !esAdmin && valorizacion.valorizado;
   const filasEstado = [
     // La etapa (pendiente / en curso / finalizado / cancelado) va siempre: es el dato
     // central de la sección, aunque la empresa oculte su badge en el encabezado.
@@ -501,125 +508,134 @@ export function ViajeViewModal({
     subClassName?: string;
     numero?: boolean;
   }[] = !tieneFacturacion
-    ? []
-    : [
+      ? []
+      : [
         ...(ver("facturacionEstado")
           ? [
-              {
-                key: "estado",
-                label: "Estado",
-                value: (
-                  <BadgeEstadoViaje className={facturacionEstadoBadgeClass[estadoFact]}>
-                    {facturacionEstadoLabel[estadoFact]}
-                  </BadgeEstadoViaje>
-                ),
-                // Error de AFIP / anulada: el texto largo explica qué pasó.
-                sub:
-                  !esMultiCliente &&
+            {
+              key: "estado",
+              label: "Estado",
+              value: (
+                <BadgeEstadoViaje className={facturacionEstadoBadgeClass[estadoFact]}>
+                  {facturacionEstadoLabel[estadoFact]}
+                </BadgeEstadoViaje>
+              ),
+              // Error de AFIP / anulada: el texto largo explica qué pasó.
+              sub:
+                !esMultiCliente &&
                   (estadoFact === "error_afip" || estadoFact === "anulado")
-                    ? tooltipFacturacionEstado(viaje)
-                    : undefined,
-                subClassName:
-                  estadoFact === "error_afip" ? "text-red-700" : "text-vialto-steel",
-              },
-            ]
+                  ? tooltipFacturacionEstado(viaje)
+                  : undefined,
+              subClassName:
+                estadoFact === "error_afip" ? "text-red-700" : "text-vialto-steel",
+            },
+          ]
           : []),
         ...(ver("monto") && !esMultiCliente && viaje.cantidadFactura != null
           ? [
-              {
-                key: "cantidad",
-                label: labelCantidadViajes(tenantEfectivo),
-                value: viaje.cantidadFactura.toLocaleString("es-AR"),
-                numero: true,
-              },
-            ]
+            {
+              key: "cantidad",
+              label: labelCantidadViajes(tenantEfectivo),
+              value: viaje.cantidadFactura.toLocaleString("es-AR"),
+              numero: true,
+            },
+          ]
           : []),
         ...(ver("monto") && !esMultiCliente && viaje.precioUnitarioFactura != null
           ? [
-              {
-                key: "tarifa",
-                label: "Tarifa cliente",
-                value: fmtMonto(viaje.precioUnitarioFactura, viaje.monedaMonto),
-                numero: true,
-              },
-            ]
+            {
+              key: "tarifa",
+              label: "Tarifa cliente",
+              value: fmtMonto(viaje.precioUnitarioFactura, viaje.monedaMonto),
+              numero: true,
+            },
+          ]
           : []),
         ...(ver("monto") && montoClienteTxt
           ? [
-              {
-                key: "monto",
-                // Sin desglose el monto es la tarifa del viaje; con desglose, el total.
-                label: viaje.precioUnitarioFactura != null ? "Total" : "Tarifa cliente",
-                value: <span className="font-semibold">{montoClienteTxt}</span>,
-                numero: true,
-              },
-            ]
+            {
+              key: "monto",
+              // Sin desglose el monto es la tarifa del viaje; con desglose, el total.
+              label: viaje.precioUnitarioFactura != null ? "Total" : "Tarifa cliente",
+              value: <span className="font-semibold">{montoClienteTxt}</span>,
+              numero: true,
+            },
+          ]
           : ver("monto") && !esMultiCliente && (viaje.monto == null || viaje.monto <= 0)
             ? [
-                {
-                  key: "monto",
-                  label: "Tarifa cliente",
-                  value: (
-                    <span className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
-                      Pendiente de carga
-                    </span>
-                  ),
-                },
-              ]
-            : []),
-        ...(ver("facturacionEstado") && !esMultiCliente && nroFactura
-          ? [
               {
-                key: "factura",
-                label: "Factura",
-                value: conAdjunto(abrirComprobanteFactura(factura), `N° ${nroFactura}`),
-                sub: (
-                  <>
-                    {[
-                      factura?.fechaEmision ? `Emitida ${fmtDate(factura.fechaEmision)}` : null,
-                      factura?.cae ? `CAE ${factura.cae}` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ") || null}
-                    {abrirComprobanteFactura(factura) && (
-                      <span className="block">
-                        <VerComprobanteAdjunto onClick={abrirComprobanteFactura(factura)!} />
-                      </span>
-                    )}
-                  </>
+                key: "monto",
+                label: "Tarifa cliente",
+                value: (
+                  <span className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
+                    Pendiente de carga
+                  </span>
                 ),
               },
             ]
+            : []),
+        ...(ver("facturacionEstado") && !esMultiCliente && nroFactura
+          ? [
+            {
+              key: "factura",
+              label: "Factura",
+              value: conAdjunto(abrirComprobanteFactura(factura), `N° ${nroFactura}`),
+              sub: (
+                <>
+                  {[
+                    factura?.fechaEmision ? `Emitida ${fmtDate(factura.fechaEmision)}` : null,
+                    factura?.cae ? `CAE ${factura.cae}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || null}
+                  {abrirComprobanteFactura(factura) && (
+                    <span className="block">
+                      <VerComprobanteAdjunto onClick={abrirComprobanteFactura(factura)!} />
+                    </span>
+                  )}
+                </>
+              ),
+            },
+          ]
           : []),
         ...(ver("facturacionEstado") && !esMultiCliente && viaje.montoFacturadoReal != null
           ? [
-              {
-                key: "facturadoReal",
-                label: "Facturado",
-                value: fmtMonto(viaje.montoFacturadoReal, viaje.monedaMontoFacturadoReal),
-                numero: true,
-              },
-            ]
+            {
+              key: "facturadoReal",
+              label: "Facturado",
+              value: fmtMonto(viaje.montoFacturadoReal, viaje.monedaMontoFacturadoReal),
+              numero: true,
+            },
+          ]
           : []),
       ];
   const filasFacturacion =
     columnasFacturacion.length === 0
       ? []
       : [
-          tablaDetalle(
-            "tabla-facturacion",
-            columnasFacturacion,
-            [Object.fromEntries(columnasFacturacion.map((c) => [c.key, c]))],
-          ),
-        ];
+        tablaDetalle(
+          "tabla-facturacion",
+          columnasFacturacion,
+          [Object.fromEntries(columnasFacturacion.map((c) => [c.key, c]))],
+        ),
+      ];
 
   // ── Liquidación / pago al transportista ──────────────────────────────────
   const conTransportista = !!viaje.transportistaId;
   const monedaTransp = viaje.monedaPrecioTransportistaExterno;
-  const ivaEfectivoTxt =
-    ver("precioTransportistaIvaIncluidoPct") && viaje.precioTransportistaIvaIncluidoPct
-      ? `+${viaje.precioTransportistaIvaIncluidoPct}% IVA en efectivo`
-      : undefined;
+  const tramosIva = viaje.tramosTransportista ?? [];
+  const ivaEfectivoTxt = !ver("precioTransportistaIvaIncluidoPct")
+    ? undefined
+    : tramosIva.length > 0
+      ? `IVA por tramo: ${tramosIva
+          .map(
+            (t) =>
+              `${t.detalle} ${t.monto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} al ${t.ivaPct}%`,
+          )
+          .join(" · ")}${viaje.precioTransportistaIvaIncluidoPct ? ` · resto al ${viaje.precioTransportistaIvaIncluidoPct}%` : ""}`
+      : viaje.precioTransportistaIvaIncluidoPct
+        ? `+${viaje.precioTransportistaIvaIncluidoPct}% IVA en efectivo`
+        : undefined;
   const verPrecioTransp = ver("precioTransportistaExterno");
   /** Celdas del precio al transportista: Toneladas/Unidades | Tarifa transportista | Total. */
   const celdasPrecioTransp: Record<string, CeldaDetalle> = {};
@@ -680,10 +696,10 @@ export function ViajeViewModal({
   const liquidacionesListadas =
     tieneLiquidaciones && ver("liquidacionEstado")
       ? (viaje.liquidacionesViaje ?? []).filter(
-          (lv) =>
-            estadoLiq !== "liquidado" ||
-            (lv.liquidacion.estado !== "anulado" && !lv.liquidacion.anuladoAt),
-        )
+        (lv) =>
+          estadoLiq !== "liquidado" ||
+          (lv.liquidacion.estado !== "anulado" && !lv.liquidacion.anuladoAt),
+      )
       : [];
   const celdasLiquidacion: Record<string, CeldaDetalle>[] = liquidacionesListadas.map((lv) => {
     const l = lv.liquidacion;
@@ -833,10 +849,10 @@ export function ViajeViewModal({
               />
             ) : undefined
           ) : !tieneLiquidaciones &&
-          onRegistrarPago &&
-          !bloqueado &&
-          saldoTransportista &&
-          !saldoTransportista.pagado ? (
+            onRegistrarPago &&
+            !bloqueado &&
+            saldoTransportista &&
+            !saldoTransportista.pagado ? (
             <AccionSeccionViaje onClick={onRegistrarPago}>Registrar pago</AccionSeccionViaje>
           ) : undefined
         }
@@ -858,9 +874,8 @@ export function ViajeViewModal({
           )}
           {isVisible("detalle_viaje", "etapa") && (
             <span
-              className={`text-xs uppercase tracking-[0.1em] border rounded-sm px-2 py-0.5 ${
-                etapaViajeBadgeClass[viaje.etapa] ?? etapaViajeBadgeClassDefault
-              }`}
+              className={`text-xs uppercase tracking-[0.1em] border rounded-sm px-2 py-0.5 ${etapaViajeBadgeClass[viaje.etapa] ?? etapaViajeBadgeClassDefault
+                }`}
             >
               {etapaViajeLabel[viaje.etapa] ?? viaje.etapa}
             </span>
@@ -887,7 +902,7 @@ export function ViajeViewModal({
           </span>
         </span>
       }
-      onClose={bloqueado ? () => {} : onClose}
+      onClose={bloqueado ? () => { } : onClose}
       maxWidthClass="sm:max-w-6xl"
       scrollBody
       footer={
@@ -948,12 +963,32 @@ export function ViajeViewModal({
               )}
             </button>
           )}
+          {onCopiar && (
+            <button
+              type="button"
+              onClick={onCopiar}
+              disabled={bloqueado}
+              className={`${viewModalBtnGhost} disabled:cursor-wait disabled:opacity-50`}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Copy
+                  className="h-3.5 w-3.5"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                Copiar
+              </span>
+            </button>
+          )}
           <span className="group relative inline-block">
             <button
               type="button"
-              onClick={onEditar}
-              disabled={bloqueado}
-              className={`${viewModalBtnPrimary}${bloqueado ? " cursor-wait" : ""}`}
+              onClick={edicionBloqueadaPorValorizacion ? undefined : onEditar}
+              disabled={bloqueado || edicionBloqueadaPorValorizacion}
+              className={`${viewModalBtnPrimary}${bloqueado ? " cursor-wait" : ""}${edicionBloqueadaPorValorizacion
+                  ? " cursor-not-allowed opacity-60 hover:border-vialto-charcoal/20 hover:bg-white hover:text-vialto-charcoal"
+                  : ""
+                }`}
             >
               {editando ? (
                 <span className="inline-flex items-center gap-1.5">
@@ -964,6 +999,14 @@ export function ViajeViewModal({
                 "Editar"
               )}
             </button>
+            {edicionBloqueadaPorValorizacion && (
+              <div
+                role="tooltip"
+                className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 w-max max-w-[220px] whitespace-normal rounded bg-vialto-charcoal px-2.5 py-1.5 text-center text-[11px] font-normal normal-case leading-tight tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
+              >
+                Viaje valorizado: solo editable por administradores
+              </div>
+            )}
           </span>
         </>
       }
@@ -986,25 +1029,25 @@ export function ViajeViewModal({
           )}
           {((ver("detalleCarga") && viaje.detalleCarga) ||
             (ver("observaciones") && viaje.observaciones)) && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {ver("detalleCarga") && viaje.detalleCarga && (
-                <div className="min-w-0">
-                  <p className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel">
-                    Detalle de carga
-                  </p>
-                  <p className="mt-0.5 whitespace-pre-line text-sm">{viaje.detalleCarga}</p>
-                </div>
-              )}
-              {ver("observaciones") && viaje.observaciones && (
-                <div className="min-w-0">
-                  <p className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel">
-                    Observaciones
-                  </p>
-                  <p className="mt-0.5 whitespace-pre-line text-sm">{viaje.observaciones}</p>
-                </div>
-              )}
-            </div>
-          )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                {ver("detalleCarga") && viaje.detalleCarga && (
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel">
+                      Detalle de carga
+                    </p>
+                    <p className="mt-0.5 whitespace-pre-line text-sm">{viaje.detalleCarga}</p>
+                  </div>
+                )}
+                {ver("observaciones") && viaje.observaciones && (
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel">
+                      Observaciones
+                    </p>
+                    <p className="mt-0.5 whitespace-pre-line text-sm">{viaje.observaciones}</p>
+                  </div>
+                )}
+              </div>
+            )}
           {secciones.length > 0 && (
             // Una debajo de la otra (Facturación, después Liquidación): cada tabla usa
             // todo el ancho.

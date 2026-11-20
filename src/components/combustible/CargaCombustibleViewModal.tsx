@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState, useCallback } from "react";
 import {
@@ -203,7 +204,7 @@ export function CargaCombustibleViewModal({
       }
     >
       {loading && (
-        <p className="text-sm text-vialto-steel">Cargando detalle…</p>
+        <CargandoVialto mensaje="Cargando la carga de combustible…" chico />
       )}
       {error && (
         <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">

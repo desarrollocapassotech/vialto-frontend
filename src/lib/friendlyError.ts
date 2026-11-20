@@ -82,6 +82,13 @@ export function friendlyError(
     }
     if (err.status === 403) {
       if (
+        err.message &&
+        err.message !== "Forbidden" &&
+        !err.message.match(/^HTTP \d+$/i)
+      ) {
+        return err.message;
+      }
+      if (
         context === "viajes" ||
         context === "tablero" ||
         context === "cargas"

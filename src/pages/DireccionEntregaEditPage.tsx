@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -139,7 +140,7 @@ export function DireccionEntregaEditPage() {
       title="Editar dirección / ruta"
     >
       {initialLoading ? (
-        <p className="text-sm text-vialto-steel">Cargando…</p>
+        <CargandoVialto mensaje="Cargando la dirección de entrega…" />
       ) : (
         <form
           className="max-w-lg grid gap-4"

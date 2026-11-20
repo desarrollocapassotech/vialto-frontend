@@ -1,3 +1,4 @@
+﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useEffect, useState } from "react";
 import { Pencil, Power, PowerOff, Trash2 } from "lucide-react";
 import { FechaPicker } from "@/components/mantenimiento/FechaPicker";
@@ -121,7 +122,7 @@ export function AsignacionesPlanLista({
     }
   }
 
-  if (filas === null) return <p className="text-sm text-vialto-steel">Cargando…</p>;
+  if (filas === null) return <CargandoVialto mensaje="Cargando asignaciones…" chico />;
   if (error) return <p className="text-xs font-medium text-red-600">{error}</p>;
   if (filas.length === 0) return <p className="text-sm text-vialto-steel">Todavía no hay vehículos asignados a este plan.</p>;
 
