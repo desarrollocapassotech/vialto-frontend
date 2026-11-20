@@ -62,6 +62,9 @@ import {
 } from "@/hooks/useAutocompletarNumeroComprobante";
 import type { ComprobanteManualErrores } from "@/lib/comprobanteManual";
 import {
+  roundMoney2,
+} from "@/lib/facturaTotales";
+import {
   FacturaTramosEditor,
   emptyFacturaTramoDraft,
 } from "@/components/facturacion/FacturaTramosEditor";
@@ -1760,19 +1763,32 @@ export function FacturaCreateModal({
                     <div className="flex justify-between text-xs">
                       <span className="text-vialto-steel">Neto</span>
                       <span className="tabular-nums text-vialto-charcoal">
-                        {fmtPreviewMoney(totales.neto)}
+                        {fmtPreviewMoney(facturaEmitida != null ? facturaEmitida.importe : totales.neto)}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-vialto-steel">IVA</span>
                       <span className="tabular-nums text-vialto-charcoal">
-                        {fmtPreviewMoney(totales.iva)}
+                        {fmtPreviewMoney(
+                          facturaEmitida != null
+                            ? (facturaEmitida.ivaMonto ??
+                              roundMoney2((facturaEmitida.importe * (facturaEmitida.ivaPct ?? 21)) / 100))
+                            : totales.iva,
+                        )}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs font-semibold text-vialto-charcoal border-t border-black/10 pt-1.5 mt-0.5">
                       <span>Total</span>
                       <span className="tabular-nums">
-                        {fmtPreviewMoney(totales.total)}
+                        {fmtPreviewMoney(
+                          facturaEmitida != null
+                            ? roundMoney2(
+                                facturaEmitida.importe +
+                                  (facturaEmitida.ivaMonto ??
+                                    roundMoney2((facturaEmitida.importe * (facturaEmitida.ivaPct ?? 21)) / 100)),
+                              )
+                            : totales.total,
+                        )}
                       </span>
                     </div>
                   </section>
