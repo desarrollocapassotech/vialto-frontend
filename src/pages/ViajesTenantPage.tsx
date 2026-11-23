@@ -10,6 +10,7 @@ import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { createPortal } from "react-dom";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { isOrgAdmin, puedeGestionarComoAdminEmpresa } from "@/lib/roleLabels";
+import { usePermisosRol } from "@/hooks/usePermisosRol";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useViajeEditor } from "@/hooks/useViajeEditor";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
@@ -116,6 +117,7 @@ import {
 import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
 import { ViajeEtapaSelectorPopover } from "@/components/viajes/ViajeEtapaSelectorPopover";
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
+import { ViajeValorizacionIndicador } from "@/components/viajes/ViajeValorizacionIndicador";
 import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
 import {
   contarViajesPagoTransportistaDesdeApi,
@@ -425,6 +427,12 @@ export function ViajesTenantPage({
 
   const platform = Boolean(tenantId?.trim());
   const esAdmin = puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
+  // Matriz de permisos (`lib/permisosRol.ts`): el Miembro ve y edita viajes (VTO-485 bloquea
+  // los valorizados), pero no crea, elimina, carga pagos/gastos, factura ni liquida.
+  const permisosRol = usePermisosRol();
+  const operaViajes = permisosRol.puedeOperar("viajes");
+  const operaFacturas = permisosRol.puedeOperar("facturas");
+  const operaLiquidaciones = permisosRol.puedeOperar("liquidaciones");
   const puedeImportar =
     !embeddedInSuperadmin &&
     isOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata }) &&
@@ -1714,9 +1722,11 @@ export function ViajesTenantPage({
     viajesSeleccionLote.current.clear();
   }, [clienteIdFiltroActivo, transportistaIdFiltroActivo]);
 
-  const loteFacturarActivo = clienteIdFiltroActivo.trim() !== "";
+  const loteFacturarActivo = operaFacturas && clienteIdFiltroActivo.trim() !== "";
   const loteLiquidarActivo =
-    hasLiquidacionesResuelto && transportistaIdFiltroActivo.trim() !== "";
+    operaLiquidaciones &&
+    hasLiquidacionesResuelto &&
+    transportistaIdFiltroActivo.trim() !== "";
 
   function esElegibleLiquidarLote(v: Viaje): boolean {
     const tid = transportistaIdFiltroActivo.trim();
@@ -2184,7 +2194,10 @@ export function ViajesTenantPage({
    * directo a la factura).
    */
   const puedeFacturarDesdeGrilla =
-    platform || hasFacturasArca || hasFacturacionSinArca || !hasLiquidaciones;
+    operaFacturas &&
+    (platform || hasFacturasArca || hasFacturacionSinArca || !hasLiquidaciones);
+  /** Liquidar desde la grilla, los indicadores y el editor. */
+  const puedeLiquidarDesdeGrilla = operaLiquidaciones && hasLiquidacionesResuelto;
 
   /** Viaje del editor con los cambios del borrador que afectan a facturar/liquidar. */
   function viajeDesdeEditor(): Viaje {
@@ -2457,8 +2470,16 @@ export function ViajesTenantPage({
     "detalle_viaje",
     "liquidacionEstado",
   );
+  // "Seguimiento de valorización": opt-in por empresa (apagado por defecto).
+  const mostrarColumnaValorizacion = isViajeFieldVisible(
+    "detalle_viaje",
+    "valorizacion",
+  );
   const mostrarColumnaEstado =
-    mostrarColumnaEtapa || mostrarColumnaFactura || mostrarColumnaLiquidacion;
+    mostrarColumnaEtapa ||
+    mostrarColumnaFactura ||
+    mostrarColumnaLiquidacion ||
+    mostrarColumnaValorizacion;
   const cantidadColumnasEstado = mostrarColumnaEstado ? 1 : 0;
 
   // Filtros de la columna Etapa. Los estados de AFIP solo se ofrecen si el tenant
@@ -3460,16 +3481,18 @@ export function ViajesTenantPage({
             labels={labelsOrdenColumna}
           />
 
-          <Link
-            to={
-              platform
-                ? `/viajes/nuevo?tenantId=${encodeURIComponent(tid)}`
-                : "/viajes/nuevo"
-            }
-            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-          >
-            Crear viaje
-          </Link>
+          {operaViajes && (
+            <Link
+              to={
+                platform
+                  ? `/viajes/nuevo?tenantId=${encodeURIComponent(tid)}`
+                  : "/viajes/nuevo"
+              }
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            >
+              Crear viaje
+            </Link>
+          )}
         </div>
       </div>
 
@@ -3656,7 +3679,6 @@ export function ViajesTenantPage({
               </td>
             ),
             etapa: mostrarColumnaEstado && (() => {
-              const valorizacion = evaluarValorizacionViaje(v);
               return (
                 <td className="h-8 px-3 py-1" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1.5">
@@ -3669,13 +3691,10 @@ export function ViajesTenantPage({
                         }
                       />
                     )}
-                    {!valorizacion.valorizado && v.etapa?.toLowerCase() !== "cancelado" && (
-                      <span
-                        className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 cursor-help whitespace-nowrap"
-                        title={`Pendiente de carga de montos (no valorizado):\n${valorizacion.mensajePendiente}`}
-                      >
-                        No valorizado
-                      </span>
+                    {mostrarColumnaValorizacion && v.etapa?.toLowerCase() !== "cancelado" && (
+                      <ViajeValorizacionIndicador
+                        valorizacion={evaluarValorizacionViaje(v)}
+                      />
                     )}
                     {v.etapa?.toLowerCase() !== "cancelado" && (
                       <>
@@ -3706,12 +3725,12 @@ export function ViajesTenantPage({
                               idPropio2Label={idPropio2Label(currentTenant)}
                               tenantId={platform ? tid : undefined}
                               hasArca={hasLiquidoProductoArcaResuelto}
-                              onRegistrarPago={() => setRegistrarPagoViaje(v)}
+                              onRegistrarPago={operaViajes ? () => setRegistrarPagoViaje(v) : undefined}
                               onLiquidar={
-                                hasLiquidacionesResuelto ? () => liquidarViaje(v) : undefined
+                                puedeLiquidarDesdeGrilla ? () => liquidarViaje(v) : undefined
                               }
                               onEmitir={
-                                hasLiquidoProductoArcaResuelto
+                                operaLiquidaciones && hasLiquidoProductoArcaResuelto
                                   ? (liq) => setEmitirLiquidacion(liq)
                                   : undefined
                               }
@@ -3846,14 +3865,14 @@ export function ViajesTenantPage({
                   onVer={() => setViewingViaje(v)}
                   onCopiar={() => handleCopiarViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
-                  onRegistrarPago={() => setRegistrarPagoViaje(v)}
+                  onRegistrarPago={operaViajes ? () => setRegistrarPagoViaje(v) : undefined}
                   onFacturar={
                     puedeFacturarDesdeGrilla
                       ? () => facturarViaje(v, undefined)
                       : undefined
                   }
                   onLiquidar={
-                    hasLiquidacionesResuelto ? () => liquidarViaje(v) : undefined
+                    puedeLiquidarDesdeGrilla ? () => liquidarViaje(v) : undefined
                   }
                   onExportar={() => setExportarViaje(v)}
                   onVerFactura={
@@ -3968,12 +3987,12 @@ export function ViajesTenantPage({
                         idPropio2Label={idPropio2Label(currentTenant)}
                         tenantId={platform ? tid : undefined}
                         hasArca={hasLiquidoProductoArcaResuelto}
-                        onRegistrarPago={() => setRegistrarPagoViaje(v)}
+                        onRegistrarPago={operaViajes ? () => setRegistrarPagoViaje(v) : undefined}
                         onLiquidar={
-                          hasLiquidacionesResuelto ? () => liquidarViaje(v) : undefined
+                          puedeLiquidarDesdeGrilla ? () => liquidarViaje(v) : undefined
                         }
                         onEmitir={
-                          hasLiquidoProductoArcaResuelto
+                          operaLiquidaciones && hasLiquidoProductoArcaResuelto
                             ? (liq) => setEmitirLiquidacion(liq)
                             : undefined
                         }
@@ -4127,14 +4146,14 @@ export function ViajesTenantPage({
                   onVer={() => setViewingViaje(v)}
                   onCopiar={() => handleCopiarViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
-                  onRegistrarPago={() => setRegistrarPagoViaje(v)}
+                  onRegistrarPago={operaViajes ? () => setRegistrarPagoViaje(v) : undefined}
                   onFacturar={
                     puedeFacturarDesdeGrilla
                       ? () => facturarViaje(v, undefined)
                       : undefined
                   }
                   onLiquidar={
-                    hasLiquidacionesResuelto ? () => liquidarViaje(v) : undefined
+                    puedeLiquidarDesdeGrilla ? () => liquidarViaje(v) : undefined
                   }
                   onExportar={() => setExportarViaje(v)}
                   onVerFactura={
@@ -4254,7 +4273,7 @@ export function ViajesTenantPage({
               : undefined
           }
           onRegistrarPago={
-            !hasLiquidoProductoArca && viewingViaje.transportistaId
+            operaViajes && !hasLiquidoProductoArca && viewingViaje.transportistaId
               ? () => {
                   const v = viewingViaje;
                   setViewingViaje(null);
@@ -4318,7 +4337,7 @@ export function ViajesTenantPage({
                   : null
               }
               onLiquidar={
-                hasLiquidacionesResuelto
+                puedeLiquidarDesdeGrilla
                   ? () => liquidarViaje(viajeDesdeEditor())
                   : undefined
               }
@@ -4332,13 +4351,19 @@ export function ViajesTenantPage({
               }
               onContinuarFactura={(() => {
                 const id = facturaBorradorIdDeViaje(viajeEditor.viajeSnapshot);
-                return id ? () => abrirEmisionFactura(id) : undefined;
+                return id && operaFacturas ? () => abrirEmisionFactura(id) : undefined;
               })()}
               onContinuarLiquidacion={(() => {
                 const id = liquidacionBorradorIdDeViaje(viajeEditor.viajeSnapshot);
-                return id ? () => abrirEmisionLiquidacion(id) : undefined;
+                return id && operaLiquidaciones
+                  ? () => abrirEmisionLiquidacion(id)
+                  : undefined;
               })()}
-              onEliminar={() => requestDeleteViaje(viajeEditor.viajeSnapshot!)}
+              onEliminar={
+                operaViajes
+                  ? () => requestDeleteViaje(viajeEditor.viajeSnapshot!)
+                  : undefined
+              }
               saving={viajeEditor.saving}
               error={viajeEditor.error}
               crearVehiculoHref={
@@ -4351,8 +4376,10 @@ export function ViajesTenantPage({
               tenant={!platform ? currentTenant : undefined}
               hasLiquidoProductoArca={hasLiquidoProductoArca}
               hasFacturasArca={hasFacturasArca}
-              onRegistrarPago={() =>
-                setRegistrarPagoViaje(viajeEditor.viajeSnapshot)
+              onRegistrarPago={
+                operaViajes
+                  ? () => setRegistrarPagoViaje(viajeEditor.viajeSnapshot)
+                  : undefined
               }
               onProductoCreado={viajeEditor.onProductoCreado}
               onClienteCreado={(c) =>

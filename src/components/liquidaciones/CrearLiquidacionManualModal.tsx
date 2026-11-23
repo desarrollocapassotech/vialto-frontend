@@ -94,7 +94,9 @@ import {
 } from "@/lib/liquidacionConceptosIva";
 import { tramosIvaParaLiquidacion } from "@/lib/viajeTramosTransportista";
 import { useToast } from "@/lib/toast";
-import { fmtDateUtc } from "@/lib/fmtDateUtc";
+import { fechaDiaYmd, fmtDateUtc } from "@/lib/fmtDateUtc";
+import { FaltaCampo } from "@/components/shared/FaltaCampo";
+import { conBordeError } from "@/lib/bordeError";
 import {
   formatViajeImporteForListado,
   numeroVisibleViaje,
@@ -429,6 +431,16 @@ export function CrearLiquidacionManualModal({
   );
   // "Comprobante interno" (solo alta sin Líquido Producto): número interno que asigna el backend.
   const [numeroAutomatico, setNumeroAutomatico] = useState(false);
+  // Fecha del comprobante del proveedor (sin ARCA): es la fecha de la liquidación en Cuenta
+  // corriente. Arranca vacía (nunca hoy): se completa sola desde la factura adjunta o la
+  // carga el usuario, y es obligatoria (pedido de LSF, nov 2026).
+  const [fechaComprobante, setFechaComprobante] = useState(
+    () => fechaDiaYmd(existente?.proveedorCbteFecha) ?? "",
+  );
+  const [faltaFechaComprobante, setFaltaFechaComprobante] = useState(false);
+  useEffect(() => {
+    if (fechaComprobante) setFaltaFechaComprobante(false);
+  }, [fechaComprobante]);
   // Liquidación manual (empresa con ARCA, transportista monotributista): la factura del
   // transportista va por separado — tipo, punto de venta, número y fecha (Libro IVA).
   const [cbteProveedor, setCbteProveedor] = useState<ComprobanteManualDraft>(() =>
@@ -614,6 +626,7 @@ export function CrearLiquidacionManualModal({
     numeroComprobanteProveedor,
     cbteProveedor,
     liquidacionManual,
+    fechaComprobante,
   });
   estadoAdjuntoRef.current = {
     comprobanteFile,
@@ -621,6 +634,7 @@ export function CrearLiquidacionManualModal({
     numeroComprobanteProveedor,
     cbteProveedor,
     liquidacionManual,
+    fechaComprobante,
   };
 
   /**
@@ -647,16 +661,24 @@ export function CrearLiquidacionManualModal({
 
   function autocompletarNumeroDesdeAdjunto(file: File) {
     const est = () => estadoAdjuntoRef.current;
+    // Texto que nunca coincide con un número/fecha autocompletado: así no se completa.
+    const NO_COMPLETAR = "\u0000no-completar";
     return autocompletarNumero(file, {
-      vigente: () =>
-        est().comprobanteFile === file && (est().liquidacionManual || !est().numeroAutomatico),
+      vigente: () => est().comprobanteFile === file,
       numeroActual: () =>
         est().liquidacionManual
           ? numeroActualComprobanteManual(
               est().cbteProveedor,
               numeroDesdeComprobanteManual(est().cbteProveedor),
             )
-          : est().numeroComprobanteProveedor,
+          : // "Comprobante interno": el número lo asigna el sistema, no se toca.
+            est().numeroAutomatico
+            ? NO_COMPLETAR
+            : est().numeroComprobanteProveedor,
+      // La fecha sí se completa aunque el número sea interno. En la manual la fecha va en los
+      // campos de la factura del transportista (`aplicar`).
+      fechaActual: () => (est().liquidacionManual ? NO_COMPLETAR : est().fechaComprobante),
+      aplicarFecha: setFechaComprobante,
       aplicar: (leido, numero) => {
         if (est().liquidacionManual) {
           const cbte = est().cbteProveedor;
@@ -1132,6 +1154,11 @@ export function CrearLiquidacionManualModal({
       setError("Seleccioná al menos un viaje.");
       return;
     }
+    if (campoNumeroEnFila && !fechaComprobante) {
+      setFaltaFechaComprobante(true);
+      setError("Ingresá la fecha del comprobante.");
+      return;
+    }
     if (liquidacionManual) {
       const errsCbte = validarComprobanteManual(cbteProveedor, true);
       setCbteProveedorErrores(errsCbte);
@@ -1262,6 +1289,7 @@ export function CrearLiquidacionManualModal({
         if (existente) body.numeroComprobanteProveedor = nro || null;
         else if (numeroAutomatico) body.numeroAutomatico = true;
         else if (nro) body.numeroComprobanteProveedor = nro;
+        body.proveedorCbteFecha = fechaComprobante;
       }
 
       // Existente: se guardan los cambios sobre la misma liquidación (no se crea otra).
@@ -1668,7 +1696,7 @@ export function CrearLiquidacionManualModal({
                   <div
                     className={`grid grid-cols-1 gap-3 ${
                       campoNumeroEnFila
-                        ? "items-start sm:grid-cols-2 lg:grid-cols-[auto_minmax(0,1.3fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                        ? "items-start sm:grid-cols-2 lg:grid-cols-[auto_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
                         : conArca
                           ? "sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]"
                           : "sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
@@ -1711,6 +1739,22 @@ export function CrearLiquidacionManualModal({
                           getToken={getToken}
                         />
                       ))}
+                    {campoNumeroEnFila && (
+                      <div className="grid gap-0.5">
+                        <label htmlFor="fechaComprobanteProveedor" className={labelClass}>
+                          Fecha del comprobante <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          id="fechaComprobanteProveedor"
+                          type="date"
+                          value={fechaComprobante}
+                          onChange={(e) => setFechaComprobante(e.target.value)}
+                          className={conBordeError(inputClass, faltaFechaComprobante)}
+                          disabled={submitting}
+                        />
+                        <FaltaCampo show={faltaFechaComprobante} />
+                      </div>
+                    )}
                     <div>
                       <label className={labelClass}>
                         {tl.singular} <span className="text-red-500">*</span>

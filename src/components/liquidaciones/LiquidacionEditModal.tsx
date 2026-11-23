@@ -7,6 +7,9 @@ import {
 } from "@/hooks/useAutocompletarNumeroComprobante";
 import { numeroDesdeComprobanteManual } from "@/lib/comprobanteManual";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { FaltaCampo } from "@/components/shared/FaltaCampo";
+import { conBordeError } from "@/lib/bordeError";
+import { fechaDiaYmd } from "@/lib/fmtDateUtc";
 import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
 import { useFieldConfig } from "@/hooks/useFieldConfig";
@@ -231,6 +234,12 @@ export function LiquidacionEditModal({
   );
   const [cbteProveedorErrores, setCbteProveedorErrores] =
     useState<ComprobanteManualErrores>({});
+  // Fecha del comprobante del proveedor (sin ARCA, no manual): fecha de la liquidación en
+  // Cuenta corriente, obligatoria. Las anteriores a este campo arrancan vacías.
+  const conFechaComprobante = showComprobante && !liquidacionManual;
+  const [fechaComprobante, setFechaComprobante] = useState(
+    () => fechaDiaYmd(liq.proveedorCbteFecha) ?? "",
+  );
 
   const [viajesDisponibles, setViajesDisponibles] = useState<
     ViajeOpcionDraft[]
@@ -278,8 +287,18 @@ export function LiquidacionEditModal({
   // Factura de ARCA adjunta: completa el número (o la factura del transportista, con fecha,
   // en la liquidación manual) leyéndolo del archivo. Estado vigente en un ref (lectura async).
   const autocompletarNumero = useAutocompletarNumeroComprobante();
-  const estadoAdjuntoRef = useRef({ comprobanteFile, numeroComprobanteProveedor, cbteProveedor });
-  estadoAdjuntoRef.current = { comprobanteFile, numeroComprobanteProveedor, cbteProveedor };
+  const estadoAdjuntoRef = useRef({
+    comprobanteFile,
+    numeroComprobanteProveedor,
+    cbteProveedor,
+    fechaComprobante,
+  });
+  estadoAdjuntoRef.current = {
+    comprobanteFile,
+    numeroComprobanteProveedor,
+    cbteProveedor,
+    fechaComprobante,
+  };
 
   function autocompletarNumeroDesdeAdjunto(file: File) {
     const est = () => estadoAdjuntoRef.current;
@@ -292,6 +311,10 @@ export function LiquidacionEditModal({
               numeroDesdeComprobanteManual(est().cbteProveedor),
             )
           : est().numeroComprobanteProveedor,
+      // En la manual la fecha va en los campos de la factura del transportista (`aplicar`).
+      ...(conFechaComprobante
+        ? { fechaActual: () => est().fechaComprobante, aplicarFecha: setFechaComprobante }
+        : {}),
       aplicar: (leido, numero) => {
         if (liquidacionManual) {
           const cbte = est().cbteProveedor;
@@ -492,6 +515,9 @@ export function LiquidacionEditModal({
     const errsCbte = liquidacionManual ? validarComprobanteManual(cbteProveedor, true) : {};
     setCbteProveedorErrores(errsCbte);
     Object.assign(errs, errsCbte);
+    if (conFechaComprobante && !fechaComprobante) {
+      errs.fechaComprobante = "Ingresá la fecha del comprobante.";
+    }
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
@@ -554,6 +580,7 @@ export function LiquidacionEditModal({
         body.comprobanteUrl = nextComprobanteUrl ?? null;
         if (!liquidacionManual) {
           body.numeroComprobanteProveedor = numeroComprobanteProveedor.trim() || null;
+          body.proveedorCbteFecha = fechaComprobante;
         }
       }
       if (liquidacionManual) {
@@ -917,6 +944,29 @@ export function LiquidacionEditModal({
               disabled={saving}
               className={INPUT}
             />
+          </div>
+        )}
+        {conFechaComprobante && (
+          <div className="grid gap-0.5">
+            <label htmlFor="liq-fecha-comprobante-proveedor" className={LABEL}>
+              Fecha del comprobante <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="liq-fecha-comprobante-proveedor"
+              type="date"
+              value={fechaComprobante}
+              onChange={(e) => {
+                setFechaComprobante(e.target.value);
+                if (e.target.value && fieldErrors.fechaComprobante) {
+                  const resto = { ...fieldErrors };
+                  delete resto.fechaComprobante;
+                  setFieldErrors(resto);
+                }
+              }}
+              disabled={saving}
+              className={conBordeError(INPUT, Boolean(fieldErrors.fechaComprobante))}
+            />
+            <FaltaCampo show={Boolean(fieldErrors.fechaComprobante)} />
           </div>
         )}
         </div>

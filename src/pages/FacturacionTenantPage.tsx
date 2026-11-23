@@ -25,6 +25,7 @@ import {
 } from "@/lib/arcaCbteTipo";
 import { descargarPdfFacturaArca, verPdfFacturaArca } from "@/lib/facturaPdfArca";
 import { FacturaAccionesMenu } from "@/components/facturacion/FacturaAccionesMenu";
+import { usePuedeOperar } from "@/hooks/usePermisosRol";
 import { AnularFacturaModal } from "@/components/facturacion/AnularFacturaModal";
 import { EmitirFacturaModal } from "@/components/facturacion/EmitirFacturaModal";
 import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
@@ -171,6 +172,8 @@ export function FacturacionTenantPage({
   const maestro = useMaestroData();
   const { showToast } = useToast();
   const platform = Boolean(tenantId?.trim());
+  // Miembro: consulta (matriz `lib/permisosRol.ts`); sin "Nueva factura" ni acciones.
+  const puedeOperarFacturas = usePuedeOperar("facturas");
   const tid = tenantId?.trim() ?? "";
   const tenantsList = useTenantsList({ enabled: platform });
   const platformTenant = useMemo(
@@ -1355,7 +1358,9 @@ export function FacturacionTenantPage({
     (metaListado?.total ?? 0) === 0 &&
     !anyFiltroActivo &&
     !(platform && (facturas?.length ?? 0) > 0)
-      ? 'Todavía no hay facturas. Hacé clic en "Nueva factura" para empezar.'
+      ? puedeOperarFacturas
+        ? 'Todavía no hay facturas. Hacé clic en "Nueva factura" para empezar.'
+        : 'Todavía no hay facturas.'
       : "No hay facturas que coincidan con los filtros aplicados.";
 
   /** Opciones del filtro de estado (columna y sheet mobile), en este orden. */
@@ -1541,18 +1546,20 @@ export function FacturacionTenantPage({
             Libro IVA
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setDraft(emptyFacturaDraft());
-              setDraftError(null);
-              void ensureViajesLoaded();
-              setCreating(true);
-            }}
-            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-          >
-            Nueva factura
-          </button>
+          {puedeOperarFacturas && (
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(emptyFacturaDraft());
+                setDraftError(null);
+                void ensureViajesLoaded();
+                setCreating(true);
+              }}
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            >
+              Nueva factura
+            </button>
+          )}
         </div>
       </div>
 
