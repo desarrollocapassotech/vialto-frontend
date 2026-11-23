@@ -89,7 +89,8 @@ export function columnasViajesHabilitadas(
     etapa:
       campoVisible("etapa") ||
       campoVisible("facturacionEstado") ||
-      campoVisible("liquidacionEstado"),
+      campoVisible("liquidacionEstado") ||
+      campoVisible("valorizacion"),
     origenDestino: true,
     cargaDescarga: true,
     // Switch propio + el campo Productos de Viajes visible (sin productos, la

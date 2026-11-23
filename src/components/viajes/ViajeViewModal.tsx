@@ -41,6 +41,7 @@ import {
 } from "@/lib/viajesIndicadores";
 import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
+import { ViajeValorizacionIndicador } from "@/components/viajes/ViajeValorizacionIndicador";
 import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
 import {
   labelCantidadViajes,
@@ -442,13 +443,8 @@ export function ViajeViewModal({
             >
               {etapaViajeLabel[viaje.etapa] ?? viaje.etapa}
             </BadgeEstadoViaje>
-            {!valorizacion.valorizado && viaje.etapa?.toLowerCase() !== "cancelado" && (
-              <span
-                className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900"
-                title={`Pendiente de carga de montos (no valorizado):\n${valorizacion.mensajePendiente}`}
-              >
-                No valorizado
-              </span>
+            {ver("valorizacion") && viaje.etapa?.toLowerCase() !== "cancelado" && (
+              <ViajeValorizacionIndicador valorizacion={valorizacion} />
             )}
           </div>
         }

@@ -4,6 +4,8 @@ export interface EstadoValorizacionViaje {
   valorizado: boolean;
   faltaCliente: boolean;
   faltaTransportista: boolean;
+  /** true si el viaje tiene transportista externo (entonces su monto también cuenta). */
+  tieneTransportistaExterno: boolean;
   mensajePendiente: string | null;
 }
 
@@ -85,6 +87,7 @@ export function evaluarValorizacionViaje(
     valorizado,
     faltaCliente,
     faltaTransportista,
+    tieneTransportistaExterno,
     mensajePendiente,
   };
 }

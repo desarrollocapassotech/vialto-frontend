@@ -116,6 +116,7 @@ import {
 import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
 import { ViajeEtapaSelectorPopover } from "@/components/viajes/ViajeEtapaSelectorPopover";
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
+import { ViajeValorizacionIndicador } from "@/components/viajes/ViajeValorizacionIndicador";
 import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
 import {
   contarViajesPagoTransportistaDesdeApi,
@@ -2457,8 +2458,16 @@ export function ViajesTenantPage({
     "detalle_viaje",
     "liquidacionEstado",
   );
+  // "Seguimiento de valorización": opt-in por empresa (apagado por defecto).
+  const mostrarColumnaValorizacion = isViajeFieldVisible(
+    "detalle_viaje",
+    "valorizacion",
+  );
   const mostrarColumnaEstado =
-    mostrarColumnaEtapa || mostrarColumnaFactura || mostrarColumnaLiquidacion;
+    mostrarColumnaEtapa ||
+    mostrarColumnaFactura ||
+    mostrarColumnaLiquidacion ||
+    mostrarColumnaValorizacion;
   const cantidadColumnasEstado = mostrarColumnaEstado ? 1 : 0;
 
   // Filtros de la columna Etapa. Los estados de AFIP solo se ofrecen si el tenant
@@ -3656,7 +3665,6 @@ export function ViajesTenantPage({
               </td>
             ),
             etapa: mostrarColumnaEstado && (() => {
-              const valorizacion = evaluarValorizacionViaje(v);
               return (
                 <td className="h-8 px-3 py-1" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1.5">
@@ -3669,13 +3677,10 @@ export function ViajesTenantPage({
                         }
                       />
                     )}
-                    {!valorizacion.valorizado && v.etapa?.toLowerCase() !== "cancelado" && (
-                      <span
-                        className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 cursor-help whitespace-nowrap"
-                        title={`Pendiente de carga de montos (no valorizado):\n${valorizacion.mensajePendiente}`}
-                      >
-                        No valorizado
-                      </span>
+                    {mostrarColumnaValorizacion && v.etapa?.toLowerCase() !== "cancelado" && (
+                      <ViajeValorizacionIndicador
+                        valorizacion={evaluarValorizacionViaje(v)}
+                      />
                     )}
                     {v.etapa?.toLowerCase() !== "cancelado" && (
                       <>
