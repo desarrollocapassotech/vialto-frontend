@@ -724,7 +724,7 @@ export function LiquidacionesTenantPage() {
    */
   async function guardarAdjuntoLiquidacion(
     liq: LiquidacionConTransportista,
-    datos: { numero: string; file: File; comprobante?: ComprobanteManualDraft },
+    datos: { numero: string; file: File; comprobante?: ComprobanteManualDraft; fecha?: string },
   ) {
     const comprobanteUrl = await uploadComprobante(
       () => getToken(),
@@ -742,6 +742,8 @@ export function LiquidacionesTenantPage() {
           numeroComprobanteProveedor: datos.numero || null,
           // Liquidación manual: factura del transportista por separado (Libro IVA).
           ...(datos.comprobante ? payloadComprobanteLiquidacion(datos.comprobante) : {}),
+          // Sin ARCA: fecha del comprobante del proveedor.
+          ...(datos.fecha ? { proveedorCbteFecha: datos.fecha } : {}),
         }),
       },
     );
@@ -1981,6 +1983,11 @@ export function LiquidacionesTenantPage() {
                   conFecha: true,
                 }
               : undefined
+          }
+          // Sin ARCA (la acción solo existe sin Líquido Producto): fecha del comprobante del
+          // proveedor, que es la fecha de la liquidación en Cuenta corriente.
+          fechaComprobante={
+            adjuntarLiq.manual ? undefined : { inicial: adjuntarLiq.proveedorCbteFecha }
           }
           onClose={() => setAdjuntarLiq(null)}
           onGuardar={(datos) => guardarAdjuntoLiquidacion(adjuntarLiq, datos)}

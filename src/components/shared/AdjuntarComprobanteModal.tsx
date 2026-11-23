@@ -11,6 +11,8 @@ import {
 import { CrudFieldLabel, CrudInput } from "@/components/crud/CrudFields";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
+import { FaltaCampo } from "@/components/shared/FaltaCampo";
+import { fechaDiaYmd } from "@/lib/fmtDateUtc";
 import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { ComprobanteManualFields } from "@/components/shared/ComprobanteManualFields";
 import {
@@ -25,12 +27,15 @@ import {
  * guarda (`onGuardar`); este modal solo junta los datos y muestra el error en el pie.
  * Con `comprobanteManual` (factura/liquidación manual de una empresa con ARCA) el número
  * se carga como tipo + punto de venta + número (+ fecha), obligatorios.
+ * Con `fechaComprobante` (liquidación de una empresa sin ARCA) pide también la fecha del
+ * comprobante, obligatoria, y la completa desde el archivo si está vacía.
  */
 export function AdjuntarComprobanteModal({
   titulo,
   numeroLabel = "Número de comprobante",
   numeroInicial,
   comprobanteManual,
+  fechaComprobante,
   onClose,
   onGuardar,
 }: {
@@ -39,15 +44,20 @@ export function AdjuntarComprobanteModal({
   numeroLabel?: string;
   numeroInicial?: string | null;
   comprobanteManual?: { inicial: ComprobanteManualDraft; conFecha?: boolean };
+  /** Fecha del comprobante por separado (`inicial`: ISO o `YYYY-MM-DD` guardado). */
+  fechaComprobante?: { inicial: string | null | undefined };
   onClose: () => void;
   onGuardar: (datos: {
     numero: string;
     file: File;
     comprobante?: ComprobanteManualDraft;
+    /** `YYYY-MM-DD`, solo con `fechaComprobante`. */
+    fecha?: string;
   }) => Promise<void>;
 }) {
   const [numero, setNumero] = useState(numeroInicial ?? "");
   const [comprobante, setComprobante] = useState(comprobanteManual?.inicial);
+  const [fecha, setFecha] = useState(() => fechaDiaYmd(fechaComprobante?.inicial) ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const descarte = useConfirmarDescarte(onClose);
@@ -57,12 +67,15 @@ export function AdjuntarComprobanteModal({
   // Factura de ARCA adjunta: completa el número leyéndolo del archivo (estado vigente en un
   // ref porque la lectura es async).
   const autocompletarNumero = useAutocompletarNumeroComprobante();
-  const estadoRef = useRef({ numero, comprobante, file });
-  estadoRef.current = { numero, comprobante, file };
+  const estadoRef = useRef({ numero, comprobante, file, fecha });
+  estadoRef.current = { numero, comprobante, file, fecha };
 
   function autocompletarDesde(f: File) {
     void autocompletarNumero(f, {
       vigente: () => estadoRef.current.file === f,
+      ...(fechaComprobante
+        ? { fechaActual: () => estadoRef.current.fecha, aplicarFecha: setFecha }
+        : {}),
       numeroActual: () => {
         const c = estadoRef.current.comprobante;
         return c
@@ -92,6 +105,7 @@ export function AdjuntarComprobanteModal({
       ? { ...validarComprobanteManual(comprobante, Boolean(comprobanteManual?.conFecha)) }
       : {};
     if (!file) errs.file = "Adjuntá el archivo del comprobante.";
+    if (fechaComprobante && !fecha) errs.fechaComprobante = "Ingresá la fecha del comprobante.";
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
@@ -100,11 +114,12 @@ export function AdjuntarComprobanteModal({
     setError(null);
     setSaving(true);
     try {
-      await onGuardar(
-        comprobante
+      await onGuardar({
+        ...(comprobante
           ? { numero: numeroDesdeComprobanteManual(comprobante), file: file!, comprobante }
-          : { numero: numero.trim(), file: file! },
-      );
+          : { numero: numero.trim(), file: file! }),
+        ...(fechaComprobante ? { fecha } : {}),
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo adjuntar el comprobante.");
     } finally {
@@ -174,15 +189,41 @@ export function AdjuntarComprobanteModal({
             className="grid grid-cols-1 gap-3 sm:grid-cols-2"
           />
         ) : (
-          <label className="grid gap-1.5">
-            <CrudFieldLabel>{numeroLabel}</CrudFieldLabel>
-            <CrudInput
-              value={numero}
-              onChange={(e) => setNumero(e.target.value)}
-              disabled={saving}
-              placeholder="Ej. 0001-00000123"
-            />
-          </label>
+          <div
+            className={
+              fechaComprobante ? "grid grid-cols-1 items-start gap-3 sm:grid-cols-2" : "grid"
+            }
+          >
+            <label className="grid gap-1.5">
+              <CrudFieldLabel>{numeroLabel}</CrudFieldLabel>
+              <CrudInput
+                value={numero}
+                onChange={(e) => setNumero(e.target.value)}
+                disabled={saving}
+                placeholder="Ej. 0001-00000123"
+              />
+            </label>
+            {fechaComprobante && (
+              <label className="grid gap-1.5">
+                <CrudFieldLabel required>Fecha del comprobante</CrudFieldLabel>
+                <CrudInput
+                  type="date"
+                  value={fecha}
+                  onChange={(e) => {
+                    setFecha(e.target.value);
+                    if (e.target.value && fieldErrors.fechaComprobante) {
+                      const resto = { ...fieldErrors };
+                      delete resto.fechaComprobante;
+                      setFieldErrors(resto);
+                    }
+                  }}
+                  error={fieldErrors.fechaComprobante}
+                  disabled={saving}
+                />
+                <FaltaCampo show={Boolean(fieldErrors.fechaComprobante)} />
+              </label>
+            )}
+          </div>
         )}
         </div>
       </div>

@@ -168,7 +168,16 @@ function estaVencido(m: MovimientoCc, hoy: string): boolean {
 }
 
 /** Orden de carga ascendente; `id` desempata movimientos creados en el mismo instante. */
-function compararPorCarga(a: MovimientoCc, b: MovimientoCc): number {
+/**
+ * Orden de la grilla (y del saldo acumulado): por fecha del movimiento —la del comprobante
+ * en facturas/liquidaciones, la del pago en cobros/pagos— y, a igual día, por orden de carga
+ * (pedido de LSF, nov 2026; antes era solo orden de carga). Mismo orden que el PDF/Excel del
+ * backend (`exportarMovimientos`).
+ */
+function compararPorFecha(a: MovimientoCc, b: MovimientoCc): number {
+  const diaA = fechaDiaYmd(a.fecha) ?? '';
+  const diaB = fechaDiaYmd(b.fecha) ?? '';
+  if (diaA !== diaB) return diaA < diaB ? -1 : 1;
   const porCarga = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   if (porCarga !== 0) return porCarga;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
@@ -252,8 +261,7 @@ export function CuentaContraparteView({
     cargarDatos();
   }, [cargarDatos]);
 
-  // Orden de carga (`createdAt`), no `fecha`: un cobro recién registrado aparece primero
-  // aunque su fecha sea anterior a otros movimientos (mismo criterio que Viajes). El saldo
+  // Orden por fecha del movimiento (`compararPorFecha`), más reciente arriba. El saldo
   // acumulado se calcula acá (no lo trae el backend en este endpoint) recorriendo ese mismo
   // orden, para que cada fila sea coherente con lo que se ve. Un movimiento anulado suma
   // junto con su crédito de anulación en el Haber (el par se cancela, VTO-431); un anulado sin crédito no suma.
@@ -261,7 +269,7 @@ export function CuentaContraparteView({
   // saldo de su moneda y el filtro por moneda sigue siendo coherente.
   const movimientosConSaldo = useMemo<MovimientoConSaldo[] | null>(() => {
     if (!movimientos) return null;
-    const ascendente = [...movimientos].sort(compararPorCarga);
+    const ascendente = [...movimientos].sort(compararPorFecha);
     const acumuladoPorMoneda = new Map<string, number>();
     const porId = new Map(movimientos.map((m) => [m.id, m]));
     const conSaldo: MovimientoConSaldo[] = [];
