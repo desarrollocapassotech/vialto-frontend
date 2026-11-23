@@ -130,8 +130,8 @@ function RequireOrgAdmin() {
     return (
       <RestrictedAccess
         message="No tenés permisos para acceder a esta sección. Contactá al administrador de tu empresa si necesitás acceso."
-        linkTo="/stock/ingresos"
-        linkLabel="Ir a Ingresos"
+        linkTo="/"
+        linkLabel="Ir al inicio"
       />
     );
   }

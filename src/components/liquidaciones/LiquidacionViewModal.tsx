@@ -9,6 +9,7 @@ import {
   nroComprobante,
 } from "@/lib/arcaCbteTipo";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { usePuedeOperar } from '@/hooks/usePermisosRol';
 import {
   idPropio2Habilitado as idPropio2HabilitadoTenant,
   idPropio2Label as idPropio2LabelTenant,
@@ -135,13 +136,13 @@ export function LiquidacionViewModal({
   detalleUrl,
   onClose,
   onEditar,
-  onEmitir,
-  onEliminar,
-  onAnular,
-  onMarcarPendienteAnulacion,
-  onConfirmarAnulacionManual,
+  onEmitir: onEmitirProp,
+  onEliminar: onEliminarProp,
+  onAnular: onAnularProp,
+  onMarcarPendienteAnulacion: onMarcarPendienteAnulacionProp,
+  onConfirmarAnulacionManual: onConfirmarAnulacionManualProp,
   onVerComprobante,
-  onAdjuntarComprobante,
+  onAdjuntarComprobante: onAdjuntarComprobanteProp,
   onVerPdfLiquidacion,
   onVerAnulacion,
   onVerComprobanteAnulacionManual,
@@ -197,6 +198,16 @@ export function LiquidacionViewModal({
   /** Label configurable de "ID Propio 2". Sin prop, el de la empresa propia. */
   idPropio2Label?: string;
 }) {
+  // Solo quien opera el módulo ve las acciones (matriz `lib/permisosRol.ts`): un
+  // Miembro abre el comprobante para consultarlo, sin editar, emitir ni anular.
+  const puedeOperarModulo = usePuedeOperar('liquidaciones');
+  const onEmitir = puedeOperarModulo ? onEmitirProp : undefined;
+  const onEliminar = puedeOperarModulo ? onEliminarProp : undefined;
+  const onAnular = puedeOperarModulo ? onAnularProp : undefined;
+  const onMarcarPendienteAnulacion = puedeOperarModulo ? onMarcarPendienteAnulacionProp : undefined;
+  const onConfirmarAnulacionManual = puedeOperarModulo ? onConfirmarAnulacionManualProp : undefined;
+  const onAdjuntarComprobante = puedeOperarModulo ? onAdjuntarComprobanteProp : undefined;
+
   // Liquidación manual (monotributista) en empresa con ARCA: se muestra como sin ARCA.
   const hasArca = liquidacionConArca(hasArcaTenant, liq);
   const { tenant: tenantPropio } = useCurrentTenant();
@@ -583,7 +594,7 @@ export function LiquidacionViewModal({
                 Confirmar anulación
               </button>
             )}
-            {source.estado === "anulado" && (
+            {source.estado === "anulado" && puedeOperarModulo && (
               <button
                 type="button"
                 onClick={
@@ -609,7 +620,7 @@ export function LiquidacionViewModal({
                 Volver a emitir
               </button>
             )}
-            {canEdit && (
+            {canEdit && puedeOperarModulo && (
               <button
                 type="button"
                 onClick={onEditar}

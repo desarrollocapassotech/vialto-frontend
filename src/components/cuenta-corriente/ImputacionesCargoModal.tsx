@@ -14,6 +14,8 @@ type Props = {
   onVerMovimiento: (m: MovimientoCc) => void;
   /** Después de deshacer una imputación: recargar la grilla y cerrar. */
   onDeshecha: () => void;
+  /** Sin "Deshacer" (rol que solo consulta Cuenta corriente). */
+  soloLectura?: boolean;
   onClose: () => void;
 };
 
@@ -35,7 +37,14 @@ export function imputacionesDeCargo(cargo: MovimientoCc, movimientos: Movimiento
  * Detalle de una venta/compra imputada: qué cobros/pagos la cancelan, cuánto aplicó cada
  * uno y cuánto le queda. Espejo de `ImputacionesCobroModal` (que va del cobro a las ventas).
  */
-export function ImputacionesCargoModal({ cargo, movimientos, onVerMovimiento, onDeshecha, onClose }: Props) {
+export function ImputacionesCargoModal({
+  cargo,
+  movimientos,
+  onVerMovimiento,
+  onDeshecha,
+  soloLectura = false,
+  onClose,
+}: Props) {
   const esVenta = !!cargo.clienteId;
   const filas = imputacionesDeCargo(cargo, movimientos);
   const totalImputado = filas.reduce((s, f) => s + f.importe, 0);
@@ -105,13 +114,13 @@ export function ImputacionesCargoModal({ cargo, movimientos, onVerMovimiento, on
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-vialto-steel" aria-hidden />
            </button>
-           <DeshacerImputacionButton
+           {!soloLectura && <DeshacerImputacionButton
             imputacionId={imputacionId}
             descripcion={`${monto(importe, cargo.moneda)} del ${esVenta ? 'cobro' : 'pago'} ${
               pago.numeroComprobante?.trim() || 'sin comprobante'
             }`}
             onDeshecha={onDeshecha}
-           />
+           />}
           </li>
         ))}
       </ul>

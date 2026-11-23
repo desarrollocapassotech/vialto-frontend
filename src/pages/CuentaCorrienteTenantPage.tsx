@@ -297,6 +297,7 @@ export function CuentaCorrienteTenantPage({ tenantId, soloLectura = false, modul
             limpiarFiltrosSlot={limpiarSlot}
             filtrosRapidosSlot={filtrosRapidosSlot}
             soloLectura={soloLectura}
+            otraEmpresa={Boolean(tenantId)}
             modulosEmpresa={modulosEmpresa}
           />
         ) : (

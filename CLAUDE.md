@@ -773,7 +773,18 @@ Pendientes conocidos (no hechos a propósito): Facturas/Liquidaciones no guardan
 
 ---
 
+## Permisos por rol: matriz única (nov 2026)
+
+**Qué ve y qué hace cada rol sale de una sola tabla: `lib/permisosRol.ts`.** Rol (`admin`, `member`, `stock_viewer`, `stock_operator`) × módulo → `no` / `consultar` / `operar`. Copia los `@Roles(...)` del backend: el front nunca muestra algo que el servidor niega, ni esconde algo que permite. Documento funcional (lo validan el responsable funcional y Flor para lo contable): "Vialto — Matriz de roles y permisos".
+
+- **Menú lateral** (`AppShell`) y **pantalla de inicio sin dashboard** (`primeraRutaModulo`, `lib/tenantHome.ts`): `puedeVerModulo(ctx, tenant.modules, modulo)` = el rol lo permite **y** la empresa lo tiene contratado. No volver a armar el menú con ramas por rol (`if (isOrgMember) …`): así el Miembro de LSF y NyM se quedó sin módulos.
+- **Botones y acciones**: `usePermisosRol()` / `usePuedeOperar(modulo)` (`hooks/usePermisosRol.ts`). Los menús y modales compartidos se gatean solos (`ViajeAccionesMenu`, `FacturaAccionesMenu`, acciones de `LiquidacionesTenantPage`, `FacturaViewModal`, `LiquidacionViewModal`), así cubren todas las pantallas que los abren (Viajes, Inicio, Cuenta corriente). Cuenta corriente usa `soloLectura` (sin operar) y `otraEmpresa` (superadmin mirando otra empresa: tampoco abre facturas ni PDF).
+- **Miembro hoy**: Viajes consultar + editar (`puedeEditarViajes`; el backend bloquea los valorizados, VTO-485), Facturas/Liquidaciones/Cuenta corriente consultar y exportar, Ingresos/Egresos de stock operar, Combustible y Mantenimiento consultar. Sin Base de datos, Usuarios ni Configuración.
+- **Si cambia un `@Roles` del backend** o se suma un módulo: cambiar la matriz, `moduloContratado`, `RUTAS_MODULO` de `tenantHome.ts` (mismo orden que el menú) y el documento.
+
 ## Checklist para nuevas funcionalidades frontend
+
+- **Toda acción que crea, modifica o anula se muestra solo si `usePuedeOperar(modulo)`**, y todo ítem nuevo del menú pasa por `puedeVerModulo` — ver "Permisos por rol: matriz única".
 
 - Definir si la vista es `tenant`, `superadmin` o ambas.
 - Crear tipos en `src/types` antes de consumir endpoints.

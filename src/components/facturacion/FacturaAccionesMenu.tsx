@@ -14,6 +14,7 @@ import {
 import { AccionesFila } from '@/components/ui/AccionesFila';
 import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Factura } from '@/types/api';
+import { usePuedeOperar } from '@/hooks/usePermisosRol';
 
 interface Props {
   factura: Factura;
@@ -44,16 +45,23 @@ export function FacturaAccionesMenu({
   onVer,
   onEliminar,
   onVerComprobante,
-  onAdjuntarComprobante,
-  onEmitirArca,
-  onAnular,
+  onAdjuntarComprobante: onAdjuntarComprobanteProp,
+  onEmitirArca: onEmitirArcaProp,
+  onAnular: onAnularProp,
   onVerNotaCredito,
   onDescargarComprobante,
   onDescargarNotaCredito,
-  onMarcarCobrada,
+  onMarcarCobrada: onMarcarCobradaProp,
   open: openProp,
   onOpenChange,
 }: Props) {
+  // Solo quien opera Facturas ve emitir, anular, cobrar, adjuntar y eliminar
+  // (matriz `lib/permisosRol.ts`); un Miembro solo consulta.
+  const puedeOperar = usePuedeOperar('facturas');
+  const onAdjuntarComprobante = puedeOperar ? onAdjuntarComprobanteProp : undefined;
+  const onEmitirArca = puedeOperar ? onEmitirArcaProp : undefined;
+  const onAnular = puedeOperar ? onAnularProp : undefined;
+  const onMarcarCobrada = puedeOperar ? onMarcarCobradaProp : undefined;
   const [internalOpen, setInternalOpen] = useState(false);
   const controlado = openProp !== undefined;
   const open = controlado ? openProp : internalOpen;
@@ -161,7 +169,7 @@ export function FacturaAccionesMenu({
         onClick: onDescargarNotaCredito,
       });
     }
-    const puedeEliminar = !autorizada && !anulada;
+    const puedeEliminar = puedeOperar && !autorizada && !anulada;
     if (puedeEliminar) {
       opts.push({
         id: 'eliminar',
@@ -187,6 +195,7 @@ export function FacturaAccionesMenu({
     onDescargarNotaCredito,
     onEliminar,
     deleting,
+    puedeOperar,
   ]);
 
   return (

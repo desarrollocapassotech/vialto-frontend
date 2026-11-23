@@ -37,6 +37,7 @@ import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos'
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
 import { adjuntosActivosViaje } from '@/lib/viajesAdjuntos';
 import { useFieldConfig } from '@/hooks/useFieldConfig';
+import { usePermisosRol } from '@/hooks/usePermisosRol';
 
 interface Props {
   viaje: Viaje;
@@ -47,13 +48,13 @@ interface Props {
   hasExportacionActiva?: boolean;
   onVer: () => void;
   onCopiar?: () => void;
-  onAgregarGasto: () => void;
-  onRegistrarPago: () => void;
+  onAgregarGasto?: () => void;
+  onRegistrarPago?: () => void;
   /** Factura al cliente. Sin pasar = el tenant no factura desde Vialto. */
   onFacturar?: () => void;
   /** Liquidación al transportista. Sin pasar = el tenant no tiene Liquidaciones. */
   onLiquidar?: () => void;
-  onExportar: () => void;
+  onExportar?: () => void;
   onVerFactura?: () => void;
   onVerLiquidacion?: () => void;
   /** Solo si la factura del viaje quedó con error de ARCA. */
@@ -78,23 +79,43 @@ export function ViajeAccionesMenu({
   hasLiquidoProductoArca = false,
   hasExportacionActiva = false,
   onVer,
-  onCopiar,
-  onAgregarGasto,
-  onRegistrarPago,
-  onFacturar,
-  onLiquidar,
-  onExportar,
+  onCopiar: onCopiarProp,
+  onAgregarGasto: onAgregarGastoProp,
+  onRegistrarPago: onRegistrarPagoProp,
+  onFacturar: onFacturarProp,
+  onLiquidar: onLiquidarProp,
+  onExportar: onExportarProp,
   onVerFactura,
   onVerLiquidacion,
-  onReintentarFactura,
-  onReintentarLiquidacion,
-  onContinuarFactura,
-  onContinuarLiquidacion,
-  onEliminar,
-  onAgregarDocumento,
+  onReintentarFactura: onReintentarFacturaProp,
+  onReintentarLiquidacion: onReintentarLiquidacionProp,
+  onContinuarFactura: onContinuarFacturaProp,
+  onContinuarLiquidacion: onContinuarLiquidacionProp,
+  onEliminar: onEliminarProp,
+  onAgregarDocumento: onAgregarDocumentoProp,
   open: openProp,
   onOpenChange,
 }: Props) {
+  // Acciones según la matriz de permisos (`lib/permisosRol.ts`): el Miembro ve y edita
+  // el viaje, pero no lo copia, elimina ni carga pagos/gastos/documentos/MIC-CRT, y no
+  // factura ni liquida (el backend se lo rechaza).
+  const permisos = usePermisosRol();
+  const operaViajes = permisos.puedeOperar('viajes');
+  const operaFacturas = permisos.puedeOperar('facturas');
+  const operaLiquidaciones = permisos.puedeOperar('liquidaciones');
+  const onCopiar = operaViajes ? onCopiarProp : undefined;
+  const onAgregarGasto = operaViajes ? onAgregarGastoProp : undefined;
+  const onRegistrarPago = operaViajes ? onRegistrarPagoProp : undefined;
+  const onExportar = operaViajes ? onExportarProp : undefined;
+  const onEliminar = operaViajes ? onEliminarProp : undefined;
+  const onAgregarDocumento = operaViajes ? onAgregarDocumentoProp : undefined;
+  const onFacturar = operaFacturas ? onFacturarProp : undefined;
+  const onReintentarFactura = operaFacturas ? onReintentarFacturaProp : undefined;
+  const onContinuarFactura = operaFacturas ? onContinuarFacturaProp : undefined;
+  const onLiquidar = operaLiquidaciones ? onLiquidarProp : undefined;
+  const onReintentarLiquidacion = operaLiquidaciones ? onReintentarLiquidacionProp : undefined;
+  const onContinuarLiquidacion = operaLiquidaciones ? onContinuarLiquidacionProp : undefined;
+
   const [internalOpen, setInternalOpen] = useState(false);
   const controlado = openProp !== undefined;
   const open = controlado ? openProp : internalOpen;
@@ -197,10 +218,10 @@ export function ViajeAccionesMenu({
         description: liquidarBloqueoArcaUsd ?? undefined,
       });
     }
-    if (permiteGasto) {
+    if (permiteGasto && onAgregarGasto) {
       items.push({ id: 'gasto', label: 'Agregar gasto', icon: PlusCircle, onClick: onAgregarGasto });
     }
-    if (permitePago) {
+    if (permitePago && onRegistrarPago) {
       items.push({
         id: 'pago',
         label: 'Registrar pago transportista',
@@ -208,7 +229,7 @@ export function ViajeAccionesMenu({
         onClick: onRegistrarPago,
       });
     }
-    if (permiteExportar) {
+    if (permiteExportar && onExportar) {
       items.push({ id: 'exportar', label: 'Exportar', icon: Download, onClick: onExportar });
     }
     if (permiteAgregarDocumento && onAgregarDocumento) {

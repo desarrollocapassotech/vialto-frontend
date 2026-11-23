@@ -115,6 +115,7 @@ import {
 } from "@/lib/viajesComprobantes";
 import type { ArcaConfig, LiquidacionEstado, Viaje } from "@/types/api";
 import { LiquidacionPagoBadge } from "@/components/liquidaciones/LiquidacionPagoBadge";
+import { usePuedeOperar } from "@/hooks/usePermisosRol";
 
 const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
   borrador: "BORRADOR",
@@ -241,19 +242,23 @@ function LiquidacionAccionesMenu({
   const controlado = openProp !== undefined;
   const open = controlado ? openProp : internalOpen;
   const setOpen = controlado ? (onOpenChange ?? (() => {})) : setInternalOpen;
+  // Solo quien opera Liquidaciones emite, anula, adjunta o elimina (matriz
+  // `lib/permisosRol.ts`); un Miembro solo consulta.
+  const operar = usePuedeOperar("liquidaciones");
 
   const puedeEmitir =
-    hasArca && (liq.estado === "borrador" || liq.estado === "error");
+    operar && hasArca && (liq.estado === "borrador" || liq.estado === "error");
   const puedeEliminar =
-    liq.estado === "borrador" ||
-    liq.estado === "error" ||
-    liq.estado === "pendiente_cae";
+    operar &&
+    (liq.estado === "borrador" ||
+      liq.estado === "error" ||
+      liq.estado === "pendiente_cae");
   const puedeAnular =
-    hasArca && liq.estado === "autorizado" && metodoAnulacion !== "manual";
+    operar && hasArca && liq.estado === "autorizado" && metodoAnulacion !== "manual";
   const puedeMarcarPendienteAnulacion =
-    hasArca && liq.estado === "autorizado" && metodoAnulacion === "manual";
+    operar && hasArca && liq.estado === "autorizado" && metodoAnulacion === "manual";
   const puedeConfirmarAnulacionManual =
-    hasArca && liq.estado === "pendiente_anulacion";
+    operar && hasArca && liq.estado === "pendiente_anulacion";
   const tienePdf =
     hasArca &&
     (liq.estado === "autorizado" ||
@@ -309,7 +314,7 @@ function LiquidacionAccionesMenu({
       onClick: onVerPdfLiquidacion,
     });
   }
-  if (onAdjuntarComprobante && !hasArca && !liq.comprobanteUrl?.trim()) {
+  if (operar && onAdjuntarComprobante && !hasArca && !liq.comprobanteUrl?.trim()) {
     options.push({
       id: "adjuntar-comprobante",
       label: "Adjuntar comprobante",
@@ -400,6 +405,7 @@ export function LiquidacionesTenantPage() {
   const { showToast } = useToast();
   const location = useLocation();
   const tenants = useTenantsList();
+  const puedeOperarLiquidaciones = usePuedeOperar("liquidaciones");
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const { tenant, transportistas, refreshTransportistas, refreshClientes } =
     useMaestroData();
@@ -1293,16 +1299,18 @@ export function LiquidacionesTenantPage() {
               Libro IVA
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setShowCrear(true);
-                void cargarViajesTodos();
-              }}
-              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-            >
-              Nueva liquidación
-            </button>
+            {puedeOperarLiquidaciones && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCrear(true);
+                  void cargarViajesTodos();
+                }}
+                className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+              >
+                Nueva liquidación
+              </button>
+            )}
           </div>
         )}
       </div>

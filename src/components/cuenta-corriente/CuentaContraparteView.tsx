@@ -201,6 +201,12 @@ type Props = {
    * empresa propia). Se ven saldos, movimientos, detalle, adjuntos, orden de pago y exportar.
    */
   soloLectura?: boolean;
+  /**
+   * El superadmin mira otra empresa: además de solo lectura, no abre facturas/liquidaciones
+   * ni sus PDF (van por rutas de la empresa propia). Un Miembro de la empresa (solo lectura
+   * por su rol, ver `lib/permisosRol.ts`) sí los abre.
+   */
+  otraEmpresa?: boolean;
   /** Módulos de la empresa que se está viendo (superadmin); sin esto, los de la empresa propia. */
   modulosEmpresa?: string[];
 };
@@ -214,6 +220,7 @@ export function CuentaContraparteView({
   limpiarFiltrosSlot,
   filtrosRapidosSlot,
   soloLectura = false,
+  otraEmpresa = false,
   modulosEmpresa,
 }: Props) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -233,8 +240,8 @@ export function CuentaContraparteView({
         (proveedorTipo != null && proveedorTipo !== 'transportista'));
   // "Ver factura/liquidación" solo si la empresa tiene el módulo (si no, no puede abrirla).
   // En solo lectura del superadmin no: se abren por rutas de la empresa propia.
-  const puedeVerFacturas = !soloLectura && ventasNacenDeFacturas(modulos);
-  const puedeVerLiquidaciones = !soloLectura && comprasNacenDeLiquidaciones(modulos);
+  const puedeVerFacturas = !otraEmpresa && ventasNacenDeFacturas(modulos);
+  const puedeVerLiquidaciones = !otraEmpresa && comprasNacenDeLiquidaciones(modulos);
   const hasArcaLiquidaciones = canAccessEmisionLiquidoProductoArca(modulos);
   const [movimientos, setMovimientos] = useState<MovimientoCc[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -420,7 +427,7 @@ export function CuentaContraparteView({
     // PDF de ARCA / de liquidación: van por rutas de la empresa propia, así que en la vista
     // de solo lectura del superadmin no se ofrecen (sí los adjuntos y la orden de pago).
     const pdfLiq = (id: string, kind: 'pdf' | 'pdf-anulacion', titulo: string) =>
-      soloLectura
+      otraEmpresa
         ? undefined
         : () =>
             void abrirAdjuntoEnPestana(
@@ -429,7 +436,7 @@ export function CuentaContraparteView({
               titulo,
             );
     const pdfFactura = (id: string, kind: 'factura' | 'nc') =>
-      soloLectura ? undefined : () => void verPdfFacturaArca(id, kind, tk).catch(() => undefined);
+      otraEmpresa ? undefined : () => void verPdfFacturaArca(id, kind, tk).catch(() => undefined);
 
     if (m.tipo === 'credito' && m.anulaMovimientoId) {
       const anulado = (movimientos ?? []).find((x) => x.id === m.anulaMovimientoId);
@@ -486,7 +493,7 @@ export function CuentaContraparteView({
           ? pdfLiq(m.liquidacionId, 'pdf', 'Liquidación')
           : adjunto(l.comprobanteUrl, 'Comprobante');
       if (abrir) clips.push(<ComprobanteAdjuntoClip key="cbte" onClick={abrir} />);
-      if (!soloLectura && !hasArcaLiquidaciones && l.cbteNro == null) {
+      if (!otraEmpresa && !hasArcaLiquidaciones && l.cbteNro == null) {
         const liqId = m.liquidacionId;
         clips.push(
           <ComprobanteAdjuntoClip
@@ -515,9 +522,12 @@ export function CuentaContraparteView({
         onClick: () => setModal({ kind: 'detalle', movimiento: m }),
       });
     }
-    // Solo lectura (superadmin): solo "Ver …" (y el detalle, sin editar ni eliminar).
-    if (soloLectura) return opciones;
+    // Superadmin mirando otra empresa: solo "Ver …" (y el detalle, sin editar ni eliminar).
+    if (otraEmpresa) return opciones;
+    // Solo lectura por rol (Miembro): sí "Ver imputación" y "Ver factura/asociadas"; no
+    // imputar, deshacer ni eliminar.
     const puedeImputar =
+      !soloLectura &&
       m.tipo === 'cargo' &&
       (m.estadoDisponibilidad === 'pendiente' || m.estadoDisponibilidad === 'parcial');
     if (puedeImputar) {
@@ -553,7 +563,7 @@ export function CuentaContraparteView({
               otro: (movimientos ?? []).find((x) => x.id === i.cargoId) ?? null,
             }))
           : [];
-    if (imputacionesFila.length > 0) {
+    if (!soloLectura && imputacionesFila.length > 0) {
       opciones.push({
         id: 'deshacer-imputacion',
         label: imputacionesFila.length === 1 ? 'Deshacer imputación' : 'Deshacer imputaciones',
@@ -578,7 +588,7 @@ export function CuentaContraparteView({
     }
     // Eliminar toda venta/compra/cobro/pago manual no anulado, aunque esté imputado: el
     // backend deshace sus imputaciones antes de borrarlo.
-    if (movimientoCcEliminable(m)) {
+    if (!soloLectura && movimientoCcEliminable(m)) {
       opciones.push({
         id: 'eliminar',
         label: `Eliminar ${nombreMovimientoCc(m)}`,
@@ -1140,6 +1150,7 @@ export function CuentaContraparteView({
             setModal(null);
             void cargarDatos();
           }}
+          soloLectura={soloLectura}
           onClose={() => setModal(null)}
         />
       )}

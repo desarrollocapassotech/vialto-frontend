@@ -43,21 +43,15 @@ import { useEnsureTenantOrganization } from "@/hooks/useEnsureTenantOrganization
 import { BreadcrumbOverrideProvider } from "@/hooks/useBreadcrumbOverride";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import {
-  canAccessCombustible,
-  canAccessCuentaCorriente,
   canAccessEmisionFacturasArca,
   canAccessEmisionLiquidoProductoArca,
   canAccessFacturacion,
-  canAccessLiquidaciones,
-  canAccessMantenimiento,
-  canAccessStock,
-  canAccessViajes,
   tieneModulosConNotificaciones,
 } from "@/lib/tenantModules";
 import { dashboardHabilitado } from "@/lib/tenantHome";
+import { puedeVerModulo, type ModuloPermiso } from "@/lib/permisosRol";
 import {
   isPlatformSuperadmin,
-  isOrgMember,
   isStockViewer,
   isStockOperator,
   puedeGestionarComoAdminEmpresa,
@@ -254,78 +248,14 @@ export function AppShell() {
           ]
         : [];
 
-    if (isOrgMember(roleCtx)) {
-      const memberGroups: NavGroup[] = [...inicioGroups];
+    // Qué módulos ve el rol: matriz única de `lib/permisosRol.ts` + módulos contratados.
+    // El superadmin ve los módulos principales aunque la empresa no los tenga.
+    const modules = tenant?.modules ?? [];
+    const ve = (modulo: ModuloPermiso, siempreSuperadmin = true): boolean =>
+      (superadmin && siempreSuperadmin) ||
+      puedeVerModulo(roleCtx, modules, modulo);
 
-      if (canAccessStock(tenant?.modules ?? [])) {
-        memberGroups.push({
-          title: "Stock",
-          items: [
-            { to: "/stock/ingresos", label: "Ingresos", icon: PackagePlus },
-            { to: "/stock/egresos", label: "Egresos", icon: PackageMinus },
-          ],
-        });
-      }
-
-      if (canAccessCombustible(tenant?.modules ?? [])) {
-        memberGroups.push({
-          title: "Combustible",
-          items: [{ to: "/combustible", label: "Cargas", icon: Fuel }],
-        });
-      }
-
-      if (canAccessMantenimiento(tenant?.modules ?? [])) {
-        memberGroups.push({
-          title: "Mantenimiento",
-          items: [
-            { to: "/mantenimiento", label: "Mantenimiento", icon: Wrench },
-          ],
-        });
-      }
-
-      return memberGroups;
-    }
-
-    if (isStockViewer(roleCtx)) {
-      if (canAccessStock(tenant?.modules ?? [])) {
-        return [
-          {
-            title: "Stock",
-            items: [
-              {
-                to: "/stock/inventario",
-                label: "Inventario",
-                icon: Warehouse,
-              },
-              {
-                to: "/stock/movimientos",
-                label: "Movimientos",
-                icon: ArrowLeftRight,
-                end: true,
-              },
-            ],
-          },
-        ];
-      }
-      return [];
-    }
-
-    if (isStockOperator(roleCtx)) {
-      if (canAccessStock(tenant?.modules ?? [])) {
-        return [
-          {
-            title: "Stock",
-            items: [
-              { to: "/stock/ingresos", label: "Ingresos", icon: PackagePlus },
-              { to: "/stock/egresos", label: "Egresos", icon: PackageMinus },
-            ],
-          },
-        ];
-      }
-      return [];
-    }
-
-    const groups: NavGroup[] = [...inicioGroups];
+    const groups: NavGroup[] = ve("inicio") ? [...inicioGroups] : [];
 
     if (superadmin) {
       groups.push({
@@ -336,7 +266,7 @@ export function AppShell() {
       });
     }
 
-    if (superadmin || canAccessViajes(tenant?.modules ?? [])) {
+    if (ve("viajes")) {
       groups.push({
         title: "Viajes y flota",
         items: [{ to: "/viajes", label: "Viajes", icon: Truck }],
@@ -344,43 +274,28 @@ export function AppShell() {
     }
 
     const hasFacturacion =
-      superadmin || canAccessFacturacion(tenant?.modules ?? []);
-    const hasFacturasArca = canAccessEmisionFacturasArca(tenant?.modules ?? []);
-    const hasLiquidoProductoArca = canAccessEmisionLiquidoProductoArca(
-      tenant?.modules ?? [],
-    );
-    const hasLiquidacionesManual = canAccessLiquidaciones(
-      tenant?.modules ?? [],
-    );
-    const hasLiquidaciones =
-      superadmin || hasLiquidacionesManual || hasLiquidoProductoArca;
+      superadmin || canAccessFacturacion(modules);
+    const hasFacturasArca = canAccessEmisionFacturasArca(modules);
+    const hasLiquidoProductoArca = canAccessEmisionLiquidoProductoArca(modules);
 
-    if (
-      hasFacturacion ||
-      hasFacturasArca ||
-      hasLiquidoProductoArca ||
-      hasLiquidacionesManual
-    ) {
-      const facturacionItems: NavItem[] = [];
-
-      if (hasFacturacion || hasFacturasArca) {
-        facturacionItems.push({
-          to: "/facturacion",
-          label: "Facturas",
-          icon: Receipt,
-          end: true,
-        });
-      }
-
-      if (hasLiquidaciones) {
-        facturacionItems.push({
-          to: "/liquidaciones",
-          label: "Liquidaciones",
-          icon: Calculator,
-          end: true,
-        });
-      }
-
+    const facturacionItems: NavItem[] = [];
+    if (ve("facturas")) {
+      facturacionItems.push({
+        to: "/facturacion",
+        label: "Facturas",
+        icon: Receipt,
+        end: true,
+      });
+    }
+    if (ve("liquidaciones")) {
+      facturacionItems.push({
+        to: "/liquidaciones",
+        label: "Liquidaciones",
+        icon: Calculator,
+        end: true,
+      });
+    }
+    if (facturacionItems.length > 0) {
       groups.push({
         title: "Facturación",
         tooltip: "Facturación y liquidaciones",
@@ -389,7 +304,7 @@ export function AppShell() {
       });
     }
 
-    if (superadmin || canAccessCuentaCorriente(tenant?.modules ?? [])) {
+    if (ve("cuentaCorriente")) {
       groups.push({
         title: "Cuenta corriente",
         items: [
@@ -403,25 +318,32 @@ export function AppShell() {
       });
     }
 
-    if (superadmin || canAccessStock(tenant?.modules ?? [])) {
-      groups.push({
-        title: "Stock",
-        items: [
-          { to: "/stock/inventario", label: "Inventario", icon: Warehouse },
-          { to: "/stock/ingresos", label: "Ingresos", icon: PackagePlus },
-          { to: "/stock/egresos", label: "Egresos", icon: PackageMinus },
-          { to: "/stock/divisiones", label: "Divisiones", icon: Split },
-          {
-            to: "/stock/movimientos",
-            label: "Movimientos",
-            icon: ArrowLeftRight,
-            end: true,
-          },
-        ],
+    const stockItems: NavItem[] = [];
+    if (ve("stockConsulta")) {
+      stockItems.push({ to: "/stock/inventario", label: "Inventario", icon: Warehouse });
+    }
+    if (ve("stockIngresosEgresos")) {
+      stockItems.push(
+        { to: "/stock/ingresos", label: "Ingresos", icon: PackagePlus },
+        { to: "/stock/egresos", label: "Egresos", icon: PackageMinus },
+      );
+    }
+    if (ve("stockDivisiones")) {
+      stockItems.push({ to: "/stock/divisiones", label: "Divisiones", icon: Split });
+    }
+    if (ve("stockConsulta")) {
+      stockItems.push({
+        to: "/stock/movimientos",
+        label: "Movimientos",
+        icon: ArrowLeftRight,
+        end: true,
       });
     }
+    if (stockItems.length > 0) {
+      groups.push({ title: "Stock", items: stockItems });
+    }
 
-    if (superadmin || canAccessCombustible(tenant?.modules ?? [])) {
+    if (ve("combustible")) {
       groups.push({
         title: "Combustible",
         // En el menú agrupado del superadmin no se ve el título del grupo: "Cargas" sola no se entiende.
@@ -435,7 +357,7 @@ export function AppShell() {
       });
     }
 
-    if (canAccessMantenimiento(tenant?.modules ?? [])) {
+    if (ve("mantenimiento", false)) {
       groups.push({
         title: "Mantenimiento",
         items: [{ to: "/mantenimiento", label: "Mantenimiento", icon: Wrench }],
@@ -478,7 +400,7 @@ export function AppShell() {
           icon: Bell,
         });
       }
-      if (ajustesItems.length > 0) {
+      if (ajustesItems.length > 0 && ve("configuracion")) {
         groups.push({
           title: "Ajustes",
           icon: Settings,
@@ -488,7 +410,7 @@ export function AppShell() {
       }
     }
 
-    groups.push({
+    if (ve("baseDeDatos")) groups.push({
       title: "Base de datos",
       subtle: true,
       items: [

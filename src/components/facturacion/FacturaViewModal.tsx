@@ -3,6 +3,7 @@ import { formatIdFiscal } from '@/lib/ciudades/paises';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Ban, Banknote, FileText, Paperclip, Receipt, RotateCw } from 'lucide-react';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
+import { usePuedeOperar } from '@/hooks/usePermisosRol';
 import {
   idPropio2Habilitado as idPropio2HabilitadoTenant,
   idPropio2Label as idPropio2LabelTenant,
@@ -105,10 +106,10 @@ export function FacturaViewModal({
   onClose,
   onEditar,
   onVerComprobante,
-  onAdjuntarComprobante,
-  onEmitirArca,
-  onAnular,
-  onMarcarCobrada,
+  onAdjuntarComprobante: onAdjuntarComprobanteProp,
+  onEmitirArca: onEmitirArcaProp,
+  onAnular: onAnularProp,
+  onMarcarCobrada: onMarcarCobradaProp,
   onVolverAEmitir,
   idPropio2Habilitado: idPropio2HabilitadoProp,
   idPropio2Label: idPropio2LabelProp,
@@ -140,6 +141,14 @@ export function FacturaViewModal({
   /** Label configurable de "ID Propio 2". Sin prop, el de la empresa propia. */
   idPropio2Label?: string;
 }) {
+  // Solo quien opera el módulo ve las acciones (matriz `lib/permisosRol.ts`): un
+  // Miembro abre el comprobante para consultarlo, sin editar, emitir ni anular.
+  const puedeOperarModulo = usePuedeOperar('facturas');
+  const onAdjuntarComprobante = puedeOperarModulo ? onAdjuntarComprobanteProp : undefined;
+  const onEmitirArca = puedeOperarModulo ? onEmitirArcaProp : undefined;
+  const onAnular = puedeOperarModulo ? onAnularProp : undefined;
+  const onMarcarCobrada = puedeOperarModulo ? onMarcarCobradaProp : undefined;
+
   // Factura manual (hecha por fuera del sistema): se muestra como en una empresa sin ARCA.
   const hasArca = facturaConArca(hasArcaTenant, factura);
   const { tenant: tenantPropio } = useCurrentTenant();
@@ -548,7 +557,7 @@ export function FacturaViewModal({
             </button>
           )}
           {/* Anulada implica ARCA (la NC sale de ahí): no depende de que la pantalla pase `hasArca`. */}
-          {anulada && (
+          {anulada && puedeOperarModulo && (
             <button
               type="button"
               onClick={
@@ -570,7 +579,7 @@ export function FacturaViewModal({
               Volver a emitir
             </button>
           )}
-          {puedeEditar && (
+          {puedeEditar && puedeOperarModulo && (
             <button type="button" onClick={onEditar} className={viewModalBtnPrimary}>
               Editar
             </button>
