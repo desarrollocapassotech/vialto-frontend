@@ -1077,6 +1077,7 @@ export interface LiquidacionConceptoLinea {
 export interface LiquidacionViajeItem {
   viajeId: string;
   subtotal: number;
+  ivaPct?: number | null;
   viaje?: {
     id: string;
     numero: string | number | null;
@@ -1085,6 +1086,9 @@ export interface LiquidacionViajeItem {
     fechaCarga: string | null;
     origen: string | null;
     destino: string | null;
+    precioTransportistaExterno?: number | null;
+    precioTransportistaIvaIncluidoPct?: number | null;
+    tramosTransportista?: unknown;
   } | null;
 }
 
