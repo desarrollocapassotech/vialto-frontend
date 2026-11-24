@@ -606,16 +606,19 @@ export function CrearLiquidacionManualModal({
   }, [viajeInicial, transportistas, transportistaId, transportistaActualizado, detalleExistente]);
 
   const condicionIva = transportistaSeleccionado?.condicionIva ?? null;
-  // Monotributista en empresa con ARCA: no se emite Líquido Producto. La liquidación queda
-  // manual con la factura del transportista adjunta, igual que en una empresa sin ARCA.
+  const esMonotributo = esCondicionIvaMonotributo(condicionIva);
+  // Monotributista en empresa con ARCA o comprobante interno: no se emite Líquido Producto. La liquidación queda
+  // manual con la factura del transportista adjunta (o número interno), igual que en una empresa sin ARCA.
   const liquidacionManual =
     hasLiquidoProductoArca &&
-    (Boolean(existente?.manual) || esCondicionIvaMonotributo(condicionIva));
+    (Boolean(existente?.manual) || esMonotributo || numeroAutomatico);
   /** Esta liquidación va por ARCA (emisión, pto. de venta, datos fiscales completos). */
   const conArca = hasLiquidoProductoArca && !liquidacionManual;
   const showComprobante = !conArca;
-  /** Número de comprobante libre (sin ARCA): va en la primera fila, junto a comisión e IVA. */
-  const campoNumeroEnFila = showComprobante && !liquidacionManual;
+  /** Número de comprobante libre en fila (solo empresas sin ARCA). */
+  const campoNumeroEnFila = !hasLiquidoProductoArca && showComprobante;
+  /** Comprobante interno en empresa con ARCA para transportista no-monotributista. */
+  const comprobanteInternoArca = hasLiquidoProductoArca && !esMonotributo && numeroAutomatico;
 
   // — Autocompletar el número desde la factura de ARCA adjunta —
   const autocompletarNumero = useAutocompletarNumeroComprobante();
@@ -1154,12 +1157,12 @@ export function CrearLiquidacionManualModal({
       setError("Seleccioná al menos un viaje.");
       return;
     }
-    if (campoNumeroEnFila && !fechaComprobante) {
+    if ((campoNumeroEnFila || numeroAutomatico) && !fechaComprobante) {
       setFaltaFechaComprobante(true);
       setError("Ingresá la fecha del comprobante.");
       return;
     }
-    if (liquidacionManual) {
+    if (liquidacionManual && !numeroAutomatico) {
       const errsCbte = validarComprobanteManual(cbteProveedor, true);
       setCbteProveedorErrores(errsCbte);
       const primero = Object.values(errsCbte)[0];
@@ -1282,8 +1285,13 @@ export function CrearLiquidacionManualModal({
       if (existente) body.proveedorContrato = proveedorContrato?.trim() || null;
       else if (proveedorContrato?.trim()) body.proveedorContrato = proveedorContrato.trim();
       if (liquidacionManual) {
-        // El backend arma `numeroComprobanteProveedor` con tipo + punto de venta + número.
-        Object.assign(body, payloadComprobanteLiquidacion(cbteProveedor));
+        if (numeroAutomatico) {
+          body.numeroAutomatico = true;
+          body.proveedorCbteFecha = fechaComprobante || fechaEmision;
+        } else {
+          // El backend arma `numeroComprobanteProveedor` con tipo + punto de venta + número.
+          Object.assign(body, payloadComprobanteLiquidacion(cbteProveedor));
+        }
       } else if (showComprobante) {
         const nro = numeroComprobanteProveedor.trim();
         if (existente) body.numeroComprobanteProveedor = nro || null;
@@ -1697,9 +1705,11 @@ export function CrearLiquidacionManualModal({
                     className={`grid grid-cols-1 gap-3 ${
                       campoNumeroEnFila
                         ? "items-start sm:grid-cols-2 lg:grid-cols-[auto_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
-                        : conArca
-                          ? "sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]"
-                          : "sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                        : comprobanteInternoArca
+                          ? "items-start sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
+                          : conArca
+                            ? "sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                            : "sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
                     }`}
                   >
                     {/* Sin ARCA: archivo + número de comprobante a la izquierda, como en Nueva factura. */}
@@ -1732,7 +1742,14 @@ export function CrearLiquidacionManualModal({
                           placeholder="Ej. 0001-00001234"
                           disabled={submitting}
                           automatico={numeroAutomatico}
-                          onAutomaticoChange={setNumeroAutomatico}
+                          onAutomaticoChange={(auto) => {
+                            setNumeroAutomatico(auto);
+                            if (auto && !fechaComprobante && fechaEmision) {
+                              setFechaComprobante(fechaEmision);
+                            } else if (!auto && !fechaEmision && fechaComprobante) {
+                              setFechaEmision(fechaComprobante);
+                            }
+                          }}
                           urlNumeroInterno={URL_NUMERO_INTERNO.liquidaciones(
                             plataforma ? tenantId! : undefined,
                           )}
@@ -1778,7 +1795,65 @@ export function CrearLiquidacionManualModal({
                           aria-label={tl.singular}
                         />
                       )}
+                      {!existente && hasLiquidoProductoArca && !esMonotributo && (
+                        <label className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 self-start text-[11px] text-vialto-steel">
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5 border-black/20"
+                            checked={numeroAutomatico}
+                            disabled={submitting}
+                            onChange={(e) => {
+                              const auto = e.target.checked;
+                              setNumeroAutomatico(auto);
+                              if (auto) {
+                                setCbteProveedorErrores({});
+                                const fecha = fechaEmision || cbteProveedor.fecha;
+                                if (fecha) setFechaComprobante(fecha);
+                              } else {
+                                if (fechaComprobante && !fechaEmision) setFechaEmision(fechaComprobante);
+                              }
+                            }}
+                          />
+                          Comprobante interno
+                        </label>
+                      )}
                     </div>
+                    {/* Con ARCA + comprobante interno (no monotributista): número interno y fecha al lado del transportista */}
+                    {comprobanteInternoArca && (
+                      <NumeroComprobanteField
+                        id="numeroComprobanteProveedor"
+                        label="Número de comprobante"
+                        labelClassName={labelClass}
+                        inputClassName={inputClass}
+                        value={numeroComprobanteProveedor}
+                        onChange={setNumeroComprobanteProveedor}
+                        placeholder="Ej. 0001-00001234"
+                        disabled={submitting}
+                        automatico={numeroAutomatico}
+                        mostrarCheckbox={false}
+                        onAutomaticoChange={setNumeroAutomatico}
+                        urlNumeroInterno={URL_NUMERO_INTERNO.liquidaciones(
+                          plataforma ? tenantId! : undefined,
+                        )}
+                        getToken={getToken}
+                      />
+                    )}
+                    {comprobanteInternoArca && (
+                      <div className="grid gap-0.5">
+                        <label htmlFor="fechaComprobanteProveedor" className={labelClass}>
+                          Fecha del comprobante <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          id="fechaComprobanteProveedor"
+                          type="date"
+                          value={fechaComprobante}
+                          onChange={(e) => setFechaComprobante(e.target.value)}
+                          className={conBordeError(inputClass, faltaFechaComprobante)}
+                          disabled={submitting}
+                        />
+                        <FaltaCampo show={faltaFechaComprobante} />
+                      </div>
+                    )}
                     {/* La condición frente al IVA del transportista se ve en el tooltip del Receptor (panel derecho). */}
                     {/* El punto de venta no se muestra: sale de Configuración ARCA (ptoVentaCvlp). */}
                     {conArca && (
@@ -1851,6 +1926,7 @@ export function CrearLiquidacionManualModal({
                         className={inputClass}
                       />
                     </div>
+                    {comprobanteInternoArca && renderAdjunto()}
                   </div>
 
                   {/* Proveedor para contrato (opciones dinámicas configuradas por superadmin) */}
@@ -2097,33 +2173,95 @@ export function CrearLiquidacionManualModal({
                     </p>
                   )}
 
-                  {liquidacionManual && (
+                  {hasLiquidoProductoArca && esMonotributo && (
                     <p className="border border-black/10 bg-vialto-mist px-3 py-2 text-xs text-vialto-charcoal">
-                      El {tFrase} es monotributista: no se le emite Líquido Producto en
-                      ARCA. La liquidación queda registrada como liquidada; adjuntá la factura
-                      que te emitió el {tFrase}.
+                      {numeroAutomatico
+                        ? `La liquidación se registra con comprobante interno correlativo (INT-xxxxxxxx) y no se emite a ARCA.`
+                        : `El ${tFrase} es monotributista: no se le emite Líquido Producto en ARCA. La liquidación queda registrada como liquidada; adjuntá la factura que te emitió el ${tFrase}.`}
                     </p>
                   )}
 
-                  {/* Monotributista: archivo a la izquierda de la factura del transportista. */}
-                  {liquidacionManual && (
+                  {/* Monotributista: archivo a la izquierda de la factura del transportista o comprobante interno. */}
+                  {hasLiquidoProductoArca && esMonotributo && (
                     <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)]">
                       {renderAdjunto()}
                       <div>
-                        <p className={labelClass}>Factura del {tFrase}</p>
-                        <ComprobanteManualFields
-                          value={cbteProveedor}
-                          onChange={(v) => {
-                            setCbteProveedor(v);
-                            setCbteProveedorErrores({});
-                          }}
-                          errores={cbteProveedorErrores}
-                          conFecha
-                          disabled={submitting}
-                          labelClassName={labelClass}
-                          inputClassName={inputClass}
-                          className="grid grid-cols-1 gap-3 sm:grid-cols-2"
-                        />
+                        {numeroAutomatico ? (
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <NumeroComprobanteField
+                              id="numeroComprobanteProveedor"
+                              label="Número de comprobante"
+                              labelClassName={labelClass}
+                              inputClassName={inputClass}
+                              value={numeroComprobanteProveedor}
+                              onChange={setNumeroComprobanteProveedor}
+                              placeholder="Ej. 0001-00001234"
+                              disabled={submitting}
+                              automatico={numeroAutomatico}
+                              onAutomaticoChange={(auto) => {
+                                setNumeroAutomatico(auto);
+                                if (!auto && !fechaEmision && fechaComprobante) {
+                                  setFechaEmision(fechaComprobante);
+                                }
+                              }}
+                              urlNumeroInterno={URL_NUMERO_INTERNO.liquidaciones(
+                                plataforma ? tenantId! : undefined,
+                              )}
+                              getToken={getToken}
+                            />
+                            <div className="grid gap-0.5">
+                              <label htmlFor="fechaComprobanteProveedor" className={labelClass}>
+                                Fecha del comprobante <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                id="fechaComprobanteProveedor"
+                                type="date"
+                                value={fechaComprobante}
+                                onChange={(e) => setFechaComprobante(e.target.value)}
+                                className={conBordeError(inputClass, faltaFechaComprobante)}
+                                disabled={submitting}
+                              />
+                              <FaltaCampo show={faltaFechaComprobante} />
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className={labelClass}>Factura del {tFrase}</p>
+                            <ComprobanteManualFields
+                              value={cbteProveedor}
+                              onChange={(v) => {
+                                setCbteProveedor(v);
+                                setCbteProveedorErrores({});
+                              }}
+                              errores={cbteProveedorErrores}
+                              conFecha
+                              disabled={submitting}
+                              labelClassName={labelClass}
+                              inputClassName={inputClass}
+                              className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+                            />
+                            {!existente && (
+                              <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 self-start text-[11px] text-vialto-steel">
+                                <input
+                                  type="checkbox"
+                                  className="h-3.5 w-3.5 border-black/20"
+                                  checked={numeroAutomatico}
+                                  disabled={submitting}
+                                  onChange={(e) => {
+                                    const auto = e.target.checked;
+                                    setNumeroAutomatico(auto);
+                                    if (auto) {
+                                      setCbteProveedorErrores({});
+                                      const fecha = cbteProveedor.fecha || fechaEmision;
+                                      if (fecha) setFechaComprobante(fecha);
+                                    }
+                                  }}
+                                />
+                                Comprobante interno
+                              </label>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -2441,7 +2579,7 @@ export function CrearLiquidacionManualModal({
                     ? "Guardando…"
                     : existente
                       ? "Guardar cambios"
-                      : liquidacionManual
+                      : (liquidacionManual && !numeroAutomatico)
                         ? "Marcar como liquidada"
                         : "Crear liquidación"}
                 </button>
