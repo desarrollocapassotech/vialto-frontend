@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import { ProductoSearchableSelect } from '@/components/viajes/ProductoSearchableSelect';
 import { ProductoModal } from '@/components/stock/ProductoModal';
+import { PresentacionSearchableSelect } from '@/components/viajes/PresentacionSearchableSelect';
+import { PresentacionFormModal } from '@/components/stock/PresentacionFormModal';
+import { usePresentaciones } from '@/hooks/usePresentaciones';
 import {
   opcionDesdeProducto,
   type OpcionProducto,
@@ -24,6 +27,8 @@ export type ViajeProductosListaProps = {
   onProductoCreado?: (p: Producto) => void;
   /** Falta la carga: borde rojo en las filas sin elegir o, si no hay ninguna, en "+ Agregar". */
   error?: boolean;
+  mostrarUnidad?: boolean;
+  tenantId?: string;
 };
 
 export function ViajeProductosLista({
@@ -36,15 +41,35 @@ export function ViajeProductosLista({
   getToken,
   onProductoCreado,
   error = false,
+  mostrarUnidad = false,
+  tenantId,
 }: ViajeProductosListaProps) {
   const labels = useProductoLabels();
   const [showNuevo, setShowNuevo] = useState(false);
   const [nuevoParaIndex, setNuevoParaIndex] = useState<number | null>(null);
+  const [showNuevaPres, setShowNuevaPres] = useState(false);
+  const [nuevaPresParaIndex, setNuevaPresParaIndex] = useState<number | null>(null);
+  const { presentaciones, agregarPresentacion } = usePresentaciones(tenantId, Boolean(mostrarUnidad));
+
   const [localOpciones, setLocalOpciones] = useState<OpcionProducto[]>([]);
   const todasLasOpciones = useMemo(() => {
     const ids = new Set(opciones.map((o) => o.id));
     return [...opciones, ...localOpciones.filter((o) => !ids.has(o.id))];
   }, [opciones, localOpciones]);
+
+  const todasLasPresentaciones = useMemo(() => {
+    const map = new Map<string, { id: string; nombre: string; activo?: boolean }>();
+    for (const p of presentaciones) {
+      map.set(p.id, p);
+    }
+    for (const item of value) {
+      if (item.presentacionId && item.presentacion && !map.has(item.presentacionId)) {
+        map.set(item.presentacionId, item.presentacion);
+      }
+    }
+    return [...map.values()];
+  }, [presentaciones, value]);
+
   function patchRow(i: number, patch: Partial<ViajeProductoItem>) {
     const next = [...value];
     next[i] = { ...next[i], ...patch };
@@ -98,6 +123,32 @@ export function ViajeProductosLista({
               aria-label={`Cantidad de ${labelEnFrase(labels.singular)} ${i + 1}`}
             />
           </label>
+          {mostrarUnidad && (
+            <div className="shrink-0 w-44">
+              <PresentacionSearchableSelect
+                id={`${groupId}-pres-${i}`}
+                value={item.presentacionId ?? ''}
+                onChange={(presId) => {
+                  const pres = todasLasPresentaciones.find((p) => p.id === presId);
+                  patchRow(i, {
+                    presentacionId: presId || null,
+                    presentacion: pres ? { id: pres.id, nombre: pres.nombre } : null,
+                  });
+                }}
+                opciones={todasLasPresentaciones}
+                triggerClassName={triggerClassName}
+                disabled={disabled}
+                onNuevaPresentacion={
+                  getToken
+                    ? () => {
+                        setNuevaPresParaIndex(i);
+                        setShowNuevaPres(true);
+                      }
+                    : undefined
+                }
+              />
+            </div>
+          )}
           <button
             type="button"
             disabled={disabled}
@@ -139,6 +190,29 @@ export function ViajeProductosLista({
             }
             setShowNuevo(false);
             setNuevoParaIndex(null);
+          }}
+        />
+      )}
+      {showNuevaPres && getToken && (
+        <PresentacionFormModal
+          modo="create"
+          titulo="Nueva unidad"
+          getToken={getToken}
+          tenantId={tenantId}
+          onClose={() => {
+            setShowNuevaPres(false);
+            setNuevaPresParaIndex(null);
+          }}
+          onSaved={(pres) => {
+            agregarPresentacion(pres);
+            if (nuevaPresParaIndex !== null) {
+              patchRow(nuevaPresParaIndex, {
+                presentacionId: pres.id,
+                presentacion: { id: pres.id, nombre: pres.nombre },
+              });
+            }
+            setShowNuevaPres(false);
+            setNuevaPresParaIndex(null);
           }}
         />
       )}
