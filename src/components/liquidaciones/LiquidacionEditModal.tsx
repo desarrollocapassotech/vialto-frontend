@@ -564,9 +564,7 @@ export function LiquidacionEditModal({
       if (canEditDatos) {
         body.periodoDesde = periodoDesde;
         body.periodoHasta = periodoHasta;
-        if (comisionPct.trim() !== "") {
-          body.comisionPct = Number(comisionPct);
-        }
+        body.comisionPct = comisionPct.trim() !== "" ? Number(comisionPct) : 0;
         // Siempre enviar IVA explícito cuando se editan datos (incluye 0 = sin IVA).
         body.ivaPct =
           ivaPct.trim() !== "" ? Number(ivaPct) : (liq.ivaPct ?? 21);

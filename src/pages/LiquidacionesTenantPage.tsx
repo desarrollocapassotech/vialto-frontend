@@ -1,4 +1,4 @@
-﻿import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
+import { useTransportistaLabels } from "@/hooks/useTransportistaLabels";
 import { transportistaEnFrase } from "@/lib/transportistaLabel";
 import {
   AdjuntarComprobanteClip,
@@ -633,12 +633,10 @@ export function LiquidacionesTenantPage() {
           `/api/integracion-arca/liquidaciones${qsTenant}`,
           () => getToken(),
         );
-        const cfg = hasArca
-          ? await apiJson<ArcaConfig | null>(
-              `/api/integracion-arca/config${qsTenant}`,
-              () => getToken(),
-            ).catch(() => null)
-          : null;
+        const cfg = await apiJson<ArcaConfig | null>(
+          `/api/integracion-arca/config${qsTenant}`,
+          () => getToken(),
+        ).catch(() => null);
         if (!cancelled) {
           setRows(data);
           setConfig(cfg);
