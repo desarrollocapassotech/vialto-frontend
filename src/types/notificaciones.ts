@@ -15,6 +15,8 @@ export type NotificacionFeedItem = {
   label: string;
   titulo: string;
   detalle: string;
+  /** Ruta de la app que abre el registro del aviso (la arma el backend). Null en avisos viejos. */
+  url?: string | null;
   enviadoAt: string;
   leido: boolean;
 };
