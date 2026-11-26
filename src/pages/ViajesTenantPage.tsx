@@ -55,7 +55,6 @@ import {
   facturaLetraFromCondicionIva,
 } from "@/lib/arcaCbteTipo";
 import { apiJson, apiFetch, ApiError } from "@/lib/api";
-import { hoyArgentinaIso, vencimientoPorDefecto } from "@/lib/facturaFechaEmision";
 import { verPdfLiquidacion } from "@/lib/liquidacionContratoPdf";
 import { useToast } from "@/lib/toast";
 import { friendlyError } from "@/lib/friendlyError";
@@ -194,7 +193,10 @@ import { LiquidacionViewModal } from "@/components/liquidaciones/LiquidacionView
 
 // Importaciones para el nuevo flujo de Facturación Inline
 import { FacturaCreateModal } from "@/components/facturacion/FacturaCreateModal";
-import type { FacturaDraft } from "@/components/facturacion/FacturaEditModal";
+import {
+  emptyFacturaDraft,
+  type FacturaDraft,
+} from "@/components/facturacion/FacturaEditModal";
 
 /** Un campo de `ListadoCard` (tarjeta mobile de la grilla). */
 type ListadoCardCampo = { label: ReactNode; value: ReactNode };
@@ -408,22 +410,9 @@ export function ViajesTenantPage({
 
   const [isFacturaModalOpen, setIsFacturaModalOpen] = useState(false);
   const [ordenColumnasAbierto, setOrdenColumnasAbierto] = useState(false);
-  const [facturaDraft, setFacturaDraft] = useState<FacturaDraft>({
-    tipo: "cliente",
-    transportistaId: "",
-    clienteId: "",
-    numero: "",
-    fechaEmision: hoyArgentinaIso(),
-    fechaVencimiento: vencimientoPorDefecto(hoyArgentinaIso()),
-    ivaPct: "",
-    viajeIds: [],
-    facturarPorTramo: false,
-    tramos: [],
-    observaciones: [],
-    comprobanteUrl: null,
-    comprobanteFile: null,
-    letraComprobante: null,
-  });
+  const [facturaDraft, setFacturaDraft] = useState<FacturaDraft>(() =>
+    emptyFacturaDraft(),
+  );
 
   const platform = Boolean(tenantId?.trim());
   const esAdmin = puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
@@ -489,17 +478,21 @@ export function ViajesTenantPage({
     const url = platform
       ? `/api/platform/viajes?tenantId=${encodeURIComponent(tid)}`
       : "/api/viajes";
-    apiJson<Viaje[]>(url, () => getToken())
-      .then((data) => {
-        if (!cancelado) setViajesFactura(data);
-      })
-      .catch(() => {
+    void (async () => {
+      try {
+        const data = await apiJson<Viaje[]>(url, () => getToken());
+        if (!cancelado) {
+          setViajesFactura(data);
+          setViajesFacturaLoading(false);
+        }
+      } catch {
         // best-effort: si falla, el selector de viajes de la factura queda vacío
-        if (!cancelado) setViajesFactura([]);
-      })
-      .finally(() => {
-        if (!cancelado) setViajesFacturaLoading(false);
-      });
+        if (!cancelado) {
+          setViajesFactura([]);
+          setViajesFacturaLoading(false);
+        }
+      }
+    })();
     return () => {
       cancelado = true;
     };
@@ -1812,6 +1805,23 @@ export function ViajesTenantPage({
     setLiquidarLote({ transportistaId: tid, viajeIds: seleccion.map((v) => v.id) });
   }
 
+  function abrirNuevaFacturaDesdeViajes(
+    clienteId: string,
+    viajeIds: string[],
+    letraComprobante: FacturaLetra | null = null,
+  ) {
+    setViajesFacturaLoading(true);
+    setFacturaDraft({
+      ...emptyFacturaDraft(),
+      ivaPct: "",
+      clienteId,
+      viajeIds,
+      letraComprobante,
+      conceptos: undefined,
+    });
+    setIsFacturaModalOpen(true);
+  }
+
   function facturarSeleccionMultiple() {
     const ids = viajesSeleccionados()
       .filter(esElegibleFacturarLote)
@@ -1829,23 +1839,7 @@ export function ViajesTenantPage({
       }
     }
 
-    setFacturaDraft({
-      tipo: "cliente",
-      transportistaId: "",
-      clienteId: cid,
-      numero: "",
-      fechaEmision: hoyArgentinaIso(),
-      fechaVencimiento: vencimientoPorDefecto(hoyArgentinaIso()),
-      ivaPct: "",
-      viajeIds: ids,
-      facturarPorTramo: false,
-      tramos: [],
-      observaciones: [],
-      comprobanteUrl: null,
-      comprobanteFile: null,
-      letraComprobante: null,
-    });
-    setIsFacturaModalOpen(true);
+    abrirNuevaFacturaDesdeViajes(cid, ids);
   }
 
   function requestDeleteViaje(v: Viaje) {
@@ -2322,23 +2316,11 @@ export function ViajesTenantPage({
       setFacturandoLoadingId(null);
     }
 
-    setFacturaDraft({
-      tipo: "cliente",
-      transportistaId: "",
-      clienteId: targetClienteId ?? v.clienteId ?? "",
-      numero: "",
-      fechaEmision: hoyArgentinaIso(),
-      fechaVencimiento: vencimientoPorDefecto(hoyArgentinaIso()),
-      ivaPct: "",
-      viajeIds: [v.id],
-      facturarPorTramo: false,
-      tramos: [],
-      observaciones: [],
-      comprobanteUrl: null,
-      comprobanteFile: null,
-      letraComprobante: letra ?? null,
-    });
-    setIsFacturaModalOpen(true);
+    abrirNuevaFacturaDesdeViajes(
+      targetClienteId ?? v.clienteId ?? "",
+      [v.id],
+      letra ?? null,
+    );
   }
 
   async function abrirFacturaModalEnContexto(
