@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatIdFiscal } from "@/lib/ciudades/paises";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
@@ -28,7 +28,13 @@ import {
   viewModalBtnPrimary,
 } from "@/components/ui/ViewModalShell";
 import { LiquidacionMontosBreakdown } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
-import { fmtSignedLiquidacionMoney } from "@/lib/liquidacionMoney";
+import {
+  fmtLiquidacionMoney,
+  fmtSignedLiquidacionMoney,
+  round2,
+} from "@/lib/liquidacionMoney";
+import { normalizarTramosTransportista } from "@/lib/viajeTramosTransportista";
+import { nombreConDetalle } from "@/lib/liquidacionConceptosIva";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
@@ -318,7 +324,10 @@ export function LiquidacionViewModal({
     return Number.isFinite(n) ? n : null;
   })();
   const conceptosLineas = normalizeConceptosLineas(source.conceptosLineas);
-  const viajesIncluidos: LiquidacionViajeItem[] = source.viajes ?? [];
+  const viajesIncluidos: LiquidacionViajeItem[] = useMemo(
+    () => source.viajes ?? [],
+    [source.viajes],
+  );
   const cantViajes = viajesIncluidos.length || source.cantViajes || 0;
   const anulada = source.estado === "anulado";
   const anulacionManual = source.anulacionMetodo === "manual";
@@ -409,6 +418,172 @@ export function LiquidacionViewModal({
       fmtFecha={fmtDate}
     />
   );
+
+  const tieneTramos = viajesIncluidos.some(
+    (row) => normalizarTramosTransportista(row.viaje?.tramosTransportista).length > 0,
+  );
+
+  const { ivaDetalle, ivaDetalleResumen } = useMemo(() => {
+    if (!tieneTramos) return { ivaDetalle: undefined, ivaDetalleResumen: undefined };
+
+    type ItemDesglose = {
+      key: string;
+      detalle: string;
+      monto: number;
+      ivaPct: number;
+      ivaCalculado: number;
+      signo: "plus" | "minus";
+    };
+
+    const items: ItemDesglose[] = [];
+    let cantTramosTotal = 0;
+    let cantRestos = 0;
+    let ultimoRestoPct: number | null = null;
+    let restosMismoPct = true;
+
+    for (let i = 0; i < viajesIncluidos.length; i++) {
+      const row = viajesIncluidos[i];
+      const v = row.viaje;
+      const vNumero =
+        v?.numeroIdentificacionPersonalizado?.trim() ||
+        (v?.numero != null ? String(v.numero) : "");
+      const vPrefijo = cantViajes > 1 && vNumero ? `Viaje #${vNumero}` : null;
+      const tramos = normalizarTramosTransportista(v?.tramosTransportista);
+      const subtotal =
+        Number(row.subtotal) || Number(v?.precioTransportistaExterno) || 0;
+      const pctGeneral =
+        row.ivaPct != null
+          ? Number(row.ivaPct)
+          : v?.precioTransportistaIvaIncluidoPct != null
+            ? Number(v.precioTransportistaIvaIncluidoPct)
+            : (ivaPctEfectivo ?? 0);
+
+      if (tramos.length > 0) {
+        cantTramosTotal += tramos.length;
+        tramos.forEach((t, tIdx) => {
+          const ivaCalculado = round2((t.monto * t.ivaPct) / 100);
+          items.push({
+            key: `tramo-${row.viajeId || i}-${tIdx}`,
+            detalle: vPrefijo
+              ? `${vPrefijo} · ${t.detalle || "Tramo"}`
+              : t.detalle || "Tramo",
+            monto: t.monto,
+            ivaPct: t.ivaPct,
+            ivaCalculado,
+            signo: "plus",
+          });
+        });
+
+        const sumaTramos = round2(tramos.reduce((s, t) => s + t.monto, 0));
+        const resto = round2(subtotal - sumaTramos);
+        if (resto > 0.005) {
+          cantRestos++;
+          if (ultimoRestoPct === null) {
+            ultimoRestoPct = pctGeneral;
+          } else if (ultimoRestoPct !== pctGeneral) {
+            restosMismoPct = false;
+          }
+          const ivaResto = round2((resto * pctGeneral) / 100);
+          items.push({
+            key: `resto-${row.viajeId || i}`,
+            detalle: vPrefijo
+              ? `${vPrefijo} · Resto del flete`
+              : "Resto del flete",
+            monto: resto,
+            ivaPct: pctGeneral,
+            ivaCalculado: ivaResto,
+            signo: "plus",
+          });
+        }
+      } else if (subtotal > 0) {
+        const ivaViaje = round2((subtotal * pctGeneral) / 100);
+        items.push({
+          key: `viaje-${row.viajeId || i}`,
+          detalle: vPrefijo ? `${vPrefijo} · Flete` : "Flete",
+          monto: subtotal,
+          ivaPct: pctGeneral,
+          ivaCalculado: ivaViaje,
+          signo: "plus",
+        });
+      }
+    }
+
+    // Comisión sobre flete (reduce el IVA)
+    if (Number(source.comision) > 0 && ivaPctEfectivo != null && ivaPctEfectivo > 0) {
+      const comisionMonto = Number(source.comision);
+      const comisionIva = round2((comisionMonto * ivaPctEfectivo) / 100);
+      items.push({
+        key: "comision-iva",
+        detalle: "IVA sobre comisión",
+        monto: comisionMonto,
+        ivaPct: ivaPctEfectivo,
+        ivaCalculado: comisionIva,
+        signo: "minus",
+      });
+    }
+
+    // Conceptos adicionales con IVA propio
+    for (let cIdx = 0; cIdx < conceptosLineas.length; cIdx++) {
+      const l = conceptosLineas[cIdx];
+      const rawPct = l.ivaPct ?? ivaPctEfectivo;
+      const linePct =
+        rawPct != null && Number.isFinite(Number(rawPct)) ? Number(rawPct) : 0;
+      const montoNeto = Number(l.monto) || 0;
+      if (linePct > 0 && montoNeto > 0) {
+        const ivaConcepto = round2((montoNeto * linePct) / 100);
+        const esContra = l.signo === "contra";
+        const nombre = l.nombreSnapshot || "Concepto";
+        items.push({
+          key: `concepto-iva-${l.id || cIdx}`,
+          detalle: `IVA ${nombreConDetalle(nombre, l.detalle)}`,
+          monto: montoNeto,
+          ivaPct: linePct,
+          ivaCalculado: ivaConcepto,
+          signo: esContra ? "minus" : "plus",
+        });
+      }
+    }
+
+    const restoTexto =
+      cantRestos > 0 && restosMismoPct && ultimoRestoPct !== null && ultimoRestoPct > 0
+        ? ` · resto ${ultimoRestoPct}%`
+        : "";
+    const resumen = `${cantTramosTotal} tramo${cantTramosTotal === 1 ? "" : "s"}${restoTexto}`;
+
+    const detalleNode = (
+      <div className="divide-y divide-black/5">
+        {items.map((item) => (
+          <div
+            key={item.key}
+            className="flex items-baseline justify-between gap-4 py-1.5 pl-5"
+          >
+            <span className="min-w-0">
+              <span className="block text-xs text-vialto-charcoal">
+                {item.detalle}
+              </span>
+              <span className="block text-[11px] text-vialto-steel">
+                {item.signo === "minus" ? "−" : ""}
+                {fmtLiquidacionMoney(item.monto)} · IVA {item.ivaPct}%
+              </span>
+            </span>
+            <span className="shrink-0 text-sm tabular-nums text-vialto-charcoal">
+              {item.signo === "minus" ? "− " : "+ "}
+              {fmtLiquidacionMoney(item.ivaCalculado)}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+
+    return { ivaDetalle: detalleNode, ivaDetalleResumen: resumen };
+  }, [
+    tieneTramos,
+    viajesIncluidos,
+    cantViajes,
+    ivaPctEfectivo,
+    source.comision,
+    conceptosLineas,
+  ]);
   const puedeEliminar =
     Boolean(onEliminar) &&
     (source.estado === "borrador" ||
@@ -739,6 +914,8 @@ export function LiquidacionViewModal({
                   : undefined
               }
               brutoDetalle={viajesDetalle}
+              ivaDetalle={ivaDetalle}
+              ivaDetalleResumen={ivaDetalleResumen}
             />
           </DetalleMontosCard>
 
