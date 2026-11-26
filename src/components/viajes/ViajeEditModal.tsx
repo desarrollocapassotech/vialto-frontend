@@ -68,6 +68,7 @@ import {
 import {
   numeroFacturaVisibleViaje,
   numeroVisibleViaje,
+  labelCantidadViajes,
   labelIdentificacionPersonalizadaViajes,
   idSistemaHabilitado,
   idPropio1Habilitado,
@@ -89,7 +90,11 @@ import type {
   Vehiculo,
   Viaje,
 } from "@/types/api";
-import type { OpcionProducto } from "@/lib/productosViaje";
+import {
+  resolverCantidadConPesos,
+  sumaPesosTn,
+  type OpcionProducto,
+} from "@/lib/productosViaje";
 import { ViajeProductosLista } from "@/components/viajes/ViajeProductosLista";
 import { ViajeDestinosLista } from "@/components/viajes/ViajeDestinosLista";
 import { ViajeGananciaBrutaManualFieldset } from "@/components/viajes/ViajeGananciaBrutaManualFieldset";
@@ -155,6 +160,7 @@ export type ViajeInlineDraft = {
   monto: string;
   monedaMonto: ViajeMonedaCodigo;
   cantidadFactura: string;
+  cantidadFacturaManual?: boolean;
   precioUnitarioFactura: string;
   kmRecorridos: string;
   litrosConsumidos: string;
@@ -343,6 +349,8 @@ export function ViajeEditModal({
   const mostrarUnidad =
     tieneStock &&
     isVisible("edicion_viaje", "unidadCarga");
+  const mostrarPeso = isVisible("edicion_viaje", "pesoCarga");
+  const labelCantidad = labelCantidadViajes(tenantEfectivo);
   const desgloseActivo = isVisible("edicion_viaje", "desgloseMontos");
 
   // ── Obligatorios que faltan (mismo estándar que el alta de viaje) ──────
@@ -607,7 +615,8 @@ export function ViajeEditModal({
       if (
         snapshotViaje.cantidadFactura == null &&
         next.cantidadFactura === "" &&
-        next.monto.trim() !== ""
+        next.monto.trim() !== "" &&
+        (!mostrarPeso || sumaPesosTn(next.productoItems) == null)
       ) {
         next.cantidadFactura = "1";
         next.precioUnitarioFactura = next.monto;
@@ -624,7 +633,7 @@ export function ViajeEditModal({
       }
       return changed ? next : p;
     });
-  }, [open, draft?.numero, desgloseActivo, snapshotViaje, setDraft]);
+  }, [open, draft?.numero, desgloseActivo, mostrarPeso, snapshotViaje, setDraft]);
 
   const descarte = useConfirmarDescarte(onClose, open);
   const { solicitarCierre } = descarte;
@@ -941,9 +950,28 @@ export function ViajeEditModal({
                           groupId="viaje-edit"
                           value={draft.productoItems}
                           onChange={(items) =>
-                            setDraft((p) =>
-                              p ? { ...p, productoItems: items } : p,
-                            )
+                            setDraft((p) => {
+                              if (!p) return p;
+                              const autocompletar =
+                                mostrarPeso &&
+                                desgloseActivo &&
+                                labelCantidad === "Toneladas" &&
+                                !datosClienteBloqueados;
+                              return {
+                                ...p,
+                                productoItems: items,
+                                ...(autocompletar
+                                  ? {
+                                      cantidadFactura: resolverCantidadConPesos(
+                                        p.cantidadFactura,
+                                        Boolean(p.cantidadFacturaManual),
+                                        items,
+                                        p.productoItems,
+                                      ),
+                                    }
+                                  : {}),
+                              };
+                            })
                           }
                           opciones={opcionesProducto}
                           triggerClassName={inputClass}
@@ -952,6 +980,7 @@ export function ViajeEditModal({
                           getToken={getToken}
                           onProductoCreado={onProductoCreado}
                           mostrarUnidad={mostrarUnidad}
+                          mostrarPeso={mostrarPeso}
                           tenantId={tenantId}
                         />
                       </div>
@@ -959,20 +988,25 @@ export function ViajeEditModal({
                     {desgloseActivo ? (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div className="flex flex-col gap-1">
-                          <span className={labelClass}>Cantidad</span>
+                          <span className={labelClass}>{labelCantidad}</span>
                           <input
                             type="text"
                             inputMode="decimal"
                             autoComplete="off"
                             disabled={datosClienteBloqueados}
                             value={draft.cantidadFactura}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const val = e.target.value;
                               setDraft((p) =>
                                 p
-                                  ? { ...p, cantidadFactura: e.target.value }
+                                  ? {
+                                      ...p,
+                                      cantidadFactura: val,
+                                      cantidadFacturaManual: val.trim() !== "",
+                                    }
                                   : p,
-                              )
-                            }
+                              );
+                            }}
                             placeholder="0.00"
                             className={`${conBordeError(inputClass, marcaP("cantidad"))} text-right tabular-nums`}
                           />
@@ -1139,7 +1173,9 @@ export function ViajeEditModal({
                   onProductoCreado={onProductoCreado}
                   paisFijo={paisFijo}
                   sugerenciasCiudad={sugerenciasCiudad}
+                  labelCantidad={labelCantidad}
                   mostrarUnidad={mostrarUnidad}
+                  mostrarPeso={mostrarPeso}
                   tenantId={tenantId}
                 />
                 <button

@@ -20,6 +20,7 @@ interface Props {
   desgloseActivo: boolean;
   mostrarProductos: boolean;
   mostrarUnidad?: boolean;
+  mostrarPeso?: boolean;
   tenantId?: string;
   paises: Pais[];
   paisesLoading: boolean;
@@ -51,6 +52,7 @@ export function ViajeCreateStep1ClientesYCarga({
   desgloseActivo,
   mostrarProductos,
   mostrarUnidad,
+  mostrarPeso,
   tenantId,
   paises,
   paisesLoading,
@@ -80,6 +82,7 @@ export function ViajeCreateStep1ClientesYCarga({
           desgloseActivo={desgloseActivo}
           mostrarProductos={mostrarProductos}
           mostrarUnidad={mostrarUnidad}
+          mostrarPeso={mostrarPeso}
           tenantId={tenantId}
           paises={paises}
           paisesLoading={paisesLoading}

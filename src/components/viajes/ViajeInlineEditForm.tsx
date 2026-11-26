@@ -20,6 +20,7 @@ import {
 } from '@/lib/currencyMask';
 import {
   choferesFlotaPropia,
+  labelCantidadViajes,
   mensajesAyudaFlotaPropia,
   normalizarIdEnLista,
   vehiculosFlotaPropia,
@@ -31,7 +32,11 @@ import { useProductoLabels } from '@/hooks/useProductoLabels';
 import { useEffect, useMemo, useRef } from 'react';
 import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
 import type { ViajeInlineDraft } from './viajesSuperadminTypes';
-import type { OpcionProducto } from '@/lib/productosViaje';
+import {
+  resolverCantidadConPesos,
+  sumaPesosTn,
+  type OpcionProducto,
+} from '@/lib/productosViaje';
 import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
 
 type Props = {
@@ -83,6 +88,8 @@ export function ViajeInlineEditForm({
   const { tenant } = useCurrentTenant();
   const tieneStock = canAccessStock(tenant?.modules ?? []);
   const mostrarUnidad = tieneStock && isVisible("edicion_viaje", "unidadCarga");
+  const mostrarPeso = isVisible("edicion_viaje", "pesoCarga");
+  const labelCantidad = labelCantidadViajes(tenant);
   const productoLabelsTenant = useProductoLabels();
   const desgloseActivo = isVisible("edicion_viaje", "desgloseMontos");
   const choferesPropios = useMemo(() => choferesFlotaPropia(choferes), [choferes]);
@@ -102,7 +109,10 @@ export function ViajeInlineEditForm({
       if (!p) return p;
       let changed = false;
       const next = { ...p };
-      if (next.cantidadFactura === "") {
+      if (
+        next.cantidadFactura === "" &&
+        (!mostrarPeso || sumaPesosTn(next.productoItems) == null)
+      ) {
         next.cantidadFactura = "1";
         next.precioUnitarioFactura = next.monto;
         changed = true;
@@ -114,7 +124,7 @@ export function ViajeInlineEditForm({
       }
       return changed ? next : p;
     });
-  }, [draft, desgloseActivo, setDraft]);
+  }, [draft, desgloseActivo, mostrarPeso, setDraft]);
 
   function set(patch: Partial<ViajeInlineDraft>) {
     setDraft((p) => (p ? { ...p, ...patch } : p));
@@ -160,13 +170,19 @@ export function ViajeInlineEditForm({
             {desgloseActivo ? (
               <>
                 <div className="flex flex-col gap-1">
-                  <span className={LABEL}>Cantidad</span>
+                  <span className={LABEL}>{labelCantidad}</span>
                   <input
                     type="text"
                     inputMode="decimal"
                     autoComplete="off"
                     value={draft.cantidadFactura}
-                    onChange={(e) => set({ cantidadFactura: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      set({
+                        cantidadFactura: val,
+                        cantidadFacturaManual: val.trim() !== '',
+                      });
+                    }}
                     placeholder="0.00"
                     className={`min-w-0 flex-1 ${INPUT} text-right tabular-nums`}
                   />
@@ -459,12 +475,35 @@ export function ViajeInlineEditForm({
               <ViajeProductosLista
                 groupId={`viaje-inline-${draft.numero || 'e'}`}
                 value={draft.productoItems}
-                onChange={(items) => set({ productoItems: items })}
+                onChange={(items) =>
+                  setDraft((p) => {
+                    if (!p) return p;
+                    const autocompletar =
+                      mostrarPeso &&
+                      desgloseActivo &&
+                      labelCantidad === 'Toneladas';
+                    return {
+                      ...p,
+                      productoItems: items,
+                      ...(autocompletar
+                        ? {
+                            cantidadFactura: resolverCantidadConPesos(
+                              p.cantidadFactura,
+                              Boolean(p.cantidadFacturaManual),
+                              items,
+                              p.productoItems,
+                            ),
+                          }
+                        : {}),
+                    };
+                  })
+                }
                 opciones={opcionesProducto}
                 triggerClassName={INPUT}
                 inputClassName={INPUT}
                 disabled={saving}
                 mostrarUnidad={mostrarUnidad}
+                mostrarPeso={mostrarPeso}
               />
             </div>
           )}

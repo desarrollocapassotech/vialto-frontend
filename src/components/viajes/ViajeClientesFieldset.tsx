@@ -16,7 +16,10 @@ import {
 import { conBordeError } from '@/lib/bordeError';
 import { FaltaCampo } from '@/components/shared/FaltaCampo';
 import { facturacionPermiteVincular } from '@/lib/viajesIndicadores';
-import type { OpcionProducto } from '@/lib/productosViaje';
+import {
+  resolverCantidadConPesos,
+  type OpcionProducto,
+} from '@/lib/productosViaje';
 import type { Cliente, Pais, Producto } from '@/types/api';
 
 const fieldLabelClass =
@@ -165,6 +168,8 @@ interface Props {
   mostrarProductos?: boolean;
   /** Si se muestra el selector de unidad de carga (presentación). */
   mostrarUnidad?: boolean;
+  /** Si se muestra el campo de peso en toneladas por carga ("Campos por empresa"). */
+  mostrarPeso?: boolean;
   tenantId?: string;
   /** `Tenant.recomendacionCiudadesHabilitada`: false = origen/destinos en texto libre. */
   sugerenciasCiudad?: boolean;
@@ -204,6 +209,7 @@ export function ViajeClientesFieldset({
   labelPrefix = 'Cliente adicional',
   mostrarProductos = true,
   mostrarUnidad = false,
+  mostrarPeso = false,
   tenantId,
   paisFijo = null,
   sugerenciasCiudad = true,
@@ -272,6 +278,11 @@ export function ViajeClientesFieldset({
         // Cliente principal (alta: la 1ª tarjeta): origen, destino y cobro obligatorios,
         // igual que en el backend. En los adicionales solo el cliente.
         const principal = i < minRows;
+        const autocompletarToneladas =
+          mostrarPeso &&
+          desgloseActivo &&
+          labelCantidad === 'Toneladas' &&
+          !bloqueado;
         return (
           <ClienteCard
             key={i}
@@ -377,7 +388,18 @@ export function ViajeClientesFieldset({
                   <ViajeProductosLista
                     groupId={`viaje-cliente-${i}`}
                     value={row.productoItems}
-                    onChange={(productoItems) => update(i, { productoItems })}
+                    onChange={(productoItems) => {
+                      const patch: Partial<ViajeClienteDraft> = { productoItems };
+                      if (autocompletarToneladas) {
+                        patch.cantidadStr = resolverCantidadConPesos(
+                          row.cantidadStr,
+                          Boolean(row.cantidadManual),
+                          productoItems,
+                          row.productoItems,
+                        );
+                      }
+                      update(i, patch);
+                    }}
                     opciones={opcionesProducto}
                     triggerClassName={inputClass}
                     inputClassName={inputClass}
@@ -386,6 +408,7 @@ export function ViajeClientesFieldset({
                     onProductoCreado={onProductoCreado}
                     error={falta('carga')}
                     mostrarUnidad={mostrarUnidad}
+                    mostrarPeso={mostrarPeso}
                     tenantId={tenantId}
                   />
                 </div>
@@ -400,7 +423,13 @@ export function ViajeClientesFieldset({
                       type="text"
                       inputMode="decimal"
                       value={row.cantidadStr}
-                      onChange={(e) => update(i, { cantidadStr: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        update(i, {
+                          cantidadStr: val,
+                          cantidadManual: val.trim() !== '',
+                        });
+                      }}
                       disabled={bloqueado}
                       placeholder="0"
                       className={`${conBordeError(inputClass, falta('cantidad'))} text-right tabular-nums`}

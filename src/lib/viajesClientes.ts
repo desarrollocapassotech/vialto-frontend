@@ -6,7 +6,12 @@ import {
   type ViajeDestinoApiItem,
   type ViajeDestinoRowDraft,
 } from '@/lib/viajesDestinos';
-import type { ViajeProductoItem } from '@/lib/productosViaje';
+import {
+  esCantidadManualInicial,
+  formatPesoTnInput,
+  productoItemsParaApi,
+  type ViajeProductoItem,
+} from '@/lib/productosViaje';
 import {
   formatNumberForMoneda,
   parseCurrencyForMoneda,
@@ -28,6 +33,8 @@ export interface ViajeClienteDraft {
   montoStr: string;
   moneda: ViajeMonedaCodigo;
   cantidadStr: string;
+  /** true = el usuario escribió las toneladas a mano y no deben pisarse con la suma de cargas. */
+  cantidadManual?: boolean;
   precioUnitarioStr: string;
   /** Presente si la fila viene de un viaje existente y ya tiene un cobro vigente (bloquea edición). */
   facturacionEstado?: string;
@@ -72,6 +79,7 @@ export function emptyClienteRow(): ViajeClienteDraft {
     montoStr: '',
     moneda: 'ARS',
     cantidadStr: '',
+    cantidadManual: false,
     precioUnitarioStr: '',
   };
 }
@@ -109,9 +117,12 @@ export function clientesRowsDesdeViaje(
           productoId: p.productoId,
           cantidad: p.cantidad ?? undefined,
           pesoKg: p.pesoKg ?? undefined,
+          pesoTn: p.pesoTn ?? undefined,
+          pesoTnStr: p.pesoTn != null ? formatPesoTnInput(p.pesoTn) : '',
           presentacionId: p.presentacionId ?? undefined,
           presentacion: p.presentacion ?? undefined,
         }));
+      const cantidadStr = c.cantidad != null ? String(c.cantidad) : '';
       return {
         clienteId: c.clienteId,
         paisOrigen: inferirPaisDesdeUbicacion(c.origen ?? ''),
@@ -120,7 +131,8 @@ export function clientesRowsDesdeViaje(
         productoItems,
         montoStr: c.monto != null ? formatNumberForMoneda(c.monto, moneda) : '',
         moneda,
-        cantidadStr: c.cantidad != null ? String(c.cantidad) : '',
+        cantidadStr,
+        cantidadManual: esCantidadManualInicial(cantidadStr, productoItems),
         precioUnitarioStr:
           c.precioUnitario != null ? formatNumberForMoneda(c.precioUnitario, moneda) : '',
         facturacionEstado: c.facturacionEstado,
@@ -142,7 +154,7 @@ export function clientesPayloadParaApi(rows: ViajeClienteDraft[]): ViajeClienteA
       clienteId,
       origen: row.origen.trim() || undefined,
       destinos: destinosApiDesdeRows(row.destinosRows),
-      productos: row.productoItems.filter((p) => p.productoId.trim()),
+      productos: productoItemsParaApi(row.productoItems),
       monedaMonto: row.moneda,
     };
     if (row.cantidadStr.trim() || row.precioUnitarioStr.trim()) {

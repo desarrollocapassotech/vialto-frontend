@@ -5,7 +5,9 @@ import { PresentacionSearchableSelect } from '@/components/viajes/PresentacionSe
 import { PresentacionFormModal } from '@/components/stock/PresentacionFormModal';
 import { usePresentaciones } from '@/hooks/usePresentaciones';
 import {
+  formatPesoTnInput,
   opcionDesdeProducto,
+  parseDecimalViaje,
   type OpcionProducto,
   type ViajeProductoItem,
 } from '@/lib/productosViaje';
@@ -28,6 +30,7 @@ export type ViajeProductosListaProps = {
   /** Falta la carga: borde rojo en las filas sin elegir o, si no hay ninguna, en "+ Agregar". */
   error?: boolean;
   mostrarUnidad?: boolean;
+  mostrarPeso?: boolean;
   tenantId?: string;
 };
 
@@ -42,6 +45,7 @@ export function ViajeProductosLista({
   onProductoCreado,
   error = false,
   mostrarUnidad = false,
+  mostrarPeso = false,
   tenantId,
 }: ViajeProductosListaProps) {
   const labels = useProductoLabels();
@@ -148,6 +152,42 @@ export function ViajeProductosLista({
                 }
               />
             </div>
+          )}
+          {mostrarPeso && (
+            <label className="flex shrink-0 items-center gap-1.5">
+              <span className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                Peso (tn)
+              </span>
+              <input
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                disabled={disabled}
+                placeholder="0"
+                value={
+                  item.pesoTnStr !== undefined
+                    ? item.pesoTnStr
+                    : item.pesoTn != null
+                      ? formatPesoTnInput(item.pesoTn)
+                      : ''
+                }
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const trimmed = raw.trim();
+                  if (!trimmed) {
+                    patchRow(i, { pesoTnStr: '', pesoTn: null });
+                    return;
+                  }
+                  if (!/^\d*([.,]\d*)?$/.test(trimmed)) return;
+                  patchRow(i, {
+                    pesoTnStr: raw,
+                    pesoTn: parseDecimalViaje(trimmed),
+                  });
+                }}
+                className={`${triggerClassName} w-24 text-right tabular-nums`}
+                aria-label={`Peso en toneladas de ${labelEnFrase(labels.singular)} ${i + 1}`}
+              />
+            </label>
           )}
           <button
             type="button"

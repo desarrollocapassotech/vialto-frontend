@@ -70,6 +70,7 @@ import {
   canAccessStock,
 } from "@/lib/tenantModules";
 import { calcularSaldoTransportista } from "@/lib/viajesTransportistaPagos";
+import { formatPesoTnTexto } from "@/lib/productosViaje";
 import { nroComprobante } from "@/lib/arcaCbteTipo";
 
 function fmtDate(iso: string | null | undefined) {
@@ -92,16 +93,33 @@ function rutaClienteAdicional(c: ViajeCliente): string {
   );
 }
 
-function cargaClienteAdicional(c: ViajeCliente, mostrarUnidad?: boolean): ReactNode {
+function textoLineaCargaDetalle(
+  p: {
+    producto: { nombre: string };
+    cantidad?: number | null;
+    pesoTn?: number | null;
+    presentacion?: { nombre: string } | null;
+  },
+  opts: { mostrarUnidad?: boolean; mostrarPeso?: boolean },
+): string {
+  const unidad =
+    opts.mostrarUnidad && p.presentacion?.nombre ? ` ${p.presentacion.nombre}` : "";
+  const base = `${p.producto.nombre}${p.cantidad != null ? ` × ${p.cantidad}${unidad}` : unidad ? ` (${p.presentacion?.nombre})` : ""}`;
+  const peso = opts.mostrarPeso ? formatPesoTnTexto(p.pesoTn) : null;
+  return `${base}${peso ? ` · ${peso}` : ""}`;
+}
+
+function cargaClienteAdicional(
+  c: ViajeCliente,
+  opts: { mostrarUnidad?: boolean; mostrarPeso?: boolean },
+): ReactNode {
   const productos = [...(c.productosCliente ?? [])].sort((a, b) => a.orden - b.orden);
   if (!productos.length) return "—";
   return (
     <div className="flex flex-col gap-0.5">
-      {productos.map((p, idx) => {
-        const unidad = mostrarUnidad && p.presentacion?.nombre ? ` ${p.presentacion.nombre}` : "";
-        const texto = `${p.producto.nombre}${p.cantidad != null ? ` × ${p.cantidad}${unidad}` : unidad ? ` (${p.presentacion?.nombre})` : ""}`;
-        return <span key={p.id ?? idx}>{texto}</span>;
-      })}
+      {productos.map((p, idx) => (
+        <span key={p.id ?? idx}>{textoLineaCargaDetalle(p, opts)}</span>
+      ))}
     </div>
   );
 }
@@ -307,13 +325,15 @@ export function ViajeViewModal({
   const ver = (key: string) => isVisible("detalle_viaje", key);
   const tieneStock = canAccessStock(tenantEfectivo?.modules ?? currentTenant?.modules ?? []);
   const mostrarUnidad = tieneStock && ver("unidadCarga");
+  const mostrarPeso = ver("pesoCarga");
+  const opcionesCargaDetalle = { mostrarUnidad, mostrarPeso };
   const productosDetalle = viaje.productosViaje?.length ? (
     <div className="flex flex-col gap-0.5">
-      {viaje.productosViaje.map((p, idx) => {
-        const unidad = mostrarUnidad && p.presentacion?.nombre ? ` ${p.presentacion.nombre}` : "";
-        const texto = `${p.producto.nombre}${p.cantidad != null ? ` × ${p.cantidad}${unidad}` : unidad ? ` (${p.presentacion?.nombre})` : ""}`;
-        return <span key={p.id ?? idx}>{texto}</span>;
-      })}
+      {viaje.productosViaje.map((p, idx) => (
+        <span key={p.id ?? idx}>
+          {textoLineaCargaDetalle(p, opcionesCargaDetalle)}
+        </span>
+      ))}
     </div>
   ) : null;
 
@@ -351,7 +371,7 @@ export function ViajeViewModal({
         id: c.id,
         nombre: c.cliente?.nombre || "—",
         ruta: rutaClienteAdicional(c),
-        carga: cargaClienteAdicional(c, mostrarUnidad),
+        carga: cargaClienteAdicional(c, opcionesCargaDetalle),
         monedaMonto: c.monedaMonto,
         facturado: !facturacionPermiteVincular(c.facturacionEstado),
         ivaPct: c.factura?.ivaPct ?? null,
