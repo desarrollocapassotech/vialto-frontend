@@ -10,12 +10,14 @@ import {
 import { formatCurrencyArFromNumber, maskCurrencyArInput, parseCurrencyAr } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
 import {
+  apiPathOrdenPago,
   crearImputacion,
   crearImputacionMultiple,
   createMovimiento,
   repartirImputacion,
   type MovimientoCc,
 } from '@/lib/cuentaCorriente';
+import { abrirAdjuntoEnPestana } from '@/lib/abrirAdjunto';
 import { ErrorPieModal } from "@/components/shared/ErrorPieModal";
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { useToast } from '@/lib/toast';
@@ -202,11 +204,14 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
       setError('Ingresá un importe mayor a 0.');
       return;
     }
-    if (!nuevoComprobante.trim()) {
-      setError(`Ingresá el número de comprobante ${esCliente ? 'del cobro' : 'del pago'}.`);
+    if (esCliente && !nuevoComprobante.trim()) {
+      setError('Ingresá el número de comprobante del cobro.');
       return;
     }
     setSaving(true);
+    // Pago a proveedor: la orden de pago se abre en una pestaña nueva al guardar (la pestaña
+    // se abre en el click para que el navegador no la bloquee).
+    const ventanaOrdenPago = !esCliente ? window.open('', '_blank') : null;
     try {
       const pagoCreado = await createMovimiento(() => getToken(), {
         ...(cargo.clienteId ? { clienteId: cargo.clienteId } : { proveedorId: cargo.proveedorId! }),
@@ -214,7 +219,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
         importe: importeNuevo,
         moneda: cargo.moneda,
         fecha: nuevaFecha,
-        numeroComprobante: nuevoComprobante.trim(),
+        numeroComprobante: esCliente ? nuevoComprobante.trim() : undefined,
         formaPago: nuevaFormaPago.trim() || undefined,
       });
       await crearImputacion(() => getToken(), {
@@ -222,10 +227,19 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
         cargoId: cargo.id,
         importe: Math.min(importeNuevo, pendienteCargo),
       });
+      if (!esCliente) {
+        void abrirAdjuntoEnPestana(
+          { apiPath: apiPathOrdenPago(pagoCreado.id) },
+          () => getToken(),
+          'Orden de pago',
+          ventanaOrdenPago,
+        );
+      }
       avisarImputado(Math.min(importeNuevo, pendienteCargo), true);
       onDone();
       onClose();
     } catch (err) {
+      ventanaOrdenPago?.close();
       setError(friendlyError(err, 'cuentaCorriente'));
     } finally {
       setSaving(false);
@@ -422,21 +436,23 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
           </>
         ) : (
           <>
-            <div>
-              <label className={labelClass} htmlFor="cc-nuevo-comprobante">
-                Número de comprobante <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="cc-nuevo-comprobante"
-                type="text"
-                maxLength={64}
-                className={inputClass}
-                value={nuevoComprobante}
-                onChange={(e) => setNuevoComprobante(e.target.value)}
-                placeholder={esCliente ? 'Ej. Recibo 0001-00000123' : 'Ej. Orden de pago 0001-00000123'}
-                required
-              />
-            </div>
+            {esCliente && (
+              <div>
+                <label className={labelClass} htmlFor="cc-nuevo-comprobante">
+                  Número de comprobante <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="cc-nuevo-comprobante"
+                  type="text"
+                  maxLength={64}
+                  className={inputClass}
+                  value={nuevoComprobante}
+                  onChange={(e) => setNuevoComprobante(e.target.value)}
+                  placeholder="Ej. Recibo 0001-00000123"
+                  required
+                />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelClass} htmlFor="cc-nuevo-importe">
