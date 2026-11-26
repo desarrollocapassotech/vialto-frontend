@@ -4,7 +4,7 @@ import {
   CalendarX,
   Fuel,
   Smartphone,
-  Wallet,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import type { NotificacionFeedGrupo, NotificacionFeedItem } from "@/types/notificaciones";
@@ -13,21 +13,24 @@ type TipoUI = {
   /** Nombre corto del grupo en la página de Notificaciones. */
   nombre: string;
   icono: LucideIcon;
-  /** Saca del título lo que el nombre del grupo ya dice (ej. "Carga sospechosa — "). */
+  /** Saca del título lo que el nombre del grupo ya dice (ej. "Revisá la carga de "). */
   limpiarTitulo?: (titulo: string) => string;
 };
 
 /** Presentación de cada tipo del catálogo (backend: notificaciones-catalog.ts). */
 const TIPOS: Record<string, TipoUI> = {
   "combustible.cargaSospechosa": {
-    nombre: "Cargas sospechosas",
+    nombre: "Cargas para revisar",
     icono: Fuel,
-    limpiarTitulo: (t) => t.replace(/^Carga sospechosa — /, ""),
+    // Avisos nuevos: "Revisá la carga de AB123CD en YPF"; viejos: "Carga sospechosa — AB123CD en YPF".
+    limpiarTitulo: (t) => t.replace(/^(Carga sospechosa — |Revisá la carga de )/, ""),
   },
   "combustible.errorChofer": { nombre: "Cargas de choferes sin registrar", icono: Smartphone },
-  "facturacion.facturaVencida": { nombre: "Facturas vencidas", icono: CalendarX },
-  "facturacion.facturaPorVencer": { nombre: "Facturas por vencer", icono: CalendarClock },
-  "cuenta-corriente.vencimiento": { nombre: "Vencimientos de cuenta corriente", icono: Wallet },
+  // Un solo aviso para facturas y cuenta corriente (nov 2026, reemplaza a los tres tipos anteriores).
+  vencimientos: { nombre: "Vencimientos de cobros y pagos", icono: CalendarClock },
+  "liquidaciones.pendienteAnulacion": { nombre: "Liquidaciones pendientes de anular", icono: CalendarX },
+  "mantenimiento.vencimientoProximo": { nombre: "Mantenimiento próximo", icono: Wrench },
+  "mantenimiento.vencido": { nombre: "Mantenimiento vencido", icono: Wrench },
 };
 
 export function tipoNotificacionUI(tipo: string, labelBackend: string): Required<TipoUI> {
@@ -62,7 +65,7 @@ export function avisosSinAgrupar(grupos: NotificacionFeedGrupo[]): NotificacionF
  */
 export const EVENTO_NOTIFICACIONES_VISTAS = "vialto:notificaciones-vistas";
 
-/** Detalle más corto: el "Motivo:" de las sospechosas es redundante con el texto que sigue. */
+/** Detalle más corto: el "Motivo:" de los avisos de carga viejos es redundante con el texto que sigue. */
 export function detalleCorto(detalle: string): string {
   return detalle.replace(/Motivo: /, "");
 }

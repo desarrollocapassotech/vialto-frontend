@@ -160,6 +160,7 @@ function agruparPorModulo(
 }
 
 const MODULO_LABEL: Record<string, string> = {
+  vencimientos: "Cobros y pagos",
   facturacion: "Facturación",
   combustible: "Combustible",
   "cuenta-corriente": "Cuenta corriente",
