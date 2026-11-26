@@ -458,6 +458,12 @@ export function ViajesTenantPage({
   // `tenantModules`, que trae `ViajesSuperadminPage.tsx` desde `useTenantsList()`) — sin
   // esto la grilla embebida en superadmin siempre caía al badge de "pago transportista"
   // en vez de "sin liquidar"/"liquidado", aunque la empresa sí tuviera Liquidaciones.
+  const hasFacturasArcaResuelto = platform
+    ? canAccessEmisionFacturasArca(tenantModules ?? [])
+    : hasFacturasArca;
+  const hasFacturacionResuelto = platform
+    ? hasFacturasArcaResuelto || canAccessFacturacion(tenantModules ?? [])
+    : hasFacturasArca || hasFacturacionSinArca;
   const hasLiquidoProductoArcaResuelto = platform
     ? canAccessEmisionLiquidoProductoArca(tenantModules ?? [])
     : hasLiquidoProductoArca;
@@ -465,6 +471,9 @@ export function ViajesTenantPage({
     ? hasLiquidoProductoArcaResuelto ||
       canAccessLiquidaciones(tenantModules ?? [])
     : hasLiquidaciones;
+  const modulosTenantCargados = platform
+    ? tenantModules !== undefined
+    : currentTenant != null;
   const tid = tenantId?.trim() ?? "";
   // Empresa solo de flota propia (Tenant.tipoFlota): no terceriza transporte,
   // la columna "Transporte" diría siempre "Flota propia".
@@ -960,10 +969,12 @@ export function ViajesTenantPage({
       // Cada conteo usa exactamente el mismo filtro que aplica su chip; si no, el número
       // no coincide con lo que muestra la grilla al tocarlo.
       const [estadoSF, estadoSL, pagoPag] = await Promise.allSettled([
-        apiJson<ViajesPaginatedResponse>(
-          `${base}facturacionEstado=sin_facturar&page=1&pageSize=1`,
-          () => getToken(),
-        ),
+        hasFacturacionResuelto
+          ? apiJson<ViajesPaginatedResponse>(
+              `${base}facturacionEstado=sin_facturar&page=1&pageSize=1`,
+              () => getToken(),
+            )
+          : Promise.resolve(null),
         // Mismo filtro que aplica el chip "Sin liquidar" (columna Liquidación).
         apiJson<ViajesPaginatedResponse>(
           `${base}liquidacionEstado=sin_liquidar&page=1&pageSize=1`,
@@ -979,7 +990,9 @@ export function ViajesTenantPage({
       // Un conteo que falló queda sin número (no 0: el chip se mostraría "sin registros").
       setResumen({
         sinFacturar:
-          estadoSF.status === "fulfilled" ? estadoSF.value.meta.total : undefined,
+          estadoSF.status === "fulfilled" && estadoSF.value
+            ? estadoSF.value.meta.total
+            : undefined,
         sinLiquidar:
           estadoSL.status === "fulfilled" ? estadoSL.value.meta.total : undefined,
         pagados: pagoPag.status === "fulfilled" ? pagoPag.value : undefined,
@@ -988,7 +1001,7 @@ export function ViajesTenantPage({
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn, platform, tid, resumenVersion]);
+  }, [getToken, hasFacturacionResuelto, isLoaded, isSignedIn, platform, tid, resumenVersion]);
 
   // Opciones acotadas dinámicamente según los filtros activos:
   // cada filtro que se aplica acota las opciones de los demás,
@@ -1722,7 +1735,10 @@ export function ViajesTenantPage({
     viajesSeleccionLote.current.clear();
   }, [clienteIdFiltroActivo, transportistaIdFiltroActivo]);
 
-  const loteFacturarActivo = operaFacturas && clienteIdFiltroActivo.trim() !== "";
+  const loteFacturarActivo =
+    operaFacturas &&
+    hasFacturacionResuelto &&
+    clienteIdFiltroActivo.trim() !== "";
   const loteLiquidarActivo =
     operaLiquidaciones &&
     hasLiquidacionesResuelto &&
@@ -2189,13 +2205,9 @@ export function ViajesTenantPage({
 
   /**
    * "Facturar" y "Liquidar" son acciones separadas (grilla y modal de edición), sin
-   * selector intermedio. Facturar se ofrece si el tenant factura desde Vialto — o si no
-   * tiene Liquidaciones (criterio heredado del viejo selector, que en ese caso iba
-   * directo a la factura).
+   * selector intermedio. Facturar solo se ofrece si la empresa tiene el módulo Facturación.
    */
-  const puedeFacturarDesdeGrilla =
-    operaFacturas &&
-    (platform || hasFacturasArca || hasFacturacionSinArca || !hasLiquidaciones);
+  const puedeFacturarDesdeGrilla = operaFacturas && hasFacturacionResuelto;
   /** Liquidar desde la grilla, los indicadores y el editor. */
   const puedeLiquidarDesdeGrilla = operaLiquidaciones && hasLiquidacionesResuelto;
 
@@ -2462,10 +2474,9 @@ export function ViajesTenantPage({
   // Columna "Etapa": una sola línea con hasta 3 íconos (etapa, factura, liquidación),
   // cada uno visible según la configuración de campos del tenant.
   const mostrarColumnaEtapa = isViajeFieldVisible("detalle_viaje", "etapa");
-  const mostrarColumnaFactura = isViajeFieldVisible(
-    "detalle_viaje",
-    "facturacionEstado",
-  );
+  const mostrarColumnaFactura =
+    hasFacturacionResuelto &&
+    isViajeFieldVisible("detalle_viaje", "facturacionEstado");
   const mostrarColumnaLiquidacion = isViajeFieldVisible(
     "detalle_viaje",
     "liquidacionEstado",
@@ -2484,9 +2495,7 @@ export function ViajesTenantPage({
 
   // Filtros de la columna Etapa. Los estados de AFIP solo se ofrecen si el tenant
   // emite por ARCA (sin ARCA nunca existen y el filtro siempre vendría vacío).
-  const arcaFacturasResuelto = platform
-    ? canAccessEmisionFacturasArca(tenantModules ?? [])
-    : hasFacturasArca;
+  const arcaFacturasResuelto = hasFacturasArcaResuelto;
   const opcionesFiltroFacturacion: { value: string; label: string }[] = [
     { value: "", label: "Todas" },
     { value: "sin_facturar", label: "Sin facturar" },
@@ -2537,6 +2546,7 @@ export function ViajesTenantPage({
   const viajesExportColumnsDisponibles = VIAJES_EXPORT_COLUMNS.filter((c) => {
     if (c.id === "chofer") return mostrarColumnaChofer;
     if (c.id === "transportista") return mostrarColumnaTransporte;
+    if (c.id === "estadoFacturacion") return mostrarColumnaFactura;
     if (c.id === "estadoPago") return mostrarPagosTransportista;
     if (c.id === "idPropio2") return mostrarColumnaIdPropio2;
     if (c.id === "numero") return mostrarColumnaIdSistema;
@@ -2584,6 +2594,15 @@ export function ViajesTenantPage({
       aplicarFiltroColumnaObservaciones("");
     }
   }, [mostrarColumnaObservaciones]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (
+      modulosTenantCargados &&
+      !mostrarColumnaFactura &&
+      facturacionFiltro.trim()
+    ) {
+      aplicarFiltroFacturacion("");
+    }
+  }, [modulosTenantCargados, mostrarColumnaFactura]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mostrarCargandoListado = !error && (rows === null || listadoRefetching);
 
@@ -3429,6 +3448,7 @@ export function ViajesTenantPage({
             onFiltroFacturacion={aplicarFiltroFacturacion}
             onFiltroLiquidacion={aplicarFiltroLiquidacion}
             onFiltroPago={aplicarFiltroPagoTransportista}
+            mostrarFiltroFacturacion={mostrarColumnaFactura}
             mostrarFiltroPago={mostrarPagosTransportista}
             mostrarFiltroLiquidacion={mostrarColumnaLiquidacion}
           />
@@ -3888,6 +3908,7 @@ export function ViajesTenantPage({
                       : undefined
                   }
                   onReintentarFactura={(() => {
+                    if (!puedeFacturarDesdeGrilla) return undefined;
                     const id = facturaIdConErrorDeViaje(v);
                     return id ? () => abrirEmisionFactura(id) : undefined;
                   })()}
@@ -3898,6 +3919,7 @@ export function ViajesTenantPage({
                       : undefined;
                   })()}
                   onContinuarFactura={(() => {
+                    if (!puedeFacturarDesdeGrilla) return undefined;
                     const id = facturaBorradorIdDeViaje(v);
                     return id ? () => abrirEmisionFactura(id) : undefined;
                   })()}
@@ -3960,7 +3982,7 @@ export function ViajesTenantPage({
               )}
               {v.etapa?.toLowerCase() !== "cancelado" && (
                 <>
-                  {isViajeFieldVisible("detalle_viaje", "facturacionEstado") && (
+                  {mostrarColumnaFactura && (
                     <ViajeFacturacionIndicador
                       viaje={v}
                       idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
@@ -4169,6 +4191,7 @@ export function ViajesTenantPage({
                       : undefined
                   }
                   onReintentarFactura={(() => {
+                    if (!puedeFacturarDesdeGrilla) return undefined;
                     const id = facturaIdConErrorDeViaje(v);
                     return id ? () => abrirEmisionFactura(id) : undefined;
                   })()}
@@ -4179,6 +4202,7 @@ export function ViajesTenantPage({
                       : undefined;
                   })()}
                   onContinuarFactura={(() => {
+                    if (!puedeFacturarDesdeGrilla) return undefined;
                     const id = facturaBorradorIdDeViaje(v);
                     return id ? () => abrirEmisionFactura(id) : undefined;
                   })()}
@@ -4351,7 +4375,7 @@ export function ViajesTenantPage({
               }
               onContinuarFactura={(() => {
                 const id = facturaBorradorIdDeViaje(viajeEditor.viajeSnapshot);
-                return id && operaFacturas ? () => abrirEmisionFactura(id) : undefined;
+                return id && puedeFacturarDesdeGrilla ? () => abrirEmisionFactura(id) : undefined;
               })()}
               onContinuarLiquidacion={(() => {
                 const id = liquidacionBorradorIdDeViaje(viajeEditor.viajeSnapshot);

@@ -37,7 +37,12 @@ export function canAccessViajes(modules: string[]): boolean {
   return modules.some((m) => m.toLowerCase() === 'viajes');
 }
 
-export function canAccessFacturacion(modules: string[]): boolean {
+export const MODULOS_FACTURACION = [
+  'facturacion',
+  'emision-facturas-arca',
+] as const;
+
+export function canAccessFacturacion(modules: readonly string[]): boolean {
   return modules.some((m) => m.toLowerCase() === 'facturacion');
 }
 
@@ -53,8 +58,13 @@ export function canAccessStock(modules: string[]): boolean {
   return modules.some((m) => m.toLowerCase() === 'stock');
 }
 
-export function canAccessEmisionFacturasArca(modules: string[]): boolean {
+export function canAccessEmisionFacturasArca(modules: readonly string[]): boolean {
   return modules.some((m) => m.toLowerCase() === 'emision-facturas-arca');
+}
+
+/** Empresa con el módulo Facturación habilitado (manual o emisión ARCA). */
+export function canAccessModuloFacturacion(modules: readonly string[]): boolean {
+  return canAccessFacturacion(modules) || canAccessEmisionFacturasArca(modules);
 }
 
 export function canAccessEmisionLiquidoProductoArca(modules: string[]): boolean {
@@ -65,8 +75,8 @@ export function canAccessEmisionLiquidoProductoArca(modules: string[]): boolean 
  * Cuenta corriente: con Facturación (manual o ARCA) las ventas nacen solo de las facturas,
  * así que no se ofrece "Nueva venta". Espejo de `assertCargoManualPermitido` del backend.
  */
-export function ventasNacenDeFacturas(modules: string[]): boolean {
-  return canAccessFacturacion(modules) || canAccessEmisionFacturasArca(modules);
+export function ventasNacenDeFacturas(modules: readonly string[]): boolean {
+  return canAccessModuloFacturacion(modules);
 }
 
 /** Cuenta corriente: con Liquidaciones (manual o ARCA) las compras nacen solo de las liquidaciones. */

@@ -281,7 +281,8 @@ export function ViajeViewModal({
     mods == null ||
     canAccessFacturacion(mods) ||
     canAccessEmisionFacturasArca(mods) ||
-    !!viaje.facturaId;
+    !!viaje.facturaId ||
+    (viaje.clientesViaje ?? []).some((c) => !!c.facturaId);
   const tieneLiqArca =
     hasLiquidoProductoArca ||
     (mods != null && canAccessEmisionLiquidoProductoArca(mods));
@@ -929,7 +930,7 @@ export function ViajeViewModal({
           >
             Cerrar
           </button>
-          {onFacturar && (
+          {tieneFacturacion && onFacturar && (
             <button
               type="button"
               onClick={onFacturar}
@@ -1109,21 +1110,25 @@ export function ViajeViewModal({
                   cell: (c) => c.carga,
                   tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
                 },
-                {
-                  id: "facturado",
-                  header: "Facturado",
-                  cell: (c) =>
-                    c.facturado
-                      ? `Sí${c.ivaPct != null ? ` (${c.ivaPct}% IVA)` : ""}`
-                      : "No",
-                  tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
-                },
+                ...(tieneFacturacion
+                  ? [
+                      {
+                        id: "facturado",
+                        header: "Facturado",
+                        cell: (c: (typeof clientesDetalle)[number]) =>
+                          c.facturado
+                            ? `Sí${c.ivaPct != null ? ` (${c.ivaPct}% IVA)` : ""}`
+                            : "No",
+                        tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
+                      },
+                    ]
+                  : []),
                 {
                   id: "monto",
                   header: "Monto",
                   cell: (c) => (
                     <span className="inline-flex items-center justify-end gap-1.5">
-                      {c.facturado && c.ivaPct != null && (
+                      {tieneFacturacion && c.facturado && c.ivaPct != null && (
                         <span
                           className="rounded-sm border border-black/10 px-1 py-px text-[9px] font-normal uppercase tracking-wide text-vialto-steel"
                           title={`Incluye ${c.ivaPct}% de IVA`}
