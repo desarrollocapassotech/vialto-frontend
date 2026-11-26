@@ -399,9 +399,7 @@ export function CrearLiquidacionManualModal({
       viajeInicial ? [viajeInicial] : [],
     );
     if (fromViaje != null) return String(fromViaje);
-    return configProp?.ivaGastosAdmin != null
-      ? String(configProp.ivaGastosAdmin)
-      : "";
+    return String(configProp?.ivaGastosAdmin ?? 21);
   });
   const ivaEditadaManualmente = useRef(Boolean(origen));
   const [ptoVenta, setPtoVenta] = useState(
@@ -475,7 +473,6 @@ export function CrearLiquidacionManualModal({
       setResolvedConfig(configProp);
       return;
     }
-    if (!hasLiquidoProductoArca) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -491,7 +488,7 @@ export function CrearLiquidacionManualModal({
     return () => {
       cancelled = true;
     };
-  }, [configProp, hasLiquidoProductoArca, getToken, arcaBase, qsTenant]);
+  }, [configProp, getToken, arcaBase, qsTenant]);
 
   // Liquidación existente o copiada: trae el detalle (viajes y conceptos) para precargar el formulario.
   const origenId = origen?.id;
@@ -572,8 +569,9 @@ export function CrearLiquidacionManualModal({
     if (comisionEditadaManualmente.current) return;
     const porDefecto =
       transportistas.find((t) => t.id === transportistaId)?.comisionPct ??
-      resolvedConfig?.comisionPctDefault;
-    setComisionPct(porDefecto != null ? String(porDefecto) : "");
+      resolvedConfig?.comisionPctDefault ??
+      0;
+    setComisionPct(String(porDefecto));
   }, [transportistaId, transportistas, resolvedConfig?.comisionPctDefault]);
 
   const transportistaSeleccionado = useMemo(() => {
@@ -834,9 +832,8 @@ export function CrearLiquidacionManualModal({
       setIvaPct(String(fromViajes));
       return;
     }
-    if (resolvedConfig?.ivaGastosAdmin != null) {
-      setIvaPct(String(resolvedConfig.ivaGastosAdmin));
-    }
+    const defaultIva = resolvedConfig?.ivaGastosAdmin ?? 21;
+    setIvaPct(String(defaultIva));
   }, [selectedViajes, resolvedConfig?.ivaGastosAdmin]);
 
   const monedaSeleccionada = useMemo<ViajeMonedaCodigo | null>(() => {
@@ -1211,6 +1208,15 @@ export function CrearLiquidacionManualModal({
       setError(conceptosCheck.message);
       return;
     }
+    const comisionResolved = comisionPct.trim() !== "" ? Number(comisionPct) : 0;
+    if (
+      !Number.isFinite(comisionResolved) ||
+      comisionResolved < 0 ||
+      comisionResolved > 100
+    ) {
+      setError("La comisión debe ser un número entre 0 y 100.");
+      return;
+    }
     const ivaResolved = ivaPct.trim() !== "" ? Number(ivaPct) : 0;
     if (!Number.isFinite(ivaResolved) || ivaResolved < 0 || ivaResolved > 100) {
       setError("El IVA debe ser un número entre 0 y 100.");
@@ -1273,7 +1279,7 @@ export function CrearLiquidacionManualModal({
       };
       if (!existente) body.transportistaId = transportistaId;
       if (puedeCambiarViajes) body.viajeIds = viajeIds;
-      if (comisionPct.trim() !== "") body.comisionPct = Number(comisionPct);
+      body.comisionPct = comisionResolved;
       body.ivaPct = ivaResolved;
       const lineasPayload = toConceptosLineasPayload(conceptosLineas);
       // En una existente se manda siempre (vacío = se quitaron todos los conceptos).

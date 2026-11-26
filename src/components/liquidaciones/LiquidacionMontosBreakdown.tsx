@@ -43,6 +43,13 @@ type Props = {
   brutoDetalle?: ReactNode;
   /** Texto chico al lado del label del bruto desplegable (ej. "1 viaje"). */
   brutoDetalleResumen?: string;
+  /**
+   * Solo `filas`: detalle que compone el IVA (ej. los tramos de IVA). Si viene, la fila del
+   * IVA se vuelve un desplegable que lo muestra debajo.
+   */
+  ivaDetalle?: ReactNode;
+  /** Texto chico al lado del label del IVA desplegable (ej. "1 tramo · resto 0%"). */
+  ivaDetalleResumen?: string;
 };
 
 function Campo({ label, value }: { label: string; value: string }) {
@@ -93,6 +100,8 @@ export function LiquidacionMontosBreakdown({
   totalLabel = "Total neto a liquidar",
   brutoDetalle,
   brutoDetalleResumen,
+  ivaDetalle,
+  ivaDetalleResumen,
 }: Props) {
   // `gastosAdminIva` es el IVA total de AFIP (incluye el IVA de los conceptos), igual que
   // la línea "IVA" del PDF. El total no se recalcula: es `liquido`.
@@ -107,7 +116,12 @@ export function LiquidacionMontosBreakdown({
     const p = coerceIvaPct(l.ivaPct);
     return p == null || p === pctEfectivo;
   });
-  const ivaLabel = ivaUnico ? formatIvaLabel(pctEfectivo) : "IVA";
+  const tieneTramos = Boolean(ivaDetalle);
+  const ivaLabel = tieneTramos
+    ? "IVA por tramo"
+    : ivaUnico && (pctEfectivo !== 0 || Number(gastosAdminIva) === 0)
+      ? formatIvaLabel(pctEfectivo)
+      : "IVA";
   const comisionLabel = `Comisión (${comisionPct}%)`;
 
   const lineItems: {
@@ -225,6 +239,15 @@ export function LiquidacionMontosBreakdown({
             value={item.value}
           >
             {brutoDetalle}
+          </FilaMontoDesplegable>
+        ) : item.key === "iva" && ivaDetalle ? (
+          <FilaMontoDesplegable
+            key={item.key}
+            label={item.label}
+            resumen={ivaDetalleResumen}
+            value={item.value}
+          >
+            {ivaDetalle}
           </FilaMontoDesplegable>
         ) : (
           <FilaMonto
