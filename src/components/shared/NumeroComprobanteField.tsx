@@ -20,6 +20,8 @@ type Props = {
   /** Endpoint de vista previa del próximo número interno (`URL_NUMERO_INTERNO`). */
   urlNumeroInterno: string;
   getToken: () => Promise<string | null>;
+  /** Si es false, oculta el checkbox "Comprobante interno" (ej. cuando se renderiza en otro lado). */
+  mostrarCheckbox?: boolean;
 };
 
 /**
@@ -42,6 +44,7 @@ export function NumeroComprobanteField({
   onAutomaticoChange,
   urlNumeroInterno,
   getToken,
+  mostrarCheckbox = true,
 }: Props) {
   const [previo, setPrevio] = useState<string | null>(null);
   const [falloPrevio, setFalloPrevio] = useState(false);
@@ -93,16 +96,18 @@ export function NumeroComprobanteField({
           disabled={disabled}
         />
       )}
-      <label className="mt-1 inline-flex cursor-pointer items-center gap-1.5 self-start text-[11px] text-vialto-steel">
-        <input
-          type="checkbox"
-          className="h-3.5 w-3.5 border-black/20"
-          checked={automatico}
-          disabled={disabled}
-          onChange={(e) => onAutomaticoChange(e.target.checked)}
-        />
-        Comprobante interno
-      </label>
+      {mostrarCheckbox && (
+        <label className="mt-1 inline-flex cursor-pointer items-center gap-1.5 self-start text-[11px] text-vialto-steel">
+          <input
+            type="checkbox"
+            className="h-3.5 w-3.5 border-black/20"
+            checked={automatico}
+            disabled={disabled}
+            onChange={(e) => onAutomaticoChange(e.target.checked)}
+          />
+          Comprobante interno
+        </label>
+      )}
     </div>
   );
 }
