@@ -1,4 +1,4 @@
-﻿import { CargandoVialto } from "@/components/shared/CargandoVialto";
+import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -39,6 +39,7 @@ import {
   type ViajeMonedaCodigo,
 } from "@/lib/currencyMask";
 import { friendlyError } from "@/lib/friendlyError";
+import { canAccessStock } from "@/lib/tenantModules";
 import {
   choferesFlotaPropia,
   choferesParaTransportistaExterno,
@@ -1300,6 +1301,8 @@ export function ViajeCreatePage() {
                 clientes={clientes}
                 desgloseActivo={desgloseActivo}
                 mostrarProductos={isVisible("alta_viaje", "productoItems")}
+                mostrarUnidad={canAccessStock(tenantConfig?.modules ?? tenantEfectivo?.modules ?? []) && isVisible("alta_viaje", "unidadCarga")}
+                tenantId={tenantId}
                 paises={paisesConSesion}
                 paisesLoading={paisesLoading}
                 onNuevoPaisOrigen={(clienteIndex) => {

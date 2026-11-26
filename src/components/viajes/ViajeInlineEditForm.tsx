@@ -25,6 +25,8 @@ import {
   vehiculosFlotaPropia,
 } from '@/lib/viajesFlota';
 import { useFieldConfig } from '@/hooks/useFieldConfig';
+import { useCurrentTenant } from '@/hooks/useCurrentTenant';
+import { canAccessStock } from '@/lib/tenantModules';
 import { useProductoLabels } from '@/hooks/useProductoLabels';
 import { useEffect, useMemo, useRef } from 'react';
 import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
@@ -78,6 +80,9 @@ export function ViajeInlineEditForm({
   onCancel,
 }: Props) {
   const { isVisible } = useFieldConfig("viajes");
+  const { tenant } = useCurrentTenant();
+  const tieneStock = canAccessStock(tenant?.modules ?? []);
+  const mostrarUnidad = tieneStock && isVisible("edicion_viaje", "unidadCarga");
   const productoLabelsTenant = useProductoLabels();
   const desgloseActivo = isVisible("edicion_viaje", "desgloseMontos");
   const choferesPropios = useMemo(() => choferesFlotaPropia(choferes), [choferes]);
@@ -459,6 +464,7 @@ export function ViajeInlineEditForm({
                 triggerClassName={INPUT}
                 inputClassName={INPUT}
                 disabled={saving}
+                mostrarUnidad={mostrarUnidad}
               />
             </div>
           )}

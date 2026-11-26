@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { PaisSearchSelect } from '@/components/forms/PaisSearchSelect';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
@@ -163,6 +163,9 @@ interface Props {
   labelPrefix?: string;
   /** Si se muestra la sección de Carga (productos) por fila. Default true. */
   mostrarProductos?: boolean;
+  /** Si se muestra el selector de unidad de carga (presentación). */
+  mostrarUnidad?: boolean;
+  tenantId?: string;
   /** `Tenant.recomendacionCiudadesHabilitada`: false = origen/destinos en texto libre. */
   sugerenciasCiudad?: boolean;
   /** Label de la cantidad con desglose: "Toneladas" o "Cantidad" (`labelCantidadViajes`). */
@@ -200,6 +203,8 @@ export function ViajeClientesFieldset({
   minRows = 0,
   labelPrefix = 'Cliente adicional',
   mostrarProductos = true,
+  mostrarUnidad = false,
+  tenantId,
   paisFijo = null,
   sugerenciasCiudad = true,
   labelCantidad = 'Cantidad',
@@ -380,6 +385,8 @@ export function ViajeClientesFieldset({
                     getToken={getToken}
                     onProductoCreado={onProductoCreado}
                     error={falta('carga')}
+                    mostrarUnidad={mostrarUnidad}
+                    tenantId={tenantId}
                   />
                 </div>
               )}

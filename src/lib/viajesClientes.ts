@@ -105,7 +105,13 @@ export function clientesRowsDesdeViaje(
             : [emptyDestinoRow()];
       const productoItems: ViajeProductoItem[] = [...(c.productosCliente ?? [])]
         .sort((a, b) => a.orden - b.orden)
-        .map((p) => ({ productoId: p.productoId, cantidad: p.cantidad ?? undefined, pesoKg: p.pesoKg ?? undefined }));
+        .map((p) => ({
+          productoId: p.productoId,
+          cantidad: p.cantidad ?? undefined,
+          pesoKg: p.pesoKg ?? undefined,
+          presentacionId: p.presentacionId ?? undefined,
+          presentacion: p.presentacion ?? undefined,
+        }));
       return {
         clienteId: c.clienteId,
         paisOrigen: inferirPaisDesdeUbicacion(c.origen ?? ''),
