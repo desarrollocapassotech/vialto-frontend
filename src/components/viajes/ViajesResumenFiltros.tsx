@@ -25,9 +25,14 @@ const OPCIONES: Array<{
   { id: 'pagado', label: 'Pagados', icon: CircleCheck, countKey: 'pagados', tipo: 'pago' },
 ];
 
-function opcionesVisibles(mostrarFiltroPago: boolean, mostrarFiltroLiquidacion: boolean) {
+function opcionesVisibles(
+  mostrarFiltroFacturacion: boolean,
+  mostrarFiltroPago: boolean,
+  mostrarFiltroLiquidacion: boolean,
+) {
   return OPCIONES.filter(
     (o) =>
+      (o.tipo !== 'facturacion' || mostrarFiltroFacturacion) &&
       (o.tipo !== 'pago' || mostrarFiltroPago) &&
       (o.tipo !== 'liquidacion' || mostrarFiltroLiquidacion),
   );
@@ -43,6 +48,8 @@ type Props = {
   onFiltroFacturacion: (val: string) => void;
   onFiltroLiquidacion: (val: string) => void;
   onFiltroPago: (val: ViajePagoTransportistaFiltro) => void;
+  /** false = el tenant no tiene el módulo Facturación — no mostrar "Sin facturar". */
+  mostrarFiltroFacturacion?: boolean;
   /** false = el tenant tiene oculto "Pagos al transportista" — no mostrar los chips de pago. */
   mostrarFiltroPago?: boolean;
   /** false = el tenant no liquida a transportistas (sin columna Liquidación) — no mostrar "Sin liquidar". */
@@ -57,6 +64,7 @@ export function ViajesResumenFiltros({
   onFiltroFacturacion,
   onFiltroLiquidacion,
   onFiltroPago,
+  mostrarFiltroFacturacion = true,
   mostrarFiltroPago = true,
   mostrarFiltroLiquidacion = true,
 }: Props) {
@@ -67,7 +75,12 @@ export function ViajesResumenFiltros({
     liquidacion: liquidacionFiltro,
     pago: pagoTransportistaFiltro,
   };
-  const opciones = opcionesVisibles(mostrarFiltroPago, mostrarFiltroLiquidacion);
+  const opciones = opcionesVisibles(
+    mostrarFiltroFacturacion,
+    mostrarFiltroPago,
+    mostrarFiltroLiquidacion,
+  );
+  if (opciones.length === 0) return null;
 
   function toggle(id: FiltroId, tipo: Tipo) {
     const nuevo = valorActual[tipo] === id ? '' : id;

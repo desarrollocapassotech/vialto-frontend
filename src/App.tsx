@@ -8,6 +8,7 @@ import { Link, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { CargandoVialto } from "@/components/shared/CargandoVialto";
 import { MaestroDataProvider, useMaestroData } from "@/hooks/useMaestroData";
+import { MODULOS_FACTURACION } from "@/lib/tenantModules";
 import {
   isPlatformSuperadmin,
   isOrgMember,
@@ -233,7 +234,7 @@ function RequireNotStockOnlyRole() {
  * El superadmin de plataforma siempre tiene acceso. Mientras se resuelve la
  * suscripción del tenant se muestra un estado de carga para evitar parpadeos.
  */
-function RequireModule({ module }: { module: string }) {
+function RequireModule({ module }: { module: string | readonly string[] }) {
   const { user, isLoaded } = useUser();
   const { organization, isLoaded: orgLoaded } = useOrganization();
   const { tenant, tenantLoading } = useMaestroData();
@@ -254,8 +255,11 @@ function RequireModule({ module }: { module: string }) {
     );
   }
 
-  const moduleActivo = (tenant?.modules ?? []).some(
-    (m) => m.toLowerCase() === module.toLowerCase(),
+  const permitidos = (Array.isArray(module) ? module : [module]).map((m) =>
+    m.toLowerCase(),
+  );
+  const moduleActivo = (tenant?.modules ?? []).some((m) =>
+    permitidos.includes(m.toLowerCase()),
   );
 
   if (!superadmin && !moduleActivo) {
@@ -322,7 +326,9 @@ export default function App() {
               path="viajes/:id/editar"
               element={<Navigate to="/viajes" replace />}
             />
-            <Route path="facturacion" element={<FacturacionPage />} />
+            <Route element={<RequireModule module={MODULOS_FACTURACION} />}>
+              <Route path="facturacion" element={<FacturacionPage />} />
+            </Route>
             <Route path="liquidaciones" element={<LiquidacionesTenantPage />} />
             <Route
               path="cuenta-corriente"

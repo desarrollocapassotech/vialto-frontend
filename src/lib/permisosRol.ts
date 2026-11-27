@@ -7,11 +7,10 @@ import {
 import {
   canAccessCombustible,
   canAccessCuentaCorriente,
-  canAccessEmisionFacturasArca,
   canAccessEmisionLiquidoProductoArca,
-  canAccessFacturacion,
   canAccessLiquidaciones,
   canAccessMantenimiento,
+  canAccessModuloFacturacion,
   canAccessStock,
   canAccessViajes,
 } from '@/lib/tenantModules';
@@ -142,7 +141,7 @@ export function moduloContratado(modules: string[], modulo: ModuloPermiso): bool
     case 'viajes':
       return canAccessViajes(modules);
     case 'facturas':
-      return canAccessFacturacion(modules) || canAccessEmisionFacturasArca(modules);
+      return canAccessModuloFacturacion(modules);
     case 'liquidaciones':
       return canAccessLiquidaciones(modules) || canAccessEmisionLiquidoProductoArca(modules);
     case 'cuentaCorriente':

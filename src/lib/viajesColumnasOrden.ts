@@ -1,4 +1,5 @@
 import type { Tenant } from "@/types/api";
+import { canAccessModuloFacturacion } from "@/lib/tenantModules";
 import {
   idPropio1Habilitado,
   idPropio2Habilitado,
@@ -66,7 +67,7 @@ export function ordenColumnasViajes(tenant: Tenant | null | undefined): ViajeCol
  */
 export function columnasViajesHabilitadas(
   tenant:
-    | Pick<
+    | (Pick<
         Tenant,
         | "idSistemaHabilitado"
         | "idPropio1Habilitado"
@@ -74,11 +75,13 @@ export function columnasViajesHabilitadas(
         | "tipoFlota"
         | "viajesColumnaProductosHabilitada"
         | "viajesObservaciones"
-      >
+      > & { modules?: readonly string[] })
     | null
     | undefined,
   campoVisible: (campo: string) => boolean,
 ): Set<ViajeColumnaId> {
+  const tieneFacturacion =
+    tenant?.modules == null || canAccessModuloFacturacion(tenant.modules);
   const habilitada: Record<ViajeColumnaId, boolean> = {
     idSistema: idSistemaHabilitado(tenant),
     idPropio1: idPropio1Habilitado(tenant),
@@ -88,7 +91,7 @@ export function columnasViajesHabilitadas(
     chofer: campoVisible("choferId") || campoVisible("choferExternoId"),
     etapa:
       campoVisible("etapa") ||
-      campoVisible("facturacionEstado") ||
+      (tieneFacturacion && campoVisible("facturacionEstado")) ||
       campoVisible("liquidacionEstado") ||
       campoVisible("valorizacion"),
     origenDestino: true,
