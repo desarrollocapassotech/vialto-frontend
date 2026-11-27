@@ -683,25 +683,26 @@ export function FacturaCreateModal({
   }, [lineas]);
 
   // Borrador que llega con viajes ya elegidos (ej. "Facturar" desde la grilla de Viajes) y sin
-  // conceptos (`undefined`): se precargan los gastos de esos viajes cuando terminan de cargar.
+  // conceptos (`undefined`): se precargan los gastos cuando ya están los viajes y el IVA inicial.
   useEffect(() => {
-    if (!open || draft.conceptos !== undefined || viajesLoading) return;
-    setDraft((prev) =>
-      prev.conceptos !== undefined
-        ? prev
-        : {
-            ...prev,
-            conceptos: sincronizarConceptosConViajes(
-              [],
-              [],
-              prev.viajeIds,
-              derivedViajes,
-              prev.clienteId,
-              ivaPctConceptos,
-            ),
-          },
-    );
-  }, [open, draft.conceptos, viajesLoading, derivedViajes, ivaPctConceptos, setDraft]);
+    if (!open || !datosReady || draft.conceptos !== undefined || viajesLoading) return;
+    setDraft((prev) => {
+      if (prev.conceptos !== undefined) return prev;
+      const ivaNum = prev.ivaPct.trim() !== "" ? Number(prev.ivaPct) : 0;
+      const ivaEfectivo = Number.isFinite(ivaNum) ? ivaNum : 21;
+      return {
+        ...prev,
+        conceptos: sincronizarConceptosConViajes(
+          [],
+          [],
+          prev.viajeIds,
+          derivedViajes,
+          prev.clienteId,
+          ivaEfectivo,
+        ),
+      };
+    });
+  }, [open, datosReady, draft.conceptos, viajesLoading, derivedViajes, setDraft]);
 
   if (!open) return null;
 
