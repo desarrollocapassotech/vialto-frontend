@@ -8,6 +8,15 @@ export const ALICUOTAS_IVA_AFIP = [0, 2.5, 5, 10.5, 21, 27] as const;
 
 export const ALICUOTAS_IVA_AFIP_LABEL = "0%, 2,5%, 5%, 10,5%, 21% o 27%";
 
+/**
+ * Ayuda del IVA general de la liquidación ("IVA sobre comisión"). Explica la regla del
+ * backend (auditoría IVA, nov 2026, H5): no es solo de la comisión.
+ */
+export const TEXTO_AYUDA_IVA_LIQUIDACION =
+  "Se aplica a la comisión. También al flete de los viajes con IVA 0 y sin tramos; " +
+  "los demás viajes usan su propio IVA. Con ARCA, si es distinto del IVA del flete, " +
+  `la liquidación no se emite. Alícuotas válidas de AFIP: ${ALICUOTAS_IVA_AFIP_LABEL}.`;
+
 export function esAlicuotaIvaAfip(pct: number | null | undefined): boolean {
   if (pct == null || !Number.isFinite(Number(pct))) return false;
   return ALICUOTAS_IVA_AFIP.some((a) => Math.abs(a - Number(pct)) < 1e-9);

@@ -91,6 +91,7 @@ import {
   nombreConDetalle,
   signedMontoConIvaConcepto,
   signedMontoNetoConcepto,
+  TEXTO_AYUDA_IVA_LIQUIDACION,
 } from "@/lib/liquidacionConceptosIva";
 import { tramosIvaParaLiquidacion } from "@/lib/viajeTramosTransportista";
 import { useToast } from "@/lib/toast";
@@ -565,14 +566,19 @@ export function CrearLiquidacionManualModal({
     );
   }, [selectedViajeIds, viajeInicial]);
 
+  // Comisión del transportista, si no la de la empresa, si no 0. Un campo vacío usa
+  // esta (en el resumen y al guardar: auditoría IVA, H4); un 0 escrito se respeta.
+  const comisionPorDefecto =
+    transportistas.find((t) => t.id === transportistaId)?.comisionPct ??
+    resolvedConfig?.comisionPctDefault ??
+    0;
+  const comisionEfectiva =
+    comisionPct.trim() !== "" ? Number(comisionPct) : comisionPorDefecto;
+
   useEffect(() => {
     if (comisionEditadaManualmente.current) return;
-    const porDefecto =
-      transportistas.find((t) => t.id === transportistaId)?.comisionPct ??
-      resolvedConfig?.comisionPctDefault ??
-      0;
-    setComisionPct(String(porDefecto));
-  }, [transportistaId, transportistas, resolvedConfig?.comisionPctDefault]);
+    setComisionPct(String(comisionPorDefecto));
+  }, [comisionPorDefecto]);
 
   const transportistaSeleccionado = useMemo(() => {
     if (
@@ -1211,7 +1217,7 @@ export function CrearLiquidacionManualModal({
       setError(conceptosCheck.message);
       return;
     }
-    const comisionResolved = comisionPct.trim() !== "" ? Number(comisionPct) : 0;
+    const comisionResolved = comisionEfectiva;
     if (
       !Number.isFinite(comisionResolved) ||
       comisionResolved < 0 ||
@@ -1394,12 +1400,7 @@ export function CrearLiquidacionManualModal({
     (sum, v) => sum + (v.precioTransportistaExterno ?? 0),
     0,
   );
-  const comisionNum =
-    comisionPct.trim() !== ""
-      ? Number(comisionPct)
-      : (transportistas.find((t) => t.id === transportistaId)?.comisionPct ??
-        resolvedConfig?.comisionPctDefault ??
-        0);
+  const comisionNum = comisionEfectiva;
   const comisionMonto = anyHasPrice ? (bruto * comisionNum) / 100 : 0;
   const conceptosCompletos = conceptosLineas.filter(isConceptoLineaCompleta);
 
@@ -1893,6 +1894,7 @@ export function CrearLiquidacionManualModal({
                         max="100"
                         step="0.01"
                         value={comisionPct}
+                        placeholder={String(comisionPorDefecto)}
                         onChange={(e) => {
                           comisionEditadaManualmente.current = true;
                           setComisionPct(e.target.value);
@@ -1911,9 +1913,8 @@ export function CrearLiquidacionManualModal({
                           {/* Anclado a la derecha del ícono y abriendo hacia abajo: centrado sobresalía del
                               panel (scroll horizontal) y hacia arriba quedaba cortado por el borde superior,
                               porque es la primera fila del panel con scroll. */}
-                          <div className="pointer-events-none absolute top-full right-0 z-50 mt-2 w-max max-w-[220px] whitespace-normal rounded bg-vialto-charcoal px-2.5 py-1.5 text-[11px] normal-case leading-tight tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100">
-                            Alícuotas válidas de AFIP: 0%, 2.5%, 5%, 10.5%, 21%
-                            y 27%
+                          <div className="pointer-events-none absolute top-full right-0 z-50 mt-2 w-max max-w-[260px] whitespace-normal rounded bg-vialto-charcoal px-2.5 py-1.5 text-[11px] normal-case leading-tight tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100">
+                            {TEXTO_AYUDA_IVA_LIQUIDACION}
                             <span className="absolute right-[2px] bottom-full -mb-[1px] border-[5px] border-transparent border-b-vialto-charcoal"></span>
                           </div>
                         </div>
