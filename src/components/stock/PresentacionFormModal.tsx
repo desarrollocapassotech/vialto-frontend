@@ -12,8 +12,9 @@ export function PresentacionFormModal({
   getToken,
   onClose,
   onSaved,
-  baseUrl = "/api/stock/presentaciones",
   tenantId,
+  baseUrl = tenantId ? "/api/platform/stock/presentaciones" : "/api/stock/presentaciones",
+  titulo,
 }: {
   modo: "create" | "edit";
   presentacionInicial?: Presentacion;
@@ -22,6 +23,7 @@ export function PresentacionFormModal({
   onSaved: (presentacion: Presentacion) => void;
   baseUrl?: string;
   tenantId?: string;
+  titulo?: string;
 }) {
   const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
   const [nombre, setNombre] = useState(presentacionInicial?.nombre ?? "");
@@ -74,8 +76,8 @@ export function PresentacionFormModal({
         className="w-full max-w-sm rounded border border-black/10 bg-white shadow-lg"
       >
         <div className="flex items-center justify-between border-b border-black/10 px-5 pt-5 pb-4">
-          <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">
-            {modo === "create" ? "Nueva presentación" : "Editar presentación"}
+          <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide uppercase">
+            {titulo ?? (modo === "create" ? "Nueva presentación" : "Editar presentación")}
           </h2>
           <button
             type="button"
@@ -89,11 +91,13 @@ export function PresentacionFormModal({
 
         <div className="px-5 py-4">
           <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
-            Nombre <span className="text-red-500">*</span>
+            <span>
+              Nombre <span className="text-red-500">*</span>
+            </span>
             <input
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
-              placeholder="Ej. Pallets, Unidad, Cajas…"
+              placeholder="Ej. Pallets, Contenedor 20', Cajas…"
               className="h-9 border border-black/15 px-2 text-sm normal-case tracking-normal"
               autoFocus
             />

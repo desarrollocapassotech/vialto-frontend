@@ -67,6 +67,7 @@ import {
   canAccessEmisionLiquidoProductoArca,
   canAccessFacturacion,
   canAccessLiquidaciones,
+  canAccessStock,
 } from "@/lib/tenantModules";
 import { calcularSaldoTransportista } from "@/lib/viajesTransportistaPagos";
 import { nroComprobante } from "@/lib/arcaCbteTipo";
@@ -91,12 +92,18 @@ function rutaClienteAdicional(c: ViajeCliente): string {
   );
 }
 
-function cargaClienteAdicional(c: ViajeCliente): string {
-  const productos = [...(c.productosCliente ?? [])]
-    .sort((a, b) => a.orden - b.orden)
-    .map((p) => `${p.producto.nombre}${p.cantidad ? ` × ${p.cantidad}` : ""}`)
-    .join(", ");
-  return productos || "—";
+function cargaClienteAdicional(c: ViajeCliente, mostrarUnidad?: boolean): ReactNode {
+  const productos = [...(c.productosCliente ?? [])].sort((a, b) => a.orden - b.orden);
+  if (!productos.length) return "—";
+  return (
+    <div className="flex flex-col gap-0.5">
+      {productos.map((p, idx) => {
+        const unidad = mostrarUnidad && p.presentacion?.nombre ? ` ${p.presentacion.nombre}` : "";
+        const texto = `${p.producto.nombre}${p.cantidad != null ? ` × ${p.cantidad}${unidad}` : unidad ? ` (${p.presentacion?.nombre})` : ""}`;
+        return <span key={p.id ?? idx}>{texto}</span>;
+      })}
+    </div>
+  );
 }
 
 type ColumnaDetalle = { key: string; label: string; numero?: boolean };
@@ -297,12 +304,18 @@ export function ViajeViewModal({
     (viaje.transportistaId ? viaje.transportistaId : "—");
   const vehiculoPatentes =
     viaje.vehiculosViaje?.map((v) => v.vehiculo.patente).join(", ") ?? null;
-  const productosDesc =
-    viaje.productosViaje
-      ?.map(
-        (p) => `${p.producto.nombre}${p.cantidad ? ` × ${p.cantidad}` : ""}`,
-      )
-      .join(", ") ?? null;
+  const ver = (key: string) => isVisible("detalle_viaje", key);
+  const tieneStock = canAccessStock(tenantEfectivo?.modules ?? currentTenant?.modules ?? []);
+  const mostrarUnidad = tieneStock && ver("unidadCarga");
+  const productosDetalle = viaje.productosViaje?.length ? (
+    <div className="flex flex-col gap-0.5">
+      {viaje.productosViaje.map((p, idx) => {
+        const unidad = mostrarUnidad && p.presentacion?.nombre ? ` ${p.presentacion.nombre}` : "";
+        const texto = `${p.producto.nombre}${p.cantidad != null ? ` × ${p.cantidad}${unidad}` : unidad ? ` (${p.presentacion?.nombre})` : ""}`;
+        return <span key={p.id ?? idx}>{texto}</span>;
+      })}
+    </div>
+  ) : null;
 
   // Con más de un cliente en el viaje no hay uno "principal" — se listan todos
   // por igual en una sola tabla (ver "Clientes del viaje" más abajo) en vez de
@@ -324,7 +337,7 @@ export function ViajeViewModal({
           viaje.origen,
           etiquetasDestinosDesdeViaje(viaje),
         ),
-        carga: productosDesc || "—",
+        carga: productosDetalle || "—",
         monedaMonto: viaje.monedaMonto ?? null,
         facturado: !facturacionPermiteVincular(viaje.facturacionEstado),
         ivaPct: viaje.factura?.ivaPct ?? null,
@@ -338,7 +351,7 @@ export function ViajeViewModal({
         id: c.id,
         nombre: c.cliente?.nombre || "—",
         ruta: rutaClienteAdicional(c),
-        carga: cargaClienteAdicional(c),
+        carga: cargaClienteAdicional(c, mostrarUnidad),
         monedaMonto: c.monedaMonto,
         facturado: !facturacionPermiteVincular(c.facturacionEstado),
         ivaPct: c.factura?.ivaPct ?? null,
@@ -351,7 +364,6 @@ export function ViajeViewModal({
     ]
     : [];
 
-  const ver = (key: string) => isVisible("detalle_viaje", key);
   const fechaCargaTxt =
     ver("fechaCarga") && viaje.fechaCarga ? fmtDate(viaje.fechaCarga) : null;
   const fechaDescargaTxt =
@@ -371,9 +383,10 @@ export function ViajeViewModal({
   const datos: {
     key: string;
     label: string;
-    value: string | number | null;
+    value: ReactNode;
     sub?: string;
     className?: string;
+    truncate?: boolean;
   }[] = [
     ...(esMultiCliente
       ? []
@@ -412,7 +425,12 @@ export function ViajeViewModal({
     { key: "vehiculosRows", label: "Vehículos", value: vehiculoPatentes },
     ...(esMultiCliente
       ? []
-      : [{ key: "productoItems", label: productoLabelsTenant.plural, value: productosDesc }]),
+      : [{
+          key: "productoItems",
+          label: productoLabelsTenant.plural,
+          value: productosDetalle,
+          truncate: false,
+        }]),
     // Sin módulo de facturación no hay sección "Facturación": el monto queda acá.
     ...(tieneFacturacion
       ? []
@@ -1019,6 +1037,7 @@ export function ViajeViewModal({
                   value={d.value}
                   sub={d.sub}
                   className={d.className}
+                  truncate={d.truncate}
                 />
               ))}
             </DatosCabecera>

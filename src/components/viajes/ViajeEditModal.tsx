@@ -101,6 +101,9 @@ import {
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useConfirmarDescarte } from "@/hooks/useConfirmarDescarte";
 import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { canAccessStock } from "@/lib/tenantModules";
 import {
   ViajeClientesFieldset,
   ClienteCard,
@@ -334,6 +337,12 @@ export function ViajeEditModal({
   const transpFrase = transportistaEnFrase(tl.singular);
   const { flotaPropiaVisible, transportistaExternoVisible } =
     useTipoFlotaVisible(tenantId || undefined);
+  const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId || undefined);
+  const { tenant: ownTenant } = useCurrentTenant();
+  const tieneStock = canAccessStock(tenantEfectivo?.modules ?? ownTenant?.modules ?? []);
+  const mostrarUnidad =
+    tieneStock &&
+    isVisible("edicion_viaje", "unidadCarga");
   const desgloseActivo = isVisible("edicion_viaje", "desgloseMontos");
 
   // ── Obligatorios que faltan (mismo estándar que el alta de viaje) ──────
@@ -942,6 +951,8 @@ export function ViajeEditModal({
                           disabled={saving}
                           getToken={getToken}
                           onProductoCreado={onProductoCreado}
+                          mostrarUnidad={mostrarUnidad}
+                          tenantId={tenantId}
                         />
                       </div>
                     )}
@@ -1128,6 +1139,8 @@ export function ViajeEditModal({
                   onProductoCreado={onProductoCreado}
                   paisFijo={paisFijo}
                   sugerenciasCiudad={sugerenciasCiudad}
+                  mostrarUnidad={mostrarUnidad}
+                  tenantId={tenantId}
                 />
                 <button
                   type="button"

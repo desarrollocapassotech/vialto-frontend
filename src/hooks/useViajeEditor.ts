@@ -621,6 +621,14 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       etapaAGuardar = "en_curso";
     }
 
+    if (
+      viajeSnapshot?.etapa !== "finalizado" &&
+      etapaAGuardar === "en_curso" &&
+      valorizacion.valorizado
+    ) {
+      etapaAGuardar = "finalizado";
+    }
+
     if (montoValido && precioTranspValido && draftRequiereGananciaBrutaManual(draft)) {
       const manualPayload = gananciaBrutaManualPayloadFromDraft(draft);
       if (manualPayload.gananciaBrutaManual == null) {

@@ -43,6 +43,7 @@ export function Dato({
   sub,
   sub2,
   className = "",
+  truncate = true,
 }: {
   label: string;
   value: ReactNode;
@@ -50,18 +51,19 @@ export function Dato({
   /** Segunda línea secundaria (ej. domicilio debajo del CUIT). */
   sub2?: string;
   className?: string;
+  truncate?: boolean;
 }) {
   return (
     <div className={`min-w-0 ${className}`}>
       <p className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel">
         {label}
       </p>
-      <p
-        className="truncate text-sm font-medium text-vialto-charcoal"
+      <div
+        className={`${truncate ? "truncate " : ""}text-sm font-medium text-vialto-charcoal`}
         title={typeof value === "string" ? value : undefined}
       >
         {value ?? "—"}
-      </p>
+      </div>
       {sub && <p className="truncate text-xs text-vialto-steel">{sub}</p>}
       {sub2 && (
         <p className="truncate text-xs text-vialto-steel" title={sub2}>

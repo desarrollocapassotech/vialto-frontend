@@ -8,61 +8,63 @@ const globalCache: Record<string, FieldConfigModulo> = {};
 const globalPromises: Record<string, Promise<FieldConfigModulo>> = {};
 
 export function useFieldConfig(modulo: string) {
-  const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { getToken, isLoaded, isSignedIn, orgId } = useAuth();
+  const cacheKey = `${orgId ?? ""}::${modulo}`;
   const [config, setConfig] = useState<FieldConfigModulo | null>(
-    globalCache[modulo] ?? null
+    globalCache[cacheKey] ?? null
   );
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
-    
+
     // Asignar el estado en caché inmediatamente (evita parpadeos en la UI)
-    if (globalCache[modulo]) {
-      setConfig(globalCache[modulo]);
+    if (globalCache[cacheKey]) {
+      setConfig(globalCache[cacheKey]);
     }
-    
+
     let cancelled = false;
 
     // Buscar los datos más recientes en segundo plano si no hay ninguna petición en curso
-    if (!globalPromises[modulo]) {
-      globalPromises[modulo] = apiJson<FieldConfigModulo>(
+    if (!globalPromises[cacheKey]) {
+      globalPromises[cacheKey] = apiJson<FieldConfigModulo>(
         `/api/field-config/${modulo}`,
         () => getToken(),
       ).then((data) => {
-        globalCache[modulo] = data;
-        delete globalPromises[modulo]; // Permite futuras recargas (refetch)
+        globalCache[cacheKey] = data;
+        delete globalPromises[cacheKey]; // Permite futuras recargas (refetch)
         return data;
       }).catch((err) => {
-        delete globalPromises[modulo];
+        delete globalPromises[cacheKey];
         throw err;
       });
     }
 
-    globalPromises[modulo]
+    globalPromises[cacheKey]
       .then((data) => {
         if (!cancelled) setConfig(data);
       })
       .catch(() => {
         // Si hay un error y no tenemos datos en caché, asignamos null
-        if (!cancelled && !globalCache[modulo]) setConfig(null);
+        if (!cancelled && !globalCache[cacheKey]) setConfig(null);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn, modulo]);
+  }, [getToken, isLoaded, isSignedIn, orgId, modulo, cacheKey]);
 
   /** true = visible (default si todavía no cargó o el campo no está en la config) */
   function isVisible(formulario: string, campo: string): boolean {
+    const defaultVisible = !(campo === "valorizacion" || campo === "unidadCarga");
     if (modulo === "viajes") {
       return (
         config?.alta_viaje?.[campo] ??
         config?.edicion_viaje?.[campo] ??
         config?.detalle_viaje?.[campo] ??
-        true
+        defaultVisible
       );
     }
-    return config?.[formulario]?.[campo] ?? true;
+    return config?.[formulario]?.[campo] ?? defaultVisible;
   }
 
   return { config, isVisible, isLoading: config === null };

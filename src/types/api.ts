@@ -71,6 +71,8 @@ export interface ViajeCliente {
     orden: number;
     cantidad: number | null;
     pesoKg: number | null;
+    presentacionId?: string | null;
+    presentacion?: { id: string; nombre: string; activo?: boolean } | null;
     producto: { id: string; nombre: string; activo: boolean };
   }>;
   /** Igual que Viaje.cantidadFactura/precioUnitarioFactura: si ambos vienen, `monto` = cantidad × precioUnitario. */
@@ -144,6 +146,8 @@ export interface Viaje {
     orden: number;
     cantidad: number | null;
     pesoKg: number | null;
+    presentacionId?: string | null;
+    presentacion?: { id: string; nombre: string; activo?: boolean } | null;
     producto: {
       id: string;
       nombre: string;

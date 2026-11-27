@@ -4,6 +4,8 @@ export type ViajeProductoItem = {
   productoId: string;
   cantidad?: number | null;
   pesoKg?: number | null;
+  presentacionId?: string | null;
+  presentacion?: { id: string; nombre: string } | null;
 };
 
 export type OpcionProducto = {
@@ -61,6 +63,8 @@ export function productoItemsDesdeViaje(v: Viaje): ViajeProductoItem[] {
       productoId: x.productoId,
       cantidad: x.cantidad,
       pesoKg: x.pesoKg,
+      presentacionId: x.presentacionId,
+      presentacion: x.presentacion,
     }));
 }
 

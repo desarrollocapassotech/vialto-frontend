@@ -19,6 +19,8 @@ interface Props {
   clientes: Cliente[];
   desgloseActivo: boolean;
   mostrarProductos: boolean;
+  mostrarUnidad?: boolean;
+  tenantId?: string;
   paises: Pais[];
   paisesLoading: boolean;
   onNuevoPaisOrigen: (clienteIndex: number) => void;
@@ -48,6 +50,8 @@ export function ViajeCreateStep1ClientesYCarga({
   clientes,
   desgloseActivo,
   mostrarProductos,
+  mostrarUnidad,
+  tenantId,
   paises,
   paisesLoading,
   onNuevoPaisOrigen,
@@ -75,6 +79,8 @@ export function ViajeCreateStep1ClientesYCarga({
           rowErrors={clientesRowErrors}
           desgloseActivo={desgloseActivo}
           mostrarProductos={mostrarProductos}
+          mostrarUnidad={mostrarUnidad}
+          tenantId={tenantId}
           paises={paises}
           paisesLoading={paisesLoading}
           onNuevoPaisOrigen={onNuevoPaisOrigen}
