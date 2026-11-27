@@ -101,7 +101,11 @@ import {
   labelCantidadViajes,
 } from "@/lib/viajesFlota";
 import { roundMoney2 } from "@/lib/facturaTotales";
-import { opcionDesdeProducto, type OpcionProducto } from "@/lib/productosViaje";
+import {
+  opcionDesdeProducto,
+  productoItemsParaApi,
+  type OpcionProducto,
+} from "@/lib/productosViaje";
 import { ViajeCreateResumenClientes } from "@/components/viajes/steps/ViajeCreateResumenClientes";
 import { ViajeCreateStep1ClientesYCarga } from "@/components/viajes/steps/ViajeCreateStep1ClientesYCarga";
 import { ViajeCreateStep2Operacion } from "@/components/viajes/steps/ViajeCreateStep2Operacion";
@@ -1038,7 +1042,7 @@ export function ViajeCreatePage() {
           ...destinosPayloadParaApi(destinosVal.destinos),
           fechaCarga: fechaHoraToIso(fechaCarga, horaCarga),
           fechaDescarga: fechaHoraToIso(fechaDescarga, horaDescarga),
-          productoItems: principal.productoItems.filter((x) => x.productoId.trim()),
+          productoItems: productoItemsParaApi(principal.productoItems),
           detalleCarga: detalleCarga.trim() || undefined,
           observaciones: observaciones.trim() || undefined,
           numeroIdentificacionPersonalizado:
@@ -1302,6 +1306,7 @@ export function ViajeCreatePage() {
                 desgloseActivo={desgloseActivo}
                 mostrarProductos={isVisible("alta_viaje", "productoItems")}
                 mostrarUnidad={canAccessStock(tenantConfig?.modules ?? tenantEfectivo?.modules ?? []) && isVisible("alta_viaje", "unidadCarga")}
+                mostrarPeso={isVisible("alta_viaje", "pesoCarga")}
                 tenantId={tenantId}
                 paises={paisesConSesion}
                 paisesLoading={paisesLoading}

@@ -32,6 +32,7 @@ export type ViajeInlineDraft = {
   monto: string;
   monedaMonto: ViajeMonedaCodigo;
   cantidadFactura: string;
+  cantidadFacturaManual?: boolean;
   precioUnitarioFactura: string;
   kmRecorridos: string;
   litrosConsumidos: string;

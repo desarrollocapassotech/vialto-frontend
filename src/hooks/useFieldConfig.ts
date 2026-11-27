@@ -55,7 +55,11 @@ export function useFieldConfig(modulo: string) {
 
   /** true = visible (default si todavía no cargó o el campo no está en la config) */
   function isVisible(formulario: string, campo: string): boolean {
-    const defaultVisible = !(campo === "valorizacion" || campo === "unidadCarga");
+    const defaultVisible = !(
+      campo === "valorizacion" ||
+      campo === "unidadCarga" ||
+      campo === "pesoCarga"
+    );
     if (modulo === "viajes") {
       return (
         config?.alta_viaje?.[campo] ??

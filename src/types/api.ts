@@ -71,6 +71,7 @@ export interface ViajeCliente {
     orden: number;
     cantidad: number | null;
     pesoKg: number | null;
+    pesoTn?: number | null;
     presentacionId?: string | null;
     presentacion?: { id: string; nombre: string; activo?: boolean } | null;
     producto: { id: string; nombre: string; activo: boolean };
@@ -146,6 +147,7 @@ export interface Viaje {
     orden: number;
     cantidad: number | null;
     pesoKg: number | null;
+    pesoTn?: number | null;
     presentacionId?: string | null;
     presentacion?: { id: string; nombre: string; activo?: boolean } | null;
     producto: {

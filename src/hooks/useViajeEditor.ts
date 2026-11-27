@@ -40,7 +40,12 @@ import {
 } from "@/lib/ciudades";
 import { evaluarValorizacionViaje } from "@/lib/viajesValorizacion";
 import { fechaHoraToIso, isoToFechaHora } from "@/lib/viajeFechaHora";
-import { productoItemsDesdeViaje, mergeOpcionesProducto } from "@/lib/productosViaje";
+import {
+  esCantidadManualInicial,
+  mergeOpcionesProducto,
+  productoItemsDesdeViaje,
+  productoItemsParaApi,
+} from "@/lib/productosViaje";
 import {
   destinosPayloadParaApi,
   destinosRowsDesdeViaje,
@@ -231,6 +236,10 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     const partesFc = isoToFechaHora(v.fechaCarga);
     const partesFd = isoToFechaHora(v.fechaDescarga);
 
+    const productoItemsIniciales = productoItemsDesdeViaje(v);
+    const cantidadFacturaInicial =
+      v.cantidadFactura != null ? String(v.cantidadFactura) : "";
+
     setDraft({
       numero: v.numero ?? "",
       numeroIdentificacionPersonalizado:
@@ -269,12 +278,16 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       horaCarga: partesFc.hora,
       fechaDescarga: partesFd.fecha,
       horaDescarga: partesFd.hora,
-      productoItems: productoItemsDesdeViaje(v),
+      productoItems: productoItemsIniciales,
       detalleCarga: v.detalleCarga ?? "",
       observaciones: v.observaciones ?? "",
       monto: formatNumberForMoneda(v.monto, normalizeViajeMoneda(v.monedaMonto)),
       monedaMonto: normalizeViajeMoneda(v.monedaMonto),
-      cantidadFactura: v.cantidadFactura != null ? String(v.cantidadFactura) : "",
+      cantidadFactura: cantidadFacturaInicial,
+      cantidadFacturaManual: esCantidadManualInicial(
+        cantidadFacturaInicial,
+        productoItemsIniciales,
+      ),
       precioUnitarioFactura: v.precioUnitarioFactura != null ? String(v.precioUnitarioFactura) : "",
       kmRecorridos: v.kmRecorridos != null ? String(v.kmRecorridos) : "",
       litrosConsumidos:
@@ -745,9 +758,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
             fechaDescarga: draft.fechaDescarga.trim()
               ? fechaHoraToIso(draft.fechaDescarga, draft.horaDescarga)
               : null,
-            productoItems: draft.productoItems.filter((x) =>
-              x.productoId.trim(),
-            ),
+            productoItems: productoItemsParaApi(draft.productoItems),
             detalleCarga: draft.detalleCarga.trim() || undefined,
             observaciones: draft.observaciones.trim() || undefined,
             monto: clienteBloqueado ? undefined : (calcMonto ?? (draft.monto.trim() ? parseCurrencyForMoneda(draft.monto, draft.monedaMonto) : null)),
